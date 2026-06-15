@@ -180,28 +180,30 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
         </section>
       </main>
 
-      <footer className="site-footer section-pad" id="contact">
-        <div>
-          <p className="eyebrow">{content.contact.eyebrow}</p>
-          <h2>{content.contact.title}</h2>
-        </div>
-        <dl>
+      <footer className="site-footer" id="contact">
+        <div className="site-footer-inner" data-testid="site-footer-inner">
           <div>
-            <dt>{content.contact.addressLabel}</dt>
-            <dd>{content.contact.address}</dd>
+            <p className="eyebrow">{content.contact.eyebrow}</p>
+            <h2>{content.contact.title}</h2>
           </div>
-          <div>
-            <dt>{content.contact.phoneLabel}</dt>
-            <dd><a href="tel:+359896778309">{content.contact.phone}</a></dd>
+          <dl>
+            <div>
+              <dt>{content.contact.addressLabel}</dt>
+              <dd>{content.contact.address}</dd>
+            </div>
+            <div>
+              <dt>{content.contact.phoneLabel}</dt>
+              <dd><a href="tel:+359896778309">{content.contact.phone}</a></dd>
+            </div>
+            <div>
+              <dt>{content.contact.hoursLabel}</dt>
+              <dd>{content.contact.hours}</dd>
+            </div>
+          </dl>
+          <div className="footer-bottom">
+            <span>© {new Date().getFullYear()} {content.brand}</span>
+            <span className="yin-yang" aria-hidden="true">☯</span>
           </div>
-          <div>
-            <dt>{content.contact.hoursLabel}</dt>
-            <dd>{content.contact.hours}</dd>
-          </div>
-        </dl>
-        <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} {content.brand}</span>
-          <span className="yin-yang" aria-hidden="true">☯</span>
         </div>
       </footer>
     </div>

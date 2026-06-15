@@ -25,7 +25,7 @@ img { object-fit: cover; }
 button, a { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid #b45cba; outline-offset: 4px; }
 .site-shell { overflow: hidden; }
-.section-pad, .site-header-inner { margin-inline: auto; max-width: calc(var(--content) + 48px); padding-inline: 24px; }
+.section-pad, .site-header-inner, .site-footer-inner { margin-inline: auto; max-width: calc(var(--content) + 48px); padding-inline: 24px; }
 
 .site-header {
   background: #e9e3eb;
@@ -161,7 +161,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .button-light:hover { background: var(--lavender); color: var(--purple-deep); }
 
 .site-footer { background: #19161b; padding-bottom: 32px; padding-top: 100px; }
-.site-footer > div:first-child { max-width: 610px; }
+.site-footer-inner > div:first-child { max-width: 610px; }
 .site-footer dl { border-bottom: 1px solid rgba(255, 255, 255, 0.14); border-top: 1px solid rgba(255, 255, 255, 0.14); display: grid; gap: 30px; grid-template-columns: repeat(3, 1fr); margin-top: 48px; padding: 32px 0; }
 .site-footer dt { color: var(--purple); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; margin-bottom: 8px; text-transform: uppercase; }
 .site-footer dd { font-size: 0.84rem; }
@@ -178,7 +178,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 
 @media (max-width: 720px) {
-  .section-pad, .site-header-inner { padding-inline: 18px; }
+  .section-pad, .site-header-inner, .site-footer-inner { padding-inline: 18px; }
   .site-header-inner { min-height: 76px; }
   .brand strong { font-size: 0.95rem; }
   .brand img { height: 42px; width: 42px; }

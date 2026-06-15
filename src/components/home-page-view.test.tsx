@@ -35,6 +35,15 @@ describe("HomePageView", () => {
     expect(screen.getByTestId("site-header-inner")).toHaveClass("site-header-inner");
   });
 
+  it("keeps the footer background full-width and constrains only its content", () => {
+    render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
+
+    const footer = screen.getByRole("contentinfo");
+
+    expect(footer).not.toHaveClass("section-pad");
+    expect(screen.getByTestId("site-footer-inner")).toHaveClass("site-footer-inner");
+  });
+
   it("uses the treatment photography as the hero background", () => {
     render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
 
