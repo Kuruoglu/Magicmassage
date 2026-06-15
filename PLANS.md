@@ -64,16 +64,16 @@ left unresolved.
 
 ## Phase 2 - Application Foundation
 
-- [ ] Initialize the Next.js App Router project with strict TypeScript.
-- [ ] Configure linting, formatting, type checking, unit tests, and end-to-end
+- [x] Initialize the Next.js App Router project with strict TypeScript.
+- [x] Configure linting, formatting, type checking, unit tests, and end-to-end
   testing.
 - [ ] Add environment validation and documented local setup.
 - [ ] Configure Supabase development and production environments.
 - [ ] Define database migrations, generated types, and seed strategy.
 - [ ] Add Supabase Auth and server-side owner authorization.
-- [ ] Implement locale routing for `/bg`, `/ru`, and `/ua`.
-- [ ] Map the public `UA` locale to standards-compliant `uk` or `uk-UA` metadata.
-- [ ] Create shared design tokens, layout primitives, navigation, and footer.
+- [x] Implement locale routing for `/bg`, `/ru`, and `/ua`.
+- [x] Map the public `UA` locale to standards-compliant `uk` or `uk-UA` metadata.
+- [x] Create shared design tokens, layout primitives, navigation, and footer.
 - [ ] Establish error handling, structured operational logging, and audit rules
   without exposing personal data.
 
@@ -101,13 +101,13 @@ editing code.
 
 ## Phase 4 - Public Website
 
-- [ ] Build the responsive home landing page.
+- [x] Build the responsive home landing page.
 - [ ] Build the services catalog and localized service pages.
 - [ ] Build About, Contacts, map, social, and working-hours sections.
 - [ ] Build the blog index, category views, and article pages.
 - [ ] Build privacy, cookie, cancellation, and rescheduling pages.
-- [ ] Integrate selected real photographs from `assets/photos`.
-- [ ] Generate responsive WebP or AVIF derivatives while preserving originals.
+- [x] Integrate selected real photographs from `assets/photos`.
+- [x] Generate optimized web derivatives while preserving originals.
 - [ ] Add accessible image descriptions and robust responsive crops.
 - [ ] Add loading, empty, error, draft-preview, and not-found states.
 - [ ] Validate responsive behavior, keyboard use, focus order, and reduced motion.
@@ -158,9 +158,9 @@ cannot bypass administration authorization.
 
 ## Phase 7 - SEO And Local Discovery
 
-- [ ] Generate localized titles, descriptions, canonicals, and social metadata.
-- [ ] Generate correct `hreflang` links for BG, RU, and UA content.
-- [ ] Generate sitemap and robots rules from published content.
+- [x] Generate localized titles, descriptions, canonicals, and social metadata.
+- [x] Generate correct `hreflang` links for BG, RU, and UA content.
+- [x] Generate sitemap and robots rules from published content.
 - [ ] Add permanent redirects when published localized slugs change.
 - [ ] Add LocalBusiness, Service, Article, Breadcrumb, and eligible FAQ structured
   data.
