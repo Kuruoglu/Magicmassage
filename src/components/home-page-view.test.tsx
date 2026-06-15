@@ -28,4 +28,10 @@ describe("HomePageView", () => {
     expect(screen.getByRole("link", { name: "RU" })).toHaveAttribute("href", "/ru");
     expect(screen.getByRole("link", { name: "UA" })).toHaveAttribute("href", "/ua");
   });
+
+  it("uses the treatment photography as the hero background", () => {
+    render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
+
+    expect(screen.getByTestId("home-hero")).toHaveClass("hero-with-background");
+  });
 });

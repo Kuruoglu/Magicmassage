@@ -57,35 +57,33 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
       </header>
 
       <main>
-        <section className="hero section-pad">
-          <div className="hero-copy">
-            <p className="eyebrow">{content.hero.eyebrow}</p>
-            <h1>{content.hero.title}</h1>
-            <p className="hero-description">{content.hero.description}</p>
-            <div className="button-row">
-              <a className="button" href={`${base}#booking`}>
-                {content.hero.primaryAction}
-              </a>
-              <a className="text-link" href={`${base}#services`}>
-                {content.hero.secondaryAction}
-                <span aria-hidden="true"> →</span>
-              </a>
-            </div>
-          </div>
-
-          <div className="hero-visual">
-            <div className="hero-orbit" aria-hidden="true" />
-            <div className="hero-image-wrap">
-              <Image
-                src="/media/hero/hero-massage-session.jpg"
-                alt=""
-                fill
-                sizes="(max-width: 900px) 92vw, 48vw"
-                priority
-              />
+        <section className="hero hero-with-background" data-testid="home-hero">
+          <Image
+            className="hero-background"
+            src="/media/hero/hero-massage-session.jpg"
+            alt=""
+            fill
+            sizes="100vw"
+            priority
+          />
+          <div className="hero-shade" aria-hidden="true" />
+          <div className="hero-content section-pad">
+            <div className="hero-copy">
+              <p className="eyebrow eyebrow-light">{content.hero.eyebrow}</p>
+              <h1>{content.hero.title}</h1>
+              <p className="hero-description">{content.hero.description}</p>
+              <div className="button-row">
+                <a className="button" href={`${base}#booking`}>
+                  {content.hero.primaryAction}
+                </a>
+                <a className="text-link text-link-light" href={`${base}#services`}>
+                  {content.hero.secondaryAction}
+                  <span aria-hidden="true"> →</span>
+                </a>
+              </div>
             </div>
             <div className="hero-note">
-              <span className="yin-yang" aria-hidden="true">☯</span>
+              <span className="yin-yang" aria-hidden="true">{String.fromCodePoint(0x262f)}</span>
               <span>{content.about.points[0]}</span>
             </div>
           </div>

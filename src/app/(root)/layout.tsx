@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { Lora, Montserrat } from "next/font/google";
 
 import "../globals.css";
 
-const sans = Manrope({
+const sans = Montserrat({
   variable: "--font-sans",
   subsets: ["cyrillic", "latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const serif = Cormorant_Garamond({
+const serif = Lora({
   variable: "--font-serif",
-  weight: ["500", "600", "700"],
-  subsets: ["latin"],
+  weight: ["500", "600"],
+  subsets: ["cyrillic", "latin"],
 });
 
 export const metadata: Metadata = {
