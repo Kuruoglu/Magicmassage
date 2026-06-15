@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Tests and coverage
+coverage/
+playwright-report/
+test-results/
+
+# Local environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local tooling and isolated worktrees
+.superpowers/
+.worktrees/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
