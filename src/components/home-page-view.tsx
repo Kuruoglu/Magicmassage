@@ -21,38 +21,40 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
   return (
     <div className="site-shell">
       <header className="site-header">
-        <Link className="brand" href={base} aria-label={content.brand}>
-          <Image src="/media/logo.png" alt="" width={58} height={58} priority />
-          <span>
-            <strong>Magic Massage</strong>
-            <small>Natali</small>
-          </span>
-        </Link>
+        <div className="site-header-inner" data-testid="site-header-inner">
+          <Link className="brand" href={base} aria-label={content.brand}>
+            <Image src="/media/logo.png" alt="" width={58} height={58} priority />
+            <span>
+              <strong>Magic Massage</strong>
+              <small>Natali</small>
+            </span>
+          </Link>
 
-        <nav className="main-nav" aria-label="Primary navigation">
-          <a href={`${base}#services`}>{content.navigation.services}</a>
-          <a href={`${base}#about`}>{content.navigation.about}</a>
-          <a href={`${base}#contact`}>{content.navigation.contacts}</a>
-        </nav>
+          <nav className="main-nav" aria-label="Primary navigation">
+            <a href={`${base}#services`}>{content.navigation.services}</a>
+            <a href={`${base}#about`}>{content.navigation.about}</a>
+            <a href={`${base}#contact`}>{content.navigation.contacts}</a>
+          </nav>
 
-        <div className="header-actions">
-          <div className="locale-switcher" aria-label="Language">
-            {locales.map((item) => (
-              <span className="locale-option" key={item}>
-                {item !== locales[0] ? <span aria-hidden="true">/</span> : null}
-                <Link
-                  className={item === locale ? "is-active" : undefined}
-                  href={`/${item}`}
-                  aria-current={item === locale ? "page" : undefined}
-                >
-                  {localeLabels[item]}
-                </Link>
-              </span>
-            ))}
+          <div className="header-actions">
+            <div className="locale-switcher" aria-label="Language">
+              {locales.map((item) => (
+                <span className="locale-option" key={item}>
+                  {item !== locales[0] ? <span aria-hidden="true">/</span> : null}
+                  <Link
+                    className={item === locale ? "is-active" : undefined}
+                    href={`/${item}`}
+                    aria-current={item === locale ? "page" : undefined}
+                  >
+                    {localeLabels[item]}
+                  </Link>
+                </span>
+              ))}
+            </div>
+            <a className="button button-small" href={`${base}#booking`}>
+              {content.navigation.booking}
+            </a>
           </div>
-          <a className="button button-small" href={`${base}#booking`}>
-            {content.navigation.booking}
-          </a>
         </div>
       </header>
 

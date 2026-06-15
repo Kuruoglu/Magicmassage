@@ -29,6 +29,12 @@ describe("HomePageView", () => {
     expect(screen.getByRole("link", { name: "UA" })).toHaveAttribute("href", "/ua");
   });
 
+  it("keeps header content inside a dedicated layout container", () => {
+    render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
+
+    expect(screen.getByTestId("site-header-inner")).toHaveClass("site-header-inner");
+  });
+
   it("uses the treatment photography as the hero background", () => {
     render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
 
