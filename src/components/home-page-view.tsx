@@ -82,10 +82,6 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                 </a>
               </div>
             </div>
-            <div className="hero-note">
-              <span className="yin-yang" aria-hidden="true">{String.fromCodePoint(0x262f)}</span>
-              <span>{content.about.points[0]}</span>
-            </div>
           </div>
         </section>
 
@@ -108,7 +104,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
           </div>
 
           <div className="service-grid">
-            {content.services.items.map((service, index) => (
+            {content.services.items.map((service) => (
               <article className="service-card" key={service.title}>
                 <div className="service-image">
                   <Image
@@ -117,7 +113,6 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                     fill
                     sizes="(max-width: 760px) 92vw, 30vw"
                   />
-                  <span>0{index + 1}</span>
                 </div>
                 <div className="service-copy">
                   <h3>{service.title}</h3>

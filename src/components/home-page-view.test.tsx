@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { getHomeContent } from "@/content/home";
@@ -33,5 +33,20 @@ describe("HomePageView", () => {
     render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
 
     expect(screen.getByTestId("home-hero")).toHaveClass("hero-with-background");
+  });
+
+  it("omits the hero note and service sequence labels", () => {
+    render(<HomePageView locale="ru" content={getHomeContent("ru")} />);
+
+    const hero = screen.getByTestId("home-hero");
+    const services = screen
+      .getByRole("heading", { name: "Массаж в соответствии с потребностями вашего тела" })
+      .closest("section");
+
+    expect(within(hero).queryByText("Индивидуальный подход")).not.toBeInTheDocument();
+    expect(services).not.toBeNull();
+    expect(within(services as HTMLElement).queryByText("01")).not.toBeInTheDocument();
+    expect(within(services as HTMLElement).queryByText("02")).not.toBeInTheDocument();
+    expect(within(services as HTMLElement).queryByText("03")).not.toBeInTheDocument();
   });
 });
