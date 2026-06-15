@@ -317,6 +317,15 @@ These are candidates after the first release, not default implementation scope:
 - Never silently discard an incomplete translation or failed notification.
 - Log operational failures without logging sensitive customer data.
 
+## Git Delivery
+
+- After completing and verifying each requested change, create a focused commit
+  and push the current feature branch to `origin`.
+- Do not push unfinished changes or changes with failing required checks.
+- Keep commits scoped to the requested work and never include unrelated local
+  modifications.
+- Do not force-push unless the user explicitly requests it.
+
 ## Testing Expectations
 
 Use test-driven development for booking and authorization behavior. At minimum,
