@@ -103,7 +103,9 @@ editing code.
 
 - [x] Build the responsive home landing page.
 - [ ] Build the services catalog and localized service pages.
-- [ ] Build About, Contacts, map, social, and working-hours sections.
+- [x] Build the localized services catalog.
+- [x] Build About and Contacts pages with working-hours sections.
+- [ ] Add map and confirmed social links.
 - [ ] Build the blog index, category views, and article pages.
 - [ ] Build privacy, cookie, cancellation, and rescheduling pages.
 - [x] Integrate selected real photographs from `assets/photos`.
@@ -161,6 +163,7 @@ cannot bypass administration authorization.
 - [x] Generate localized titles, descriptions, canonicals, and social metadata.
 - [x] Generate correct `hreflang` links for BG, RU, and UA content.
 - [x] Generate sitemap and robots rules from published content.
+- [x] Add localized metadata and sitemap entries for Services, About, and Contacts.
 - [ ] Add permanent redirects when published localized slugs change.
 - [ ] Add LocalBusiness, Service, Article, Breadcrumb, and eligible FAQ structured
   data.

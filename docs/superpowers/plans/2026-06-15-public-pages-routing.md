@@ -20,17 +20,17 @@
 - Modify: `src/content/home.ts`
 - Modify: `src/content/home.test.ts`
 
-- [ ] **Step 1: Write failing route and content tests**
+- [x] **Step 1: Write failing route and content tests**
 
 Add tests that require `home`, `services`, `about`, and `contacts` paths for every locale, verify locale switching preserves the selected page, and require eleven localized services plus complete About and Contacts copy for BG, RU, and UA.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `npm test -- --run src/navigation/public-routes.test.ts src/content/public-pages.test.ts src/content/home.test.ts`
 
 Expected: FAIL because the route and public-page modules do not exist and home services are not backed by the complete catalog.
 
-- [ ] **Step 3: Implement route helpers and typed dictionaries**
+- [x] **Step 3: Implement route helpers and typed dictionaries**
 
 Implement:
 
@@ -44,7 +44,7 @@ export function getPublicPagesContent(locale: Locale): PublicPagesContent;
 
 The content must contain all eleven approved service names, restrained factual summaries, localized page headings, image alt text, and existing verified contact details. Update home content to use the first three catalog services as featured previews.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run: `npm test -- --run src/navigation/public-routes.test.ts src/content/public-pages.test.ts src/content/home.test.ts`
 
@@ -60,17 +60,17 @@ Expected: all focused tests PASS.
 - Modify: `src/components/home-page-view.tsx`
 - Modify: `src/components/home-page-view.test.tsx`
 
-- [ ] **Step 1: Write failing shell navigation tests**
+- [x] **Step 1: Write failing shell navigation tests**
 
 Render the shell on the Services page and assert that Services, About, and Contacts use `/${locale}/...` links, Services has `aria-current="page"`, locale links preserve `/services`, and the booking action targets `/${locale}#booking`.
 
-- [ ] **Step 2: Run the shell tests and verify RED**
+- [x] **Step 2: Run the shell tests and verify RED**
 
 Run: `npm test -- --run src/components/public-page-shell.test.tsx src/components/home-page-view.test.tsx`
 
 Expected: FAIL because the shared shell does not exist and the home header still uses hash links.
 
-- [ ] **Step 3: Implement the shared components**
+- [x] **Step 3: Implement the shared components**
 
 Move the existing brand/header markup into `SiteHeader`, move the full-width footer markup into `SiteFooter`, and compose both through:
 
@@ -82,7 +82,7 @@ Move the existing brand/header markup into `SiteHeader`, move the full-width foo
 
 Remove duplicated header/footer markup from `HomePageView`. Replace home service and About actions with `Link` elements pointing to dedicated pages.
 
-- [ ] **Step 4: Run the shell tests and verify GREEN**
+- [x] **Step 4: Run the shell tests and verify GREEN**
 
 Run: `npm test -- --run src/components/public-page-shell.test.tsx src/components/home-page-view.test.tsx`
 
@@ -97,21 +97,21 @@ Expected: all focused tests PASS.
 - Create: `src/components/public-pages.test.tsx`
 - Modify: `src/app/globals.css`
 
-- [ ] **Step 1: Write failing view tests**
+- [x] **Step 1: Write failing view tests**
 
 Require the Services view to render eleven service headings, the About view to render real Natali/studio images and its localized main heading, and the Contacts view to render address, phone, hours, and a `tel:` action.
 
-- [ ] **Step 2: Run the view tests and verify RED**
+- [x] **Step 2: Run the view tests and verify RED**
 
 Run: `npm test -- --run src/components/public-pages.test.tsx`
 
 Expected: FAIL because the page views do not exist.
 
-- [ ] **Step 3: Implement the page views and responsive styling**
+- [x] **Step 3: Implement the page views and responsive styling**
 
 Build a shared editorial page hero style, a responsive services catalog, an About story layout, and a Contacts layout with a non-tracking future-map panel. Reuse existing design tokens, real images, content width, focus styles, and full-width section backgrounds.
 
-- [ ] **Step 4: Run the view tests and verify GREEN**
+- [x] **Step 4: Run the view tests and verify GREEN**
 
 Run: `npm test -- --run src/components/public-pages.test.tsx`
 
@@ -129,21 +129,21 @@ Expected: all focused tests PASS.
 - Modify: `src/app/sitemap.ts`
 - Create: `src/app/sitemap.test.ts`
 
-- [ ] **Step 1: Write failing metadata and sitemap tests**
+- [x] **Step 1: Write failing metadata and sitemap tests**
 
 Require canonical and alternate links for `/bg/services`, `/ru/about`, and `/ua/contacts`, and require the sitemap to contain all twelve localized public URLs.
 
-- [ ] **Step 2: Run SEO tests and verify RED**
+- [x] **Step 2: Run SEO tests and verify RED**
 
 Run: `npm test -- --run src/seo/public-page-metadata.test.ts src/app/sitemap.test.ts`
 
 Expected: FAIL because route metadata does not exist and the sitemap only contains home routes.
 
-- [ ] **Step 3: Implement routes and SEO helpers**
+- [x] **Step 3: Implement routes and SEO helpers**
 
 Each App Router page validates the locale, generates static locale parameters, returns localized metadata, and renders its page view inside `PublicPageShell`. Update the home route to use the same shell and metadata helper. Generate sitemap entries from the public page route model.
 
-- [ ] **Step 4: Run SEO tests and verify GREEN**
+- [x] **Step 4: Run SEO tests and verify GREEN**
 
 Run: `npm test -- --run src/seo/public-page-metadata.test.ts src/app/sitemap.test.ts`
 
@@ -155,11 +155,11 @@ Expected: all focused tests PASS.
 - Modify: `PLANS.md`
 - Modify: `docs/superpowers/plans/2026-06-15-public-pages-routing.md`
 
-- [ ] **Step 1: Update project status**
+- [x] **Step 1: Update project status**
 
 Mark the Services catalog and About/Contacts page work complete in Phase 4, while leaving individual service pages, map integration, blog, and booking unchecked.
 
-- [ ] **Step 2: Run all automated checks**
+- [x] **Step 2: Run all automated checks**
 
 Run in order:
 
@@ -172,11 +172,10 @@ npm run build
 
 Expected: every command exits with code 0.
 
-- [ ] **Step 3: Verify in a real browser**
+- [x] **Step 3: Verify in a real browser**
 
 Open `/bg`, `/ru/services`, `/ua/about`, and `/bg/contacts`. Verify navigation, locale switching, unique page headings, desktop/mobile layout, all eleven service cards, contact links, and absence of broken images or horizontal overflow.
 
-- [ ] **Step 4: Mark plan complete, commit, and push**
+- [x] **Step 4: Mark plan complete, commit, and push**
 
 Check completed steps in this file, stage only the requested implementation files, commit with `feat: add localized public pages`, and push `codex/foundation-home` to `origin`.
-

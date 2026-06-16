@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { HomePageView } from "@/components/home-page-view";
+import { AboutPageView } from "@/components/about-page-view";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { getHomeContent } from "@/content/home";
+import { getPublicPagesContent } from "@/content/public-pages";
 import { isSupportedLocale, locales } from "@/i18n/config";
 import { createPublicPageMetadata } from "@/seo/public-page-metadata";
 
-type LocalePageProps = {
+type AboutPageProps = {
   params: Promise<{ locale: string }>;
 };
 
@@ -15,28 +16,26 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-export async function generateMetadata({ params }: LocalePageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: AboutPageProps): Promise<Metadata> {
   const { locale } = await params;
 
   if (!isSupportedLocale(locale)) {
     return {};
   }
 
-  return createPublicPageMetadata(locale, "home");
+  return createPublicPageMetadata(locale, "about");
 }
 
-export default async function LocalePage({ params }: LocalePageProps) {
+export default async function AboutPage({ params }: AboutPageProps) {
   const { locale } = await params;
 
   if (!isSupportedLocale(locale)) {
     notFound();
   }
 
-  const content = getHomeContent(locale);
-
   return (
-    <PublicPageShell locale={locale} currentPage="home" content={content}>
-      <HomePageView locale={locale} content={content} />
+    <PublicPageShell locale={locale} currentPage="about" content={getHomeContent(locale)}>
+      <AboutPageView locale={locale} content={getPublicPagesContent(locale).about} />
     </PublicPageShell>
   );
 }

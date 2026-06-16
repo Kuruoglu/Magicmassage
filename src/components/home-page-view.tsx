@@ -2,63 +2,18 @@ import Image from "next/image";
 import Link from "next/link";
 
 import type { HomeContent } from "@/content/home";
-import { locales, type Locale } from "@/i18n/config";
+import type { Locale } from "@/i18n/config";
 
 type HomePageViewProps = {
   locale: Locale;
   content: HomeContent;
 };
 
-const localeLabels: Record<Locale, string> = {
-  bg: "BG",
-  ru: "RU",
-  ua: "UA",
-};
-
 export function HomePageView({ locale, content }: HomePageViewProps) {
   const base = `/${locale}`;
 
   return (
-    <div className="site-shell">
-      <header className="site-header">
-        <div className="site-header-inner" data-testid="site-header-inner">
-          <Link className="brand" href={base} aria-label={content.brand}>
-            <Image src="/media/logo.png" alt="" width={58} height={58} priority />
-            <span>
-              <strong>Magic Massage</strong>
-              <small>Natali</small>
-            </span>
-          </Link>
-
-          <nav className="main-nav" aria-label="Primary navigation">
-            <a href={`${base}#services`}>{content.navigation.services}</a>
-            <a href={`${base}#about`}>{content.navigation.about}</a>
-            <a href={`${base}#contact`}>{content.navigation.contacts}</a>
-          </nav>
-
-          <div className="header-actions">
-            <div className="locale-switcher" aria-label="Language">
-              {locales.map((item) => (
-                <span className="locale-option" key={item}>
-                  {item !== locales[0] ? <span aria-hidden="true">/</span> : null}
-                  <Link
-                    className={item === locale ? "is-active" : undefined}
-                    href={`/${item}`}
-                    aria-current={item === locale ? "page" : undefined}
-                  >
-                    {localeLabels[item]}
-                  </Link>
-                </span>
-              ))}
-            </div>
-            <a className="button button-small" href={`${base}#booking`}>
-              {content.navigation.booking}
-            </a>
-          </div>
-        </div>
-      </header>
-
-      <main>
+    <main>
         <section className="hero hero-with-background" data-testid="home-hero">
           <Image
             className="hero-background"
@@ -78,10 +33,10 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                 <a className="button" href={`${base}#booking`}>
                   {content.hero.primaryAction}
                 </a>
-                <a className="text-link text-link-light" href={`${base}#services`}>
+                <Link className="text-link text-link-light" href={`${base}/services`}>
                   {content.hero.secondaryAction}
                   <span aria-hidden="true"> →</span>
-                </a>
+                </Link>
               </div>
             </div>
           </div>
@@ -127,9 +82,9 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
             ))}
           </div>
 
-          <a className="text-link section-link" href={`${base}#services`}>
+          <Link className="text-link section-link" href={`${base}/services`}>
             {content.services.action} <span aria-hidden="true">→</span>
-          </a>
+          </Link>
         </section>
 
         <section className="about section-pad" id="about">
@@ -178,34 +133,6 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
             </a>
           </div>
         </section>
-      </main>
-
-      <footer className="site-footer" id="contact">
-        <div className="site-footer-inner" data-testid="site-footer-inner">
-          <div>
-            <p className="eyebrow">{content.contact.eyebrow}</p>
-            <h2>{content.contact.title}</h2>
-          </div>
-          <dl>
-            <div>
-              <dt>{content.contact.addressLabel}</dt>
-              <dd>{content.contact.address}</dd>
-            </div>
-            <div>
-              <dt>{content.contact.phoneLabel}</dt>
-              <dd><a href="tel:+359896778309">{content.contact.phone}</a></dd>
-            </div>
-            <div>
-              <dt>{content.contact.hoursLabel}</dt>
-              <dd>{content.contact.hours}</dd>
-            </div>
-          </dl>
-          <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} {content.brand}</span>
-            <span className="yin-yang" aria-hidden="true">☯</span>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </main>
   );
 }

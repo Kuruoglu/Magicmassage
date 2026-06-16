@@ -18,30 +18,12 @@ describe("HomePageView", () => {
     expect(
       screen.getByRole("heading", { name: "Классический массаж" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("ул. «Места» 49, Бургас")).toBeInTheDocument();
   });
 
-  it("exposes locale links for BG, RU, and UA", () => {
+  it("links home previews to dedicated public pages", () => {
     render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
 
-    expect(screen.getByRole("link", { name: "BG" })).toHaveAttribute("href", "/bg");
-    expect(screen.getByRole("link", { name: "RU" })).toHaveAttribute("href", "/ru");
-    expect(screen.getByRole("link", { name: "UA" })).toHaveAttribute("href", "/ua");
-  });
-
-  it("keeps header content inside a dedicated layout container", () => {
-    render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
-
-    expect(screen.getByTestId("site-header-inner")).toHaveClass("site-header-inner");
-  });
-
-  it("keeps the footer background full-width and constrains only its content", () => {
-    render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
-
-    const footer = screen.getByRole("contentinfo");
-
-    expect(footer).not.toHaveClass("section-pad");
-    expect(screen.getByTestId("site-footer-inner")).toHaveClass("site-footer-inner");
+    expect(screen.getByRole("link", { name: "Виж всички масажи" })).toHaveAttribute("href", "/bg/services");
   });
 
   it("uses the treatment photography as the hero background", () => {

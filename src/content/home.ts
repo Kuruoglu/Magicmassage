@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/config";
+import { getPublicPagesContent, type ServiceContent } from "@/content/public-pages";
 
 export type HomeContent = {
   brand: string;
@@ -22,7 +23,7 @@ export type HomeContent = {
     title: string;
     description: string;
     action: string;
-    items: Array<{ title: string; description: string; image: string }>;
+    items: ServiceContent[];
   };
   about: {
     eyebrow: string;
@@ -47,12 +48,6 @@ export type HomeContent = {
     hoursLabel: string;
     hours: string;
   };
-};
-
-const sharedImages = {
-  classic: "/media/services/classic-massage.jpg",
-  relaxing: "/media/services/relaxing-neck-massage.jpg",
-  deepTissue: "/media/services/deep-tissue-massage.jpg",
 };
 
 const content: Record<Locale, HomeContent> = {
@@ -80,23 +75,7 @@ const content: Record<Locale, HomeContent> = {
       description:
         "От дълбоко отпускане до целенасочена работа върху напрежението и умората.",
       action: "Виж всички масажи",
-      items: [
-        {
-          title: "Класически масаж",
-          description: "Балансирана грижа за тонус, движение и общо възстановяване.",
-          image: sharedImages.classic,
-        },
-        {
-          title: "Релаксиращ масаж",
-          description: "Плавни техники за освобождаване от стрес и дълбоко отпускане.",
-          image: sharedImages.relaxing,
-        },
-        {
-          title: "Дълбокотъканен масаж",
-          description: "Фокусирана работа при натрупано мускулно напрежение.",
-          image: sharedImages.deepTissue,
-        },
-      ],
+      items: getPublicPagesContent("bg").services.items.slice(0, 3),
     },
     about: {
       eyebrow: "За Натали",
@@ -152,23 +131,7 @@ const content: Record<Locale, HomeContent> = {
       description:
         "От глубокого расслабления до направленной работы с напряжением и усталостью.",
       action: "Все виды массажа",
-      items: [
-        {
-          title: "Классический массаж",
-          description: "Сбалансированная забота о тонусе, движении и восстановлении.",
-          image: sharedImages.classic,
-        },
-        {
-          title: "Расслабляющий массаж",
-          description: "Плавные техники для снятия стресса и глубокого расслабления.",
-          image: sharedImages.relaxing,
-        },
-        {
-          title: "Глубокий массаж тканей",
-          description: "Направленная работа с накопившимся мышечным напряжением.",
-          image: sharedImages.deepTissue,
-        },
-      ],
+      items: getPublicPagesContent("ru").services.items.slice(0, 3),
     },
     about: {
       eyebrow: "О Натали",
@@ -224,23 +187,7 @@ const content: Record<Locale, HomeContent> = {
       description:
         "Від глибокого розслаблення до цілеспрямованої роботи з напруженням і втомою.",
       action: "Усі види масажу",
-      items: [
-        {
-          title: "Класичний масаж",
-          description: "Збалансована турбота про тонус, рухливість і відновлення.",
-          image: sharedImages.classic,
-        },
-        {
-          title: "Розслаблювальний масаж",
-          description: "Плавні техніки для зняття стресу та глибокого відпочинку.",
-          image: sharedImages.relaxing,
-        },
-        {
-          title: "Глибокий масаж тканин",
-          description: "Цілеспрямована робота з накопиченим м'язовим напруженням.",
-          image: sharedImages.deepTissue,
-        },
-      ],
+      items: getPublicPagesContent("ua").services.items.slice(0, 3),
     },
     about: {
       eyebrow: "Про Наталі",

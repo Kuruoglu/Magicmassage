@@ -23,4 +23,14 @@ describe("home content", () => {
 
     expect(titles.size).toBe(3);
   });
+
+  it("uses the first three catalog services as home page previews", async () => {
+    const { getPublicPagesContent } = await import("./public-pages");
+
+    for (const locale of ["bg", "ru", "ua"] as const) {
+      expect(getHomeContent(locale).services.items).toEqual(
+        getPublicPagesContent(locale).services.items.slice(0, 3),
+      );
+    }
+  });
 });
