@@ -39,12 +39,34 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                 </Link>
               </div>
             </div>
+            <div className="hero-visual" aria-hidden="true">
+              <div className="hero-frame">
+                <Image
+                  src="/media/gallery/studio-treatment-room.jpg"
+                  alt=""
+                  fill
+                  sizes="(max-width: 980px) 80vw, 34vw"
+                  priority
+                />
+              </div>
+              <div className="hero-floating-card hero-floating-card-top">
+                <span>01</span>
+                <strong>{content.trust[0].value}</strong>
+                <small>{content.trust[0].label}</small>
+              </div>
+              <div className="hero-floating-card hero-floating-card-bottom">
+                <span>MMN</span>
+                <strong>{content.trust[2].value}</strong>
+                <small>{content.trust[2].label}</small>
+              </div>
+            </div>
           </div>
         </section>
 
         <section className="trust-strip" aria-label="Studio highlights">
           {content.trust.map((item) => (
             <div key={item.label}>
+              <span className="trust-icon" aria-hidden="true">✧</span>
               <strong>{item.value}</strong>
               <span>{item.label}</span>
             </div>
@@ -61,8 +83,8 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
           </div>
 
           <div className="service-grid">
-            {content.services.items.map((service) => (
-              <article className="service-card" key={service.title}>
+            {content.services.items.map((service, index) => (
+              <article className={`service-card service-card-${index + 1}`} key={service.title}>
                 <div className="service-image">
                   <Image
                     src={service.image}
@@ -72,6 +94,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                   />
                 </div>
                 <div className="service-copy">
+                  <span className="service-kicker" aria-hidden="true">MMN</span>
                   <h3>{service.title}</h3>
                   <p>{service.description}</p>
                   <a href={`${base}#booking`} aria-label={`${content.navigation.booking}: ${service.title}`}>
@@ -117,6 +140,10 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                 </li>
               ))}
             </ul>
+          </div>
+          <div className="about-signature" aria-hidden="true">
+            <span>Magic Massage</span>
+            <strong>Natali</strong>
           </div>
         </section>
 
