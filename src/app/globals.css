@@ -428,13 +428,15 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   width: 1px;
 }
 .hero h1 {
-  font-size: clamp(4rem, 7.2vw, 7.8rem);
-  letter-spacing: -0.055em;
-  max-width: 860px;
+  font-size: clamp(3.1rem, 5.4vw, 5.9rem);
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+  max-width: 760px;
 }
 .hero-description {
-  font-size: clamp(1rem, 1.3vw, 1.18rem);
-  max-width: 620px;
+  font-size: clamp(0.94rem, 1.08vw, 1.05rem);
+  line-height: 1.65;
+  max-width: 590px;
 }
 .hero-visual {
   animation: floatIn 850ms 120ms ease both;
@@ -821,7 +823,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
 @media (max-width: 720px) {
   .hero h1 {
-    font-size: clamp(3.1rem, 15vw, 5.1rem);
+    font-size: clamp(2.85rem, 13vw, 4.45rem);
   }
   .hero-copy::before,
   .hero::before,
