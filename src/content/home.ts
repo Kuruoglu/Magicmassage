@@ -31,7 +31,7 @@ export type HomeContent = {
     description: string;
     points: string[];
   };
-  trust: Array<{ value: string; label: string }>;
+  trust: Array<{ icon: "access" | "variations" | "professional"; title: string; description: string; highlight: string }>;
   booking: {
     eyebrow: string;
     title: string;
@@ -85,9 +85,24 @@ const content: Record<Locale, HomeContent> = {
       points: ["Индивидуален подход", "Уютно студио", "Лесно онлайн записване"],
     },
     trust: [
-      { value: "1:1", label: "лично внимание" },
-      { value: "3", label: "езика за записване" },
-      { value: "Бургас", label: "удобна локация" },
+      {
+        icon: "access",
+        title: "Достъпност",
+        description: "Лесна връзка, удобна локация в Бургас и записване според свободните часове.",
+        highlight: "Бургас",
+      },
+      {
+        icon: "variations",
+        title: "Вариации масажи",
+        description: "Класически, релаксиращ, дълбокотъканен и фокусиран масаж според нуждите.",
+        highlight: "11 вида",
+      },
+      {
+        icon: "professional",
+        title: "Професионализъм",
+        description: "Внимателен подход, чиста среда и работа с уважение към Вашия комфорт.",
+        highlight: "лично",
+      },
     ],
     booking: {
       eyebrow: "Вашето време за почивка",
@@ -141,9 +156,24 @@ const content: Record<Locale, HomeContent> = {
       points: ["Индивидуальный подход", "Уютный салон", "Удобная онлайн-запись"],
     },
     trust: [
-      { value: "1:1", label: "личное внимание" },
-      { value: "3", label: "языка для записи" },
-      { value: "Бургас", label: "удобное расположение" },
+      {
+        icon: "access",
+        title: "Доступность",
+        description: "Удобная локация в Бургасе, простая связь и запись на подходящее время.",
+        highlight: "Бургас",
+      },
+      {
+        icon: "variations",
+        title: "Вариации массажей",
+        description: "Классический, расслабляющий, глубокий и локальный массаж под вашу задачу.",
+        highlight: "11 видов",
+      },
+      {
+        icon: "professional",
+        title: "Профессионализм",
+        description: "Внимательный подход, чистая атмосфера и работа с уважением к вашему комфорту.",
+        highlight: "лично",
+      },
     ],
     booking: {
       eyebrow: "Ваше время для отдыха",
@@ -197,9 +227,24 @@ const content: Record<Locale, HomeContent> = {
       points: ["Індивідуальний підхід", "Затишний салон", "Зручний онлайн-запис"],
     },
     trust: [
-      { value: "1:1", label: "особиста увага" },
-      { value: "3", label: "мови для запису" },
-      { value: "Бургас", label: "зручне розташування" },
+      {
+        icon: "access",
+        title: "Доступність",
+        description: "Зручна локація в Бургасі, простий зв'язок і запис на відповідний час.",
+        highlight: "Бургас",
+      },
+      {
+        icon: "variations",
+        title: "Варіації масажів",
+        description: "Класичний, розслаблювальний, глибокий і локальний масаж під вашу потребу.",
+        highlight: "11 видів",
+      },
+      {
+        icon: "professional",
+        title: "Професіоналізм",
+        description: "Уважний підхід, чиста атмосфера та робота з повагою до вашого комфорту.",
+        highlight: "особисто",
+      },
     ],
     booking: {
       eyebrow: "Ваш час для відпочинку",

@@ -9,6 +9,37 @@ type HomePageViewProps = {
   content: HomeContent;
 };
 
+function TrustIcon({ type }: { type: HomeContent["trust"][number]["icon"] }) {
+  if (type === "access") {
+    return (
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M24 7v7M24 34v7M8 24h7M33 24h7" />
+        <path d="M15.5 15.5l5 5M32.5 15.5l-5 5M15.5 32.5l5-5M32.5 32.5l-5-5" />
+        <circle cx="24" cy="24" r="7" />
+      </svg>
+    );
+  }
+
+  if (type === "variations") {
+    return (
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M12 30c8-1 12-7 12-18 0 11 4 17 12 18" />
+        <path d="M10 36c8-1 13-5 14-13 1 8 6 12 14 13" />
+        <path d="M24 12v28" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M16 25c0-6 4-10 8-10s8 4 8 10" />
+      <path d="M13 36c3-7 6-10 11-10s8 3 11 10" />
+      <path d="M18 12l6-5 6 5" />
+      <path d="M19 41h10" />
+    </svg>
+  );
+}
+
 export function HomePageView({ locale, content }: HomePageViewProps) {
   const base = `/${locale}`;
 
@@ -50,14 +81,14 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                 />
               </div>
               <div className="hero-floating-card hero-floating-card-top">
-                <span>01</span>
-                <strong>{content.trust[0].value}</strong>
-                <small>{content.trust[0].label}</small>
+                <span>MMN</span>
+                <strong>{content.trust[0].highlight}</strong>
+                <small>{content.trust[0].title}</small>
               </div>
               <div className="hero-floating-card hero-floating-card-bottom">
                 <span>MMN</span>
-                <strong>{content.trust[2].value}</strong>
-                <small>{content.trust[2].label}</small>
+                <strong>{content.trust[1].highlight}</strong>
+                <small>{content.trust[1].title}</small>
               </div>
             </div>
           </div>
@@ -65,11 +96,13 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
 
         <section className="trust-strip" aria-label="Studio highlights">
           {content.trust.map((item) => (
-            <div key={item.label}>
-              <span className="trust-icon" aria-hidden="true">✧</span>
-              <strong>{item.value}</strong>
-              <span>{item.label}</span>
-            </div>
+            <article className="trust-card" key={item.title}>
+              <span className="trust-icon">
+                <TrustIcon type={item.icon} />
+              </span>
+              <h2>{item.title}</h2>
+              <p>{item.description}</p>
+            </article>
           ))}
         </section>
 
