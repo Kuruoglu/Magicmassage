@@ -81,14 +81,18 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                 />
               </div>
               <div className="hero-floating-card hero-floating-card-top">
-                <span>MMN</span>
+                <span className="hero-card-mark">
+                  <TrustIcon type={content.trust[0].icon} />
+                </span>
                 <strong>{content.trust[0].highlight}</strong>
-                <small>{content.trust[0].title}</small>
+                <small>{content.trust[0].shortLabel}</small>
               </div>
               <div className="hero-floating-card hero-floating-card-bottom">
-                <span>MMN</span>
+                <span className="hero-card-mark">
+                  <TrustIcon type={content.trust[1].icon} />
+                </span>
                 <strong>{content.trust[1].highlight}</strong>
-                <small>{content.trust[1].title}</small>
+                <small>{content.trust[1].shortLabel}</small>
               </div>
             </div>
           </div>
@@ -127,7 +131,6 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                   />
                 </div>
                 <div className="service-copy">
-                  <span className="service-kicker" aria-hidden="true">MMN</span>
                   <h3>{service.title}</h3>
                   <p>{service.description}</p>
                   <a href={`${base}#booking`} aria-label={`${content.navigation.booking}: ${service.title}`}>
