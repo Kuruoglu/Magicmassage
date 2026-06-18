@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import type { HomeContent } from "@/content/home";
 import type { Locale } from "@/i18n/config";
+import { createLocalBusinessJsonLd } from "@/seo/local-business-json-ld";
 
 type HomePageViewProps = {
   locale: Locale;
@@ -42,9 +43,17 @@ function TrustIcon({ type }: { type: HomeContent["trust"][number]["icon"] }) {
 
 export function HomePageView({ locale, content }: HomePageViewProps) {
   const base = `/${locale}`;
+  const localBusinessJsonLd = createLocalBusinessJsonLd(locale, content);
 
   return (
-    <main>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(localBusinessJsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
+      <main>
         <section className="hero hero-with-background" data-testid="home-hero">
           <Image
             className="hero-background"
@@ -196,6 +205,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
             </a>
           </div>
         </section>
-    </main>
+      </main>
+    </>
   );
 }

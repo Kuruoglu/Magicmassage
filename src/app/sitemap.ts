@@ -3,8 +3,7 @@ import type { MetadataRoute } from "next";
 import { locales } from "@/i18n/config";
 import { getPublicPagePath } from "@/navigation/public-routes";
 import { getPublicSitemapPages } from "@/seo/public-page-metadata";
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+import { siteUrl } from "@/seo/site-url";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return locales.flatMap((locale) =>

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Lora, Montserrat } from "next/font/google";
 
+import { siteUrl } from "@/seo/site-url";
+
 import "../globals.css";
 
 const sans = Montserrat({
@@ -16,7 +18,7 @@ const serif = Lora({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(siteUrl),
   title: "Magic Massage Natali | Burgas",
   description: "Personal massage and relaxation in Burgas.",
 };

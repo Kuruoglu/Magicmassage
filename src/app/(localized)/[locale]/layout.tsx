@@ -3,6 +3,7 @@ import { Lora, Montserrat } from "next/font/google";
 import { notFound } from "next/navigation";
 
 import { getHtmlLanguage, isSupportedLocale } from "@/i18n/config";
+import { siteUrl } from "@/seo/site-url";
 
 import "../../globals.css";
 
@@ -19,7 +20,7 @@ const serif = Lora({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "Magic Massage Natali | Burgas",
     template: "%s | Magic Massage Natali",

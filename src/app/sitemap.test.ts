@@ -7,9 +7,9 @@ describe("sitemap", () => {
     const urls = sitemap().map((entry) => entry.url);
 
     expect(urls).toHaveLength(12);
-    expect(urls).toContain("http://localhost:3000/bg");
-    expect(urls).toContain("http://localhost:3000/bg/services");
-    expect(urls).toContain("http://localhost:3000/ru/about");
-    expect(urls).toContain("http://localhost:3000/ua/contacts");
+    expect(urls).toContain("https://magicmassagenatali.bg/bg");
+    expect(urls).toContain("https://magicmassagenatali.bg/bg/services");
+    expect(urls).toContain("https://magicmassagenatali.bg/ru/about");
+    expect(urls).toContain("https://magicmassagenatali.bg/ua/contacts");
   });
 });

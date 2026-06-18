@@ -13,8 +13,9 @@ const metadataByLocale: Record<
 > = {
   bg: {
     home: {
-      title: "Масаж в Бургас",
-      description: "Персонален масаж и спокойна грижа в Magic Massage Natali, Бургас.",
+      title: "Масажен салон в Бургас",
+      description:
+        "Magic Massage Natali е масажно студио в Бургас за класически, релаксиращ, дълбокотъканен и антицелулитен масаж с предварително записване.",
     },
     services: {
       title: "Видове масаж в Бургас",
@@ -31,8 +32,9 @@ const metadataByLocale: Record<
   },
   ru: {
     home: {
-      title: "Массаж в Бургасе",
-      description: "Персональный массаж и бережная забота в Magic Massage Natali, Бургас.",
+      title: "Массажный салон в Бургасе",
+      description:
+        "Magic Massage Natali - массажный салон в Бургасе: классический, расслабляющий, глубокий и антицеллюлитный массаж по предварительной записи.",
     },
     services: {
       title: "Виды массажа в Бургасе",
@@ -49,8 +51,9 @@ const metadataByLocale: Record<
   },
   ua: {
     home: {
-      title: "Масаж у Бургасі",
-      description: "Персональний масаж і дбайлива турбота в Magic Massage Natali, Бургас.",
+      title: "Масажний салон у Бургасі",
+      description:
+        "Magic Massage Natali - масажний салон у Бургасі: класичний, розслаблювальний, глибокий та антицелюлітний масаж за попереднім записом.",
     },
     services: {
       title: "Види масажу в Бургасі",

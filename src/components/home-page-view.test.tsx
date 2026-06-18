@@ -32,6 +32,20 @@ describe("HomePageView", () => {
     expect(screen.getByTestId("home-hero")).toHaveClass("hero-with-background");
   });
 
+  it("renders local business structured data for search engines", () => {
+    const { container } = render(<HomePageView locale="ru" content={getHomeContent("ru")} />);
+    const script = container.querySelector('script[type="application/ld+json"]');
+
+    expect(script).not.toBeNull();
+    const jsonLd = JSON.parse(script?.textContent ?? "{}");
+
+    expect(jsonLd["@type"]).toBe("HealthAndBeautyBusiness");
+    expect(jsonLd.name).toBe("Magic Massage Natali");
+    expect(jsonLd.address.addressLocality).toBe("Burgas");
+    expect(jsonLd.telephone).toBe("+359 89 677 8309");
+    expect(jsonLd.makesOffer).toHaveLength(11);
+  });
+
   it("omits the hero note and service sequence labels", () => {
     render(<HomePageView locale="ru" content={getHomeContent("ru")} />);
 
