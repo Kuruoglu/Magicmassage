@@ -236,3 +236,11 @@ const content: Record<Locale, PublicPagesContent> = {
 export function getPublicPagesContent(locale: Locale): PublicPagesContent {
   return content[locale];
 }
+
+export function getServiceContent(locale: Locale, slug: string): ServiceContent | undefined {
+  return getPublicPagesContent(locale).services.items.find((service) => service.slug === slug);
+}
+
+export function getServiceSlugs(locale: Locale): string[] {
+  return getPublicPagesContent(locale).services.items.map((service) => service.slug);
+}

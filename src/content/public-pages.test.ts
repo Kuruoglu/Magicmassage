@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPublicPagesContent } from "./public-pages";
+import { getPublicPagesContent, getServiceContent, getServiceSlugs } from "./public-pages";
 
 describe("public pages content", () => {
   it("provides a complete eleven-service catalog for every locale", () => {
@@ -35,5 +35,11 @@ describe("public pages content", () => {
     );
 
     expect(serviceTitles.size).toBe(3);
+  });
+
+  it("finds individual service content by slug", () => {
+    expect(getServiceSlugs("ru")).toHaveLength(11);
+    expect(getServiceContent("ru", "classic-massage")?.slug).toBe("classic-massage");
+    expect(getServiceContent("ru", "missing-service")).toBeUndefined();
   });
 });

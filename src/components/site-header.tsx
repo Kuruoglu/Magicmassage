@@ -19,9 +19,10 @@ type SiteHeaderProps = {
   locale: Locale;
   currentPage: PublicPageKey;
   content: HomeContent;
+  localePaths?: Partial<Record<Locale, string>>;
 };
 
-export function SiteHeader({ locale, currentPage, content }: SiteHeaderProps) {
+export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHeaderProps) {
   const links: Array<{ page: PublicPageKey; label: string }> = [
     { page: "home", label: content.navigation.home },
     { page: "services", label: content.navigation.services },
@@ -63,7 +64,7 @@ export function SiteHeader({ locale, currentPage, content }: SiteHeaderProps) {
                 {item !== locales[0] ? <span aria-hidden="true">/</span> : null}
                 <Link
                   className={item === locale ? "is-active" : undefined}
-                  href={getLocaleSwitchPath(item, currentPage)}
+                  href={localePaths?.[item] ?? getLocaleSwitchPath(item, currentPage)}
                   aria-current={item === locale ? "page" : undefined}
                 >
                   {localeLabels[item]}

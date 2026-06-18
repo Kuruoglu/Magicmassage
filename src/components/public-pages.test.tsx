@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { getPublicPagesContent } from "@/content/public-pages";
 import { AboutPageView } from "./about-page-view";
 import { ContactsPageView } from "./contacts-page-view";
+import { ServiceDetailPageView } from "./service-detail-page-view";
 import { ServicesPageView } from "./services-page-view";
 
 describe("localized public page views", () => {
@@ -15,6 +16,33 @@ describe("localized public page views", () => {
     for (const service of content.services.items) {
       expect(screen.getByRole("heading", { level: 2, name: service.title })).toBeInTheDocument();
     }
+    expect(screen.getAllByRole("link", { name: /Подробнее/ })[0]).toHaveAttribute(
+      "href",
+      "/ru/services/classic-massage",
+    );
+  });
+
+  it("renders an individual service page with a booking action", () => {
+    const content = getPublicPagesContent("bg");
+    const service = content.services.items[0];
+
+    render(
+      <ServiceDetailPageView
+        locale="bg"
+        service={service}
+        bookingAction={content.services.bookingAction}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: service.title })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: content.services.bookingAction })[0]).toHaveAttribute(
+      "href",
+      "/bg#booking",
+    );
+    expect(screen.getByRole("link", { name: /Всички масажи/ })).toHaveAttribute(
+      "href",
+      "/bg/services",
+    );
   });
 
   it("renders the About story with real photography", () => {

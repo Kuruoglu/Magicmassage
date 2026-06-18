@@ -11,6 +11,7 @@ type PublicPageShellProps = {
   currentPage: PublicPageKey;
   content: HomeContent;
   children: ReactNode;
+  localePaths?: Partial<Record<Locale, string>>;
 };
 
 export function PublicPageShell({
@@ -18,10 +19,16 @@ export function PublicPageShell({
   currentPage,
   content,
   children,
+  localePaths,
 }: PublicPageShellProps) {
   return (
     <div className="site-shell">
-      <SiteHeader locale={locale} currentPage={currentPage} content={content} />
+      <SiteHeader
+        locale={locale}
+        currentPage={currentPage}
+        content={content}
+        localePaths={localePaths}
+      />
       {children}
       <SiteFooter content={content} />
     </div>

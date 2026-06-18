@@ -3,10 +3,17 @@ import Link from "next/link";
 
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
+import { getServicePagePath } from "@/navigation/service-routes";
 
 type ServicesPageViewProps = {
   locale: Locale;
   content: PublicPagesContent["services"];
+};
+
+const detailLinkLabels: Record<Locale, string> = {
+  bg: "Повече",
+  ru: "Подробнее",
+  ua: "Докладніше",
 };
 
 export function ServicesPageView({ locale, content }: ServicesPageViewProps) {
@@ -37,8 +44,8 @@ export function ServicesPageView({ locale, content }: ServicesPageViewProps) {
                   <p>{service.slug.replaceAll("-", " ")}</p>
                   <h2>{service.title}</h2>
                   <span>{service.description}</span>
-                  <Link href={`/${locale}#booking`}>
-                    {content.bookingAction} <span aria-hidden="true">↗</span>
+                  <Link href={getServicePagePath(locale, service.slug)}>
+                    {detailLinkLabels[locale]} <span aria-hidden="true">↗</span>
                   </Link>
                 </div>
               </article>

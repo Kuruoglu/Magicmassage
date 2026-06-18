@@ -194,6 +194,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   padding-bottom: 100px;
   padding-top: 108px;
 }
+.page-hero .section-inner {
+  position: relative;
+  z-index: 1;
+}
 .page-hero h1 { max-width: 920px; }
 .page-hero .section-inner > p:last-child { color: #ead9bd; line-height: 1.8; margin-top: 24px; max-width: 680px; }
 .catalog-section { background: var(--cream); max-width: none; padding-bottom: 125px; padding-top: 90px; }
@@ -300,7 +304,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .main-nav { display: none; }
   .site-header-inner { grid-template-columns: 1fr auto; }
   .hero-content { align-items: flex-start; flex-direction: column; justify-content: flex-end; }
-  .section-heading, .about, .story-layout, .contact-layout { grid-template-columns: 1fr; }
+  .section-heading, .about, .story-layout, .contact-layout, .service-detail-hero-inner, .service-detail-grid, .service-detail-cta { grid-template-columns: 1fr; }
   .section-heading > p, .about-copy { max-width: 680px; }
   .booking { grid-template-columns: auto 1fr; }
   .booking-action { grid-column: 2; }
@@ -334,6 +338,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .page-hero { padding-bottom: 72px; padding-top: 76px; }
   .catalog-section { padding-bottom: 90px; padding-top: 70px; }
   .catalog-grid { grid-template-columns: 1fr; }
+  .service-detail-body { padding-bottom: 90px; padding-top: 70px; }
+  .service-detail-hero { padding-bottom: 84px; }
+  .service-detail-image { min-height: 360px; }
+  .service-detail-cta { justify-items: start; }
   .story-section { padding-bottom: 90px; padding-top: 90px; }
   .story-images { min-height: 480px; }
   .contact-page { padding-bottom: 90px; padding-top: 70px; }
@@ -664,6 +672,98 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .catalog-card:nth-child(6) .catalog-image,
 .catalog-card:nth-child(11) .catalog-image {
   aspect-ratio: 1.6;
+}
+.service-detail-hero {
+  padding-bottom: 120px;
+}
+.service-detail-hero-inner {
+  align-items: center;
+  display: grid;
+  gap: clamp(42px, 7vw, 96px);
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 0.72fr);
+}
+.service-detail-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 34px;
+}
+.service-detail-image {
+  aspect-ratio: 0.95;
+  border: 1px solid rgba(230, 189, 107, 0.24);
+  border-radius: 32px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  position: relative;
+}
+.service-detail-body {
+  background: var(--cream);
+  max-width: none;
+  padding-bottom: 125px;
+  padding-top: 105px;
+}
+.service-detail-body.section-pad {
+  padding-inline: 0;
+}
+.service-detail-lead {
+  max-width: 780px;
+}
+.service-detail-lead p:last-child {
+  color: var(--muted);
+  line-height: 1.8;
+  margin-top: 20px;
+}
+.service-detail-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 54px;
+}
+.service-detail-grid article {
+  background: var(--cream-strong);
+  border: 1px solid rgba(128, 89, 39, 0.14);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: clamp(26px, 3.5vw, 42px);
+}
+.service-detail-grid span {
+  color: var(--gold);
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  margin-bottom: 22px;
+}
+.service-detail-grid h3 {
+  color: var(--forest);
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1.3rem, 2vw, 1.8rem);
+  line-height: 1.18;
+}
+.service-detail-grid p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.75;
+  margin-top: 16px;
+}
+.service-detail-cta {
+  align-items: center;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(201, 146, 59, 0.18), transparent 34%),
+    linear-gradient(100deg, #071c13, #123925);
+  border-radius: 28px;
+  color: var(--white);
+  display: grid;
+  gap: 30px;
+  grid-template-columns: 1fr auto;
+  margin-top: 52px;
+  padding: clamp(30px, 4vw, 52px);
+}
+.service-detail-cta p {
+  color: #ead9bd;
+  line-height: 1.75;
+  max-width: 760px;
 }
 
 @keyframes riseIn {
