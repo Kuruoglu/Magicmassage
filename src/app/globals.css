@@ -499,33 +499,33 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   width: 42px;
 }
 .services {
-  background:
-    linear-gradient(90deg, rgba(253, 244, 228, 0.94), rgba(253, 244, 228, 0.78) 46%, rgba(253, 244, 228, 0.9)),
-    url("/media/hero/hero-massage-session.jpg") center / cover fixed;
+  background: var(--cream);
+  isolation: isolate;
   max-width: none;
   overflow: hidden;
   padding-inline: max(24px, calc((100vw - var(--content)) / 2));
   position: relative;
 }
 .services::before {
-  background:
-    radial-gradient(circle at 18% 18%, rgba(255, 250, 241, 0.72), transparent 34%),
-    radial-gradient(circle at 84% 10%, rgba(201, 146, 59, 0.2), transparent 32%),
-    linear-gradient(180deg, rgba(255, 250, 241, 0.28), rgba(255, 250, 241, 0.58));
+  background: url("/media/hero/hero-massage-session.jpg") center / cover;
   content: "";
   inset: 0;
   pointer-events: none;
   position: absolute;
+  transform: translateZ(0);
+  z-index: -2;
 }
 .services::after {
-  background: radial-gradient(circle, rgba(201, 146, 59, 0.16), transparent 62%);
+  background:
+    linear-gradient(90deg, rgba(253, 244, 228, 0.94), rgba(253, 244, 228, 0.78) 46%, rgba(253, 244, 228, 0.9)),
+    radial-gradient(circle at 18% 18%, rgba(255, 250, 241, 0.72), transparent 34%),
+    radial-gradient(circle at 84% 10%, rgba(201, 146, 59, 0.2), transparent 32%),
+    radial-gradient(circle at calc(100% + 210px) 20px, rgba(201, 146, 59, 0.16), transparent 38%);
   content: "";
-  height: 520px;
+  inset: 0;
   pointer-events: none;
   position: absolute;
-  right: -210px;
-  top: 20px;
-  width: 520px;
+  z-index: -1;
 }
 .section-heading {
   position: relative;
@@ -735,9 +735,6 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .service-grid,
   .catalog-grid {
     grid-template-columns: 1fr;
-  }
-  .services {
-    background-attachment: scroll;
   }
   .service-card-2:hover,
   .service-card-3:hover,
