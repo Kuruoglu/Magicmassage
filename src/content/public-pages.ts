@@ -41,13 +41,19 @@ export type PublicPagesContent = {
   };
 };
 
-const serviceImages = {
-  classic: "/media/services/classic-massage.jpg",
-  relaxing: "/media/services/relaxing-neck-massage.jpg",
-  deep: "/media/services/deep-tissue-massage.jpg",
+const serviceImages: Record<string, string> = {
+  "classic-massage": "/media/services/classic-massage.jpg",
+  "anti-cellulite-massage": "/media/services/anti-cellulite-massage.jpg",
+  "deep-tissue-massage": "/media/services/deep-tissue-massage.jpg",
+  "therapeutic-massage": "/media/services/therapeutic-massage.jpg",
+  "relaxing-massage": "/media/services/relaxing-massage.jpg",
+  "spa-procedures": "/media/services/spa-procedures.jpg",
+  "thai-massage": "/media/services/thai-massage.jpg",
+  "partial-massage": "/media/services/partial-massage.jpg",
+  "cupping-therapy": "/media/services/cupping-therapy.jpg",
+  "anti-stress-massage": "/media/services/anti-stress-massage.jpg",
+  "chiropractic-massage": "/media/services/chiropractic-massage.jpg",
 };
-
-const images = [serviceImages.classic, serviceImages.relaxing, serviceImages.deep];
 
 function services(
   names: string[],
@@ -72,7 +78,7 @@ function services(
     slug,
     title: names[index],
     description: descriptions[index],
-    image: images[index % images.length],
+    image: serviceImages[slug],
     imageAlt: `${altPrefix}: ${names[index]}`,
   }));
 }
