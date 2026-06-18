@@ -62,5 +62,10 @@ describe("localized public page views", () => {
     expect(screen.getByText(content.contacts.address)).toBeInTheDocument();
     expect(screen.getByText(content.contacts.hours)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: content.contacts.callAction })).toHaveAttribute("href", "tel:+359896778309");
+    expect(screen.getByTitle(content.contacts.mapTitle)).toHaveAttribute("src", expect.stringContaining("google.com/maps"));
+    expect(screen.getByRole("link", { name: content.contacts.directionsAction })).toHaveAttribute(
+      "href",
+      expect.stringContaining("google.com/maps/dir"),
+    );
   });
 });

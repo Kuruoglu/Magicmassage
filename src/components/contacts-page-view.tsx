@@ -8,6 +8,10 @@ type ContactsPageViewProps = {
   content: PublicPagesContent["contacts"];
 };
 
+const googleMapsQuery = "49 ulitsa Mesta, Burgas, Bulgaria";
+const googleMapsEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(googleMapsQuery)}&output=embed`;
+const googleMapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(googleMapsQuery)}`;
+
 export function ContactsPageView({ content }: ContactsPageViewProps) {
   return (
     <main>
@@ -43,9 +47,27 @@ export function ContactsPageView({ content }: ContactsPageViewProps) {
             </Link>
           </div>
           <div className="map-panel" aria-label={content.mapTitle}>
-            <span aria-hidden="true">49</span>
-            <h2>{content.mapTitle}</h2>
-            <p>{content.mapDescription}</p>
+            <div className="map-frame">
+              <iframe
+                title={content.mapTitle}
+                src={googleMapsEmbedUrl}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+            <div className="map-copy">
+              <h2>{content.mapTitle}</h2>
+              <p>{content.mapDescription}</p>
+              <a
+                className="button button-light"
+                href={googleMapsDirectionsUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {content.directionsAction}
+              </a>
+            </div>
           </div>
         </div>
       </section>

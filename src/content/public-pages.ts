@@ -36,6 +36,7 @@ export type PublicPagesContent = {
     hoursLabel: string;
     hours: string;
     callAction: string;
+    directionsAction: string;
     mapTitle: string;
     mapDescription: string;
   };
@@ -131,8 +132,9 @@ const content: Record<Locale, PublicPagesContent> = {
       hoursLabel: "Работно време",
       hours: "С предварително записване",
       callAction: "Обадете се",
+      directionsAction: "Получи маршрут",
       mapTitle: "Студиото е в Бургас",
-      mapDescription: "Интерактивната карта ще бъде добавена след потвърждаване на точните координати и настройките за поверителност.",
+      mapDescription: "Картата показва Magic Massage Natali на ул. „Места“ 49. Използвайте бутона за маршрут през Google Maps.",
     },
   },
   ru: {
@@ -182,8 +184,9 @@ const content: Record<Locale, PublicPagesContent> = {
       hoursLabel: "Время работы",
       hours: "По предварительной записи",
       callAction: "Позвонить",
+      directionsAction: "Проложить маршрут",
       mapTitle: "Салон находится в Бургасе",
-      mapDescription: "Интерактивная карта будет добавлена после подтверждения точных координат и настроек конфиденциальности.",
+      mapDescription: "Карта показывает Magic Massage Natali на ул. «Места» 49. Кнопка маршрута откроет Google Maps.",
     },
   },
   ua: {
@@ -233,8 +236,9 @@ const content: Record<Locale, PublicPagesContent> = {
       hoursLabel: "Години роботи",
       hours: "За попереднім записом",
       callAction: "Зателефонувати",
+      directionsAction: "Прокласти маршрут",
       mapTitle: "Салон розташований у Бургасі",
-      mapDescription: "Інтерактивну карту буде додано після підтвердження точних координат і налаштувань конфіденційності.",
+      mapDescription: "Карта показує Magic Massage Natali на вул. «Места» 49. Кнопка маршруту відкриє Google Maps.",
     },
   },
 };
