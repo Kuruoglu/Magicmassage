@@ -82,7 +82,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
             <div className="hero-visual" aria-hidden="true">
               <div className="hero-frame">
                 <Image
-                  src="/media/gallery/studio-treatment-room.jpg"
+                  src="/media/about/natali-at-work.jpg"
                   alt=""
                   fill
                   sizes="(max-width: 980px) 80vw, 34vw"
