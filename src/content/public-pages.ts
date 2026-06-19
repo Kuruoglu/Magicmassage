@@ -119,7 +119,7 @@ const content: Record<Locale, PublicPagesContent> = {
       ],
       values: ["Индивидуален подход", "Внимание към комфорта", "Спокойна атмосфера", "Лична комуникация"],
       imageAlt: "Натали по време на масажна процедура",
-      studioImageAlt: "Интериор на Magic Massage Natali в Бургас",
+      studioImageAlt: "Подаръчен ваучер за масаж в Magic Massage Natali",
     },
     contacts: {
       eyebrow: "Посетете студиото",
@@ -171,7 +171,7 @@ const content: Record<Locale, PublicPagesContent> = {
       ],
       values: ["Индивидуальный подход", "Внимание к комфорту", "Спокойная атмосфера", "Личное общение"],
       imageAlt: "Натали во время массажной процедуры",
-      studioImageAlt: "Интерьер Magic Massage Natali в Бургасе",
+      studioImageAlt: "Подарочный ваучер на массаж в Magic Massage Natali",
     },
     contacts: {
       eyebrow: "Посетите салон",
@@ -223,7 +223,7 @@ const content: Record<Locale, PublicPagesContent> = {
       ],
       values: ["Індивідуальний підхід", "Увага до комфорту", "Спокійна атмосфера", "Особисте спілкування"],
       imageAlt: "Наталі під час масажної процедури",
-      studioImageAlt: "Інтер'єр Magic Massage Natali у Бургасі",
+      studioImageAlt: "Подарунковий ваучер на масаж у Magic Massage Natali",
     },
     contacts: {
       eyebrow: "Відвідайте салон",
@@ -275,7 +275,7 @@ const content: Record<Locale, PublicPagesContent> = {
       ],
       values: ["Individual approach", "Attention to comfort", "Calm atmosphere", "Personal communication"],
       imageAlt: "Natali during a massage treatment",
-      studioImageAlt: "Interior of Magic Massage Natali in Burgas",
+      studioImageAlt: "Massage gift voucher at Magic Massage Natali",
     },
     contacts: {
       eyebrow: "Visit the studio",
