@@ -1256,4 +1256,32 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
     min-height: 0;
     width: 100%;
   }
+
+  .service-detail-grid {
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 34px;
+  }
+
+  .service-detail-grid article {
+    padding: 26px 24px;
+  }
+
+  .service-detail-grid span {
+    margin-bottom: 14px;
+  }
+
+  .service-detail-grid p {
+    font-size: 0.9rem;
+  }
+
+  .service-detail-cta {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 30px 24px;
+  }
+
+  .service-detail-cta .button {
+    justify-content: center;
+    width: 100%;
+  }
 }
