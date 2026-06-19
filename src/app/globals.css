@@ -874,7 +874,8 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 .service-grid {
   align-items: stretch;
-  grid-template-columns: 1.18fr 0.9fr 0.9fr;
+  gap: clamp(20px, 2.4vw, 30px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   position: relative;
   z-index: 2;
 }
@@ -887,6 +888,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   border-color: rgba(155, 107, 194, 0.22);
   border-radius: 24px;
   box-shadow: 0 28px 74px rgba(29, 20, 36, 0.13);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
 .service-card:hover {
   border-color: rgba(155, 107, 194, 0.48);
@@ -895,26 +900,19 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .service-copy p {
   color: #5E5366;
 }
-.service-card-1 {
-  grid-row: span 2;
+.services .service-image {
+  aspect-ratio: 1.03;
 }
-.service-card-1 .service-image {
-  aspect-ratio: 0.82;
+.services .service-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
-.service-card-2 {
-  transform: translateY(46px);
+.services .service-copy a {
+  margin-top: auto;
 }
-.service-card-3 {
-  transform: translateY(-22px);
-}
-.service-card:hover {
+.services .service-card:hover {
   transform: translateY(-8px);
-}
-.service-card-2:hover {
-  transform: translateY(36px);
-}
-.service-card-3:hover {
-  transform: translateY(-32px);
 }
 .service-kicker {
   color: var(--gold);
