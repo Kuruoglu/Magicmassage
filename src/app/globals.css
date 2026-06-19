@@ -1170,70 +1170,114 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
 .trust-strip {
   background:
-    linear-gradient(180deg, #FFFFFF, #F8F5FA),
-    radial-gradient(circle at 50% 0%, rgba(141, 90, 174, 0.14), transparent 42%);
-  gap: 0;
-  padding-block: 54px;
+    radial-gradient(circle at 12% 18%, rgba(155, 107, 194, 0.13), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(176, 122, 221, 0.16), transparent 30%),
+    linear-gradient(180deg, #FFFFFF 0%, #F7F2FA 100%);
+  gap: clamp(18px, 2.4vw, 28px);
+  padding-block: 58px;
 }
 .trust-card {
   align-items: center;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(250, 246, 252, 0.94));
+  border: 1px solid rgba(155, 107, 194, 0.2);
+  border-radius: 30px;
+  box-shadow: 0 24px 70px rgba(29, 20, 36, 0.1);
   display: grid;
-  gap: 12px;
+  gap: 14px;
   justify-items: center;
-  padding: 10px clamp(18px, 4vw, 62px);
+  min-height: 240px;
+  overflow: hidden;
+  padding: 32px clamp(20px, 3vw, 38px);
   position: relative;
   text-align: center;
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+.trust-card::before {
+  background: linear-gradient(90deg, transparent, rgba(155, 107, 194, 0.5), transparent);
+  content: "";
+  height: 3px;
+  left: 22%;
+  position: absolute;
+  right: 22%;
+  top: 0;
+}
+.trust-card::after {
+  background: radial-gradient(circle, rgba(155, 107, 194, 0.12), transparent 68%);
+  border-radius: 50%;
+  content: "";
+  height: 140px;
+  position: absolute;
+  right: -58px;
+  top: -70px;
+  width: 140px;
+}
+.trust-card:hover {
+  border-color: rgba(155, 107, 194, 0.34);
+  box-shadow: 0 30px 86px rgba(29, 20, 36, 0.14);
+  transform: translateY(-4px);
 }
 .trust-card + .trust-card {
-  border-left: 1px solid rgba(139, 98, 43, 0.18);
+  border-left: 0;
 }
 .trust-card h2 {
   align-items: center;
   color: var(--forest);
   display: inline-flex;
-  font-size: clamp(1.28rem, 2.2vw, 2rem);
+  font-size: clamp(1.3rem, 2vw, 1.85rem);
   gap: 10px;
   line-height: 1.1;
+  position: relative;
+  z-index: 1;
 }
 .trust-card p {
-  color: var(--muted);
-  font-size: 0.86rem;
-  line-height: 1.65;
-  max-width: 310px;
+  color: #554B5C;
+  font-size: 0.92rem;
+  line-height: 1.72;
+  max-width: 330px;
+  position: relative;
+  z-index: 1;
 }
 .trust-icon {
   align-items: center;
-  background: rgba(255, 250, 241, 0.72);
-  border: 1px solid rgba(141, 90, 174, 0.34);
-  border-radius: 22px;
-  box-shadow: 0 18px 36px rgba(62, 39, 18, 0.08);
-  color: var(--gold);
+  background:
+    radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.95), transparent 34%),
+    linear-gradient(135deg, rgba(229, 212, 242, 0.95), rgba(155, 107, 194, 0.2));
+  border: 1px solid rgba(155, 107, 194, 0.28);
+  border-radius: 24px;
+  box-shadow: 0 18px 38px rgba(110, 74, 139, 0.16);
+  color: var(--purple-deep);
   display: inline-flex;
-  height: 62px;
+  height: 68px;
   justify-content: center;
-  margin-bottom: 2px;
-  width: 62px;
+  margin-bottom: 4px;
+  position: relative;
+  width: 68px;
+  z-index: 1;
 }
 .trust-icon svg {
   fill: none;
-  height: 34px;
+  height: 38px;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.7;
-  width: 34px;
+  stroke-width: 1.9;
+  width: 38px;
 }
 
 @media (max-width: 720px) {
   .trust-strip {
-    padding-block: 34px;
+    gap: 16px;
+    padding-block: 30px;
   }
   .trust-card {
-    padding: 22px 10px;
+    border-radius: 24px;
+    min-height: 0;
+    padding: 26px 22px;
   }
   .trust-card + .trust-card {
     border-left: 0;
-    border-top: 1px solid rgba(139, 98, 43, 0.18);
+    border-top: 0;
   }
 
   .service-detail-hero {
