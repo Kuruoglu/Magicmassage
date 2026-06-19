@@ -167,7 +167,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
             </div>
             <div className="about-image-small">
               <Image
-                src="/media/gallery/studio-treatment-room.jpg"
+                src="/media/services/deep-tissue-massage.jpg"
                 alt=""
                 fill
                 sizes="(max-width: 800px) 46vw, 19vw"
