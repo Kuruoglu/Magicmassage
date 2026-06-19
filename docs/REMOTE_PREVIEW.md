@@ -4,10 +4,10 @@ Use this when the local development site must be visible from the internet for a
 
 ## Public internet link with Cloudflare Tunnel
 
-1. Start the local Next.js server:
+1. Start the production preview server:
 
 ```bash
-npm run dev
+npm run preview
 ```
 
 2. In a second terminal, start the public tunnel:
@@ -21,6 +21,19 @@ npm run share
 The public URL works only while both terminals are running. If the tunnel is restarted, the URL can change.
 
 The first `npm run share` run downloads `cloudflared.exe` to the local user app data folder. The binary is not stored in the repository.
+
+Use production preview for client review. Tunneling `next dev` can break browser interactivity because development websocket/HMR traffic may fail through public tunnels.
+
+## Development tunnel
+
+For quick remote checks during active development, you can expose `next dev`:
+
+```bash
+npm run dev
+npm run share:dev
+```
+
+If interactive elements behave strangely on this development tunnel, use the production preview flow above.
 
 ## Local Wi-Fi testing
 

@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$port = if ($env:PORT) { $env:PORT } else { "3000" }
+$port = if ($env:PORT) { $env:PORT } else { "3001" }
 $installDir = Join-Path $env:LOCALAPPDATA "MagicMassageNatali"
 $cloudflared = Join-Path $installDir "cloudflared.exe"
 $downloadUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
