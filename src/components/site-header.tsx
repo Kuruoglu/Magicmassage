@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 import type { HomeContent } from "@/content/home";
+import { getPublicPagesContent } from "@/content/public-pages";
 import { locales, type Locale } from "@/i18n/config";
 import {
   getLocaleSwitchPath,
   getPublicPagePath,
   type PublicPageKey,
 } from "@/navigation/public-routes";
+import { getServicePagePath } from "@/navigation/service-routes";
 
 const localeLabels: Record<Locale, string> = {
   bg: "BG",
@@ -27,6 +29,7 @@ type SiteHeaderProps = {
 
 export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<"services" | "language" | null>(null);
   const mobileMenuId = useId();
   const links: Array<{ page: PublicPageKey; label: string }> = [
     { page: "home", label: content.navigation.home },
@@ -34,7 +37,13 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
     { page: "about", label: content.navigation.about },
     { page: "contacts", label: content.navigation.contacts },
   ];
+  const services = getPublicPagesContent(locale).services.items;
+  const localePathFor = (item: Locale) =>
+    localePaths?.[item] ?? getLocaleSwitchPath(item, currentPage);
   const closeMenu = () => setIsMenuOpen(false);
+  const toggleDropdown = (dropdown: "services" | "language") => {
+    setOpenDropdown((current) => (current === dropdown ? null : dropdown));
+  };
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -70,32 +79,78 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
         </Link>
 
         <nav className="main-nav" aria-label="Primary navigation">
-          {links.map(({ page, label }) => (
-            <Link
-              key={page}
-              href={getPublicPagePath(locale, page)}
-              aria-current={page === currentPage ? "page" : undefined}
-            >
-              {label}
-            </Link>
-          ))}
+          {links.map(({ page, label }) =>
+            page === "services" ? (
+              <details
+                className="nav-dropdown services-dropdown"
+                key={page}
+                open={openDropdown === "services"}
+              >
+                <summary
+                  className={page === currentPage ? "is-active" : undefined}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    toggleDropdown("services");
+                  }}
+                >
+                  {label} <span aria-hidden="true">⌄</span>
+                </summary>
+                <div className="dropdown-panel service-dropdown-panel">
+                  <Link
+                    href={getPublicPagePath(locale, "services")}
+                    aria-current={page === currentPage ? "page" : undefined}
+                    onClick={() => setOpenDropdown(null)}
+                  >
+                    {content.services.action}
+                  </Link>
+                  {services.map((service) => (
+                    <Link
+                      key={service.slug}
+                      href={getServicePagePath(locale, service.slug)}
+                      onClick={() => setOpenDropdown(null)}
+                    >
+                      {service.title}
+                    </Link>
+                  ))}
+                </div>
+              </details>
+            ) : (
+              <Link
+                key={page}
+                href={getPublicPagePath(locale, page)}
+                aria-current={page === currentPage ? "page" : undefined}
+              >
+                {label}
+              </Link>
+            ),
+          )}
         </nav>
 
         <div className="header-actions">
-          <div className="locale-switcher" aria-label="Language">
-            {locales.map((item) => (
-              <span className="locale-option" key={item}>
-                {item !== locales[0] ? <span aria-hidden="true">/</span> : null}
+          <details className="nav-dropdown locale-select" open={openDropdown === "language"}>
+            <summary
+              aria-label="Language selector"
+              onClick={(event) => {
+                event.preventDefault();
+                toggleDropdown("language");
+              }}
+            >
+              {localeLabels[locale]} <span aria-hidden="true">⌄</span>
+            </summary>
+            <div className="dropdown-panel locale-dropdown-panel" aria-label="Language">
+              {locales.map((item) => (
                 <Link
+                  key={item}
                   className={item === locale ? "is-active" : undefined}
-                  href={localePaths?.[item] ?? getLocaleSwitchPath(item, currentPage)}
+                  href={localePathFor(item)}
                   aria-current={item === locale ? "page" : undefined}
+                  onClick={() => setOpenDropdown(null)}
                 >
                   {localeLabels[item]}
                 </Link>
-              </span>
-            ))}
-          </div>
+              ))}
+            </div>
+          </details>
           <Link className="button button-small" href={`/${locale}#booking`}>
             {content.navigation.booking}
           </Link>
@@ -143,32 +198,49 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
         </div>
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          {links.map(({ page, label }) => (
-            <Link
-              key={page}
-              href={getPublicPagePath(locale, page)}
-              aria-current={page === currentPage ? "page" : undefined}
-              onClick={closeMenu}
-            >
-              {label}
-            </Link>
-          ))}
+          {links.map(({ page, label }) =>
+            page === "services" ? (
+              <details
+                className="mobile-nav-details"
+                key={page}
+                open={currentPage === "services"}
+              >
+                <summary className={page === currentPage ? "is-active" : undefined}>
+                  {label} <span aria-hidden="true">⌄</span>
+                </summary>
+                <div className="mobile-services-list">
+                  <Link
+                    href={getPublicPagePath(locale, "services")}
+                    aria-current={page === currentPage ? "page" : undefined}
+                    onClick={closeMenu}
+                  >
+                    {content.services.action}
+                  </Link>
+                  {services.map((service) => (
+                    <Link
+                      key={service.slug}
+                      href={getServicePagePath(locale, service.slug)}
+                      onClick={closeMenu}
+                    >
+                      {service.title}
+                    </Link>
+                  ))}
+                </div>
+              </details>
+            ) : (
+              <Link
+                key={page}
+                href={getPublicPagePath(locale, page)}
+                aria-current={page === currentPage ? "page" : undefined}
+                onClick={closeMenu}
+              >
+                {label}
+              </Link>
+            ),
+          )}
         </nav>
 
         <div className="mobile-menu-footer">
-          <div className="mobile-locale-switcher" aria-label="Language">
-            {locales.map((item) => (
-              <Link
-                key={item}
-                className={item === locale ? "is-active" : undefined}
-                href={localePaths?.[item] ?? getLocaleSwitchPath(item, currentPage)}
-                aria-current={item === locale ? "page" : undefined}
-                onClick={closeMenu}
-              >
-                {localeLabels[item]}
-              </Link>
-            ))}
-          </div>
           <Link className="button" href={`/${locale}#booking`} onClick={closeMenu}>
             {content.navigation.booking}
           </Link>

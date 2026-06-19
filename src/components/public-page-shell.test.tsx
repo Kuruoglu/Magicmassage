@@ -1,31 +1,43 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { getHomeContent } from "@/content/home";
+import { getPublicPagesContent } from "@/content/public-pages";
 import { PublicPageShell } from "./public-page-shell";
 
 describe("PublicPageShell", () => {
-  it("uses dedicated routes and marks the current page", () => {
+  it("uses dedicated routes and exposes the services dropdown", async () => {
+    const user = userEvent.setup();
+    const content = getHomeContent("ru");
+
     render(
-      <PublicPageShell
-        locale="ru"
-        currentPage="services"
-        content={getHomeContent("ru")}
-      >
+      <PublicPageShell locale="ru" currentPage="services" content={content}>
         <main>Catalog</main>
       </PublicPageShell>,
     );
 
-    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Главная" })).toHaveAttribute("href", "/ru");
-    expect(screen.getByRole("link", { name: "Массажи" })).toHaveAttribute("href", "/ru/services");
-    expect(screen.getByRole("link", { name: "Массажи" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Обо мне" })).toHaveAttribute("href", "/ru/about");
-    expect(screen.getByRole("link", { name: "Контакты" })).toHaveAttribute("href", "/ru/contacts");
+    const primaryNav = screen.getByRole("navigation", { name: "Primary navigation" });
+    expect(primaryNav).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Главная" })).toHaveAttribute("href", "/ru");
+    expect(within(primaryNav).getByRole("link", { name: "Обо мне" })).toHaveAttribute("href", "/ru/about");
+    expect(within(primaryNav).getByRole("link", { name: "Контакты" })).toHaveAttribute("href", "/ru/contacts");
+
+    await user.click(within(primaryNav).getByText("Массажи"));
+
+    expect(screen.getByRole("link", { name: content.services.action })).toHaveAttribute(
+      "href",
+      "/ru/services",
+    );
+    expect(screen.getByRole("link", { name: "Классический массаж" })).toHaveAttribute(
+      "href",
+      "/ru/services/classic-massage",
+    );
   });
 
-  it("preserves the selected public page when switching locale", () => {
+  it("uses a language selector that preserves the selected public page", async () => {
+    const user = userEvent.setup();
+
     render(
       <PublicPageShell
         locale="ru"
@@ -36,13 +48,16 @@ describe("PublicPageShell", () => {
       </PublicPageShell>,
     );
 
+    await user.click(screen.getByLabelText("Language selector"));
+
     expect(screen.getByRole("link", { name: "BG" })).toHaveAttribute("href", "/bg/contacts");
     expect(screen.getByRole("link", { name: "UA" })).toHaveAttribute("href", "/ua/contacts");
     expect(screen.getByRole("link", { name: "Записаться" })).toHaveAttribute("href", "/ru#booking");
   });
 
-  it("opens a left mobile menu with page, locale, and booking links", async () => {
+  it("opens a left mobile menu with a collapsible services list and no language links", async () => {
     const user = userEvent.setup();
+    const service = getPublicPagesContent("ru").services.items[0];
 
     render(
       <PublicPageShell
@@ -60,17 +75,21 @@ describe("PublicPageShell", () => {
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("navigation", { name: "Mobile navigation" })).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Контакты" })[1]).toHaveAttribute(
+    const mobileMenu = screen.getByRole("complementary");
+    const mobileNav = within(mobileMenu).getByRole("navigation", { name: "Mobile navigation" });
+    expect(within(mobileNav).getByRole("link", { name: "Контакты" })).toHaveAttribute(
       "href",
       "/ru/contacts",
     );
-    expect(screen.getAllByRole("link", { name: "Контакты" })[1]).toHaveAttribute(
-      "aria-current",
-      "page",
+    expect(within(mobileMenu).queryByRole("link", { name: "BG" })).toBeNull();
+
+    await user.click(within(mobileNav).getByText("Массажи"));
+
+    expect(within(mobileNav).getByRole("link", { name: service.title })).toHaveAttribute(
+      "href",
+      "/ru/services/classic-massage",
     );
-    expect(screen.getAllByRole("link", { name: "BG" })[1]).toHaveAttribute("href", "/bg/contacts");
-    expect(screen.getAllByRole("link", { name: "Записаться" })[1]).toHaveAttribute(
+    expect(within(mobileMenu).getByRole("link", { name: "Записаться" })).toHaveAttribute(
       "href",
       "/ru#booking",
     );
