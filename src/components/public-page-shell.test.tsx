@@ -55,7 +55,7 @@ describe("PublicPageShell", () => {
     expect(screen.getByRole("link", { name: "Записаться" })).toHaveAttribute("href", "/ru#booking");
   });
 
-  it("opens a left mobile menu with a collapsible services list and no language links", async () => {
+  it("opens a left mobile menu with services and language links", async () => {
     const user = userEvent.setup();
     const service = getPublicPagesContent("ru").services.items[0];
 
@@ -81,7 +81,18 @@ describe("PublicPageShell", () => {
       "href",
       "/ru/contacts",
     );
-    expect(within(mobileMenu).queryByRole("link", { name: "BG" })).toBeNull();
+    expect(within(mobileMenu).getByRole("link", { name: "BG" })).toHaveAttribute(
+      "href",
+      "/bg/contacts",
+    );
+    expect(within(mobileMenu).getByRole("link", { name: "RU" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(mobileMenu).getByRole("link", { name: "UA" })).toHaveAttribute(
+      "href",
+      "/ua/contacts",
+    );
 
     await user.click(within(mobileNav).getByText("Массажи"));
 

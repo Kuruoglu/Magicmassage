@@ -197,6 +197,20 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
           </button>
         </div>
 
+        <div className="mobile-locale-switcher" aria-label="Language">
+          {locales.map((item) => (
+            <Link
+              key={item}
+              className={item === locale ? "is-active" : undefined}
+              href={localePathFor(item)}
+              aria-current={item === locale ? "page" : undefined}
+              onClick={closeMenu}
+            >
+              {localeLabels[item]}
+            </Link>
+          ))}
+        </div>
+
         <nav className="mobile-nav" aria-label="Mobile navigation">
           {links.map(({ page, label }) =>
             page === "services" ? (
