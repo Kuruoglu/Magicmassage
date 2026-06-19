@@ -139,7 +139,7 @@ export const serviceDefinitions: ServiceDefinition[] = [
   {
     slug: "modeling-massage",
     category: "massage",
-    image: "/media/services/modeling-massage.jpg",
+    image: "/media/services/belly-massage.jpg",
     titles: {
       bg: "Моделиращ масаж",
       ru: "Моделирующий массаж",
@@ -275,7 +275,7 @@ export const serviceDefinitions: ServiceDefinition[] = [
   {
     slug: "belly-massage",
     category: "partial",
-    image: "/media/services/belly-massage.jpg",
+    image: "/media/services/modeling-massage.jpg",
     titles: {
       bg: "Масаж на корем",
       ru: "Массаж живота",
