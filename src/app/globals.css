@@ -592,9 +592,13 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
 @media (max-width: 720px) {
   .section-pad, .section-inner, .site-header-inner, .site-footer-inner { padding-inline: 18px; }
-  .site-header-inner { min-height: 76px; }
+  .site-header-inner { gap: 10px; grid-template-columns: minmax(0, 1fr) auto; min-height: 76px; }
+  .brand { min-width: 0; }
+  .brand span { min-width: 0; }
   .brand strong { font-size: 0.95rem; }
   .brand img { height: 42px; width: 42px; }
+  .header-actions { gap: 10px; }
+  .header-actions .locale-select { display: none; }
   .header-actions .button-small { display: none; }
   .hero, .hero-content { min-height: 650px; }
   .hero-background { object-position: 64% center; }
@@ -1111,7 +1115,9 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
 @media (max-width: 720px) {
   .hero h1 {
-    font-size: clamp(2.85rem, 13vw, 4.45rem);
+    font-size: clamp(2.35rem, 11vw, 3.35rem);
+    letter-spacing: -0.035em;
+    max-width: min(100%, 8.4em);
   }
   .hero-copy::before,
   .hero::before,
