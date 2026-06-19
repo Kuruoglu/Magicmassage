@@ -93,7 +93,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
                     toggleDropdown("services");
                   }}
                 >
-                  {label} <span aria-hidden="true">⌄</span>
+                  {label}
                 </summary>
                 <div className="dropdown-panel service-dropdown-panel">
                   <Link
@@ -135,7 +135,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
                 toggleDropdown("language");
               }}
             >
-              {localeLabels[locale]} <span aria-hidden="true">⌄</span>
+              {localeLabels[locale]}
             </summary>
             <div className="dropdown-panel locale-dropdown-panel" aria-label="Language">
               {locales.map((item) => (
@@ -206,7 +206,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
                 open={currentPage === "services"}
               >
                 <summary className={page === currentPage ? "is-active" : undefined}>
-                  {label} <span aria-hidden="true">⌄</span>
+                  {label}
                 </summary>
                 <div className="mobile-services-list">
                   <Link

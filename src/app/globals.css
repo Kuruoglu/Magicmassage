@@ -80,9 +80,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
   align-items: center;
   cursor: pointer;
   display: inline-flex;
-  gap: 6px;
+  gap: 8px;
   list-style: none;
   user-select: none;
+}
+.nav-dropdown summary::before {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  content: "";
+  display: block;
+  height: 5px;
+  order: 2;
+  transform: translateY(-1px) rotate(45deg);
+  width: 5px;
 }
 .nav-dropdown summary::-webkit-details-marker {
   display: none;
@@ -247,6 +257,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
   display: flex;
   justify-content: space-between;
   list-style: none;
+}
+.mobile-nav summary::after {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  content: "";
+  display: block;
+  height: 9px;
+  margin-left: 18px;
+  transform: translateY(-2px) rotate(45deg);
+  width: 9px;
 }
 .mobile-nav summary::-webkit-details-marker {
   display: none;
