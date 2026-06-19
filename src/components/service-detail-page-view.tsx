@@ -50,6 +50,19 @@ const localized = {
     noteText:
       "Якщо є сильний біль, нещодавня травма, вагітність або медичний стан, повідомте про це до візиту, щоб підібрати відповідний формат.",
   },
+  en: {
+    eyebrow: "Massage type",
+    back: "All massages",
+    suitableTitle: "What it is suitable for",
+    suitableText:
+      "Suitable when you need focused care, more lightness in the body and a calmer rhythm after a busy or tense day.",
+    sessionTitle: "How the session works",
+    sessionText:
+      "The session starts with a short conversation about your comfort, tension areas and preferred intensity. The work is adapted to how you feel.",
+    noteTitle: "Before booking",
+    noteText:
+      "If you have strong pain, a recent injury, pregnancy or a medical condition, please mention it before the visit so the right format can be chosen.",
+  },
 } satisfies Record<Locale, Record<string, string>>;
 
 export function ServiceDetailPageView({
@@ -125,4 +138,3 @@ export function ServiceDetailPageView({
     </main>
   );
 }
-

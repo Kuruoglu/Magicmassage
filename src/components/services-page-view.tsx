@@ -14,6 +14,7 @@ const detailLinkLabels: Record<Locale, string> = {
   bg: "Повече",
   ru: "Подробнее",
   ua: "Докладніше",
+  en: "More",
 };
 
 export function ServicesPageView({ locale, content }: ServicesPageViewProps) {

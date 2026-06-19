@@ -4,7 +4,7 @@ import { getPublicPagesContent, getServiceContent, getServiceSlugs } from "./pub
 
 describe("public pages content", () => {
   it("provides a complete eleven-service catalog for every locale", () => {
-    for (const locale of ["bg", "ru", "ua"] as const) {
+    for (const locale of ["bg", "ru", "ua", "en"] as const) {
       const content = getPublicPagesContent(locale);
 
       expect(content.services.items).toHaveLength(11);
@@ -15,7 +15,7 @@ describe("public pages content", () => {
   });
 
   it("provides complete About and Contacts pages in every locale", () => {
-    for (const locale of ["bg", "ru", "ua"] as const) {
+    for (const locale of ["bg", "ru", "ua", "en"] as const) {
       const content = getPublicPagesContent(locale);
 
       expect(content.about.title.length).toBeGreaterThan(10);
@@ -29,12 +29,12 @@ describe("public pages content", () => {
 
   it("localizes page headings instead of reusing one language", () => {
     const serviceTitles = new Set(
-      (["bg", "ru", "ua"] as const).map(
+      (["bg", "ru", "ua", "en"] as const).map(
         (locale) => getPublicPagesContent(locale).services.title,
       ),
     );
 
-    expect(serviceTitles.size).toBe(3);
+    expect(serviceTitles.size).toBe(4);
   });
 
   it("finds individual service content by slug", () => {

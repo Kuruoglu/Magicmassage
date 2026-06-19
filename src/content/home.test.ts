@@ -4,7 +4,7 @@ import { getHomeContent } from "./home";
 
 describe("home content", () => {
   it("provides localized hero and navigation content for every locale", () => {
-    for (const locale of ["bg", "ru", "ua"] as const) {
+    for (const locale of ["bg", "ru", "ua", "en"] as const) {
       const content = getHomeContent(locale);
 
       expect(content.brand).toBe("Magic Massage Natali");
@@ -16,18 +16,18 @@ describe("home content", () => {
 
   it("returns different localized hero titles", () => {
     const titles = new Set(
-      (["bg", "ru", "ua"] as const).map(
+      (["bg", "ru", "ua", "en"] as const).map(
         (locale) => getHomeContent(locale).hero.title,
       ),
     );
 
-    expect(titles.size).toBe(3);
+    expect(titles.size).toBe(4);
   });
 
   it("uses the first three catalog services as home page previews", async () => {
     const { getPublicPagesContent } = await import("./public-pages");
 
-    for (const locale of ["bg", "ru", "ua"] as const) {
+    for (const locale of ["bg", "ru", "ua", "en"] as const) {
       expect(getHomeContent(locale).services.items).toEqual(
         getPublicPagesContent(locale).services.items.slice(0, 3),
       );

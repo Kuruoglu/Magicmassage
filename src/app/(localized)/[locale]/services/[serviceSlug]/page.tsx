@@ -21,18 +21,21 @@ const languageAlternates = {
   bg: "bg-BG",
   ru: "ru",
   ua: "uk-UA",
+  en: "en",
 } as const;
 
 const titleSuffix: Record<Locale, string> = {
   bg: "в Бургас",
   ru: "в Бургасе",
   ua: "у Бургасі",
+  en: "in Burgas",
 };
 
 const descriptionPrefix: Record<Locale, string> = {
   bg: "Описание, подход и записване за",
   ru: "Описание, подход и запись на",
   ua: "Опис, підхід і запис на",
+  en: "Description, approach and booking for",
 };
 
 export function generateStaticParams() {
@@ -76,7 +79,7 @@ export async function generateMetadata({ params }: ServicePageProps): Promise<Me
       title: `${title} | Magic Massage Natali`,
       description,
       type: "website",
-      locale: locale === "ua" ? "uk_UA" : locale === "bg" ? "bg_BG" : "ru_RU",
+      locale: locale === "ua" ? "uk_UA" : locale === "bg" ? "bg_BG" : locale === "en" ? "en" : "ru_RU",
       images: [service.image],
     },
   };

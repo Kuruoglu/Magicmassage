@@ -241,6 +241,58 @@ const content: Record<Locale, PublicPagesContent> = {
       mapDescription: "Карта показує Magic Massage Natali на вул. «Места» 49. Кнопка маршруту відкриє Google Maps.",
     },
   },
+  en: {
+    services: {
+      eyebrow: "All treatments",
+      title: "Massages for recovery, lightness and a calmer rhythm",
+      description: "Choose the right care for your comfort, daily load and the feeling you want after the session.",
+      bookingAction: "Book now",
+      items: services(
+        ["Classic massage", "Anti-cellulite massage", "Deep tissue massage", "Therapeutic massage", "Relaxing massage", "SPA procedures", "Thai massage", "Partial massage", "Cupping therapy", "Anti-stress massage", "Chiropractic massage"],
+        [
+          "Balanced work for tone, movement and general recovery.",
+          "Targeted techniques for tone and care for specific body zones.",
+          "Focused work with accumulated muscle tension and stiffness.",
+          "Individually adapted work according to your condition and comfort.",
+          "Smooth techniques for stress relief and deep relaxation.",
+          "Calm rituals combining body care and pleasant sensory relaxation.",
+          "Stretching and pressure for mobility and a feeling of lightness.",
+          "A shorter focused session for a selected area with built-up tension.",
+          "Cupping as an additional technique for releasing tissue tension.",
+          "A soft rhythm and calming movements for fatigue and emotional tension.",
+          "A manual mobility approach offered only within qualification and client needs.",
+        ],
+        "Massage treatment",
+      ),
+    },
+    about: {
+      eyebrow: "About Natali and the studio",
+      title: "Personal attention in a calm and discreet atmosphere",
+      lead: "Magic Massage Natali is a small massage studio in Burgas created for individual care without rush.",
+      paragraphs: [
+        "Each session starts with a short conversation about how you feel, your preferences and areas of tension. Intensity and rhythm are adapted to your comfort.",
+        "The studio is arranged to provide calm, cleanliness and personal attention from the moment you arrive until the end of the visit.",
+      ],
+      values: ["Individual approach", "Attention to comfort", "Calm atmosphere", "Personal communication"],
+      imageAlt: "Natali during a massage treatment",
+      studioImageAlt: "Interior of Magic Massage Natali in Burgas",
+    },
+    contacts: {
+      eyebrow: "Visit the studio",
+      title: "Contacts and booking at Magic Massage Natali",
+      description: "Contact the studio directly to choose a treatment and a convenient appointment time.",
+      addressLabel: "Address",
+      address: "Mesta Street 49, Burgas",
+      phoneLabel: "Phone",
+      phone: "+359 89 677 8309",
+      hoursLabel: "Working hours",
+      hours: "By appointment",
+      callAction: "Call now",
+      directionsAction: "Get directions",
+      mapTitle: "The studio is in Burgas",
+      mapDescription: "The map shows Magic Massage Natali at Mesta Street 49. The directions button opens Google Maps.",
+    },
+  },
 };
 
 export function getPublicPagesContent(locale: Locale): PublicPagesContent {

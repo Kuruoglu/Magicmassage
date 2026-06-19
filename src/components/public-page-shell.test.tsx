@@ -52,6 +52,7 @@ describe("PublicPageShell", () => {
 
     expect(screen.getByRole("link", { name: "BG" })).toHaveAttribute("href", "/bg/contacts");
     expect(screen.getByRole("link", { name: "UA" })).toHaveAttribute("href", "/ua/contacts");
+    expect(screen.getByRole("link", { name: "EN" })).toHaveAttribute("href", "/en/contacts");
     expect(screen.getByRole("link", { name: "Записаться" })).toHaveAttribute("href", "/ru#booking");
   });
 
@@ -92,6 +93,10 @@ describe("PublicPageShell", () => {
     expect(within(mobileMenu).getByRole("link", { name: "UA" })).toHaveAttribute(
       "href",
       "/ua/contacts",
+    );
+    expect(within(mobileMenu).getByRole("link", { name: "EN" })).toHaveAttribute(
+      "href",
+      "/en/contacts",
     );
 
     await user.click(within(mobileNav).getByText("Массажи"));

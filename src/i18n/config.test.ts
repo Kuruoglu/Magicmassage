@@ -8,12 +8,13 @@ import {
 } from "./config";
 
 describe("locale configuration", () => {
-  it("supports the agreed BG, RU, and UA public locale segments", () => {
-    expect(locales).toEqual(["bg", "ru", "ua"]);
+  it("supports the agreed BG, RU, UA, and EN public locale segments", () => {
+    expect(locales).toEqual(["bg", "ru", "ua", "en"]);
     expect(defaultLocale).toBe("bg");
     expect(isSupportedLocale("bg")).toBe(true);
     expect(isSupportedLocale("ru")).toBe(true);
     expect(isSupportedLocale("ua")).toBe(true);
+    expect(isSupportedLocale("en")).toBe(true);
     expect(isSupportedLocale("uk")).toBe(false);
   });
 
@@ -21,5 +22,6 @@ describe("locale configuration", () => {
     expect(getHtmlLanguage("bg")).toBe("bg-BG");
     expect(getHtmlLanguage("ru")).toBe("ru");
     expect(getHtmlLanguage("ua")).toBe("uk-UA");
+    expect(getHtmlLanguage("en")).toBe("en");
   });
 });

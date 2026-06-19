@@ -11,6 +11,7 @@ describe("createHomeMetadata", () => {
       "bg-BG": "/bg",
       ru: "/ru",
       "uk-UA": "/ua",
+      en: "/en",
       "x-default": "/bg",
     });
   });

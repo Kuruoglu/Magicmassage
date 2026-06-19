@@ -10,8 +10,10 @@ describe("public page metadata", () => {
 
     expect(services.alternates?.canonical).toBe("/bg/services");
     expect(services.alternates?.languages?.["ru"]).toBe("/ru/services");
+    expect(services.alternates?.languages?.["en"]).toBe("/en/services");
     expect(about.alternates?.canonical).toBe("/ru/about");
     expect(contacts.alternates?.canonical).toBe("/ua/contacts");
     expect(contacts.alternates?.languages?.["uk-UA"]).toBe("/ua/contacts");
+    expect(createPublicPageMetadata("en", "contacts").alternates?.canonical).toBe("/en/contacts");
   });
 });

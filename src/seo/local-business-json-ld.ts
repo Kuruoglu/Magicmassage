@@ -7,6 +7,7 @@ const descriptions: Record<Locale, string> = {
   bg: "Масажно студио в Бургас за индивидуален класически, релаксиращ, дълбокотъканен и антицелулитен масаж.",
   ru: "Массажный салон в Бургасе для индивидуального классического, расслабляющего, глубокого и антицеллюлитного массажа.",
   ua: "Масажний салон у Бургасі для індивідуального класичного, розслаблювального, глибокого та антицелюлітного масажу.",
+  en: "Massage studio in Burgas for individual classic, relaxing, deep tissue and anti-cellulite massage.",
 };
 
 export function createLocalBusinessJsonLd(locale: Locale, content: HomeContent) {
@@ -32,7 +33,7 @@ export function createLocalBusinessJsonLd(locale: Locale, content: HomeContent) 
       "@type": "City",
       name: "Burgas",
     },
-    availableLanguage: ["Bulgarian", "Russian", "Ukrainian"],
+    availableLanguage: ["Bulgarian", "Russian", "Ukrainian", "English"],
     makesOffer: services.map((service) => ({
       "@type": "Offer",
       itemOffered: {

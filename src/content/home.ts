@@ -279,6 +279,80 @@ const content: Record<Locale, HomeContent> = {
       hours: "За попереднім записом",
     },
   },
+  en: {
+    brand: "Magic Massage Natali",
+    navigation: {
+      home: "Home",
+      services: "Massages",
+      about: "About me",
+      blog: "Blog",
+      contacts: "Contacts",
+      booking: "Book now",
+    },
+    hero: {
+      eyebrow: "Massage studio in Burgas",
+      title: "Care for the body. Calm for the mind.",
+      description:
+        "Personal massage in a calm atmosphere, adapted to your condition, rhythm and goals.",
+      primaryAction: "Book now",
+      secondaryAction: "Explore massages",
+    },
+    services: {
+      eyebrow: "Selected treatments",
+      title: "Massage matched to what your body needs",
+      description:
+        "From deep relaxation to focused work with tension, tiredness and specific body zones.",
+      action: "All massage types",
+      items: getPublicPagesContent("en").services.items.slice(0, 3),
+    },
+    about: {
+      eyebrow: "About Natali",
+      title: "Attentive care for every person",
+      description:
+        "Every session begins with a short conversation and is adapted to your comfort. The goal is to leave lighter, calmer and genuinely cared for.",
+      points: ["Individual approach", "Cozy studio", "Easy online booking"],
+    },
+    trust: [
+      {
+        icon: "access",
+        title: "Accessibility",
+        description: "A convenient location in Burgas, easy contact and booking for a suitable time.",
+        highlight: "Burgas",
+        shortLabel: "convenient location",
+      },
+      {
+        icon: "variations",
+        title: "Massage variations",
+        description: "Classic, relaxing, deep tissue and focused massage options for different goals.",
+        highlight: "11 types",
+        shortLabel: "for different needs",
+      },
+      {
+        icon: "professional",
+        title: "Professional care",
+        description: "A thoughtful approach, clean atmosphere and work with respect for your comfort.",
+        highlight: "personal",
+        shortLabel: "with attention",
+      },
+    ],
+    booking: {
+      eyebrow: "Your time to rest",
+      title: "Choose a massage and send a request for a convenient time",
+      description:
+        "Natali will personally confirm the booking. If the selected time is busy, you will receive the nearest available option.",
+      action: "Book now",
+    },
+    contact: {
+      eyebrow: "Visit the studio",
+      title: "Magic Massage Natali in Burgas",
+      addressLabel: "Address",
+      address: "Mesta Street 49, Burgas",
+      phoneLabel: "Phone",
+      phone: "+359 89 677 8309",
+      hoursLabel: "Working hours",
+      hours: "By appointment",
+    },
+  },
 };
 
 export function getHomeContent(locale: Locale): HomeContent {

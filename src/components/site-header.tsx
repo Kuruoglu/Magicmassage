@@ -18,6 +18,7 @@ const localeLabels: Record<Locale, string> = {
   bg: "BG",
   ru: "RU",
   ua: "UA",
+  en: "EN",
 };
 
 type SiteHeaderProps = {
