@@ -43,7 +43,7 @@ describe("HomePageView", () => {
     expect(jsonLd.name).toBe("Magic Massage Natali");
     expect(jsonLd.address.addressLocality).toBe("Burgas");
     expect(jsonLd.telephone).toBe("+359 89 677 8309");
-    expect(jsonLd.makesOffer).toHaveLength(11);
+    expect(jsonLd.makesOffer).toHaveLength(19);
   });
 
   it("omits the hero note and service sequence labels", () => {

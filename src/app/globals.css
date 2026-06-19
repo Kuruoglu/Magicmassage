@@ -471,6 +471,12 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .contact-page.section-pad {
   padding-inline: 0;
 }
+.catalog-group + .catalog-group { margin-top: 72px; }
+.catalog-group > h2 {
+  color: var(--graphite);
+  font-size: clamp(1.7rem, 3vw, 2.8rem);
+  margin-bottom: 26px;
+}
 .catalog-grid { display: grid; gap: 22px; grid-template-columns: repeat(3, 1fr); }
 .catalog-card {
   background: var(--cream-strong);
@@ -489,7 +495,8 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.catalog-copy h2 { font-size: clamp(1.45rem, 2.4vw, 2.05rem); }
+.catalog-copy h2,
+.catalog-copy h3 { font-size: clamp(1.45rem, 2.4vw, 2.05rem); }
 .catalog-copy span { color: var(--muted); font-size: 0.82rem; line-height: 1.7; }
 .catalog-copy a { color: var(--gold); font-size: 0.76rem; font-weight: 700; margin-top: 8px; }
 .story-section {

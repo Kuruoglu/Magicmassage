@@ -13,8 +13,11 @@ describe("localized public page views", () => {
     render(<ServicesPageView locale="ru" content={content.services} />);
 
     expect(screen.getByRole("heading", { level: 1, name: content.services.title })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: content.services.categoryLabels.massage })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: content.services.categoryLabels.partial })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: content.services.categoryLabels.spa })).toBeInTheDocument();
     for (const service of content.services.items) {
-      expect(screen.getByRole("heading", { level: 2, name: service.title })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 3, name: service.title })).toBeInTheDocument();
     }
     expect(screen.getAllByRole("link", { name: /Подробнее/ })[0]).toHaveAttribute(
       "href",

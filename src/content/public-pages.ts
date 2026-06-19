@@ -1,7 +1,13 @@
+import {
+  buildServices,
+  serviceCategoryLabels,
+  type ServiceCategory,
+} from "@/content/service-catalog";
 import type { Locale } from "@/i18n/config";
 
 export type ServiceContent = {
   slug: string;
+  category: ServiceCategory;
   title: string;
   description: string;
   image: string;
@@ -14,6 +20,7 @@ export type PublicPagesContent = {
     title: string;
     description: string;
     bookingAction: string;
+    categoryLabels: Record<ServiceCategory, string>;
     items: ServiceContent[];
   };
   about: {
@@ -42,48 +49,6 @@ export type PublicPagesContent = {
   };
 };
 
-const serviceImages: Record<string, string> = {
-  "classic-massage": "/media/services/classic-massage.jpg",
-  "anti-cellulite-massage": "/media/services/anti-cellulite-massage.jpg",
-  "deep-tissue-massage": "/media/services/deep-tissue-massage.jpg",
-  "therapeutic-massage": "/media/services/therapeutic-massage.jpg",
-  "relaxing-massage": "/media/services/relaxing-massage.jpg",
-  "spa-procedures": "/media/services/spa-procedures.jpg",
-  "thai-massage": "/media/services/thai-massage.jpg",
-  "partial-massage": "/media/services/partial-massage.jpg",
-  "cupping-therapy": "/media/services/cupping-therapy.jpg",
-  "anti-stress-massage": "/media/services/anti-stress-massage.jpg",
-  "chiropractic-massage": "/media/services/chiropractic-massage.jpg",
-};
-
-function services(
-  names: string[],
-  descriptions: string[],
-  altPrefix: string,
-): ServiceContent[] {
-  const slugs = [
-    "classic-massage",
-    "anti-cellulite-massage",
-    "deep-tissue-massage",
-    "therapeutic-massage",
-    "relaxing-massage",
-    "spa-procedures",
-    "thai-massage",
-    "partial-massage",
-    "cupping-therapy",
-    "anti-stress-massage",
-    "chiropractic-massage",
-  ];
-
-  return slugs.map((slug, index) => ({
-    slug,
-    title: names[index],
-    description: descriptions[index],
-    image: serviceImages[slug],
-    imageAlt: `${altPrefix}: ${names[index]}`,
-  }));
-}
-
 const content: Record<Locale, PublicPagesContent> = {
   bg: {
     services: {
@@ -91,23 +56,8 @@ const content: Record<Locale, PublicPagesContent> = {
       title: "Масажи за възстановяване, лекота и спокоен ритъм",
       description: "Изберете подходяща грижа според Вашия комфорт, натоварване и желаното усещане след сеанса.",
       bookingAction: "Запази час",
-      items: services(
-        ["Класически масаж", "Антицелулитен масаж", "Дълбокотъканен масаж", "Терапевтичен масаж", "Релаксиращ масаж", "SPA процедури", "Тайландски масаж", "Частичен масаж", "Вендузотерапия", "Антистрес масаж", "Хиропрактичен масаж"],
-        [
-          "Балансирана грижа за тонус, движение и общо възстановяване.",
-          "Целенасочени техники за тонизиране и грижа за проблемните зони.",
-          "Фокусирана работа при натрупано мускулно напрежение и скованост.",
-          "Индивидуално подбрана работа според състоянието и комфорта на клиента.",
-          "Плавни техники за освобождаване от стрес и дълбоко отпускане.",
-          "Комбинация от спокойни ритуали за грижа за тялото и сетивата.",
-          "Разтягания и натиск, насочени към подвижност и усещане за лекота.",
-          "Кратък фокусиран сеанс за избрана зона с натрупано напрежение.",
-          "Работа с вендузи като допълваща техника за отпускане на тъканите.",
-          "Мек ритъм и успокояващи движения за умора и емоционално напрежение.",
-          "Мануален подход за мобилност, който се предлага само според квалификацията и нуждите.",
-        ],
-        "Масажна процедура",
-      ),
+      categoryLabels: serviceCategoryLabels.bg,
+      items: buildServices("bg"),
     },
     about: {
       eyebrow: "За Натали и студиото",
@@ -143,23 +93,8 @@ const content: Record<Locale, PublicPagesContent> = {
       title: "Массажи для восстановления, легкости и спокойного ритма",
       description: "Выберите подходящий уход с учетом вашего комфорта, нагрузки и желаемого ощущения после сеанса.",
       bookingAction: "Записаться",
-      items: services(
-        ["Классический массаж", "Антицеллюлитный массаж", "Глубокий массаж тканей", "Терапевтический массаж", "Расслабляющий массаж", "SPA-процедуры", "Тайский массаж", "Частичный массаж", "Баночная терапия", "Антистрессовый массаж", "Хиропрактический массаж"],
-        [
-          "Сбалансированная работа для тонуса, движения и общего восстановления.",
-          "Направленные техники для тонуса и ухода за отдельными зонами.",
-          "Сфокусированная работа с накопившимся мышечным напряжением и скованностью.",
-          "Индивидуально подобранная работа с учетом состояния и комфорта клиента.",
-          "Плавные техники для снятия стресса и глубокого расслабления.",
-          "Спокойные ритуалы, объединяющие уход за телом и приятные ощущения.",
-          "Растяжения и давление для улучшения подвижности и ощущения легкости.",
-          "Короткий сфокусированный сеанс для выбранной зоны напряжения.",
-          "Использование банок как дополнительной техники для расслабления тканей.",
-          "Мягкий ритм и успокаивающие движения при усталости и эмоциональном напряжении.",
-          "Мануальный подход к подвижности, применяемый только в рамках квалификации и потребностей клиента.",
-        ],
-        "Массажная процедура",
-      ),
+      categoryLabels: serviceCategoryLabels.ru,
+      items: buildServices("ru"),
     },
     about: {
       eyebrow: "О Натали и салоне",
@@ -195,23 +130,8 @@ const content: Record<Locale, PublicPagesContent> = {
       title: "Масажі для відновлення, легкості та спокійного ритму",
       description: "Оберіть відповідний догляд з урахуванням вашого комфорту, навантаження та бажаного відчуття після сеансу.",
       bookingAction: "Записатися",
-      items: services(
-        ["Класичний масаж", "Антицелюлітний масаж", "Глибокий масаж тканин", "Терапевтичний масаж", "Розслаблювальний масаж", "SPA-процедури", "Тайський масаж", "Частковий масаж", "Баночна терапія", "Антистресовий масаж", "Хіропрактичний масаж"],
-        [
-          "Збалансована робота для тонусу, рухливості та загального відновлення.",
-          "Спрямовані техніки для тонусу й догляду за окремими зонами.",
-          "Зосереджена робота з накопиченим м'язовим напруженням і скутістю.",
-          "Індивідуально підібрана робота з урахуванням стану та комфорту клієнта.",
-          "Плавні техніки для зняття стресу та глибокого розслаблення.",
-          "Спокійні ритуали, що поєднують догляд за тілом і приємні відчуття.",
-          "Розтягування й тиск для рухливості та відчуття легкості.",
-          "Короткий зосереджений сеанс для обраної зони напруження.",
-          "Використання банок як додаткової техніки для розслаблення тканин.",
-          "М'який ритм і заспокійливі рухи при втомі та емоційному напруженні.",
-          "Мануальний підхід до рухливості, що застосовується лише в межах кваліфікації та потреб клієнта.",
-        ],
-        "Масажна процедура",
-      ),
+      categoryLabels: serviceCategoryLabels.ua,
+      items: buildServices("ua"),
     },
     about: {
       eyebrow: "Про Наталі та салон",
@@ -247,23 +167,8 @@ const content: Record<Locale, PublicPagesContent> = {
       title: "Massages for recovery, lightness and a calmer rhythm",
       description: "Choose the right care for your comfort, daily load and the feeling you want after the session.",
       bookingAction: "Book now",
-      items: services(
-        ["Classic massage", "Anti-cellulite massage", "Deep tissue massage", "Therapeutic massage", "Relaxing massage", "SPA procedures", "Thai massage", "Partial massage", "Cupping therapy", "Anti-stress massage", "Chiropractic massage"],
-        [
-          "Balanced work for tone, movement and general recovery.",
-          "Targeted techniques for tone and care for specific body zones.",
-          "Focused work with accumulated muscle tension and stiffness.",
-          "Individually adapted work according to your condition and comfort.",
-          "Smooth techniques for stress relief and deep relaxation.",
-          "Calm rituals combining body care and pleasant sensory relaxation.",
-          "Stretching and pressure for mobility and a feeling of lightness.",
-          "A shorter focused session for a selected area with built-up tension.",
-          "Cupping as an additional technique for releasing tissue tension.",
-          "A soft rhythm and calming movements for fatigue and emotional tension.",
-          "A manual mobility approach offered only within qualification and client needs.",
-        ],
-        "Massage treatment",
-      ),
+      categoryLabels: serviceCategoryLabels.en,
+      items: buildServices("en"),
     },
     about: {
       eyebrow: "About Natali and the studio",
