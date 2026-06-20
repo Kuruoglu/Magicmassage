@@ -197,16 +197,20 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
         </section>
 
         <section className="booking section-pad" id="booking">
-          <div className="booking-mark" aria-hidden="true">☯</div>
-          <div>
-            <p className="eyebrow eyebrow-light">{content.booking.eyebrow}</p>
-            <h2>{content.booking.title}</h2>
-          </div>
-          <div className="booking-action">
-            <p>{content.booking.description}</p>
-            <a className="button button-light" {...externalBookingLinkProps}>
-              {content.booking.action}
-            </a>
+          <div className="booking-card">
+            <div className="booking-mark" aria-hidden="true">
+              <TrustIcon type="access" />
+            </div>
+            <div className="booking-copy">
+              <p className="eyebrow eyebrow-light">{content.booking.eyebrow}</p>
+              <h2>{content.booking.title}</h2>
+            </div>
+            <div className="booking-action">
+              <p>{content.booking.description}</p>
+              <a className="button" {...externalBookingLinkProps}>
+                {content.booking.action}
+              </a>
+            </div>
           </div>
         </section>
       </main>
