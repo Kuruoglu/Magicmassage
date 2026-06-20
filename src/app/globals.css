@@ -630,7 +630,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 .story-images { min-height: 620px; position: relative; }
 .story-image-large, .story-image-small { box-shadow: var(--shadow); overflow: hidden; position: absolute; }
-.story-image-large { inset: 0 14% 10% 0; }
+.story-image-large { inset: 0; }
 .story-image-small { border: 10px solid var(--cream-strong); bottom: 0; height: 40%; right: 0; width: 44%; }
 .story-copy { display: grid; gap: 26px; }
 .story-copy p { color: #E8DDEE; line-height: 1.8; }

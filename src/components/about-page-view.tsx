@@ -41,14 +41,6 @@ export function AboutPageView({ content }: AboutPageViewProps) {
                 sizes="(max-width: 840px) 92vw, 42vw"
               />
             </div>
-            <div className="story-image-small">
-              <Image
-                src="/media/gallery/studio-treatment-room.jpg"
-                alt={content.studioImageAlt}
-                fill
-                sizes="(max-width: 840px) 56vw, 22vw"
-              />
-            </div>
           </div>
           <div className="story-copy">
             {content.paragraphs.map((paragraph) => (

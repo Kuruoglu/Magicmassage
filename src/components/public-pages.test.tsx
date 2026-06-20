@@ -56,7 +56,8 @@ describe("localized public page views", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: content.about.title })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: content.about.imageAlt })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: content.about.studioImageAlt })).toBeInTheDocument();
+    expect(screen.getByText(content.about.values[0])).toBeInTheDocument();
+    expect(screen.getByText(content.about.values[2])).toBeInTheDocument();
   });
 
   it("renders contact facts and a direct call action", () => {
