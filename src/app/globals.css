@@ -485,17 +485,19 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   font-size: clamp(1.7rem, 3vw, 2.8rem);
   margin-bottom: 26px;
 }
-.catalog-grid { display: grid; gap: 22px; grid-template-columns: repeat(3, 1fr); }
+.catalog-grid { display: grid; gap: 22px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .catalog-card {
   background: var(--cream-strong);
   border: 1px solid rgba(141, 90, 174, 0.16);
   border-radius: 10px;
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
   min-height: 100%;
   overflow: hidden;
 }
 .catalog-image { aspect-ratio: 1.12; overflow: hidden; position: relative; }
-.catalog-copy { color: var(--graphite); display: grid; gap: 14px; padding: 28px; }
+.catalog-copy { color: var(--graphite); display: flex; flex: 1; flex-direction: column; gap: 14px; padding: 28px; }
 .catalog-copy > p {
   color: var(--gold);
   font-size: 0.62rem;
@@ -506,7 +508,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .catalog-copy h2,
 .catalog-copy h3 { font-size: clamp(1.45rem, 2.4vw, 2.05rem); }
 .catalog-copy span { color: var(--muted); font-size: 0.82rem; line-height: 1.7; }
-.catalog-copy a { color: var(--gold); font-size: 0.76rem; font-weight: 700; margin-top: 8px; }
+.catalog-copy a { color: var(--gold); font-size: 0.76rem; font-weight: 700; margin-top: auto; }
 .story-section {
   align-items: center;
   background:
@@ -1408,7 +1410,92 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
 .service-image,
 .catalog-image {
+  background:
+    radial-gradient(circle at 35% 25%, rgba(176, 122, 221, 0.22), transparent 34%),
+    linear-gradient(135deg, #FFFFFF, #F1E9F7);
   border-radius: calc(var(--radius-card) - 4px) calc(var(--radius-card) - 4px) 0 0;
+}
+
+.catalog-section {
+  background:
+    radial-gradient(circle at 14% 4%, rgba(155, 107, 194, 0.14), transparent 28%),
+    radial-gradient(circle at 88% 12%, rgba(176, 122, 221, 0.12), transparent 30%),
+    linear-gradient(180deg, #FBFAFC 0%, #F4EEF8 54%, #F8F5FA 100%);
+  overflow: hidden;
+  position: relative;
+}
+
+.catalog-section::before {
+  background:
+    linear-gradient(135deg, transparent 0 48%, rgba(155, 107, 194, 0.1) 48% 48.25%, transparent 48.25%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.7), transparent 62%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.catalog-section > .section-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.catalog-group + .catalog-group {
+  margin-top: clamp(58px, 7vw, 92px);
+}
+
+.catalog-group > h2 {
+  display: inline-flex;
+  margin-bottom: 30px;
+  padding-left: 18px;
+  position: relative;
+}
+
+.catalog-group > h2::before {
+  background: linear-gradient(180deg, var(--purple), transparent);
+  border-radius: 999px;
+  content: "";
+  left: 0;
+  position: absolute;
+  top: 0.18em;
+  bottom: 0.12em;
+  width: 3px;
+}
+
+.catalog-grid {
+  gap: clamp(20px, 2.4vw, 30px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.catalog-card,
+.catalog-card:nth-child(1),
+.catalog-card:nth-child(6),
+.catalog-card:nth-child(11) {
+  grid-column: auto;
+}
+
+.catalog-card {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(155, 107, 194, 0.22);
+  min-height: 100%;
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+
+.catalog-card:hover {
+  border-color: rgba(155, 107, 194, 0.48);
+  box-shadow: 0 36px 90px rgba(29, 20, 36, 0.16);
+  transform: translateY(-6px);
+}
+
+.catalog-card:nth-child(1) .catalog-image,
+.catalog-card:nth-child(6) .catalog-image,
+.catalog-card:nth-child(11) .catalog-image,
+.catalog-image {
+  aspect-ratio: 1.05;
+}
+
+.catalog-copy span {
+  color: #5E5366;
 }
 
 .about,
@@ -1524,5 +1611,23 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .booking::before,
   .site-footer::before {
     opacity: 0.7;
+  }
+}
+
+@media (max-width: 980px) {
+  .catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .catalog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalog-card:nth-child(1),
+  .catalog-card:nth-child(6),
+  .catalog-card:nth-child(11) {
+    grid-column: auto;
   }
 }
