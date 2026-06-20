@@ -53,6 +53,10 @@ export type HomeContent = {
     phone: string;
     hoursLabel: string;
     hours: string;
+    hoursSchedule: Array<{
+      day: string;
+      time: string;
+    }>;
   };
 };
 
@@ -129,6 +133,15 @@ const content: Record<Locale, HomeContent> = {
       phone: "+359 89 677 8309",
       hoursLabel: "Работно време",
       hours: "С предварително записване",
+      hoursSchedule: [
+        { day: "Понеделник", time: "10:00 - 19:00" },
+        { day: "Вторник", time: "10:00 - 19:00" },
+        { day: "Сряда", time: "10:00 - 19:00" },
+        { day: "Четвъртък", time: "10:00 - 19:00" },
+        { day: "Петък", time: "10:00 - 19:00" },
+        { day: "Събота", time: "10:00 - 18:00" },
+        { day: "Неделя", time: "почивен ден" },
+      ],
     },
   },
   ru: {
@@ -203,6 +216,15 @@ const content: Record<Locale, HomeContent> = {
       phone: "+359 89 677 8309",
       hoursLabel: "Время работы",
       hours: "По предварительной записи",
+      hoursSchedule: [
+        { day: "Понедельник", time: "10:00 - 19:00" },
+        { day: "Вторник", time: "10:00 - 19:00" },
+        { day: "Среда", time: "10:00 - 19:00" },
+        { day: "Четверг", time: "10:00 - 19:00" },
+        { day: "Пятница", time: "10:00 - 19:00" },
+        { day: "Суббота", time: "10:00 - 18:00" },
+        { day: "Воскресенье", time: "выходной" },
+      ],
     },
   },
   ua: {
@@ -277,6 +299,15 @@ const content: Record<Locale, HomeContent> = {
       phone: "+359 89 677 8309",
       hoursLabel: "Години роботи",
       hours: "За попереднім записом",
+      hoursSchedule: [
+        { day: "Понеділок", time: "10:00 - 19:00" },
+        { day: "Вівторок", time: "10:00 - 19:00" },
+        { day: "Середа", time: "10:00 - 19:00" },
+        { day: "Четвер", time: "10:00 - 19:00" },
+        { day: "П'ятниця", time: "10:00 - 19:00" },
+        { day: "Субота", time: "10:00 - 18:00" },
+        { day: "Неділя", time: "вихідний" },
+      ],
     },
   },
   en: {
@@ -351,6 +382,15 @@ const content: Record<Locale, HomeContent> = {
       phone: "+359 89 677 8309",
       hoursLabel: "Working hours",
       hours: "By appointment",
+      hoursSchedule: [
+        { day: "Monday", time: "10:00 - 19:00" },
+        { day: "Tuesday", time: "10:00 - 19:00" },
+        { day: "Wednesday", time: "10:00 - 19:00" },
+        { day: "Thursday", time: "10:00 - 19:00" },
+        { day: "Friday", time: "10:00 - 19:00" },
+        { day: "Saturday", time: "10:00 - 18:00" },
+        { day: "Sunday", time: "closed" },
+      ],
     },
   },
 };

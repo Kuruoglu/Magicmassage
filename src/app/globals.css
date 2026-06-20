@@ -455,6 +455,54 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .site-footer dl { border-bottom: 1px solid rgba(255, 255, 255, 0.14); border-top: 1px solid rgba(255, 255, 255, 0.14); display: grid; gap: 30px; grid-template-columns: repeat(3, 1fr); margin-top: 48px; padding: 32px 0; }
 .site-footer dt { color: var(--gold-light); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; margin-bottom: 8px; text-transform: uppercase; }
 .site-footer dd { font-size: 0.84rem; }
+.footer-hours dt {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+.footer-hours-icon {
+  align-items: center;
+  border: 1px solid rgba(176, 122, 221, 0.34);
+  border-radius: 10px;
+  color: var(--violet-light);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+.footer-hours-icon svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 18px;
+}
+.footer-hours-list {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.footer-hours-list li {
+  align-items: baseline;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(120px, 1fr) auto;
+}
+.footer-hours-list span:last-child {
+  color: var(--white);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.footer-hours-note {
+  color: #BFB4C6;
+  font-size: 0.76rem;
+  margin-top: 16px;
+}
 .footer-bottom { align-items: center; color: #D8D0DC; display: flex; font-size: 0.7rem; justify-content: space-between; padding-top: 26px; }
 
 .page-hero {
