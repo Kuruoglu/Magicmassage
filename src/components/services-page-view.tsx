@@ -23,11 +23,22 @@ const categoryOrder: ServiceCategory[] = ["massage", "partial", "spa"];
 export function ServicesPageView({ locale, content }: ServicesPageViewProps) {
   return (
     <main>
-      <section className="page-hero section-pad">
-        <div className="section-inner">
-          <p className="eyebrow eyebrow-light">{content.eyebrow}</p>
-          <h1>{content.title}</h1>
-          <p>{content.description}</p>
+      <section className="page-hero services-hero section-pad">
+        <div className="section-inner services-hero-inner">
+          <div className="services-hero-copy">
+            <p className="eyebrow eyebrow-light">{content.eyebrow}</p>
+            <h1>{content.title}</h1>
+            <p>{content.description}</p>
+          </div>
+          <div className="services-hero-visual" aria-hidden="true">
+            <Image
+              src="/media/hero/services-gift-hero.jpg"
+              alt=""
+              fill
+              priority
+              sizes="(max-width: 980px) 92vw, 38vw"
+            />
+          </div>
         </div>
       </section>
 

@@ -90,8 +90,8 @@ const content: Record<Locale, PublicPagesContent> = {
   ru: {
     services: {
       eyebrow: "Все процедуры",
-      title: "Массажи для восстановления, легкости и спокойного ритма",
-      description: "Выберите подходящий уход с учетом вашего комфорта, нагрузки и желаемого ощущения после сеанса.",
+      title: "Подари себе незабываемый момент заботы",
+      description: "Выберите массаж как личный подарок для тела: спокойная атмосфера, внимание к вашим ощущениям и уход, после которого хочется выдохнуть.",
       bookingAction: "Записаться",
       categoryLabels: serviceCategoryLabels.ru,
       items: buildServices("ru"),
