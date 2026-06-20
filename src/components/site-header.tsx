@@ -15,6 +15,7 @@ import {
   type PublicPageKey,
 } from "@/navigation/public-routes";
 import { getServicePagePath } from "@/navigation/service-routes";
+import { MessengerIcon } from "./messenger-icon";
 
 const localeLabels: Record<Locale, string> = {
   bg: "BG",
@@ -267,9 +268,15 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
               {...externalMessengerLinkProps}
               onClick={closeMenu}
             >
+              <span aria-hidden="true">
+                <MessengerIcon name="telegram" />
+              </span>
               Telegram
             </a>
             <a href={messengerLinks.viber.href} {...externalMessengerLinkProps} onClick={closeMenu}>
+              <span aria-hidden="true">
+                <MessengerIcon name="viber" />
+              </span>
               Viber
             </a>
           </div>

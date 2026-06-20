@@ -4,6 +4,7 @@ import {
   telegramUsername,
 } from "@/config/messengers";
 import type { HomeContent } from "@/content/home";
+import { MessengerIcon } from "./messenger-icon";
 
 type SiteFooterProps = {
   content: HomeContent;
@@ -55,7 +56,9 @@ export function SiteFooter({ content }: SiteFooterProps) {
             href={messengerLinks.telegram.href}
             {...externalMessengerLinkProps}
           >
-            <span aria-hidden="true">TG</span>
+            <span aria-hidden="true">
+              <MessengerIcon name="telegram" />
+            </span>
             <strong>Telegram</strong>
             <small>@{telegramUsername}</small>
           </a>
@@ -64,7 +67,9 @@ export function SiteFooter({ content }: SiteFooterProps) {
             href={messengerLinks.viber.href}
             {...externalMessengerLinkProps}
           >
-            <span aria-hidden="true">VB</span>
+            <span aria-hidden="true">
+              <MessengerIcon name="viber" />
+            </span>
             <strong>Viber</strong>
             <small>{content.contact.phone}</small>
           </a>

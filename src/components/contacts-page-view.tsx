@@ -7,6 +7,7 @@ import {
 } from "@/config/messengers";
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
+import { MessengerIcon } from "./messenger-icon";
 
 type ContactsPageViewProps = {
   locale: Locale;
@@ -56,7 +57,9 @@ export function ContactsPageView({ content }: ContactsPageViewProps) {
                 href={messengerLinks.telegram.href}
                 {...externalMessengerLinkProps}
               >
-                <span aria-hidden="true">TG</span>
+                <span aria-hidden="true">
+                  <MessengerIcon name="telegram" />
+                </span>
                 <strong>Telegram</strong>
                 <small>@{telegramUsername}</small>
               </a>
@@ -65,7 +68,9 @@ export function ContactsPageView({ content }: ContactsPageViewProps) {
                 href={messengerLinks.viber.href}
                 {...externalMessengerLinkProps}
               >
-                <span aria-hidden="true">VB</span>
+                <span aria-hidden="true">
+                  <MessengerIcon name="viber" />
+                </span>
                 <strong>Viber</strong>
                 <small>{content.phone}</small>
               </a>

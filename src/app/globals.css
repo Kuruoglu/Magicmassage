@@ -330,8 +330,28 @@ button, a { -webkit-tap-highlight-color: transparent; }
   display: inline-flex;
   font-size: 0.82rem;
   font-weight: 800;
+  gap: 8px;
   justify-content: center;
   padding: 12px 14px;
+}
+.mobile-messenger-actions a > span {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+.mobile-messenger-actions a:first-child > span {
+  background: #2AABEE;
+}
+.mobile-messenger-actions a:last-child > span {
+  background: #7360F2;
+}
+.mobile-messenger-actions svg {
+  color: var(--white);
+  height: 14px;
+  width: 14px;
 }
 .mobile-locale-switcher {
   display: flex;
@@ -683,13 +703,15 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   border-radius: 999px;
   color: var(--white);
   display: inline-flex;
-  font-size: 0.7rem;
-  font-weight: 900;
   grid-row: span 2;
   height: 38px;
   justify-content: center;
-  letter-spacing: 0.08em;
   width: 38px;
+}
+.messenger-link > span svg {
+  color: var(--white);
+  height: 20px;
+  width: 20px;
 }
 .messenger-link strong {
   font-size: 0.94rem;
