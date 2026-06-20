@@ -1,3 +1,8 @@
+import {
+  externalMessengerLinkProps,
+  messengerLinks,
+  telegramUsername,
+} from "@/config/messengers";
 import type { HomeContent } from "@/content/home";
 
 type SiteFooterProps = {
@@ -44,6 +49,26 @@ export function SiteFooter({ content }: SiteFooterProps) {
             </dd>
           </div>
         </dl>
+        <div className="footer-messengers" aria-label="Messengers">
+          <a
+            className="messenger-link messenger-link-telegram"
+            href={messengerLinks.telegram.href}
+            {...externalMessengerLinkProps}
+          >
+            <span aria-hidden="true">TG</span>
+            <strong>Telegram</strong>
+            <small>@{telegramUsername}</small>
+          </a>
+          <a
+            className="messenger-link messenger-link-viber"
+            href={messengerLinks.viber.href}
+            {...externalMessengerLinkProps}
+          >
+            <span aria-hidden="true">VB</span>
+            <strong>Viber</strong>
+            <small>{content.contact.phone}</small>
+          </a>
+        </div>
         <div className="footer-bottom">
           <span>© {new Date().getFullYear()} {content.brand}</span>
           <span className="yin-yang" aria-hidden="true">☯</span>

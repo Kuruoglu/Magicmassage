@@ -1,5 +1,10 @@
 import Link from "next/link";
 
+import {
+  externalMessengerLinkProps,
+  messengerLinks,
+  telegramUsername,
+} from "@/config/messengers";
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
 
@@ -45,6 +50,26 @@ export function ContactsPageView({ content }: ContactsPageViewProps) {
             <Link className="button" href="tel:+359896778309">
               {content.callAction}
             </Link>
+            <div className="messenger-actions" aria-label="Messengers">
+              <a
+                className="messenger-link messenger-link-telegram"
+                href={messengerLinks.telegram.href}
+                {...externalMessengerLinkProps}
+              >
+                <span aria-hidden="true">TG</span>
+                <strong>Telegram</strong>
+                <small>@{telegramUsername}</small>
+              </a>
+              <a
+                className="messenger-link messenger-link-viber"
+                href={messengerLinks.viber.href}
+                {...externalMessengerLinkProps}
+              >
+                <span aria-hidden="true">VB</span>
+                <strong>Viber</strong>
+                <small>{content.phone}</small>
+              </a>
+            </div>
           </div>
           <div className="map-panel" aria-label={content.mapTitle}>
             <div className="map-frame">

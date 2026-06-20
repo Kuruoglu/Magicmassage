@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 import { externalBookingLinkProps } from "@/config/booking";
+import { externalMessengerLinkProps, messengerLinks } from "@/config/messengers";
 import type { HomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
 import { locales, type Locale } from "@/i18n/config";
@@ -260,6 +261,18 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
           <a className="button" {...externalBookingLinkProps} onClick={closeMenu}>
             {content.navigation.booking}
           </a>
+          <div className="mobile-messenger-actions" aria-label="Messengers">
+            <a
+              href={messengerLinks.telegram.href}
+              {...externalMessengerLinkProps}
+              onClick={closeMenu}
+            >
+              Telegram
+            </a>
+            <a href={messengerLinks.viber.href} {...externalMessengerLinkProps} onClick={closeMenu}>
+              Viber
+            </a>
+          </div>
         </div>
       </aside>
     </header>

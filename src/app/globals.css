@@ -314,8 +314,24 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .mobile-menu-footer {
   display: grid;
-  gap: 24px;
+  gap: 18px;
   margin-top: auto;
+}
+.mobile-messenger-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+.mobile-messenger-actions a {
+  align-items: center;
+  border: 1px solid rgba(176, 122, 221, 0.28);
+  border-radius: 999px;
+  color: #F7F1FA;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  justify-content: center;
+  padding: 12px 14px;
 }
 .mobile-locale-switcher {
   display: flex;
@@ -503,6 +519,19 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   font-size: 0.76rem;
   margin-top: 16px;
 }
+.footer-messengers {
+  border-bottom: 1px solid rgba(176, 122, 221, 0.18);
+  margin-top: 0;
+  padding-bottom: 28px;
+}
+.site-footer .messenger-link {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(176, 122, 221, 0.2);
+  color: var(--white);
+}
+.site-footer .messenger-link small {
+  color: #D8D0DC;
+}
 .footer-bottom { align-items: center; color: #D8D0DC; display: flex; font-size: 0.7rem; justify-content: space-between; padding-top: 26px; }
 
 .page-hero {
@@ -622,6 +651,64 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   text-transform: uppercase;
 }
 .contact-panel dd { font-family: var(--font-serif), Georgia, serif; font-size: clamp(1.35rem, 2.7vw, 2.3rem); line-height: 1.2; }
+.messenger-actions,
+.footer-messengers {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 22px;
+}
+.contact-panel .messenger-actions {
+  grid-template-columns: 1fr;
+}
+.messenger-link {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(141, 90, 174, 0.16);
+  border-radius: 18px;
+  color: var(--graphite);
+  display: grid;
+  gap: 2px 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 15px 16px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+.messenger-link:hover {
+  border-color: rgba(176, 122, 221, 0.46);
+  box-shadow: 0 20px 48px rgba(29, 20, 36, 0.12);
+  transform: translateY(-2px);
+}
+.messenger-link > span {
+  align-items: center;
+  border-radius: 999px;
+  color: var(--white);
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 900;
+  grid-row: span 2;
+  height: 38px;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  width: 38px;
+}
+.messenger-link strong {
+  font-size: 0.94rem;
+  line-height: 1.1;
+}
+.messenger-link small {
+  color: #746A79;
+  font-size: 0.72rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.messenger-link-telegram > span {
+  background: #2AABEE;
+}
+.messenger-link-viber > span {
+  background: #7360F2;
+}
 .map-panel {
   background:
     linear-gradient(135deg, rgba(17, 17, 17, 0.94), rgba(26, 23, 29, 0.88)),
@@ -712,6 +799,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .map-frame { min-height: 300px; }
   .map-copy { align-items: start; grid-template-columns: 1fr; padding: 12px; }
   .map-copy .button { width: 100%; }
+  .messenger-actions,
+  .footer-messengers {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

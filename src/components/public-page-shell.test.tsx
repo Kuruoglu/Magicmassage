@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { studio24BookingUrl } from "@/config/booking";
+import { messengerLinks } from "@/config/messengers";
 import { getHomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
 import { PublicPageShell } from "./public-page-shell";
@@ -112,6 +113,14 @@ describe("PublicPageShell", () => {
     expect(within(mobileMenu).getByRole("link", { name: "Записаться" })).toHaveAttribute(
       "href",
       studio24BookingUrl,
+    );
+    expect(within(mobileMenu).getByRole("link", { name: "Telegram" })).toHaveAttribute(
+      "href",
+      messengerLinks.telegram.href,
+    );
+    expect(within(mobileMenu).getByRole("link", { name: "Viber" })).toHaveAttribute(
+      "href",
+      messengerLinks.viber.href,
     );
   });
 });
