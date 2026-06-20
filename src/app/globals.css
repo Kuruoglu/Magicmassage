@@ -1901,8 +1901,9 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   gap: 34px;
   grid-template-columns: auto minmax(0, 1.15fr) minmax(280px, 0.7fr);
   margin-inline: auto;
-  max-width: var(--content);
+  max-width: calc(var(--content) + 48px);
   padding: clamp(30px, 4.8vw, 58px);
+  width: calc(100% - 48px);
 }
 
 .booking-card::before {
@@ -2037,6 +2038,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
     gap: 22px;
     grid-template-columns: 1fr;
     padding: 28px;
+    width: 100%;
   }
 
   .booking-card::before {
