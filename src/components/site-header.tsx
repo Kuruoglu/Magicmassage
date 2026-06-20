@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
+import { externalBookingLinkProps } from "@/config/booking";
 import type { HomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
 import { locales, type Locale } from "@/i18n/config";
@@ -152,9 +153,9 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
               ))}
             </div>
           </details>
-          <Link className="button button-small" href={`/${locale}#booking`}>
+          <a className="button button-small" {...externalBookingLinkProps}>
             {content.navigation.booking}
-          </Link>
+          </a>
           <button
             className="menu-toggle"
             type="button"
@@ -256,9 +257,9 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
         </nav>
 
         <div className="mobile-menu-footer">
-          <Link className="button" href={`/${locale}#booking`} onClick={closeMenu}>
+          <a className="button" {...externalBookingLinkProps} onClick={closeMenu}>
             {content.navigation.booking}
-          </Link>
+          </a>
         </div>
       </aside>
     </header>

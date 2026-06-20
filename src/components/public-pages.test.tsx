@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { studio24BookingUrl } from "@/config/booking";
 import { getPublicPagesContent } from "@/content/public-pages";
 import { AboutPageView } from "./about-page-view";
 import { ContactsPageView } from "./contacts-page-view";
@@ -40,7 +41,7 @@ describe("localized public page views", () => {
     expect(screen.getByRole("heading", { level: 1, name: service.title })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: content.services.bookingAction })[0]).toHaveAttribute(
       "href",
-      "/bg#booking",
+      studio24BookingUrl,
     );
     expect(screen.getByRole("link", { name: /Всички масажи/ })).toHaveAttribute(
       "href",

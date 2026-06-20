@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { externalBookingLinkProps } from "@/config/booking";
 import type { HomeContent } from "@/content/home";
 import type { Locale } from "@/i18n/config";
 import { createLocalBusinessJsonLd } from "@/seo/local-business-json-ld";
@@ -70,7 +71,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
               <h1>{content.hero.title}</h1>
               <p className="hero-description">{content.hero.description}</p>
               <div className="button-row">
-                <a className="button" href={`${base}#booking`}>
+                <a className="button" {...externalBookingLinkProps}>
                   {content.hero.primaryAction}
                 </a>
                 <Link className="text-link text-link-light" href={`${base}/services`}>
@@ -142,7 +143,10 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
                 <div className="service-copy">
                   <h3>{service.title}</h3>
                   <p>{service.description}</p>
-                  <a href={`${base}#booking`} aria-label={`${content.navigation.booking}: ${service.title}`}>
+                  <a
+                    {...externalBookingLinkProps}
+                    aria-label={`${content.navigation.booking}: ${service.title}`}
+                  >
                     {content.navigation.booking} <span aria-hidden="true">↗</span>
                   </a>
                 </div>
@@ -200,7 +204,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
           </div>
           <div className="booking-action">
             <p>{content.booking.description}</p>
-            <a className="button button-light" href="tel:+359896778309">
+            <a className="button button-light" {...externalBookingLinkProps}>
               {content.booking.action}
             </a>
           </div>

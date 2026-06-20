@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { studio24BookingUrl } from "@/config/booking";
 import { getHomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
 import { PublicPageShell } from "./public-page-shell";
@@ -53,7 +54,10 @@ describe("PublicPageShell", () => {
     expect(screen.getByRole("link", { name: "BG" })).toHaveAttribute("href", "/bg/contacts");
     expect(screen.getByRole("link", { name: "UA" })).toHaveAttribute("href", "/ua/contacts");
     expect(screen.getByRole("link", { name: "EN" })).toHaveAttribute("href", "/en/contacts");
-    expect(screen.getByRole("link", { name: "Записаться" })).toHaveAttribute("href", "/ru#booking");
+    expect(screen.getByRole("link", { name: "Записаться" })).toHaveAttribute(
+      "href",
+      studio24BookingUrl,
+    );
   });
 
   it("opens a left mobile menu with services and language links", async () => {
@@ -107,7 +111,7 @@ describe("PublicPageShell", () => {
     );
     expect(within(mobileMenu).getByRole("link", { name: "Записаться" })).toHaveAttribute(
       "href",
-      "/ru#booking",
+      studio24BookingUrl,
     );
   });
 });

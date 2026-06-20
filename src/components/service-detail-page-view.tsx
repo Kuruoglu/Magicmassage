@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { externalBookingLinkProps } from "@/config/booking";
 import type { ServiceContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
 
@@ -81,9 +82,9 @@ export function ServiceDetailPageView({
             <h1>{service.title}</h1>
             <p>{service.description}</p>
             <div className="service-detail-actions">
-              <Link className="button" href={`/${locale}#booking`}>
+              <a className="button" {...externalBookingLinkProps}>
                 {bookingAction}
-              </Link>
+              </a>
               <Link className="text-link text-link-light" href={`/${locale}/services`}>
                 {copy.back} <span aria-hidden="true">→</span>
               </Link>
@@ -137,9 +138,9 @@ export function ServiceDetailPageView({
 
           <div className="service-detail-cta">
             <p>{service.description}</p>
-            <Link className="button" href={`/${locale}#booking`}>
+            <a className="button" {...externalBookingLinkProps}>
               {bookingAction}
-            </Link>
+            </a>
           </div>
         </div>
       </section>
