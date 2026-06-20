@@ -10,6 +10,7 @@ export type ServiceContent = {
   category: ServiceCategory;
   title: string;
   description: string;
+  detailParagraphs: string[];
   image: string;
   imageAlt: string;
 };

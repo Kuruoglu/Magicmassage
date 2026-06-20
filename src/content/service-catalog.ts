@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/config";
+import { getServiceDetailCopy } from "@/content/service-detail-copy";
 
 export type ServiceCategory = "massage" | "partial" | "spa";
 
@@ -372,6 +373,7 @@ export function buildServices(locale: Locale) {
     category: service.category,
     title: service.titles[locale],
     description: service.descriptions[locale],
+    detailParagraphs: getServiceDetailCopy(service.slug, locale),
     image: service.image,
     imageAlt: `${altPrefixes[locale]}: ${service.titles[locale]}`,
   }));

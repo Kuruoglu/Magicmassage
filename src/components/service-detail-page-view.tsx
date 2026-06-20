@@ -109,6 +109,14 @@ export function ServiceDetailPageView({
             <p>{service.description}</p>
           </div>
 
+          {service.detailParagraphs.length > 0 ? (
+            <div className="service-detail-copy">
+              {service.detailParagraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+          ) : null}
+
           <div className="service-detail-grid">
             <article>
               <span aria-hidden="true">01</span>

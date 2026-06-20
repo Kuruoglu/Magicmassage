@@ -1139,6 +1139,25 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   line-height: 1.8;
   margin-top: 20px;
 }
+.service-detail-copy {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(247, 240, 250, 0.96)),
+    radial-gradient(circle at 0% 0%, rgba(176, 122, 221, 0.13), transparent 34%);
+  border: 1px solid rgba(141, 90, 174, 0.14);
+  border-radius: 28px;
+  box-shadow: 0 28px 80px rgba(29, 20, 36, 0.08);
+  display: grid;
+  gap: 18px;
+  margin-top: 34px;
+  max-width: 980px;
+  padding: clamp(26px, 4vw, 46px);
+}
+.service-detail-copy p {
+  color: #54495C;
+  font-size: clamp(1rem, 1.25vw, 1.12rem);
+  line-height: 1.85;
+  max-width: 860px;
+}
 .service-detail-grid {
   display: grid;
   gap: 22px;
