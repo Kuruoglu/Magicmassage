@@ -11,11 +11,22 @@ type AboutPageViewProps = {
 export function AboutPageView({ content }: AboutPageViewProps) {
   return (
     <main>
-      <section className="page-hero section-pad">
-        <div className="section-inner">
-          <p className="eyebrow eyebrow-light">{content.eyebrow}</p>
-          <h1>{content.title}</h1>
-          <p>{content.lead}</p>
+      <section className="page-hero about-page-hero section-pad">
+        <div className="section-inner about-page-hero-inner">
+          <div className="about-page-hero-copy">
+            <p className="eyebrow eyebrow-light">{content.eyebrow}</p>
+            <h1>{content.title}</h1>
+            <p>{content.lead}</p>
+          </div>
+          <div className="about-page-hero-visual" aria-hidden="true">
+            <Image
+              src="/media/about/about-hero-premium.webp"
+              alt=""
+              fill
+              priority
+              sizes="(max-width: 980px) 92vw, 38vw"
+            />
+          </div>
         </div>
       </section>
 

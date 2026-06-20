@@ -1192,6 +1192,56 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   pointer-events: none;
   position: absolute;
 }
+
+.about-page-hero {
+  padding-bottom: 90px;
+  padding-top: 96px;
+}
+
+.about-page-hero-inner {
+  align-items: center;
+  display: grid;
+  gap: clamp(36px, 6vw, 84px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+}
+
+.about-page-hero-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.about-page-hero h1 {
+  font-size: clamp(3.2rem, 5.2vw, 6rem);
+  max-width: 980px;
+}
+
+.about-page-hero-copy > p:last-child {
+  color: #E8DDEE;
+  font-size: 1rem;
+  line-height: 1.8;
+  margin-top: 24px;
+  max-width: 700px;
+}
+
+.about-page-hero-visual {
+  aspect-ratio: 1.08;
+  border: 1px solid rgba(176, 122, 221, 0.28);
+  border-radius: 34px;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.about-page-hero-visual::after {
+  background:
+    linear-gradient(180deg, transparent 58%, rgba(12, 9, 15, 0.36)),
+    radial-gradient(circle at 18% 16%, rgba(176, 122, 221, 0.18), transparent 32%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
 .page-hero::after {
   border: 1px solid rgba(160, 106, 203, 0.18);
   border-radius: 999px;
@@ -2009,6 +2059,16 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 
 @media (max-width: 980px) {
+  .about-page-hero-inner {
+    gap: 34px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .about-page-hero-visual {
+    aspect-ratio: 1.55;
+    width: min(760px, 100%);
+  }
+
   .booking-card {
     grid-template-columns: 1fr;
   }
@@ -2058,6 +2118,22 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .service-detail-image {
     aspect-ratio: 1.55;
     width: min(760px, 100%);
+  }
+}
+
+@media (max-width: 720px) {
+  .about-page-hero {
+    padding-bottom: 62px;
+    padding-top: 70px;
+  }
+
+  .about-page-hero h1 {
+    font-size: clamp(2.75rem, 11vw, 4rem);
+  }
+
+  .about-page-hero-visual {
+    aspect-ratio: 1.08;
+    border-radius: 26px;
   }
 }
 
