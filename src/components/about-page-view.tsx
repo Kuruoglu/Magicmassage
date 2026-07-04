@@ -35,7 +35,7 @@ export function AboutPageView({ content }: AboutPageViewProps) {
           <div className="story-images">
             <div className="story-image-large">
               <Image
-                src="/media/about/natali-at-work.jpg"
+                src="/media/about/natali-portrait.jpg"
                 alt={content.imageAlt}
                 fill
                 sizes="(max-width: 840px) 92vw, 42vw"
