@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { studio24BookingUrl } from "@/config/booking";
 import { messengerLinks } from "@/config/messengers";
@@ -8,6 +9,11 @@ import { AboutPageView } from "./about-page-view";
 import { ContactsPageView } from "./contacts-page-view";
 import { ServiceDetailPageView } from "./service-detail-page-view";
 import { ServicesPageView } from "./services-page-view";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  window.localStorage.clear();
+});
 
 describe("localized public page views", () => {
   it("renders the full services catalog", () => {
@@ -77,10 +83,50 @@ describe("localized public page views", () => {
       "href",
       messengerLinks.viber.href,
     );
-    expect(screen.getByTitle(content.contacts.mapTitle)).toHaveAttribute("src", expect.stringContaining("google.com/maps"));
+    expect(screen.queryByTitle(content.contacts.mapTitle)).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: content.contacts.mapTitle })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: content.contacts.directionsAction })).toHaveAttribute(
       "href",
       expect.stringContaining("google.com/maps/dir"),
+    );
+  });
+
+  it("does not load the Google Maps iframe until cookie consent is accepted", async () => {
+    const user = userEvent.setup();
+    const content = getPublicPagesContent("bg");
+
+    render(<ContactsPageView locale="bg" content={content.contacts} />);
+
+    expect(screen.queryByTitle(content.contacts.mapTitle)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /cookies/i }));
+
+    expect(screen.getByTitle(content.contacts.mapTitle)).toHaveAttribute(
+      "src",
+      expect.stringContaining("google.com/maps"),
+    );
+  });
+
+  it("unlocks the map for mounted UI when cookie storage is unavailable", async () => {
+    const user = userEvent.setup();
+    const content = getPublicPagesContent("en");
+
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("Storage unavailable");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("Storage unavailable");
+    });
+
+    render(<ContactsPageView locale="en" content={content.contacts} />);
+
+    expect(screen.queryByTitle(content.contacts.mapTitle)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Accept cookies" }));
+
+    expect(screen.getByTitle(content.contacts.mapTitle)).toHaveAttribute(
+      "src",
+      expect.stringContaining("google.com/maps"),
     );
   });
 });

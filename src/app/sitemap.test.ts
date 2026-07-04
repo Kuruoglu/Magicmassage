@@ -20,4 +20,10 @@ describe("sitemap", () => {
     expect(urls).toContain("https://magicmassagenatali.bg/bg/services/lymphatic-drainage-massage");
     expect(urls).toContain("https://magicmassagenatali.bg/ru/services/bms-apparatus-massage");
   });
+
+  it("uses a stable content update date instead of generation time", () => {
+    const entries = sitemap();
+
+    expect(entries.every((entry) => entry.lastModified === "2026-07-04")).toBe(true);
+  });
 });

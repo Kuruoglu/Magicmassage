@@ -1,6 +1,7 @@
 # Magic Massage Natali
 
-Multilingual website and booking platform for Magic Massage Natali in Burgas.
+Multilingual public website for Magic Massage Natali in Burgas. The current
+first release is a simplified public site with Studio24 booking handoff.
 
 ## Requirements
 
@@ -21,6 +22,7 @@ Bulgarian. Localized home routes are:
 - `http://localhost:3000/bg`
 - `http://localhost:3000/ru`
 - `http://localhost:3000/ua`
+- `http://localhost:3000/en`
 
 ## Verification
 
@@ -28,6 +30,7 @@ Bulgarian. Localized home routes are:
 npm run lint
 npm run typecheck
 npm test -- --run
+npm run test:e2e
 npm run build
 ```
 
@@ -35,6 +38,11 @@ npm run build
 
 - [AGENTS.md](./AGENTS.md) contains enduring product and engineering rules.
 - [PLANS.md](./PLANS.md) is the living product roadmap.
+- [Current scope](./docs/CURRENT_SCOPE.md) summarizes the active MVP decisions.
+- [Agent notes](./docs/AGENT_NOTES.md) lists decisions that should not be
+  re-reported as bugs.
+- [Review checklist](./docs/REVIEW_CHECKLIST.md) defines verification before
+  completion.
 - [Foundation plan](./docs/superpowers/plans/2026-06-15-foundation-home.md) describes
   the first implementation slice.
 

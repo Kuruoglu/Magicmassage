@@ -2,226 +2,194 @@
 
 ## How To Use This File
 
-This is the living roadmap for the project. Read it together with
-[AGENTS.md](./AGENTS.md) before planning or implementing work.
+This is the living roadmap for the current simplified first release. Read it
+together with [AGENTS.md](./AGENTS.md), [docs/CURRENT_SCOPE.md](./docs/CURRENT_SCOPE.md),
+[docs/AGENT_NOTES.md](./docs/AGENT_NOTES.md), and
+[docs/REVIEW_CHECKLIST.md](./docs/REVIEW_CHECKLIST.md).
 
 - Keep completed work checked off.
 - Add newly approved work to the appropriate phase before implementing it.
 - Do not move later-release ideas into the MVP without explicit approval.
-- For a substantial feature, create a focused implementation plan before coding.
 - Update this file when scope, sequencing, or acceptance criteria change.
 
 ## Goal
 
-Launch a fast, accessible, multilingual website for Magic Massage Natali in
-Burgas with service pages, local SEO, request-based online booking, a blog, a
-custom administration panel, email notifications, and Telegram integration.
+Launch a fast, accessible, multilingual public website for Magic Massage Natali
+in Burgas with service pages, local SEO, real photography, contact information,
+cookie consent, and appointment calls to action that open Studio24.
+
+## Current MVP Decisions
+
+- The first release is a public website, not a custom booking platform.
+- Booking CTAs open Studio24 by client request.
+- There is no first-release Supabase database, custom admin panel, internal
+  booking flow, email automation, or Telegram booking notification workflow.
+- Public locales are `bg`, `ru`, `ua`, and `en`.
+- `ua` remains the public URL segment and `UA` user-facing label; metadata maps
+  it to `uk-UA`.
+- Shared English service slugs are acceptable for the first release.
+- Service content is maintained in code; there is no admin publication gate.
+- No blog is included in the first release.
+- Natali's experience and certificate claims are confirmed by the client.
+- Google Maps iframe usage requires cookie consent before loading, or an
+  equivalent privacy-safe pattern.
+- Sitemap entries should use real content update dates or omit `lastModified`.
+- A small Playwright smoke suite should cover public critical flows.
 
 ## MVP Definition
 
 The first production release includes:
 
-- Bulgarian, Russian, and Ukrainian public content.
-- Public URL segments `/bg`, `/ru`, and `/ua`.
-- Home landing page, Services, individual service pages, About, Blog, Booking,
-  Contacts, and required legal pages.
-- A light Premium Wellness visual system using the real salon photography stored
+- Bulgarian, Russian, Ukrainian, and English public content.
+- Public URL segments `/bg`, `/ru`, `/ua`, and `/en`.
+- Home landing page, Services, individual service pages, About, Contacts, and
+  required privacy/cookie/legal information.
+- Studio24 appointment handoff for booking CTAs.
+- A light Premium Wellness visual system using real salon photography stored
   under `assets/photos`.
-- A custom authenticated administration panel.
-- Manual content translation fields for all three languages.
-- One specialist, Natali, with data structures prepared for additional staff.
-- Request-based booking with manual confirmation by default.
-- Configurable global and per-service automatic confirmation for future use.
-- Customer email confirmations, changes, cancellations, and reminders.
-- Telegram notifications for Natali and a customer contact link.
-- Secure, expiring customer links for cancellation and rescheduling requests.
 - Technical and local SEO foundations.
-- Privacy, security, accessibility, performance, and backup checks.
+- Cookie consent for non-essential third-party embeds or cookies.
+- Public accessibility, responsive behavior, performance, and launch checks.
 
-Online payment, customer accounts, loyalty features, and complete booking inside
-Telegram are not part of the MVP.
+Out of MVP scope:
 
-## Phase 1 - Discovery And Design
+- Blog.
+- Custom administration panel.
+- Supabase/PostgreSQL.
+- Internal booking, availability, specialists, booking status history, and
+  customer management links.
+- Booking emails, reminders, and Telegram notifications.
+- Online payment, customer accounts, loyalty features, and full Telegram booking.
+
+## Phase 1 - Scope, Content, And Design
 
 - [x] Define product scope and first-release priorities.
-- [x] Select Next.js, TypeScript, Supabase/PostgreSQL, and a custom admin panel.
+- [x] Select Next.js and TypeScript for the public site.
 - [x] Select the light Premium Wellness visual direction.
-- [x] Define Bulgarian, Russian, and Ukrainian locale requirements.
+- [x] Define Bulgarian, Russian, Ukrainian, and English locale requirements.
+- [x] Approve Studio24 as the first-release booking destination.
+- [x] Approve shared English service slugs for the first release.
+- [x] Confirm Natali's experience and certificate claims are allowed in copy.
 - [x] Review the supplied photography and copy selected originals into assets.
 - [ ] Confirm that all depicted clients have granted permission for website use.
-- [ ] Confirm Natali's exact qualifications and legally supportable service names.
 - [ ] Confirm final business name spelling, address, telephone, email, Telegram,
   social profiles, working hours, map coordinates, and timezone.
-- [ ] Produce responsive wireframes for the home, service, booking, article,
-  contact, and administration screens.
 - [ ] Approve final typography, color tokens, spacing, logo treatment, and image
   cropping rules.
-- [ ] Prepare final BG, RU, and UA content inventory.
+- [ ] Prepare final BG, RU, UA, and EN content inventory.
 
-**Exit criteria:** Public and administrative screen structures are approved,
-business facts are verified, and no critical content or legal naming decision is
-left unresolved.
+**Exit criteria:** Current first-release scope is documented, business facts are
+verified, required public content is ready, and no critical legal/content
+decision is left unresolved.
 
 ## Phase 2 - Application Foundation
 
 - [x] Initialize the Next.js App Router project with strict TypeScript.
-- [x] Configure linting, formatting, type checking, unit tests, and end-to-end
-  testing.
-- [ ] Add environment validation and documented local setup.
-- [ ] Configure Supabase development and production environments.
-- [ ] Define database migrations, generated types, and seed strategy.
-- [ ] Add Supabase Auth and server-side owner authorization.
-- [x] Implement locale routing for `/bg`, `/ru`, and `/ua`.
-- [x] Map the public `UA` locale to standards-compliant `uk` or `uk-UA` metadata.
+- [x] Configure linting, type checking, and Vitest unit/component tests.
+- [x] Implement locale routing for `/bg`, `/ru`, `/ua`, and `/en`.
+- [x] Map the public `UA` locale to standards-compliant `uk-UA` metadata.
 - [x] Create shared design tokens, layout primitives, navigation, and footer.
-- [ ] Establish error handling, structured operational logging, and audit rules
-  without exposing personal data.
+- [x] Add a minimal Playwright smoke-test setup.
+- [ ] Add documented environment setup for production URL and preview behavior.
+- [ ] Establish simple operational guidance for launch verification.
 
-**Exit criteria:** The application builds and deploys, locale routes render,
-authentication protects administration routes, migrations run cleanly, and the
-quality pipeline passes.
+**Exit criteria:** The application builds, locale routes render, the quality
+pipeline passes, and browser smoke checks cover the critical public flows.
 
-## Phase 3 - Content Model And Administration
-
-- [ ] Implement localized site settings and page content.
-- [ ] Implement services, variants, durations, prices, media, FAQs, and status.
-- [ ] Implement specialists and specialist-service assignments.
-- [ ] Implement blog posts, categories, drafts, scheduled publication, and SEO
-  fields.
-- [ ] Implement reviews and moderation state.
-- [ ] Implement the media library with localized alt text and focal points.
-- [ ] Build administration navigation and dashboard.
-- [ ] Build page, contact, service, specialist, blog, review, and media editors.
-- [ ] Prevent publication when required translations are incomplete.
-- [ ] Record administrative content changes where auditability is important.
-
-**Exit criteria:** Natali can manage all agreed public content, translations,
-services, prices, specialists, images, contacts, reviews, and blog posts without
-editing code.
-
-## Phase 4 - Public Website
+## Phase 3 - Public Website
 
 - [x] Build the responsive home landing page.
-- [ ] Build the services catalog and localized service pages.
 - [x] Build the localized services catalog.
+- [x] Build individual service pages.
 - [x] Build About and Contacts pages with working-hours sections.
-- [ ] Add map and confirmed social links.
-- [ ] Build the blog index, category views, and article pages.
-- [ ] Build privacy, cookie, cancellation, and rescheduling pages.
 - [x] Integrate selected real photographs from `assets/photos`.
 - [x] Generate optimized web derivatives while preserving originals.
-- [ ] Add accessible image descriptions and robust responsive crops.
-- [ ] Add loading, empty, error, draft-preview, and not-found states.
+- [ ] Add or verify accessible image descriptions and robust responsive crops.
+- [ ] Add privacy and cookie information pages or sections.
+- [x] Add cookie consent for Google Maps and other non-essential third-party
+  content.
+- [ ] Ensure Studio24 booking CTAs are clear and tested.
 - [ ] Validate responsive behavior, keyboard use, focus order, and reduced motion.
 
-**Exit criteria:** All public pages work on supported viewport sizes and locales,
-use real approved content, meet the agreed visual direction, and pass WCAG 2.2 AA
-checks for critical flows.
+**Exit criteria:** All first-release public pages work on supported viewport
+sizes and locales, use approved content/media, and pass critical accessibility
+checks.
 
-## Phase 5 - Scheduling And Booking
-
-- [ ] Implement recurring specialist availability.
-- [ ] Implement breaks, booking buffers, days off, and vacation exceptions.
-- [ ] Implement timezone-safe available-slot calculation.
-- [ ] Implement customers, bookings, statuses, and booking status history.
-- [ ] Enforce non-overlapping bookings at the database level.
-- [ ] Build the customer booking flow for service, duration, specialist, slot,
-  details, and required consent.
-- [ ] Use manual confirmation as the initial default.
-- [ ] Add configurable global and per-service confirmation modes.
-- [ ] Build administration calendar and booking list views.
-- [ ] Support confirm, reject, reschedule, cancel, and internal notes.
-- [ ] Create hashed, expiring, revocable customer management tokens.
-- [ ] Build customer cancellation and rescheduling-request pages.
-- [ ] Add rate limiting, validation, and accessible bot protection.
-
-**Exit criteria:** A customer can submit one valid request for an available slot,
-Natali can manage it, concurrent booking attempts cannot double-book a slot, and
-the customer can securely cancel or request rescheduling without an account.
-
-## Phase 6 - Email And Telegram
-
-- [ ] Select and configure a transactional email provider.
-- [ ] Create localized receipt, confirmation, rejection, rescheduling,
-  cancellation, and reminder templates.
-- [ ] Send one configurable reminder 24 hours before confirmed appointments by
-  default.
-- [ ] Add retry and failure visibility without duplicating customer messages.
-- [ ] Configure the Telegram bot and secure webhook handling.
-- [ ] Notify Natali about new, changed, and cancelled bookings.
-- [ ] Include secure links to the relevant administration booking view.
-- [ ] Add confirm or reject Telegram actions only when authorization and replay
-  protection are correctly enforced.
-- [ ] Add a public link for customers to start a Telegram conversation.
-
-**Exit criteria:** Every booking state transition produces the intended localized
-notification, delivery failures are visible and retryable, and Telegram actions
-cannot bypass administration authorization.
-
-## Phase 7 - SEO And Local Discovery
+## Phase 4 - SEO And Local Discovery
 
 - [x] Generate localized titles, descriptions, canonicals, and social metadata.
-- [x] Generate correct `hreflang` links for BG, RU, and UA content.
-- [x] Generate sitemap and robots rules from published content.
+- [x] Generate correct `hreflang` links for BG, RU, UA, and EN content.
+- [x] Generate sitemap and robots rules from public content.
 - [x] Add localized metadata and sitemap entries for Services, About, and Contacts.
-- [ ] Add permanent redirects when published localized slugs change.
-- [ ] Add LocalBusiness, Service, Article, Breadcrumb, and eligible FAQ structured
-  data.
+- [x] Replace `new Date()` sitemap timestamps with real update dates or omit
+  `lastModified`.
+- [ ] Add or verify LocalBusiness, Service, Breadcrumb, and eligible FAQ
+  structured data.
 - [ ] Verify consistent business name, address, and phone data.
-- [ ] Provide a stable booking URL for Google Business Profile.
+- [ ] Provide the Studio24 appointment URL for Google Business Profile where
+  appropriate.
 - [ ] Connect Google Search Console.
-- [ ] Add privacy-respecting analytics with consent where required.
+- [ ] Add privacy-respecting analytics only with consent if requested.
 - [ ] Validate Core Web Vitals and image loading behavior.
 
 **Exit criteria:** Search engines receive complete localized metadata, valid
 structured data, consistent local business information, and indexable performant
-pages without duplicate-language URL problems.
+pages.
 
-## Phase 8 - Launch Readiness
+## Phase 5 - Accessibility, Privacy, And Launch Readiness
 
-- [ ] Complete unit, integration, database, and end-to-end test coverage for
-  critical flows.
-- [ ] Test concurrent booking attempts and notification failure recovery.
-- [ ] Run an accessibility review of customer and administration workflows.
-- [ ] Run a security review of authentication, authorization, tokens, rate limits,
-  secrets, webhooks, and personal data access.
-- [ ] Define retention and deletion rules for customer and booking data.
-- [ ] Configure database and media backups.
-- [ ] Perform and document a restoration test.
+- [x] Fix mobile menu focus behavior so hidden drawer links are not tabbable and
+  open drawer interaction is keyboard-safe.
+- [ ] Verify focus visibility and keyboard navigation on all public pages.
+- [ ] Verify reduced-motion behavior for decorative animations.
+- [x] Verify cookie consent blocks Google Maps until allowed.
+- [ ] Run an accessibility review of public workflows.
+- [ ] Run dependency audit and apply safe targeted updates where possible.
 - [ ] Verify production environment variables and domain configuration.
-- [ ] Run formatting, linting, type checking, tests, and production build.
-- [ ] Complete a production smoke test in BG, RU, and UA.
-- [ ] Confirm Natali can use the administration and booking workflows.
+- [ ] Run linting, type checking, tests, Playwright smoke tests, and production
+  build.
+- [ ] Complete a production smoke test in BG, RU, UA, and EN.
+- [ ] Confirm Natali accepts the public site and Studio24 booking handoff.
 
-**Exit criteria:** All critical tests pass, backup restoration is proven, no
-high-severity accessibility or security findings remain, and the owner accepts
-the production workflows.
+**Exit criteria:** All critical checks pass, no high-severity accessibility or
+security findings remain, and the owner accepts the production public website.
 
 ## Later Releases
 
 These features require separate approval and planning:
 
-- online deposit or full payment;
-- gift certificates and multi-session packages;
-- promotion codes;
-- waiting list for occupied slots;
-- calendar synchronization and export;
-- customer accounts and booking history;
-- loyalty and repeat-customer features;
-- restricted staff administration accounts;
-- business analytics dashboards;
-- AI-assisted translation drafts;
-- complete booking inside Telegram.
+- Supabase/PostgreSQL data model.
+- Supabase Auth and custom administration panel.
+- Internal request-based booking.
+- Specialist schedules, breaks, buffers, days off, and booking availability.
+- Customer management links for cancellation and rescheduling.
+- Transactional booking emails and reminders.
+- Telegram owner notifications and secure booking actions.
+- Online deposits or full payments.
+- Gift certificates and multi-session packages.
+- Promotion codes.
+- Waiting list for occupied slots.
+- Calendar synchronization and export.
+- Customer accounts and booking history.
+- Loyalty and repeat-customer features.
+- Restricted staff administration accounts.
+- Business analytics dashboards.
+- Blog publishing.
+- AI-assisted translation drafts.
+- Complete booking inside Telegram.
+- Localized service slugs and slug-change redirects.
+- Admin publication status and translation completeness gates.
 
 ## Definition Of Done
 
 A task is complete only when:
 
 - the agreed behavior is implemented without unrelated scope expansion;
-- tests cover the relevant success, validation, permission, and failure paths;
+- documentation is updated when behavior or scope changes;
+- tests cover the relevant public behavior for the current scope;
 - accessibility and responsive behavior have been checked where applicable;
+- cookie/privacy behavior is correct for third-party embeds;
 - personal data is not exposed in logs, URLs, client bundles, or error messages;
-- documentation and this roadmap are updated when behavior or scope changes;
-- formatting, linting, type checking, relevant tests, and production build pass;
-- no placeholders or silently incomplete translations remain in published content.
-
+- linting, type checking, relevant tests, and production build pass;
+- browser-visible changes are verified in a real browser when required;
+- no unapproved placeholders or unsupported claims remain in published content.

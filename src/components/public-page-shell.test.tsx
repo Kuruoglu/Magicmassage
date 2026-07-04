@@ -123,4 +123,30 @@ describe("PublicPageShell", () => {
       messengerLinks.viber.href,
     );
   });
+
+  it("keeps the closed mobile menu inert and focuses the close button when opened", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <PublicPageShell
+        locale="ru"
+        currentPage="contacts"
+        content={getHomeContent("ru")}
+      >
+        <main>Contacts</main>
+      </PublicPageShell>,
+    );
+
+    const mobileMenu = screen.getByTestId("mobile-menu");
+    expect(mobileMenu).toHaveAttribute("inert");
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+    expect(mobileMenu).not.toHaveAttribute("inert");
+    expect(screen.getByRole("button", { name: "Close menu" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+
+    expect(mobileMenu).toHaveAttribute("inert");
+  });
 });

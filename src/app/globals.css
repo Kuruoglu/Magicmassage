@@ -757,6 +757,32 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   position: absolute;
   width: 100%;
 }
+.map-consent-placeholder {
+  align-content: center;
+  background:
+    radial-gradient(circle at 90% 12%, rgba(176, 122, 221, 0.2), transparent 28%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(176, 122, 221, 0.08));
+  color: var(--white);
+  display: grid;
+  gap: 16px;
+  height: 100%;
+  min-height: 320px;
+  padding: clamp(24px, 4vw, 42px);
+}
+.map-consent-placeholder strong {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1.35rem, 2.2vw, 2rem);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.map-consent-placeholder p {
+  color: #E8DDEE;
+  line-height: 1.75;
+  max-width: 560px;
+}
+.map-consent-placeholder .button {
+  justify-self: start;
+}
 .map-copy {
   align-items: end;
   display: grid;
@@ -819,6 +845,13 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .contact-page { padding-bottom: 90px; padding-top: 70px; }
   .map-panel { grid-template-rows: 300px auto; padding: 18px; }
   .map-frame { min-height: 300px; }
+  .map-consent-placeholder {
+    min-height: 300px;
+    padding: 24px;
+  }
+  .map-consent-placeholder .button {
+    justify-self: stretch;
+  }
   .map-copy { align-items: start; grid-template-columns: 1fr; padding: 12px; }
   .map-copy .button { width: 100%; }
   .messenger-actions,
@@ -1506,6 +1539,45 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 @media (prefers-reduced-motion: reduce) {
   .contact-hero-logo-coin-inner {
     animation: none;
+  }
+}
+
+.cookie-consent {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(155, 107, 194, 0.26);
+  border-radius: 24px;
+  bottom: 24px;
+  box-shadow: 0 24px 70px rgba(29, 20, 36, 0.18);
+  color: var(--graphite);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  left: 50%;
+  max-width: min(760px, calc(100vw - 32px));
+  padding: 18px 20px;
+  position: fixed;
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 16;
+}
+.cookie-consent p {
+  color: #54495C;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .cookie-consent {
+    align-items: stretch;
+    bottom: 16px;
+    border-radius: 20px;
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .cookie-consent .button {
+    width: 100%;
   }
 }
 

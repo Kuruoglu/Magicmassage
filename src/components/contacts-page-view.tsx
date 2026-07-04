@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 
 import {
   externalMessengerLinkProps,
@@ -8,6 +7,7 @@ import {
 } from "@/config/messengers";
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
+import { ConsentGatedMap } from "./consent-gated-map";
 import { MessengerIcon } from "./messenger-icon";
 
 type ContactsPageViewProps = {
@@ -19,7 +19,7 @@ const googleMapsQuery = "49 ulitsa Mesta, Burgas, Bulgaria";
 const googleMapsEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(googleMapsQuery)}&output=embed`;
 const googleMapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(googleMapsQuery)}`;
 
-export function ContactsPageView({ content }: ContactsPageViewProps) {
+export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
   return (
     <main>
       <section className="page-hero contact-hero section-pad">
@@ -65,9 +65,9 @@ export function ContactsPageView({ content }: ContactsPageViewProps) {
                 <dd>{content.hours}</dd>
               </div>
             </dl>
-            <Link className="button" href="tel:+359896778309">
+            <a className="button" href="tel:+359896778309">
               {content.callAction}
-            </Link>
+            </a>
             <div className="messenger-actions" aria-label="Messengers">
               <a
                 className="messenger-link messenger-link-telegram"
@@ -95,12 +95,10 @@ export function ContactsPageView({ content }: ContactsPageViewProps) {
           </div>
           <div className="map-panel" aria-label={content.mapTitle}>
             <div className="map-frame">
-              <iframe
+              <ConsentGatedMap
+                locale={locale}
                 title={content.mapTitle}
                 src={googleMapsEmbedUrl}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                allowFullScreen
               />
             </div>
             <div className="map-copy">

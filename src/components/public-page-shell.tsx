@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { HomeContent } from "@/content/home";
 import type { Locale } from "@/i18n/config";
 import type { PublicPageKey } from "@/navigation/public-routes";
+import { CookieConsentBanner } from "./cookie-consent";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 
@@ -31,6 +32,7 @@ export function PublicPageShell({
       />
       {children}
       <SiteFooter content={content} />
+      <CookieConsentBanner locale={locale} />
     </div>
   );
 }

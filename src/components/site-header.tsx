@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { externalBookingLinkProps } from "@/config/booking";
 import { externalMessengerLinkProps, messengerLinks } from "@/config/messengers";
@@ -35,6 +35,9 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<"services" | "language" | null>(null);
   const mobileMenuId = useId();
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLElement>(null);
+  const menuCloseRef = useRef<HTMLButtonElement>(null);
   const links: Array<{ page: PublicPageKey; label: string }> = [
     { page: "home", label: content.navigation.home },
     { page: "services", label: content.navigation.services },
@@ -44,7 +47,13 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
   const services = getPublicPagesContent(locale).services.items;
   const localePathFor = (item: Locale) =>
     localePaths?.[item] ?? getLocaleSwitchPath(item, currentPage);
-  const closeMenu = () => setIsMenuOpen(false);
+  const closeMenu = useCallback(() => {
+    setIsMenuOpen(false);
+  }, []);
+  const closeMenuAndRestoreFocus = useCallback(() => {
+    closeMenu();
+    window.setTimeout(() => menuToggleRef.current?.focus(), 0);
+  }, [closeMenu]);
   const toggleDropdown = (dropdown: "services" | "language") => {
     setOpenDropdown((current) => (current === dropdown ? null : dropdown));
   };
@@ -52,9 +61,43 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
   useEffect(() => {
     if (!isMenuOpen) return;
 
+    menuCloseRef.current?.focus();
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        closeMenu();
+        closeMenuAndRestoreFocus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !mobileMenuRef.current) {
+        return;
+      }
+
+      const focusableItems = Array.from(
+        mobileMenuRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((item) => item.tabIndex >= 0);
+      const firstItem = focusableItems[0];
+      const lastItem = focusableItems[focusableItems.length - 1];
+
+      if (!firstItem || !lastItem) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!mobileMenuRef.current.contains(document.activeElement)) {
+        event.preventDefault();
+        firstItem.focus();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstItem) {
+        event.preventDefault();
+        lastItem.focus();
+      } else if (!event.shiftKey && document.activeElement === lastItem) {
+        event.preventDefault();
+        firstItem.focus();
       }
     };
 
@@ -65,7 +108,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
       document.removeEventListener("keydown", onKeyDown);
       document.body.classList.remove("mobile-menu-open");
     };
-  }, [isMenuOpen]);
+  }, [closeMenuAndRestoreFocus, isMenuOpen]);
 
   return (
     <header className="site-header">
@@ -159,9 +202,10 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
             {content.navigation.booking}
           </a>
           <button
+            ref={menuToggleRef}
             className="menu-toggle"
             type="button"
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            aria-label={isMenuOpen ? "Close mobile menu" : "Open menu"}
             aria-expanded={isMenuOpen}
             aria-controls={mobileMenuId}
             onClick={() => setIsMenuOpen((open) => !open)}
@@ -179,9 +223,12 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
         onClick={closeMenu}
       />
       <aside
+        ref={mobileMenuRef}
+        data-testid="mobile-menu"
         className={isMenuOpen ? "mobile-menu is-open" : "mobile-menu"}
         id={mobileMenuId}
         aria-hidden={!isMenuOpen}
+        inert={isMenuOpen ? undefined : true}
       >
         <div className="mobile-menu-head">
           <Link
@@ -196,7 +243,13 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
               <small>Natali</small>
             </span>
           </Link>
-          <button className="menu-close" type="button" aria-label="Close menu" onClick={closeMenu}>
+          <button
+            ref={menuCloseRef}
+            className="menu-close"
+            type="button"
+            aria-label="Close menu"
+            onClick={closeMenuAndRestoreFocus}
+          >
             <span aria-hidden="true">×</span>
           </button>
         </div>
