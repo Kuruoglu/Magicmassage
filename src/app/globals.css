@@ -1148,6 +1148,84 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   overflow: hidden;
   position: relative;
 }
+.contact-hero-inner {
+  align-items: center;
+  min-height: 355px;
+}
+.contact-hero-copy {
+  max-width: 920px;
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+}
+.contact-hero-copy > p:last-child {
+  color: #E8DDEE;
+  line-height: 1.8;
+  margin-top: 24px;
+  max-width: 680px;
+}
+.contact-hero-logo-coin {
+  aspect-ratio: 1;
+  perspective: 1000px;
+  position: absolute;
+  right: clamp(-9px, -4vw, -58px);
+  top: 34%;
+  transform: translateY(-50%);
+  width: clamp(220px, 15vw, 270px);
+  z-index: 1;
+}
+.contact-hero-logo-coin::before {
+  background: radial-gradient(circle, rgba(176, 122, 221, 0.34), transparent 64%);
+  border-radius: 999px;
+  content: "";
+  filter: blur(18px);
+  inset: 10%;
+  opacity: 0.75;
+  position: absolute;
+  transform: translateY(20px);
+}
+.contact-hero-logo-coin-inner {
+  animation: logoCoinFlip 6s cubic-bezier(0.72, 0, 0.28, 1) infinite;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  width: 100%;
+}
+.contact-hero-logo-coin-face {
+  align-items: center;
+  backface-visibility: hidden;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.78) 34%, rgba(229, 212, 242, 0.94) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 7px rgba(255, 255, 255, 0.5),
+    inset 0 0 0 13px rgba(155, 107, 194, 0.18),
+    0 30px 80px rgba(0, 0, 0, 0.34);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(14px, 1.6vw, 22px);
+  position: absolute;
+}
+.contact-hero-logo-coin-face::after {
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.62), transparent 36%, rgba(255, 255, 255, 0.18) 62%, transparent);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+.contact-hero-logo-coin-face img {
+  height: 100%;
+  object-fit: contain;
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+.contact-hero-logo-coin-back {
+  transform: rotateY(180deg);
+}
 .services-hero {
   padding-bottom: 86px;
   padding-top: 92px;
@@ -1211,7 +1289,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 
 .about-page-hero h1 {
-  font-size: clamp(3.2rem, 5.2vw, 6rem);
+  font-size: 57.6px;
   max-width: 980px;
 }
 
@@ -1410,6 +1488,37 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   }
 }
 
+@keyframes logoCoinFlip {
+  0%,
+  18% {
+    transform: rotateY(0deg);
+  }
+  42%,
+  58% {
+    transform: rotateY(180deg);
+  }
+  82%,
+  100% {
+    transform: rotateY(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-hero-logo-coin-inner {
+    animation: none;
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 721px) {
+  .contact-hero-copy {
+    max-width: calc(100% - 250px);
+  }
+  .contact-hero-logo-coin {
+    right: 18px;
+    width: clamp(190px, 22vw, 230px);
+  }
+}
+
 @media (max-width: 980px) {
   .hero-content {
     grid-template-columns: 1fr;
@@ -1442,6 +1551,17 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 
 @media (max-width: 720px) {
+  .contact-hero-inner {
+    min-height: 540px;
+  }
+  .contact-hero-logo-coin {
+    bottom: 6px;
+    left: 50%;
+    right: auto;
+    top: auto;
+    transform: translateX(-50%);
+    width: clamp(150px, 42vw, 190px);
+  }
   .hero h1 {
     font-size: clamp(2.35rem, 11vw, 3.35rem);
     letter-spacing: -0.035em;

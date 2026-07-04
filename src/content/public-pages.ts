@@ -62,7 +62,7 @@ const content: Record<Locale, PublicPagesContent> = {
     },
     about: {
       eyebrow: "За Натали и студиото",
-      title: "Наталия Бурачек — 7 години лична грижа чрез масаж в Бургас",
+      title: "Magic Massage Natali — 7 години лична грижа чрез масаж в Бургас",
       lead: "В Magic Massage Natali всеки масаж започва с внимание към човека, неговото състояние и нуждите на тялото.",
       paragraphs: [
         "Казвам се Наталия Бурачек. Работя като масажист в Бургас вече 7 години, с повече от 1000 клиенти и над 5000 проведени масажа. Омъжена съм и имам двама прекрасни сина, затова добре знам колко ценни са спокойствието, доверието и времето за възстановяване.",
@@ -99,7 +99,7 @@ const content: Record<Locale, PublicPagesContent> = {
     },
     about: {
       eyebrow: "О Натали и салоне",
-      title: "Наталья Бурачек — 7 лет личной заботы через массаж в Бургасе",
+      title: "Magic Massage Natali — 7 лет личной заботы через массаж в Бургасе",
       lead: "В Magic Massage Natali каждый массаж начинается с внимания к человеку, его состоянию и потребностям тела.",
       paragraphs: [
         "Меня зовут Наталья Бурачек. Я работаю массажистом в Бургасе уже 7 лет: за это время ко мне обратились более 1000 клиентов, а количество проведенных массажей превысило 5000. Я замужем и мама двух прекрасных сыновей, поэтому хорошо понимаю, как важны спокойствие, доверие и время для восстановления.",
@@ -136,7 +136,7 @@ const content: Record<Locale, PublicPagesContent> = {
     },
     about: {
       eyebrow: "Про Наталі та салон",
-      title: "Наталія Бурачек — 7 років особистої турботи через масаж у Бургасі",
+      title: "Magic Massage Natali — 7 років особистої турботи через масаж у Бургасі",
       lead: "У Magic Massage Natali кожен масаж починається з уваги до людини, її стану та потреб тіла.",
       paragraphs: [
         "Мене звати Наталія Бурачек. Я працюю масажистом у Бургасі вже 7 років: за цей час до мене звернулися понад 1000 клієнтів, а кількість проведених масажів перевищила 5000. Я заміжня і мама двох прекрасних синів, тому добре розумію, наскільки важливі спокій, довіра та час для відновлення.",
@@ -173,7 +173,7 @@ const content: Record<Locale, PublicPagesContent> = {
     },
     about: {
       eyebrow: "About Natali and the studio",
-      title: "Nataliya Burachek — 7 years of personal massage care in Burgas",
+      title: "Magic Massage Natali — 7 years of personal massage care in Burgas",
       lead: "At Magic Massage Natali, every massage starts with attention to the person, their condition and the needs of the body.",
       paragraphs: [
         "My name is Nataliya Burachek. I have worked as a massage therapist in Burgas for 7 years, welcoming more than 1000 clients and completing over 5000 massage sessions. I am married and a mother of two wonderful sons, so I understand how valuable calm, trust and time for recovery can be.",

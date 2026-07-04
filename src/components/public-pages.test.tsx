@@ -65,6 +65,7 @@ describe("localized public page views", () => {
     render(<ContactsPageView locale="bg" content={content.contacts} />);
 
     expect(screen.getByRole("heading", { level: 1, name: content.contacts.title })).toBeInTheDocument();
+    expect(screen.getByTestId("contacts-hero-logo-coin")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText(content.contacts.address)).toBeInTheDocument();
     expect(screen.getByText(content.contacts.hours)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: content.contacts.callAction })).toHaveAttribute("href", "tel:+359896778309");

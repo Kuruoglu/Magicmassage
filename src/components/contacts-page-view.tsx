@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import {
@@ -21,11 +22,27 @@ const googleMapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destinat
 export function ContactsPageView({ content }: ContactsPageViewProps) {
   return (
     <main>
-      <section className="page-hero section-pad">
-        <div className="section-inner">
-          <p className="eyebrow eyebrow-light">{content.eyebrow}</p>
-          <h1>{content.title}</h1>
-          <p>{content.description}</p>
+      <section className="page-hero contact-hero section-pad">
+        <div className="section-inner contact-hero-inner">
+          <div className="contact-hero-copy">
+            <p className="eyebrow eyebrow-light">{content.eyebrow}</p>
+            <h1>{content.title}</h1>
+            <p>{content.description}</p>
+          </div>
+          <div
+            className="contact-hero-logo-coin"
+            data-testid="contacts-hero-logo-coin"
+            aria-hidden="true"
+          >
+            <div className="contact-hero-logo-coin-inner">
+              <span className="contact-hero-logo-coin-face contact-hero-logo-coin-front">
+                <Image src="/media/logo.png" alt="" width={260} height={260} priority />
+              </span>
+              <span className="contact-hero-logo-coin-face contact-hero-logo-coin-back">
+                <Image src="/media/logo.png" alt="" width={260} height={260} priority />
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 
