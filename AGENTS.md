@@ -348,6 +348,20 @@ booking constraints, and end-to-end tests for the critical customer and admin
 flows. Before declaring work complete, run formatting checks, linting, type
 checking, tests, and the production build.
 
+For any browser-visible UI, content, layout, image, routing, or preview-link
+change, do not tell the user the task is complete until Playwright has verified
+the relevant page or flow in a real browser on the actual preview URL the user is
+using. Inspect the rendered result yourself with a screenshot or equivalent
+browser evidence, including the specific element that changed, and fix any
+mismatch before reporting completion.
+
+Before every final response after a code or content change, perform an
+independent review of the diff using the suitable skills for the work. Use the
+`code-reviewer` profile for substantive implementation or UI changes, and use
+the relevant specialist skills such as `ui-designer`, `frontend-developer`,
+`backend-architect`, or `debugger` when they match the risk. Do not skip this
+review just because automated checks passed.
+
 ## Delivery Order
 
 Unless the user requests a narrower task, plan work in these increments:
