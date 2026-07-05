@@ -100,7 +100,7 @@ function createDocumentDefinition(
   contentLines.push(
     { text: `Valid until: ${order.expiresOn}`, style: "sectionTitle" },
     {
-      text: "Booking is by prior arrangement. Redemption v1 is manual by certificate code.",
+      text: "Booking is by prior arrangement. Certificate redemption is manual by certificate code.",
       margin: [0, 8, 0, 0],
     },
     { text: studioFacts.join("\n"), margin: [0, 28, 0, 0] },

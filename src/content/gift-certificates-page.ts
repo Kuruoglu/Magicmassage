@@ -133,7 +133,7 @@ const localizedCopy: Record<
       items: [
         "Один заказ создает один сертификат для одного получателя.",
         "В сертификате можно совместить несколько массажей и/или сумму.",
-        "Погашение v1 выполняется вручную по уникальному коду и по предварительной записи.",
+        "Использование сертификата выполняется вручную по уникальному коду и по предварительной записи.",
       ],
     },
     form: {
@@ -180,7 +180,7 @@ const localizedCopy: Record<
       items: [
         "Одне замовлення створює один сертифікат для одного отримувача.",
         "У сертифікаті можна поєднати кілька масажів і/або суму.",
-        "Погашення v1 виконується вручну за унікальним кодом і за попереднім записом.",
+        "Використання сертифіката виконується вручну за унікальним кодом і за попереднім записом.",
       ],
     },
     form: {
@@ -227,7 +227,7 @@ const localizedCopy: Record<
       items: [
         "One order creates one certificate for one recipient.",
         "A certificate can combine several massages and/or an amount voucher.",
-        "V1 redemption is manual by unique code and by appointment.",
+        "Certificate redemption is manual by unique code and by appointment.",
       ],
     },
     form: {
