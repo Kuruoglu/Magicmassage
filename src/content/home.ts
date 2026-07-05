@@ -6,6 +6,7 @@ export type HomeContent = {
   navigation: {
     home: string;
     services: string;
+    giftCertificates: string;
     about: string;
     blog: string;
     contacts: string;
@@ -66,6 +67,7 @@ const content: Record<Locale, HomeContent> = {
     navigation: {
       home: "Начало",
       services: "Масажи",
+      giftCertificates: "Сертификати",
       about: "За мен",
       blog: "Блог",
       contacts: "Контакти",
@@ -149,6 +151,7 @@ const content: Record<Locale, HomeContent> = {
     navigation: {
       home: "Главная",
       services: "Массажи",
+      giftCertificates: "Сертификаты",
       about: "Обо мне",
       blog: "Блог",
       contacts: "Контакты",
@@ -232,6 +235,7 @@ const content: Record<Locale, HomeContent> = {
     navigation: {
       home: "Головна",
       services: "Масажі",
+      giftCertificates: "Сертифікати",
       about: "Про мене",
       blog: "Блог",
       contacts: "Контакти",
@@ -315,6 +319,7 @@ const content: Record<Locale, HomeContent> = {
     navigation: {
       home: "Home",
       services: "Massages",
+      giftCertificates: "Gift certificates",
       about: "About me",
       blog: "Blog",
       contacts: "Contacts",

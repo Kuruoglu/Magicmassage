@@ -21,6 +21,11 @@ const metadataByLocale: Record<
       title: "Видове масаж в Бургас",
       description: "Класически, релаксиращ, дълбокотъканен и други масажи в Magic Massage Natali.",
     },
+    giftCertificates: {
+      title: "Подаръчни сертификати за масаж",
+      description:
+        "Подаръчни сертификати за масаж в Magic Massage Natali: конкретни масажи, няколко сеанса или свободна сума в EUR.",
+    },
     about: {
       title: "За Magic Massage Natali",
       description: "Научете повече за Натали, студиото и индивидуалния подход към всеки сеанс.",
@@ -39,6 +44,11 @@ const metadataByLocale: Record<
     services: {
       title: "Виды массажа в Бургасе",
       description: "Классический, расслабляющий, глубокий массаж тканей и другие процедуры.",
+    },
+    giftCertificates: {
+      title: "Подарочные сертификаты на массаж",
+      description:
+        "Подарочные сертификаты Magic Massage Natali: конкретные массажи, несколько сеансов или свободная сумма в EUR.",
     },
     about: {
       title: "О Magic Massage Natali",
@@ -59,6 +69,11 @@ const metadataByLocale: Record<
       title: "Види масажу в Бургасі",
       description: "Класичний, розслаблювальний, глибокий масаж тканин та інші процедури.",
     },
+    giftCertificates: {
+      title: "Подарункові сертифікати на масаж",
+      description:
+        "Подарункові сертифікати Magic Massage Natali: конкретні масажі, кілька сеансів або вільна сума в EUR.",
+    },
     about: {
       title: "Про Magic Massage Natali",
       description: "Дізнайтеся більше про Наталі, салон та індивідуальний підхід до кожного сеансу.",
@@ -77,6 +92,11 @@ const metadataByLocale: Record<
     services: {
       title: "Massage types in Burgas",
       description: "Classic, relaxing, deep tissue massage and other treatments at Magic Massage Natali.",
+    },
+    giftCertificates: {
+      title: "Massage gift certificates",
+      description:
+        "Gift certificates for Magic Massage Natali: specific massages, multiple sessions or a free EUR amount.",
     },
     about: {
       title: "About Magic Massage Natali",

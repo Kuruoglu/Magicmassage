@@ -72,7 +72,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .brand span { display: grid; line-height: 1; }
 .brand strong { color: var(--gold-light); font-family: var(--font-serif), Georgia, serif; font-size: 1.18rem; font-weight: 600; }
 .brand small { color: #DCC8EC; font-family: var(--font-serif), Georgia, serif; font-size: 0.72rem; letter-spacing: 0.2em; margin-top: 5px; text-transform: uppercase; }
-.main-nav { align-items: center; display: flex; gap: clamp(18px, 3vw, 42px); justify-content: center; }
+.main-nav { align-items: center; display: flex; gap: clamp(14px, 2.2vw, 34px); justify-content: center; }
 .main-nav a, .nav-dropdown summary, .dropdown-panel a {
   color: #F7F1FA;
   font-size: 0.78rem;
@@ -1804,6 +1804,272 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   line-height: 1.6;
 }
 
+.gift-page-section {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(155, 107, 194, 0.12), transparent 30%),
+    linear-gradient(180deg, #FFFFFF 0%, #F4EEF8 100%);
+  max-width: none;
+  padding-bottom: 118px;
+  padding-top: 92px;
+}
+
+.gift-page-section.section-pad,
+.gift-hero.section-pad {
+  padding-inline: 0;
+}
+
+.gift-page-grid {
+  align-items: start;
+  display: grid;
+  gap: clamp(28px, 4vw, 56px);
+  grid-template-columns: minmax(240px, 0.36fr) minmax(0, 0.64fr);
+}
+
+.gift-intro-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(176, 122, 221, 0.18), transparent 34%),
+    linear-gradient(135deg, #111111, #201727);
+  border: 1px solid rgba(176, 122, 221, 0.24);
+  border-radius: 28px;
+  box-shadow: var(--shadow-soft);
+  color: var(--white);
+  display: grid;
+  gap: 24px;
+  padding: clamp(26px, 3.2vw, 42px);
+  position: sticky;
+  top: 24px;
+}
+
+.gift-intro-panel h2 {
+  font-size: clamp(1.8rem, 2.8vw, 2.8rem);
+}
+
+.gift-intro-panel ul,
+.gift-line-items {
+  display: grid;
+  gap: 16px;
+}
+
+.gift-intro-panel li {
+  color: #E8DDEE;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  list-style: none;
+  padding-left: 24px;
+  position: relative;
+}
+
+.gift-intro-panel li::before {
+  color: var(--gold-light);
+  content: "•";
+  left: 0;
+  position: absolute;
+}
+
+.gift-form {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(155, 107, 194, 0.2);
+  border-radius: 28px;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+  padding: clamp(24px, 3.6vw, 44px);
+}
+
+.gift-form-heading {
+  display: grid;
+  gap: 12px;
+}
+
+.gift-form-heading h2 {
+  font-size: clamp(2rem, 3vw, 3rem);
+}
+
+.gift-form-heading p:last-child,
+.gift-summary p,
+.gift-payment-section p,
+.gift-demo-notice {
+  color: #5E5366;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.gift-segmented,
+.gift-delivery-options,
+.gift-payment-section {
+  border: 0;
+  min-width: 0;
+}
+
+.gift-segmented legend,
+.gift-delivery-options legend,
+.gift-payment-section legend {
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.gift-segmented,
+.gift-delivery-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.gift-segmented label,
+.gift-delivery-options label,
+.gift-quick-amounts button,
+.gift-add-button,
+.gift-remove-button {
+  align-items: center;
+  background: #FFFFFF;
+  border: 1px solid rgba(155, 107, 194, 0.22);
+  border-radius: 999px;
+  color: var(--graphite);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.gift-segmented input,
+.gift-delivery-options input {
+  accent-color: var(--purple-deep);
+}
+
+.gift-field-grid,
+.gift-line-item {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.gift-line-item {
+  align-items: end;
+  grid-template-columns: minmax(0, 1.4fr) minmax(120px, 0.5fr) auto;
+}
+
+.gift-form label,
+.gift-full-field,
+.gift-amount-panel label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gift-form label > span,
+.gift-amount-panel h3,
+.gift-summary span {
+  color: #4C4054;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gift-form input,
+.gift-form select {
+  background: #FFFFFF;
+  border: 1px solid rgba(155, 107, 194, 0.26);
+  border-radius: 16px;
+  color: var(--graphite);
+  font: inherit;
+  min-height: 48px;
+  min-width: 0;
+  padding: 0 14px;
+  width: 100%;
+}
+
+.gift-line-item select {
+  text-overflow: ellipsis;
+}
+
+.gift-add-button,
+.gift-remove-button {
+  background: rgba(155, 107, 194, 0.08);
+  justify-content: center;
+}
+
+.gift-remove-button {
+  min-height: 48px;
+}
+
+.gift-amount-panel,
+.gift-summary,
+.gift-payment-section {
+  background: #FBFAFC;
+  border: 1px solid rgba(155, 107, 194, 0.18);
+  border-radius: 22px;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 22px;
+}
+
+.gift-quick-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gift-quick-amounts button.is-selected {
+  background: var(--purple-deep);
+  color: var(--white);
+}
+
+.gift-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gift-summary div {
+  display: grid;
+  gap: 8px;
+}
+
+.gift-summary strong {
+  color: var(--purple-deep);
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1.45rem, 2.8vw, 2.2rem);
+}
+
+.gift-summary p {
+  grid-column: 1 / -1;
+}
+
+.gift-payment-section {
+  background: #FFFFFF;
+  overflow: visible;
+}
+
+.gift-payment-element {
+  min-width: 0;
+}
+
+.gift-pay-button {
+  justify-self: start;
+}
+
+.form-error {
+  color: #9A2D2D;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.form-success {
+  color: #23643A;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 @media (max-width: 720px) {
   .cookie-consent {
     align-items: stretch;
@@ -2540,6 +2806,14 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .certificates-lower-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .gift-page-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gift-intro-panel {
+    position: static;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -2665,6 +2939,32 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
   .catalog-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gift-page-section {
+    padding-bottom: 82px;
+    padding-top: 68px;
+  }
+
+  .gift-form {
+    border-radius: 24px;
+    padding: 22px;
+  }
+
+  .gift-field-grid,
+  .gift-line-item,
+  .gift-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gift-line-item {
+    align-items: stretch;
+  }
+
+  .gift-pay-button,
+  .gift-add-button,
+  .gift-remove-button {
+    width: 100%;
   }
 
   .catalog-card:nth-child(1),

@@ -1,12 +1,19 @@
 import type { Locale } from "@/i18n/config";
 
-export const publicPageKeys = ["home", "services", "about", "contacts"] as const;
+export const publicPageKeys = [
+  "home",
+  "services",
+  "giftCertificates",
+  "about",
+  "contacts",
+] as const;
 
 export type PublicPageKey = (typeof publicPageKeys)[number];
 
 const pageSegments: Record<PublicPageKey, string> = {
   home: "",
   services: "services",
+  giftCertificates: "gift-certificates",
   about: "about",
   contacts: "contacts",
 };

@@ -41,6 +41,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
   const links: Array<{ page: PublicPageKey; label: string }> = [
     { page: "home", label: content.navigation.home },
     { page: "services", label: content.navigation.services },
+    { page: "giftCertificates", label: content.navigation.giftCertificates },
     { page: "about", label: content.navigation.about },
     { page: "contacts", label: content.navigation.contacts },
   ];
