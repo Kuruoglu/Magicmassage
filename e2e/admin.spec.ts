@@ -1,0 +1,35 @@
+import { expect, test } from "@playwright/test";
+
+test("admin foundation renders a data-dense dashboard shell", async ({ page }) => {
+  await page.goto("/admin");
+
+  await expect(page.getByRole("heading", { name: "Дашборд" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Admin sections" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Клиенты" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Финансы" })).toBeVisible();
+  await expect(page.getByText("Сегодня")).toBeVisible();
+});
+
+test("accountant view exposes only finance navigation", async ({ page }) => {
+  await page.goto("/admin?role=accountant");
+
+  const navigation = page.getByRole("navigation", { name: "Admin sections" });
+  await expect(navigation.getByRole("link", { name: "Финансы" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Клиенты" })).toHaveCount(0);
+  await expect(navigation.getByRole("link", { name: "Календарь" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Финансы" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Выгрузить отчет" })).toBeVisible();
+});
+
+test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin?section=calendar");
+
+  await expect(page.getByRole("heading", { name: "Календарь" })).toBeVisible();
+
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+
+  expect(hasHorizontalOverflow).toBe(false);
+});
