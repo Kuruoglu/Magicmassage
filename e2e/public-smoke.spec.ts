@@ -7,6 +7,11 @@ test("public routes render and expose the Studio24 booking handoff", async ({ pa
     await page.goto(`/${locale}`);
 
     await expect(page.locator("h1")).toBeVisible();
+
+    await page.goto(`/${locale}/gift-certificates`);
+
+    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.getByRole("group", { name: /payment|плащане|оплата|оплата/i })).toBeVisible();
   }
 
   await page.goto("/bg");
@@ -40,4 +45,18 @@ test("mobile menu is inert while closed and keyboard-safe while open", async ({ 
   await page.keyboard.press("Escape");
 
   await expect(mobileMenu).toHaveAttribute("inert", "");
+});
+
+test("gift certificate page fits mobile without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/ru/gift-certificates");
+
+  await expect(page.getByRole("heading", { name: /сертификаты/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Добавить массаж" })).toBeVisible();
+
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+
+  expect(hasHorizontalOverflow).toBe(false);
 });

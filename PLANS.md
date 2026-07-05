@@ -16,14 +16,17 @@ together with [AGENTS.md](./AGENTS.md), [docs/CURRENT_SCOPE.md](./docs/CURRENT_S
 
 Launch a fast, accessible, multilingual public website for Magic Massage Natali
 in Burgas with service pages, local SEO, real photography, contact information,
-cookie consent, and appointment calls to action that open Studio24.
+cookie consent, appointment calls to action that open Studio24, and a guarded
+gift certificate purchase flow.
 
 ## Current MVP Decisions
 
 - The first release is a public website, not a custom booking platform.
 - Booking CTAs open Studio24 by client request.
+- Gift certificates and online card payments are in the current implementation
+  slice. Live payments remain blocked until final prices are confirmed.
 - There is no first-release Supabase database, custom admin panel, internal
-  booking flow, email automation, or Telegram booking notification workflow.
+  booking flow, booking email automation, or Telegram booking notification workflow.
 - Public locales are `bg`, `ru`, `ua`, and `en`.
 - `ua` remains the public URL segment and `UA` user-facing label; metadata maps
   it to `uk-UA`.
@@ -42,9 +45,11 @@ The first production release includes:
 
 - Bulgarian, Russian, Ukrainian, and English public content.
 - Public URL segments `/bg`, `/ru`, `/ua`, and `/en`.
-- Home landing page, Services, individual service pages, About, Contacts, and
-  required privacy/cookie/legal information.
+- Home landing page, Services, individual service pages, Gift Certificates,
+  About, Contacts, and required privacy/cookie/legal information.
 - Studio24 appointment handoff for booking CTAs.
+- Stripe Payment Element for gift certificate payments, using card-based
+  payment methods and guarded live-payment flags.
 - A light Premium Wellness visual system using real salon photography stored
   under `assets/photos`.
 - Technical and local SEO foundations.
@@ -59,7 +64,7 @@ Out of MVP scope:
 - Internal booking, availability, specialists, booking status history, and
   customer management links.
 - Booking emails, reminders, and Telegram notifications.
-- Online payment, customer accounts, loyalty features, and full Telegram booking.
+- Customer accounts, loyalty features, and full Telegram booking.
 
 ## Phase 1 - Scope, Content, And Design
 
@@ -68,6 +73,7 @@ Out of MVP scope:
 - [x] Select the light Premium Wellness visual direction.
 - [x] Define Bulgarian, Russian, Ukrainian, and English locale requirements.
 - [x] Approve Studio24 as the first-release booking destination.
+- [x] Approve gift certificates as the current payment-enabled slice.
 - [x] Approve shared English service slugs for the first release.
 - [x] Confirm Natali's experience and certificate claims are allowed in copy.
 - [x] Review the supplied photography and copy selected originals into assets.
@@ -108,6 +114,8 @@ pipeline passes, and browser smoke checks cover the critical public flows.
 - [ ] Add privacy and cookie information pages or sections.
 - [x] Add cookie consent for Google Maps and other non-essential third-party
   content.
+- [ ] Add Gift Certificates page with embedded Stripe Payment Element,
+  server-side totals, PDF/email fulfillment, and live-payment safety flags.
 - [ ] Ensure Studio24 booking CTAs are clear and tested.
 - [ ] Validate responsive behavior, keyboard use, focus order, and reduced motion.
 
@@ -146,6 +154,8 @@ pages.
 - [ ] Run an accessibility review of public workflows.
 - [ ] Run dependency audit and apply safe targeted updates where possible.
 - [ ] Verify production environment variables and domain configuration.
+- [ ] Verify Stripe test keys, webhook secret, Resend sender, and live-payment
+  flags before enabling real payments.
 - [ ] Run linting, type checking, tests, Playwright smoke tests, and production
   build.
 - [ ] Complete a production smoke test in BG, RU, UA, and EN.
@@ -165,8 +175,9 @@ These features require separate approval and planning:
 - Customer management links for cancellation and rescheduling.
 - Transactional booking emails and reminders.
 - Telegram owner notifications and secure booking actions.
-- Online deposits or full payments.
-- Gift certificates and multi-session packages.
+- Online deposits or full payments outside the gift certificate flow.
+- Broader gift certificate administration, redemption tracking, and package
+  management.
 - Promotion codes.
 - Waiting list for occupied slots.
 - Calendar synchronization and export.

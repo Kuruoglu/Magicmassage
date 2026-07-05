@@ -6,6 +6,8 @@ Use this file to avoid noisy reviews caused by stale assumptions.
 
 - `/en` is intentional and approved.
 - Studio24 booking links are intentional and approved for the first release.
+- `/gift-certificates` and embedded Stripe Payment Element are now approved for
+  the current implementation slice.
 - Missing Supabase, custom admin, internal booking, booking emails, and Telegram
   automation are not bugs in the first release.
 - Shared English service slugs are acceptable for the first release.
@@ -18,6 +20,8 @@ Use this file to avoid noisy reviews caused by stale assumptions.
 
 - Broken locale routing, canonical URLs, or `hreflang`.
 - Broken Studio24 booking CTA targets.
+- Broken gift certificate totals, Stripe PaymentIntent creation, webhook
+  signature validation, PDF generation, or email fulfillment.
 - Google Maps or analytics loading before cookie consent.
 - Sitemap entries using `new Date()` as a fake update date.
 - Hidden mobile menu content remaining keyboard-focusable.

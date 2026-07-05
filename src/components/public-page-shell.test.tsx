@@ -23,6 +23,7 @@ describe("PublicPageShell", () => {
     expect(primaryNav).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Главная" })).toHaveAttribute("href", "/ru");
     expect(within(primaryNav).getByRole("link", { name: "Обо мне" })).toHaveAttribute("href", "/ru/about");
+    expect(within(primaryNav).getByRole("link", { name: "Сертификаты" })).toHaveAttribute("href", "/ru/gift-certificates");
     expect(within(primaryNav).getByRole("link", { name: "Контакты" })).toHaveAttribute("href", "/ru/contacts");
 
     await user.click(within(primaryNav).getByText("Массажи"));
@@ -86,6 +87,10 @@ describe("PublicPageShell", () => {
     expect(within(mobileNav).getByRole("link", { name: "Контакты" })).toHaveAttribute(
       "href",
       "/ru/contacts",
+    );
+    expect(within(mobileNav).getByRole("link", { name: "Сертификаты" })).toHaveAttribute(
+      "href",
+      "/ru/gift-certificates",
     );
     expect(within(mobileMenu).getByRole("link", { name: "BG" })).toHaveAttribute(
       "href",

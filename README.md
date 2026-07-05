@@ -1,7 +1,8 @@
 # Magic Massage Natali
 
 Multilingual public website for Magic Massage Natali in Burgas. The current
-first release is a simplified public site with Studio24 booking handoff.
+first release is a public site with Studio24 booking handoff plus a test-mode
+gift certificate purchase flow for Stripe Elements.
 
 ## Requirements
 
@@ -23,6 +24,12 @@ Bulgarian. Localized home routes are:
 - `http://localhost:3000/ru`
 - `http://localhost:3000/ua`
 - `http://localhost:3000/en`
+
+Gift certificate routes are available at `/${locale}/gift-certificates`.
+Without Stripe environment variables the form stays in demo mode and cannot
+accept real payments. Live payments require confirmed prices plus
+`GIFT_CERTIFICATES_ENABLE_LIVE_PAYMENTS=true` and
+`GIFT_CERTIFICATES_FINAL_PRICES_CONFIRMED=true`.
 
 ## Verification
 

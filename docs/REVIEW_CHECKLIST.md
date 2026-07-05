@@ -21,9 +21,14 @@ Verify in a browser:
 
 - `/bg`, `/ru`, `/ua`, and `/en` render.
 - Services catalog renders in all supported locales.
+- Gift Certificates renders in all supported locales and the form supports
+  self/gift delivery, add/remove massage lines, free EUR amount, and disabled
+  payment until valid.
 - At least one service detail page renders.
 - Language switcher preserves the current public page.
 - Studio24 booking CTA opens the expected external URL.
+- Stripe Payment Element is embedded only on the gift certificate payment flow;
+  card number, CVC, and financial data are not handled by site code.
 - Mobile menu opens, closes, handles keyboard focus correctly, and does not leave
   hidden links tabbable.
 - Cookie consent appears before non-essential third-party content loads.
@@ -46,6 +51,8 @@ Verify in a browser:
 - Meaningful images have useful localized alt text.
 - Real salon/treatment photos are not described as generated or stock imagery.
 - Privacy and cookie text matches the actual third-party content in use.
+- Gift certificate price placeholders and 6-month validity are marked as needing
+  client confirmation before live payments.
 
 ## Dependency Checks
 

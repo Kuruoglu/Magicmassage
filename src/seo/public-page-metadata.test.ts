@@ -16,4 +16,15 @@ describe("public page metadata", () => {
     expect(contacts.alternates?.languages?.["uk-UA"]).toBe("/ua/contacts");
     expect(createPublicPageMetadata("en", "contacts").alternates?.canonical).toBe("/en/contacts");
   });
+
+  it("creates metadata for localized gift certificate pages", () => {
+    const metadata = createPublicPageMetadata("en", "giftCertificates");
+
+    expect(metadata.title).toBe("Massage gift certificates");
+    expect(metadata.description).toContain("Gift certificates");
+    expect(metadata.alternates?.canonical).toBe("/en/gift-certificates");
+    expect(metadata.alternates?.languages?.["bg-BG"]).toBe("/bg/gift-certificates");
+    expect(metadata.alternates?.languages?.["uk-UA"]).toBe("/ua/gift-certificates");
+    expect(metadata.alternates?.languages?.["x-default"]).toBe("/bg/gift-certificates");
+  });
 });

@@ -13,22 +13,22 @@ const cookieConsentCopy: Record<
 > = {
   bg: {
     message:
-      "Използваме необходими бисквитки и зареждаме Google Maps само след Вашето съгласие.",
+      "Използваме необходими бисквитки. Stripe обработва плащанията чрез защитени iframe елементи, а Google Maps се зарежда само след Вашето съгласие.",
     action: "Приемам cookies",
   },
   ru: {
     message:
-      "Мы используем необходимые cookies и загружаем Google Maps только после вашего согласия.",
+      "Мы используем необходимые cookies. Stripe обрабатывает оплату через защищенные iframe-элементы, а Google Maps загружается только после вашего согласия.",
     action: "Принимаю cookies",
   },
   ua: {
     message:
-      "Ми використовуємо необхідні cookies і завантажуємо Google Maps лише після вашої згоди.",
+      "Ми використовуємо необхідні cookies. Stripe обробляє оплату через захищені iframe-елементи, а Google Maps завантажується лише після вашої згоди.",
     action: "Приймаю cookies",
   },
   en: {
     message:
-      "We use necessary cookies and load Google Maps only after your consent.",
+      "We use necessary cookies. Stripe processes payments through secure iframe elements, and Google Maps loads only after your consent.",
     action: "Accept cookies",
   },
 };

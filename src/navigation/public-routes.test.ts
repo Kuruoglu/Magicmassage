@@ -8,9 +8,16 @@ import {
 
 describe("public route helpers", () => {
   it("builds localized paths for every public page", () => {
-    expect(publicPageKeys).toEqual(["home", "services", "about", "contacts"]);
+    expect(publicPageKeys).toEqual([
+      "home",
+      "services",
+      "giftCertificates",
+      "about",
+      "contacts",
+    ]);
     expect(getPublicPagePath("bg", "home")).toBe("/bg");
     expect(getPublicPagePath("ru", "services")).toBe("/ru/services");
+    expect(getPublicPagePath("ru", "giftCertificates")).toBe("/ru/gift-certificates");
     expect(getPublicPagePath("ua", "about")).toBe("/ua/about");
     expect(getPublicPagePath("en", "about")).toBe("/en/about");
     expect(getPublicPagePath("bg", "contacts")).toBe("/bg/contacts");
@@ -18,6 +25,7 @@ describe("public route helpers", () => {
 
   it("preserves the current page when switching locale", () => {
     expect(getLocaleSwitchPath("bg", "services")).toBe("/bg/services");
+    expect(getLocaleSwitchPath("ru", "giftCertificates")).toBe("/ru/gift-certificates");
     expect(getLocaleSwitchPath("ua", "contacts")).toBe("/ua/contacts");
     expect(getLocaleSwitchPath("en", "contacts")).toBe("/en/contacts");
   });

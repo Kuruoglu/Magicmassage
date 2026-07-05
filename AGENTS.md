@@ -5,11 +5,13 @@
 Build a fast multilingual public website for the Magic Massage Natali massage
 studio in Burgas, Bulgaria. The first release is a focused marketing and local
 SEO site with service pages, real photography, contact information, cookie
-consent, and appointment calls to action that open Studio24.
+consent, appointment calls to action that open Studio24, and a guarded gift
+certificate purchase flow.
 
 The first release is intentionally not a custom booking platform. Supabase,
-custom administration, internal booking, email automation, and Telegram booking
-notifications are later-release candidates only.
+custom administration, internal booking, booking email automation, and Telegram
+booking notifications are later-release candidates only. Gift certificate
+payment emails are in scope only for paid certificate fulfillment.
 
 Treat this file as the product and engineering baseline. When project scope
 changes, update this file, [PLANS.md](./PLANS.md), and the short sync documents
@@ -44,6 +46,8 @@ Read these files before planning, reviewing, or implementing:
 - Real photography in `assets/photos` with optimized public derivatives in
   `public/media`.
 - Studio24 as the external appointment booking destination.
+- Stripe Payment Element for gift certificate purchases, with live payments
+  blocked until final prices and flags are confirmed.
 - Google Maps may be used only with an appropriate cookie consent mechanism.
 - Vercel is the preferred deployment target unless project constraints change.
 
@@ -93,6 +97,7 @@ The first-release public site contains:
 - Services catalog.
 - Individual service pages.
 - About.
+- Gift certificates.
 - Contacts, map access, social links, and working hours.
 - Privacy policy.
 - Cookie information and cookie consent where non-essential third-party content
@@ -244,10 +249,16 @@ Later releases may add localized slugs, slug history, and permanent redirects.
 
 The first-release website should avoid collecting personal booking data directly.
 Studio24 handles appointment data after the external handoff.
+Gift certificate checkout collects purchaser/recipient details needed to issue a
+certificate. Stripe handles card data through embedded payment elements; the site
+must not store card numbers, CVC, or financial data.
 
 - Keep secrets in environment variables and never commit them.
 - Do not add advertising, marketing trackers, analytics, maps, or other
   non-essential third-party embeds without an appropriate consent mechanism.
+- Stripe Elements may be loaded for payment processing on the gift certificate
+  flow. Privacy/cookie text must mention Stripe payment iframes, IP/fraud
+  prevention, and that card data is handled by Stripe.
 - Google Maps iframe usage requires cookie consent before loading or an
   equivalent privacy-safe pattern.
 - Privacy and cookie pages should clearly explain non-essential cookies and
@@ -264,7 +275,8 @@ These are candidates after the first release, not default implementation scope:
 - Email confirmations, reminders, and failure handling.
 - Telegram owner notifications and secure actions.
 - Online deposits or full payments.
-- Gift certificates.
+- Online deposits or full payments outside the gift certificate flow.
+- Gift certificate administration, redemption history, and resend tooling.
 - Multi-session packages.
 - Promotion codes.
 - Waiting list for occupied times.

@@ -6,13 +6,17 @@ describe("sitemap", () => {
   it("contains every localized public page URL", () => {
     const urls = sitemap().map((entry) => entry.url);
 
-    expect(urls).toHaveLength(92);
+    expect(urls).toHaveLength(96);
     expect(urls).toContain("https://magicmassagenatali.bg/bg");
     expect(urls).toContain("https://magicmassagenatali.bg/bg/services");
+    expect(urls).toContain("https://magicmassagenatali.bg/bg/gift-certificates");
     expect(urls).toContain("https://magicmassagenatali.bg/ru/about");
+    expect(urls).toContain("https://magicmassagenatali.bg/ru/gift-certificates");
     expect(urls).toContain("https://magicmassagenatali.bg/ua/contacts");
+    expect(urls).toContain("https://magicmassagenatali.bg/ua/gift-certificates");
     expect(urls).toContain("https://magicmassagenatali.bg/en");
     expect(urls).toContain("https://magicmassagenatali.bg/en/services");
+    expect(urls).toContain("https://magicmassagenatali.bg/en/gift-certificates");
     expect(urls).toContain("https://magicmassagenatali.bg/bg/services/classic-massage");
     expect(urls).toContain("https://magicmassagenatali.bg/ru/services/deep-tissue-massage");
     expect(urls).toContain("https://magicmassagenatali.bg/ua/services/hot-stone-therapy");
