@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { GiftCertificatesPageContent } from "@/content/gift-certificates-page";
 import type { Locale } from "@/i18n/config";
 import { GiftCertificateForm } from "./gift-certificate-form";
@@ -17,9 +19,20 @@ export function GiftCertificatesPageView({
     <main>
       <section className="page-hero gift-hero section-pad">
         <div className="section-inner gift-hero-inner">
-          <p className="eyebrow eyebrow-light">{content.hero.eyebrow}</p>
-          <h1>{content.hero.title}</h1>
-          <p>{content.hero.description}</p>
+          <div className="gift-hero-copy">
+            <p className="eyebrow eyebrow-light">{content.hero.eyebrow}</p>
+            <h1>{content.hero.title}</h1>
+            <p>{content.hero.description}</p>
+          </div>
+          <div className="gift-hero-visual" aria-hidden="true">
+            <Image
+              src="/media/gift-certificates/gift-certificate-hero-bow.webp"
+              alt=""
+              fill
+              priority
+              sizes="(max-width: 720px) 86vw, 38vw"
+            />
+          </div>
         </div>
       </section>
 
