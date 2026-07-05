@@ -2217,6 +2217,13 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   text-transform: uppercase;
 }
 
+.gift-field-grid .gift-field-label,
+.gift-line-item .gift-field-label {
+  align-items: end;
+  display: flex;
+  min-height: 2.4em;
+}
+
 .gift-form input,
 .gift-form select {
   background: #FFFFFF;
