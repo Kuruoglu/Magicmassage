@@ -1877,7 +1877,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   color: transparent;
   font-size: 0;
   height: 5px;
-  top: 0.72em;
+  top: 0.92em;
   width: 5px;
 }
 
@@ -2156,6 +2156,15 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   min-width: 0;
   padding: 0 15px;
   width: 100%;
+}
+
+.gift-form select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 5.25L7 8.75L10.5 5.25' stroke='%236E4A8B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 22px center;
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+  padding-right: 52px;
 }
 
 .gift-form input:focus,
