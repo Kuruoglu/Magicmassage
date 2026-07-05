@@ -20,7 +20,27 @@ Magic Massage Natali is currently a simplified public website:
 - Google Maps may be used only with cookie consent or another privacy-safe
   pattern.
 
-## Explicitly Out Of Scope For The First Release
+## Approved Admin Direction
+
+The client has re-approved a custom admin/CRM platform as the next product
+direction after the current public-site MVP line. For admin, Supabase, roles,
+clients, calendar, blog, settings, and Stripe finance exports, use
+[ADMIN_SCOPE.md](./ADMIN_SCOPE.md) as the source of truth.
+
+The old MVP exclusions below describe the current public-site release only. They
+do not apply to tasks that explicitly start from the approved admin scope.
+
+The approved admin direction includes:
+
+- Supabase/PostgreSQL, Supabase Auth, Row Level Security, and Storage.
+- A protected `/admin` area.
+- Clients, users, roles, certificates, calendar, services, price list, media,
+  contacts, blog, settings, and finance modules.
+- A `Бухгалтер` role with narrow read/export access to Stripe sales reports for
+  tax periods.
+- A target migration from Studio24 handoff to internal request-based booking.
+
+## Explicitly Out Of Scope For The Current Public-Site First Release
 
 - Supabase/PostgreSQL.
 - Custom admin panel.

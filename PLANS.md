@@ -39,6 +39,23 @@ gift certificate purchase flow.
 - Sitemap entries should use real content update dates or omit `lastModified`.
 - A small Playwright smoke suite should cover public critical flows.
 
+## Approved Next Direction - Admin Platform
+
+The client has re-approved a custom admin/CRM platform as the next product
+direction, separate from the current public-site MVP line. The detailed source
+of truth is [docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md).
+
+The approved admin direction includes Supabase/PostgreSQL, Supabase Auth, Row
+Level Security, Storage, protected `/admin` routes, clients, users, roles,
+certificates, calendar, services, price list, media, contacts, blog, settings,
+and finance reports. It also includes a narrow `Бухгалтер` role that can export
+Stripe sales for a selected tax period, including gross, fees, refunds, and net
+totals.
+
+The target admin version migrates booking away from Studio24 to an internal
+request-based booking flow. Until that work begins, the current public-site MVP
+can continue to use Studio24 as documented below.
+
 ## MVP Definition
 
 The first production release includes:
@@ -168,28 +185,23 @@ security findings remain, and the owner accepts the production public website.
 
 These features require separate approval and planning:
 
-- Supabase/PostgreSQL data model.
-- Supabase Auth and custom administration panel.
-- Internal request-based booking.
-- Specialist schedules, breaks, buffers, days off, and booking availability.
+Admin/CRM platform details that used to live here are now approved as the next
+direction and are tracked in [docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md).
+Remaining later-release candidates include:
+
+- Customer-facing accounts and booking history.
 - Customer management links for cancellation and rescheduling.
-- Transactional booking emails and reminders.
 - Telegram owner notifications and secure booking actions.
 - Online deposits or full payments outside the gift certificate flow.
-- Broader gift certificate administration, redemption tracking, and package
-  management.
+- Package management beyond the v1 certificate flow.
 - Promotion codes.
 - Waiting list for occupied slots.
 - Calendar synchronization and export.
-- Customer accounts and booking history.
 - Loyalty and repeat-customer features.
-- Restricted staff administration accounts.
 - Business analytics dashboards.
-- Blog publishing.
 - AI-assisted translation drafts.
 - Complete booking inside Telegram.
 - Localized service slugs and slug-change redirects.
-- Admin publication status and translation completeness gates.
 
 ## Definition Of Done
 

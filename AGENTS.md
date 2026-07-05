@@ -13,6 +13,11 @@ custom administration, internal booking, booking email automation, and Telegram
 booking notifications are later-release candidates only. Gift certificate
 payment emails are in scope only for paid certificate fulfillment.
 
+After the public-site MVP scope was defined, the client re-approved a custom
+admin/CRM platform as the next product direction. For admin, Supabase, roles,
+calendar, clients, blog, settings, and Stripe finance export work, follow
+[docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md).
+
 Treat this file as the product and engineering baseline. When project scope
 changes, update this file, [PLANS.md](./PLANS.md), and the short sync documents
 under `docs/` before treating new behavior as a bug.
@@ -21,9 +26,20 @@ under `docs/` before treating new behavior as a bug.
 
 Read these files before planning, reviewing, or implementing:
 
+- Context routing:
+  - public site, current MVP, locale routing, Studio24 handoff, cookies, and SEO:
+    read [docs/CURRENT_SCOPE.md](./docs/CURRENT_SCOPE.md).
+  - admin, Supabase, roles, calendar, clients, blog, settings, and Stripe
+    finance exports: read [docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md).
+  - preview links, local production preview, and Cloudflare tunnel sharing: read
+    [docs/REMOTE_PREVIEW.md](./docs/REMOTE_PREVIEW.md).
+  - reviews and completion checks: read [docs/AGENT_NOTES.md](./docs/AGENT_NOTES.md)
+    and [docs/REVIEW_CHECKLIST.md](./docs/REVIEW_CHECKLIST.md).
 - [PLANS.md](./PLANS.md) - live roadmap and MVP checklist.
 - [docs/CURRENT_SCOPE.md](./docs/CURRENT_SCOPE.md) - short current truth for
   new sessions.
+- [docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md) - approved next direction for
+  the admin/CRM platform.
 - [docs/AGENT_NOTES.md](./docs/AGENT_NOTES.md) - decisions that should not be
   re-reported as review findings.
 - [docs/REVIEW_CHECKLIST.md](./docs/REVIEW_CHECKLIST.md) - verification checklist.
@@ -208,11 +224,18 @@ custom booking.
 
 ## Administration Panel
 
-A custom administration panel is out of scope for the first release. Content is
-maintained in code and reviewed before deployment.
+A custom administration panel is out of scope for the current public-site first
+release. Content is maintained in code and reviewed before deployment until the
+approved admin/CRM platform work starts.
 
-Later administration may include services, pages, media, reviews, SEO fields,
-contacts, blog posts, booking settings, and role-aware authorization.
+The approved next admin direction is documented in
+[docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md). Do not treat that file's admin
+requirements as bugs in the current public-site MVP, and do not treat old
+first-release exclusions as blockers for tasks that explicitly start from the
+admin scope.
+
+Keep admin requirements in [docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md) instead
+of duplicating the full admin module list here.
 
 ## Content And Claims
 
@@ -267,16 +290,13 @@ must not store card numbers, CVC, or financial data.
 
 ## Recommended Later Features
 
-These are candidates after the first release, not default implementation scope:
+The custom admin/CRM platform is now an approved next direction, tracked in
+[docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md). Remaining later candidates beyond
+the admin v1 include:
 
-- Supabase/PostgreSQL data model.
-- Supabase Auth and custom administration.
-- Internal request-based booking.
-- Email confirmations, reminders, and failure handling.
+- Advanced email confirmations, reminders, and failure handling.
 - Telegram owner notifications and secure actions.
-- Online deposits or full payments.
 - Online deposits or full payments outside the gift certificate flow.
-- Gift certificate administration, redemption history, and resend tooling.
 - Multi-session packages.
 - Promotion codes.
 - Waiting list for occupied times.
@@ -284,7 +304,6 @@ These are candidates after the first release, not default implementation scope:
 - Customer loyalty features.
 - Analytics for repeat clients and popular services.
 - Richer staff roles.
-- Blog publishing.
 - AI-assisted translation drafts.
 - Full Telegram booking experience.
 
