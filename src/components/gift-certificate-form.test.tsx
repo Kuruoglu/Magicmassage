@@ -62,6 +62,22 @@ describe("GiftCertificateForm", () => {
     expect(screen.getAllByLabelText(content.form.serviceLabel)).toHaveLength(1);
   });
 
+  it("does not offer already selected massages in additional massage rows", async () => {
+    const user = userEvent.setup();
+    const content = getGiftCertificatesPageContent("en");
+
+    render(<GiftCertificateForm locale="en" content={content.form} stripePublishableKey={null} />);
+
+    await user.click(screen.getByRole("button", { name: content.form.addMassageAction }));
+
+    const serviceSelects = screen.getAllByLabelText(content.form.serviceLabel);
+
+    expect(serviceSelects[0]).toHaveValue(content.form.services[0].slug);
+    expect(serviceSelects[1]).toHaveValue(content.form.services[1].slug);
+    expect(within(serviceSelects[1]).queryByRole("option", { name: /Classic massage/i })).not.toBeInTheDocument();
+    expect(within(serviceSelects[1]).getByRole("option", { name: /Deep tissue massage/i })).toBeInTheDocument();
+  });
+
   it("allows creating an amount-only certificate after choosing a free amount", async () => {
     const user = userEvent.setup();
     const content = getGiftCertificatesPageContent("en");

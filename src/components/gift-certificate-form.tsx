@@ -164,6 +164,8 @@ export function GiftCertificateForm({
       lineTotalEurCents: service.priceEur * line.sessions * 100,
     };
   });
+  const selectedServiceSlugs = new Set(massageLines.map((line) => line.serviceSlug));
+  const hasAvailableServices = massageLines.length < content.services.length;
   const hasInvalidAmountVoucher =
     amountVoucherEur !== undefined &&
     (!Number.isInteger(amountVoucherEur) ||
@@ -192,9 +194,16 @@ export function GiftCertificateForm({
 
   function updateMassageLine(id: string, patch: Partial<MassageLine>) {
     setSession(undefined);
-    setMassageLines((current) =>
-      current.map((line) => (line.id === id ? { ...line, ...patch } : line)),
-    );
+    setMassageLines((current) => {
+      if (
+        patch.serviceSlug &&
+        current.some((line) => line.id !== id && line.serviceSlug === patch.serviceSlug)
+      ) {
+        return current;
+      }
+
+      return current.map((line) => (line.id === id ? { ...line, ...patch } : line));
+    });
   }
 
   function removeMassageLine(id: string) {
@@ -204,14 +213,23 @@ export function GiftCertificateForm({
 
   function addMassageLine() {
     setSession(undefined);
-    setMassageLines((current) => [
-      ...current,
-      {
-        id: createLineId(),
-        serviceSlug: content.services[0].slug,
-        sessions: content.sessionOptions[0],
-      },
-    ]);
+    setMassageLines((current) => {
+      const usedServiceSlugs = new Set(current.map((line) => line.serviceSlug));
+      const nextService = content.services.find((service) => !usedServiceSlugs.has(service.slug));
+
+      if (!nextService) {
+        return current;
+      }
+
+      return [
+        ...current,
+        {
+          id: createLineId(),
+          serviceSlug: nextService.slug,
+          sessions: content.sessionOptions[0],
+        },
+      ];
+    });
   }
 
   function setVoucherAmount(amount: number | undefined) {
@@ -456,11 +474,16 @@ export function GiftCertificateForm({
                       })
                     }
                   >
-                    {content.services.map((service) => (
-                      <option key={service.slug} value={service.slug}>
-                        {service.title} - {service.priceEur} EUR
-                      </option>
-                    ))}
+                    {content.services
+                      .filter(
+                        (service) =>
+                          service.slug === line.serviceSlug || !selectedServiceSlugs.has(service.slug),
+                      )
+                      .map((service) => (
+                        <option key={service.slug} value={service.slug}>
+                          {service.title} - {service.priceEur} EUR
+                        </option>
+                      ))}
                   </select>
                 </label>
                 <label className="gift-field gift-session-field">
@@ -490,7 +513,12 @@ export function GiftCertificateForm({
                 ) : null}
               </div>
             ))}
-            <button className="gift-add-button" type="button" onClick={addMassageLine}>
+            <button
+              className="gift-add-button"
+              type="button"
+              disabled={!hasAvailableServices}
+              onClick={addMassageLine}
+            >
               {content.addMassageAction}
             </button>
           </div>
