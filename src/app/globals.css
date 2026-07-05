@@ -1923,7 +1923,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   height: 5px;
   left: 0;
   position: absolute;
-  top: 0.92em;
+  top: calc(0.92em + 10px);
   width: 5px;
 }
 
