@@ -46,7 +46,7 @@ export const giftCertificateSalesConfig = {
   },
   sessionOptions: [1, 2, 3, 5],
   validityMonths: 6,
-  validityNeedsClientConfirmation: true,
+  validityNeedsClientConfirmation: false,
   eurToBgnRate: 1.95583,
   bgnEquivalentVisibleThrough: "2026-08-08",
   sellableServices: Object.fromEntries(

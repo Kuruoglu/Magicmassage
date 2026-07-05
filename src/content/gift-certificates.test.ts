@@ -64,9 +64,9 @@ describe("gift certificate sales catalog", () => {
     );
   });
 
-  it("expires gift certificates after the configured placeholder validity period", () => {
+  it("expires gift certificates after the confirmed validity period", () => {
     expect(giftCertificateSalesConfig.validityMonths).toBe(6);
-    expect(giftCertificateSalesConfig.validityNeedsClientConfirmation).toBe(true);
+    expect(giftCertificateSalesConfig.validityNeedsClientConfirmation).toBe(false);
 
     expect(
       getGiftCertificateExpiryDate(new Date("2026-07-05T00:00:00.000Z")),

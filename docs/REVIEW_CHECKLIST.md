@@ -51,8 +51,9 @@ Verify in a browser:
 - Meaningful images have useful localized alt text.
 - Real salon/treatment photos are not described as generated or stock imagery.
 - Privacy and cookie text matches the actual third-party content in use.
-- Gift certificate price placeholders and 6-month validity are marked as needing
-  client confirmation before live payments.
+- Gift certificate price placeholders are marked as needing client confirmation
+  before live payments.
+- Gift certificate validity is confirmed as 6 months from the purchase date.
 
 ## Dependency Checks
 

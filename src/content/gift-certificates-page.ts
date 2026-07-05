@@ -110,7 +110,7 @@ const localizedCopy: Record<
       totalLabel: "Общо",
       bgnEquivalentLabel: "BGN еквивалент до 8 август 2026",
       validityNotice: "Срок на валидност: 6 месеца.",
-      validityConfirmationNotice: "Този срок трябва да се потвърди от клиента преди live плащания.",
+      validityConfirmationNotice: "Валиден 6 месеца от датата на покупка.",
       paymentSectionTitle: "Плащане",
       paymentPrivacyNotice:
         "Данните на картата се обработват от Stripe. Magic Massage Natali не съхранява номер на карта, CVC или финансови данни.",
@@ -157,7 +157,7 @@ const localizedCopy: Record<
       totalLabel: "Итого",
       bgnEquivalentLabel: "BGN-эквивалент до 8 августа 2026",
       validityNotice: "Срок действия: 6 месяцев.",
-      validityConfirmationNotice: "Этот срок нужно подтвердить у заказчика перед live-оплатами.",
+      validityConfirmationNotice: "Действует 6 месяцев с даты покупки.",
       paymentSectionTitle: "Оплата",
       paymentPrivacyNotice:
         "Данные карты обрабатывает Stripe. Magic Massage Natali не хранит номер карты, CVC и финансовые данные.",
@@ -204,7 +204,7 @@ const localizedCopy: Record<
       totalLabel: "Разом",
       bgnEquivalentLabel: "BGN-еквівалент до 8 серпня 2026",
       validityNotice: "Строк дії: 6 місяців.",
-      validityConfirmationNotice: "Цей строк потрібно підтвердити у замовника перед live-оплатами.",
+      validityConfirmationNotice: "Діє 6 місяців з дати покупки.",
       paymentSectionTitle: "Оплата",
       paymentPrivacyNotice:
         "Дані картки обробляє Stripe. Magic Massage Natali не зберігає номер картки, CVC та фінансові дані.",
@@ -251,7 +251,7 @@ const localizedCopy: Record<
       totalLabel: "Total",
       bgnEquivalentLabel: "BGN equivalent until 8 August 2026",
       validityNotice: "Validity: 6 months.",
-      validityConfirmationNotice: "This validity period must be confirmed by the client before live payments.",
+      validityConfirmationNotice: "Valid for 6 months from the purchase date.",
       paymentSectionTitle: "Payment",
       paymentPrivacyNotice:
         "Card details are processed by Stripe. Magic Massage Natali does not store card numbers, CVC or financial data.",
