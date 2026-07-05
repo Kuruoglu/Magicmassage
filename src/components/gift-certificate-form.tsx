@@ -36,6 +36,7 @@ const stripePromiseCache = new Map<string, Promise<Stripe | null>>();
 const nameMaxLength = 80;
 const emailMaxLength = 254;
 const messageMaxLength = 180;
+type TouchedField = "purchaserName" | "purchaserEmail" | "recipientName" | "recipientEmail";
 
 function getStripePromise(key: string): Promise<Stripe | null> {
   const cached = stripePromiseCache.get(key);
@@ -58,6 +59,12 @@ function formatEur(cents: number): string {
 }
 
 const customAmountErrorId = "gift-custom-amount-error";
+const fieldErrorIds: Record<TouchedField, string> = {
+  purchaserName: "gift-purchaser-name-error",
+  purchaserEmail: "gift-purchaser-email-error",
+  recipientName: "gift-recipient-name-error",
+  recipientEmail: "gift-recipient-email-error",
+};
 
 function StripePaymentButton({
   content,
@@ -141,6 +148,7 @@ export function GiftCertificateForm({
   const [session, setSession] = useState<PaymentSessionResponse | undefined>();
   const [isPreparingPayment, setIsPreparingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | undefined>();
+  const [touchedFields, setTouchedFields] = useState<Partial<Record<TouchedField, boolean>>>({});
 
   const total = calculateGiftCertificateTotal({
     serviceItems: massageLines.map((line) => ({
@@ -174,6 +182,24 @@ export function GiftCertificateForm({
   const amountVoucherError = hasInvalidAmountVoucher
     ? `${content.customAmountLabel}: ${content.amountMinEur}-${content.amountMaxEur} EUR`
     : undefined;
+  const getRequiredFieldError = (field: TouchedField, value: string) =>
+    touchedFields[field] && value.trim().length < 2 ? content.requiredFieldError : undefined;
+  const getEmailFieldError = (field: TouchedField, value: string) => {
+    if (!touchedFields[field]) return undefined;
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue) return content.requiredFieldError;
+
+    return emailPattern.test(trimmedValue) ? undefined : content.invalidEmailError;
+  };
+  const purchaserNameError = getRequiredFieldError("purchaserName", purchaserName);
+  const purchaserEmailError = getEmailFieldError("purchaserEmail", purchaserEmail);
+  const recipientNameError =
+    purchaseMode === "gift" ? getRequiredFieldError("recipientName", recipientName) : undefined;
+  const recipientEmailError =
+    purchaseMode === "gift" && deliveryMode === "recipient_email"
+      ? getEmailFieldError("recipientEmail", recipientEmail)
+      : undefined;
   const isValid =
     purchaserName.trim().length >= 2 &&
     emailPattern.test(purchaserEmail.trim()) &&
@@ -237,8 +263,29 @@ export function GiftCertificateForm({
     setAmountVoucherEur(amount);
   }
 
+  function markFieldTouched(field: TouchedField) {
+    setTouchedFields((current) => ({ ...current, [field]: true }));
+  }
+
+  function markRequiredFieldsTouched() {
+    setTouchedFields((current) => ({
+      ...current,
+      purchaserName: true,
+      purchaserEmail: true,
+      ...(purchaseMode === "gift" ? { recipientName: true } : {}),
+      ...(purchaseMode === "gift" && deliveryMode === "recipient_email"
+        ? { recipientEmail: true }
+        : {}),
+    }));
+  }
+
   async function preparePayment() {
-    if (!isValid || session?.clientSecret) {
+    if (!isValid) {
+      markRequiredFieldsTouched();
+      return;
+    }
+
+    if (session?.clientSecret) {
       return;
     }
 
@@ -348,12 +395,20 @@ export function GiftCertificateForm({
                 name="purchaserName"
                 value={purchaserName}
                 maxLength={nameMaxLength}
+                aria-describedby={purchaserNameError ? fieldErrorIds.purchaserName : undefined}
+                aria-invalid={Boolean(purchaserNameError)}
                 onChange={(event) => {
                   setPurchaserName(event.target.value);
                   setSession(undefined);
                 }}
+                onBlur={() => markFieldTouched("purchaserName")}
                 autoComplete="name"
               />
+              {purchaserNameError ? (
+                <p className="gift-field-error" id={fieldErrorIds.purchaserName} aria-live="polite">
+                  {purchaserNameError}
+                </p>
+              ) : null}
             </label>
             <label className="gift-field">
               <span className="gift-field-label">{content.purchaserEmailLabel}</span>
@@ -362,12 +417,20 @@ export function GiftCertificateForm({
                 name="purchaserEmail"
                 value={purchaserEmail}
                 maxLength={emailMaxLength}
+                aria-describedby={purchaserEmailError ? fieldErrorIds.purchaserEmail : undefined}
+                aria-invalid={Boolean(purchaserEmailError)}
                 onChange={(event) => {
                   setPurchaserEmail(event.target.value);
                   setSession(undefined);
                 }}
+                onBlur={() => markFieldTouched("purchaserEmail")}
                 autoComplete="email"
               />
+              {purchaserEmailError ? (
+                <p className="gift-field-error" id={fieldErrorIds.purchaserEmail} aria-live="polite">
+                  {purchaserEmailError}
+                </p>
+              ) : null}
             </label>
           </div>
 
@@ -380,12 +443,20 @@ export function GiftCertificateForm({
                     name="recipientName"
                     value={recipientName}
                     maxLength={nameMaxLength}
+                    aria-describedby={recipientNameError ? fieldErrorIds.recipientName : undefined}
+                    aria-invalid={Boolean(recipientNameError)}
                     onChange={(event) => {
                       setRecipientName(event.target.value);
                       setSession(undefined);
                     }}
+                    onBlur={() => markFieldTouched("recipientName")}
                     autoComplete="name"
                   />
+                  {recipientNameError ? (
+                    <p className="gift-field-error" id={fieldErrorIds.recipientName} aria-live="polite">
+                      {recipientNameError}
+                    </p>
+                  ) : null}
                 </label>
                 <label className="gift-field">
                   <span className="gift-field-label">{content.recipientMessageLabel}</span>
@@ -405,6 +476,7 @@ export function GiftCertificateForm({
                 <legend className="sr-only">{content.deliverySectionLabel}</legend>
                 <label className={deliveryMode === "buyer_only" ? "is-selected" : undefined}>
                   <input
+                    className="sr-only"
                     type="radio"
                     name="deliveryMode"
                     checked={deliveryMode === "buyer_only"}
@@ -413,10 +485,12 @@ export function GiftCertificateForm({
                       setSession(undefined);
                     }}
                   />
+                  <span className="gift-choice-mark" aria-hidden="true" />
                   <span>{content.deliveryBuyerOnlyLabel}</span>
                 </label>
                 <label className={deliveryMode === "recipient_email" ? "is-selected" : undefined}>
                   <input
+                    className="sr-only"
                     type="radio"
                     name="deliveryMode"
                     checked={deliveryMode === "recipient_email"}
@@ -425,6 +499,7 @@ export function GiftCertificateForm({
                       setSession(undefined);
                     }}
                   />
+                  <span className="gift-choice-mark" aria-hidden="true" />
                   <span>{content.deliveryRecipientEmailLabel}</span>
                 </label>
               </fieldset>
@@ -437,12 +512,20 @@ export function GiftCertificateForm({
                     name="recipientEmail"
                     value={recipientEmail}
                     maxLength={emailMaxLength}
+                    aria-describedby={recipientEmailError ? fieldErrorIds.recipientEmail : undefined}
+                    aria-invalid={Boolean(recipientEmailError)}
                     onChange={(event) => {
                       setRecipientEmail(event.target.value);
                       setSession(undefined);
                     }}
+                    onBlur={() => markFieldTouched("recipientEmail")}
                     autoComplete="email"
                   />
+                  {recipientEmailError ? (
+                    <p className="gift-field-error" id={fieldErrorIds.recipientEmail} aria-live="polite">
+                      {recipientEmailError}
+                    </p>
+                  ) : null}
                 </label>
               ) : null}
             </>

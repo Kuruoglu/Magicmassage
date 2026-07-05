@@ -179,6 +179,46 @@ describe("GiftCertificateForm", () => {
     expect(screen.getByLabelText(content.form.recipientEmailLabel)).toBeInTheDocument();
   });
 
+  it("uses custom delivery option controls instead of exposed native radios", async () => {
+    const user = userEvent.setup();
+    const content = getGiftCertificatesPageContent("en");
+
+    render(<GiftCertificateForm locale="en" content={content.form} stripePublishableKey={null} />);
+
+    await user.click(screen.getByRole("radio", { name: content.form.giftModeLabel }));
+
+    const deliveryRadio = screen.getByRole("radio", { name: content.form.deliveryBuyerOnlyLabel });
+    const deliveryLabel = deliveryRadio.closest("label");
+
+    expect(deliveryRadio).toHaveClass("sr-only");
+    expect(deliveryLabel).toHaveClass("is-selected");
+    expect(deliveryLabel?.querySelector(".gift-choice-mark")).toBeInTheDocument();
+  });
+
+  it("shows field errors on blur for whitespace names and invalid emails", async () => {
+    const user = userEvent.setup();
+    const content = getGiftCertificatesPageContent("en");
+
+    render(<GiftCertificateForm locale="en" content={content.form} stripePublishableKey={null} />);
+
+    const purchaserName = screen.getByLabelText(content.form.purchaserNameLabel);
+    const purchaserEmail = screen.getByLabelText(content.form.purchaserEmailLabel);
+
+    await user.click(purchaserName);
+    await user.keyboard("   ");
+    await user.tab();
+
+    expect(purchaserName).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(content.form.requiredFieldError)).toBeInTheDocument();
+
+    await user.click(purchaserEmail);
+    await user.keyboard("not-an-email");
+    await user.tab();
+
+    expect(purchaserEmail).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(content.form.invalidEmailError)).toBeInTheDocument();
+  });
+
   it("shows the Stripe privacy notice and disables payment until the form is valid", async () => {
     const user = userEvent.setup();
     const content = getGiftCertificatesPageContent("en");

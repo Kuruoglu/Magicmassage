@@ -48,6 +48,8 @@ export type GiftCertificatesPageContent = {
     paymentSectionTitle: string;
     paymentPrivacyNotice: string;
     demoPaymentNotice: string;
+    requiredFieldError: string;
+    invalidEmailError: string;
     payAction: string;
     preparingPayment: string;
     paymentSuccess: string;
@@ -67,6 +69,8 @@ const localizedCopy: Record<
       GiftCertificatesPageContent["form"],
       | "services"
       | "deliverySectionLabel"
+      | "requiredFieldError"
+      | "invalidEmailError"
       | "sessionOptions"
       | "quickAmountValuesEur"
       | "amountMinEur"
@@ -271,6 +275,20 @@ const deliverySectionLabels: Record<Locale, string> = {
   en: "Choose certificate delivery",
 };
 
+const requiredFieldErrors: Record<Locale, string> = {
+  bg: "Попълнете това поле.",
+  ru: "Заполните это поле.",
+  ua: "Заповніть це поле.",
+  en: "Enter this field.",
+};
+
+const invalidEmailErrors: Record<Locale, string> = {
+  bg: "Въведете валиден email.",
+  ru: "Введите корректный email.",
+  ua: "Введіть коректний email.",
+  en: "Enter a valid email address.",
+};
+
 function getLocalizedServiceOptions(locale: Locale): GiftCertificateServiceFormOption[] {
   return giftCertificateServiceSlugs.map((slug) => {
     const definition = getGiftCertificateServiceDefinition(slug);
@@ -289,6 +307,8 @@ export function getGiftCertificatesPageContent(locale: Locale): GiftCertificates
     form: {
       ...localizedCopy[locale].form,
       deliverySectionLabel: deliverySectionLabels[locale],
+      requiredFieldError: requiredFieldErrors[locale],
+      invalidEmailError: invalidEmailErrors[locale],
       services: getLocalizedServiceOptions(locale),
       sessionOptions: giftCertificateSalesConfig.sessionOptions,
       quickAmountValuesEur: giftCertificateSalesConfig.quickAmountValuesEur,

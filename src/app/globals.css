@@ -2140,20 +2140,43 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   padding: 0 16px;
 }
 
-.gift-segmented input,
-.gift-delivery-options input {
+.gift-segmented input {
   accent-color: var(--purple-deep);
 }
 
 .gift-delivery-options label {
+  align-items: center;
   border-radius: 16px;
-  justify-content: flex-start;
-  min-height: 50px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: stretch;
+  line-height: 1.18;
+  min-height: 64px;
+  padding: 12px 14px;
 }
 
 .gift-delivery-options label.is-selected {
-  background: rgba(155, 107, 194, 0.1);
-  border-color: rgba(110, 74, 139, 0.42);
+  background: linear-gradient(180deg, rgba(155, 107, 194, 0.11), rgba(176, 122, 221, 0.08));
+  border-color: rgba(110, 74, 139, 0.5);
+  box-shadow: 0 12px 28px rgba(110, 74, 139, 0.1);
+}
+
+.gift-delivery-options label.is-selected .gift-choice-mark {
+  background: var(--purple-deep);
+  border-color: var(--purple-deep);
+}
+
+.gift-delivery-options label.is-selected .gift-choice-mark::after {
+  border-bottom: 2px solid #FFFFFF;
+  border-right: 2px solid #FFFFFF;
+  content: "";
+  height: 9px;
+  left: 8px;
+  position: absolute;
+  top: 5px;
+  transform: rotate(45deg);
+  width: 5px;
 }
 
 .gift-field-grid,
@@ -2229,6 +2252,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   height: 1px;
   min-height: 0;
   padding: 0;
+  pointer-events: none;
   width: 1px;
 }
 
