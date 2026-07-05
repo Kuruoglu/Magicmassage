@@ -32,6 +32,7 @@ export type GiftCertificatesPageContent = {
     recipientNameLabel: string;
     recipientMessageLabel: string;
     recipientEmailLabel: string;
+    deliverySectionLabel: string;
     deliveryBuyerOnlyLabel: string;
     deliveryRecipientEmailLabel: string;
     serviceLabel: string;
@@ -65,6 +66,7 @@ const localizedCopy: Record<
     form: Omit<
       GiftCertificatesPageContent["form"],
       | "services"
+      | "deliverySectionLabel"
       | "sessionOptions"
       | "quickAmountValuesEur"
       | "amountMinEur"
@@ -262,6 +264,13 @@ const localizedCopy: Record<
   },
 };
 
+const deliverySectionLabels: Record<Locale, string> = {
+  bg: "Начин на доставка на сертификата",
+  ru: "Как отправить сертификат",
+  ua: "Як надіслати сертифікат",
+  en: "Choose certificate delivery",
+};
+
 function getLocalizedServiceOptions(locale: Locale): GiftCertificateServiceFormOption[] {
   return giftCertificateServiceSlugs.map((slug) => {
     const definition = getGiftCertificateServiceDefinition(slug);
@@ -279,6 +288,7 @@ export function getGiftCertificatesPageContent(locale: Locale): GiftCertificates
     ...localizedCopy[locale],
     form: {
       ...localizedCopy[locale].form,
+      deliverySectionLabel: deliverySectionLabels[locale],
       services: getLocalizedServiceOptions(locale),
       sessionOptions: giftCertificateSalesConfig.sessionOptions,
       quickAmountValuesEur: giftCertificateSalesConfig.quickAmountValuesEur,

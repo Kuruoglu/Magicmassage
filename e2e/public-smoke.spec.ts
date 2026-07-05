@@ -59,4 +59,28 @@ test("gift certificate page fits mobile without horizontal overflow", async ({ p
   );
 
   expect(hasHorizontalOverflow).toBe(false);
+
+  const consentLayout = await page.evaluate(() => {
+    const form = document.querySelector(".gift-form")?.getBoundingClientRect();
+    const consent = document.querySelector(".cookie-consent")?.getBoundingClientRect();
+    const consentElement = document.querySelector(".cookie-consent");
+
+    if (!form || !consent || !consentElement) {
+      return null;
+    }
+
+    return {
+      position: window.getComputedStyle(consentElement).position,
+      overlapsForm:
+        consent.bottom > form.top &&
+        consent.top < form.bottom &&
+        consent.right > form.left &&
+        consent.left < form.right,
+    };
+  });
+
+  expect(consentLayout).toEqual({
+    position: "static",
+    overlapsForm: false,
+  });
 });

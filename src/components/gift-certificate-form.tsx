@@ -33,6 +33,9 @@ type PaymentSessionResponse = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const stripePromiseCache = new Map<string, Promise<Stripe | null>>();
+const nameMaxLength = 80;
+const emailMaxLength = 254;
+const messageMaxLength = 180;
 
 function getStripePromise(key: string): Promise<Stripe | null> {
   const cached = stripePromiseCache.get(key);
@@ -53,6 +56,8 @@ function createLineId(): string {
 function formatEur(cents: number): string {
   return `${(cents / 100).toFixed(2)} EUR`;
 }
+
+const customAmountErrorId = "gift-custom-amount-error";
 
 function StripePaymentButton({
   content,
@@ -99,8 +104,16 @@ function StripePaymentButton({
       >
         {status === "submitting" ? content.preparingPayment : content.payAction}
       </button>
-      {status === "success" ? <p className="form-success">{content.paymentSuccess}</p> : null}
-      {status === "error" ? <p className="form-error">{content.paymentError}</p> : null}
+      {status === "success" ? (
+        <p className="form-success" aria-live="polite">
+          {content.paymentSuccess}
+        </p>
+      ) : null}
+      {status === "error" ? (
+        <p className="form-error" aria-live="polite">
+          {content.paymentError}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -139,11 +152,32 @@ export function GiftCertificateForm({
   const bgnEquivalent = convertEurCentsToBgn(total.totalEurCents);
   const showBgn = isBgnEquivalentVisible(new Date());
   const effectiveRecipientName = purchaseMode === "self" ? purchaserName : recipientName;
+  const previewRecipientName =
+    effectiveRecipientName.trim() ||
+    (purchaseMode === "gift" ? content.recipientNameLabel : content.purchaserNameLabel);
+  const selectedMassageLines = massageLines.map((line) => {
+    const service = content.services.find((option) => option.slug === line.serviceSlug) ?? content.services[0];
+
+    return {
+      ...line,
+      service,
+      lineTotalEurCents: service.priceEur * line.sessions * 100,
+    };
+  });
+  const hasInvalidAmountVoucher =
+    amountVoucherEur !== undefined &&
+    (!Number.isInteger(amountVoucherEur) ||
+      amountVoucherEur < content.amountMinEur ||
+      amountVoucherEur > content.amountMaxEur);
+  const amountVoucherError = hasInvalidAmountVoucher
+    ? `${content.customAmountLabel}: ${content.amountMinEur}-${content.amountMaxEur} EUR`
+    : undefined;
   const isValid =
     purchaserName.trim().length >= 2 &&
     emailPattern.test(purchaserEmail.trim()) &&
     effectiveRecipientName.trim().length >= 2 &&
     total.totalEurCents > 0 &&
+    !hasInvalidAmountVoucher &&
     (purchaseMode === "self" ||
       deliveryMode === "buyer_only" ||
       emailPattern.test(recipientEmail.trim()));
@@ -238,259 +272,352 @@ export function GiftCertificateForm({
 
   return (
     <form className="gift-form" onSubmit={(event) => event.preventDefault()}>
-      <div className="gift-form-heading">
-        <p className="eyebrow">{content.paymentSectionTitle}</p>
-        <h2>{content.title}</h2>
-        <p>{content.description}</p>
-      </div>
+      <div className="gift-form-flow">
+        <div className="gift-form-heading">
+          <p className="eyebrow">Magic Massage Natali</p>
+          <h2>{content.title}</h2>
+          <p>{content.description}</p>
+        </div>
 
-      <fieldset className="gift-segmented">
-        <legend>{content.title}</legend>
-        <label>
-          <input
-            type="radio"
-            name="purchaseMode"
-            checked={purchaseMode === "self"}
-            onChange={() => {
-              setPurchaseMode("self");
-              setDeliveryMode("buyer_only");
-              setSession(undefined);
-            }}
-          />
-          <span>{content.selfModeLabel}</span>
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="purchaseMode"
-            checked={purchaseMode === "gift"}
-            onChange={() => {
-              setPurchaseMode("gift");
-              setSession(undefined);
-            }}
-          />
-          <span>{content.giftModeLabel}</span>
-        </label>
-      </fieldset>
-
-      <div className="gift-field-grid">
-        <label>
-          <span>{content.purchaserNameLabel}</span>
-          <input
-            value={purchaserName}
-            onChange={(event) => {
-              setPurchaserName(event.target.value);
-              setSession(undefined);
-            }}
-            autoComplete="name"
-          />
-        </label>
-        <label>
-          <span>{content.purchaserEmailLabel}</span>
-          <input
-            type="email"
-            value={purchaserEmail}
-            onChange={(event) => {
-              setPurchaserEmail(event.target.value);
-              setSession(undefined);
-            }}
-            autoComplete="email"
-          />
-        </label>
-      </div>
-
-      {purchaseMode === "gift" ? (
-        <>
-          <div className="gift-field-grid">
-            <label>
-              <span>{content.recipientNameLabel}</span>
-              <input
-                value={recipientName}
-                onChange={(event) => {
-                  setRecipientName(event.target.value);
-                  setSession(undefined);
-                }}
-              />
-            </label>
-            <label>
-              <span>{content.recipientMessageLabel}</span>
-              <input
-                value={recipientMessage}
-                maxLength={180}
-                onChange={(event) => {
-                  setRecipientMessage(event.target.value);
-                  setSession(undefined);
-                }}
-              />
-            </label>
+        <section className="gift-form-step" data-testid="gift-form-step-recipient">
+          <div className="gift-step-heading">
+            <span className="gift-step-number">1</span>
+            <div>
+              <p>{content.title}</p>
+              <h3>
+                {content.selfModeLabel} / {content.giftModeLabel}
+              </h3>
+            </div>
           </div>
 
-          <fieldset className="gift-delivery-options">
-            <legend>{content.deliveryBuyerOnlyLabel}</legend>
-            <label>
+          <fieldset className="gift-choice-grid">
+            <legend className="sr-only">{content.title}</legend>
+            <label className={`gift-choice-card ${purchaseMode === "self" ? "is-selected" : ""}`}>
               <input
+                className="sr-only"
                 type="radio"
-                name="deliveryMode"
-                checked={deliveryMode === "buyer_only"}
+                name="purchaseMode"
+                checked={purchaseMode === "self"}
                 onChange={() => {
+                  setPurchaseMode("self");
                   setDeliveryMode("buyer_only");
                   setSession(undefined);
                 }}
               />
-              <span>{content.deliveryBuyerOnlyLabel}</span>
+              <span className="gift-choice-mark" aria-hidden="true" />
+              <strong>{content.selfModeLabel}</strong>
             </label>
-            <label>
+            <label className={`gift-choice-card ${purchaseMode === "gift" ? "is-selected" : ""}`}>
               <input
+                className="sr-only"
                 type="radio"
-                name="deliveryMode"
-                checked={deliveryMode === "recipient_email"}
+                name="purchaseMode"
+                checked={purchaseMode === "gift"}
                 onChange={() => {
-                  setDeliveryMode("recipient_email");
+                  setPurchaseMode("gift");
                   setSession(undefined);
                 }}
               />
-              <span>{content.deliveryRecipientEmailLabel}</span>
+              <span className="gift-choice-mark" aria-hidden="true" />
+              <strong>{content.giftModeLabel}</strong>
             </label>
           </fieldset>
 
-          {deliveryMode === "recipient_email" ? (
-            <label className="gift-full-field">
-              <span>{content.recipientEmailLabel}</span>
+          <div className="gift-field-grid">
+            <label className="gift-field">
+              <span className="gift-field-label">{content.purchaserNameLabel}</span>
               <input
-                type="email"
-                value={recipientEmail}
+                name="purchaserName"
+                value={purchaserName}
+                maxLength={nameMaxLength}
                 onChange={(event) => {
-                  setRecipientEmail(event.target.value);
+                  setPurchaserName(event.target.value);
                   setSession(undefined);
                 }}
+                autoComplete="name"
               />
             </label>
+            <label className="gift-field">
+              <span className="gift-field-label">{content.purchaserEmailLabel}</span>
+              <input
+                type="email"
+                name="purchaserEmail"
+                value={purchaserEmail}
+                maxLength={emailMaxLength}
+                onChange={(event) => {
+                  setPurchaserEmail(event.target.value);
+                  setSession(undefined);
+                }}
+                autoComplete="email"
+              />
+            </label>
+          </div>
+
+          {purchaseMode === "gift" ? (
+            <>
+              <div className="gift-field-grid">
+                <label className="gift-field">
+                  <span className="gift-field-label">{content.recipientNameLabel}</span>
+                  <input
+                    name="recipientName"
+                    value={recipientName}
+                    maxLength={nameMaxLength}
+                    onChange={(event) => {
+                      setRecipientName(event.target.value);
+                      setSession(undefined);
+                    }}
+                    autoComplete="name"
+                  />
+                </label>
+                <label className="gift-field">
+                  <span className="gift-field-label">{content.recipientMessageLabel}</span>
+                  <input
+                    name="recipientMessage"
+                    value={recipientMessage}
+                    maxLength={messageMaxLength}
+                    onChange={(event) => {
+                      setRecipientMessage(event.target.value);
+                      setSession(undefined);
+                    }}
+                  />
+                </label>
+              </div>
+
+              <fieldset className="gift-delivery-options">
+                <legend className="sr-only">{content.deliverySectionLabel}</legend>
+                <label className={deliveryMode === "buyer_only" ? "is-selected" : undefined}>
+                  <input
+                    type="radio"
+                    name="deliveryMode"
+                    checked={deliveryMode === "buyer_only"}
+                    onChange={() => {
+                      setDeliveryMode("buyer_only");
+                      setSession(undefined);
+                    }}
+                  />
+                  <span>{content.deliveryBuyerOnlyLabel}</span>
+                </label>
+                <label className={deliveryMode === "recipient_email" ? "is-selected" : undefined}>
+                  <input
+                    type="radio"
+                    name="deliveryMode"
+                    checked={deliveryMode === "recipient_email"}
+                    onChange={() => {
+                      setDeliveryMode("recipient_email");
+                      setSession(undefined);
+                    }}
+                  />
+                  <span>{content.deliveryRecipientEmailLabel}</span>
+                </label>
+              </fieldset>
+
+              {deliveryMode === "recipient_email" ? (
+                <label className="gift-field gift-full-field">
+                  <span className="gift-field-label">{content.recipientEmailLabel}</span>
+                  <input
+                    type="email"
+                    name="recipientEmail"
+                    value={recipientEmail}
+                    maxLength={emailMaxLength}
+                    onChange={(event) => {
+                      setRecipientEmail(event.target.value);
+                      setSession(undefined);
+                    }}
+                    autoComplete="email"
+                  />
+                </label>
+              ) : null}
+            </>
           ) : null}
-        </>
-      ) : null}
+        </section>
 
-      <div className="gift-line-items">
-        {massageLines.map((line) => (
-          <div className="gift-line-item" key={line.id}>
-            <label>
-              <span>{content.serviceLabel}</span>
-              <select
-                aria-label={content.serviceLabel}
-                value={line.serviceSlug}
-                onChange={(event) =>
-                  updateMassageLine(line.id, {
-                    serviceSlug: event.target.value as GiftCertificateServiceSlug,
-                  })
-                }
-              >
-                {content.services.map((service) => (
-                  <option key={service.slug} value={service.slug}>
-                    {service.title} - {service.priceEur} EUR
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>{content.sessionsLabel}</span>
-              <select
-                aria-label={content.sessionsLabel}
-                value={line.sessions}
-                onChange={(event) =>
-                  updateMassageLine(line.id, { sessions: Number(event.target.value) })
-                }
-              >
-                {content.sessionOptions.map((sessions) => (
-                  <option key={sessions} value={sessions}>
-                    {sessions}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="gift-remove-button"
-              type="button"
-              onClick={() => removeMassageLine(line.id)}
-            >
-              {content.removeMassageAction}
+        <section className="gift-form-step" data-testid="gift-form-step-contents">
+          <div className="gift-step-heading">
+            <span className="gift-step-number">2</span>
+            <div>
+              <p>{content.serviceLabel}</p>
+              <h3>
+                {content.serviceLabel} / {content.amountTitle}
+              </h3>
+            </div>
+          </div>
+
+          <div className="gift-line-items">
+            {massageLines.map((line, index) => (
+              <div className="gift-line-item" key={line.id}>
+                <label className="gift-field">
+                  <span className="gift-field-label">{content.serviceLabel}</span>
+                  <select
+                    aria-label={content.serviceLabel}
+                    value={line.serviceSlug}
+                    onChange={(event) =>
+                      updateMassageLine(line.id, {
+                        serviceSlug: event.target.value as GiftCertificateServiceSlug,
+                      })
+                    }
+                  >
+                    {content.services.map((service) => (
+                      <option key={service.slug} value={service.slug}>
+                        {service.title} - {service.priceEur} EUR
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="gift-field gift-session-field">
+                  <span className="gift-field-label">{content.sessionsLabel}</span>
+                  <select
+                    aria-label={content.sessionsLabel}
+                    value={line.sessions}
+                    onChange={(event) =>
+                      updateMassageLine(line.id, { sessions: Number(event.target.value) })
+                    }
+                  >
+                    {content.sessionOptions.map((sessions) => (
+                      <option key={sessions} value={sessions}>
+                        {sessions}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {index > 0 || amountVoucherEur !== undefined ? (
+                  <button
+                    className="gift-remove-button"
+                    type="button"
+                    onClick={() => removeMassageLine(line.id)}
+                  >
+                    {content.removeMassageAction}
+                  </button>
+                ) : null}
+              </div>
+            ))}
+            <button className="gift-add-button" type="button" onClick={addMassageLine}>
+              {content.addMassageAction}
             </button>
           </div>
-        ))}
-        <button className="gift-add-button" type="button" onClick={addMassageLine}>
-          {content.addMassageAction}
-        </button>
+
+          <div className="gift-amount-panel">
+            <h3>{content.amountTitle}</h3>
+            <div className="gift-quick-amounts">
+              {content.quickAmountValuesEur.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  aria-pressed={amountVoucherEur === amount}
+                  className={amountVoucherEur === amount ? "is-selected" : undefined}
+                  onClick={() => setVoucherAmount(amount)}
+                >
+                  {amount} EUR
+                </button>
+              ))}
+            </div>
+            <label className="gift-field">
+              <span className="gift-field-label">{content.customAmountLabel}</span>
+              <input
+                type="number"
+                name="customAmountEur"
+                inputMode="numeric"
+                min={content.amountMinEur}
+                max={content.amountMaxEur}
+                step={1}
+                aria-describedby={amountVoucherError ? customAmountErrorId : undefined}
+                aria-invalid={hasInvalidAmountVoucher}
+                value={amountVoucherEur ?? ""}
+                onChange={(event) =>
+                  setVoucherAmount(event.target.value ? Number(event.target.value) : undefined)
+                }
+              />
+            </label>
+            {amountVoucherError ? (
+              <p className="gift-field-error" id={customAmountErrorId} aria-live="polite">
+                {amountVoucherError}
+              </p>
+            ) : null}
+          </div>
+        </section>
+
       </div>
 
-      <div className="gift-amount-panel">
-        <h3>{content.amountTitle}</h3>
-        <div className="gift-quick-amounts">
-          {content.quickAmountValuesEur.map((amount) => (
-            <button
-              key={amount}
-              type="button"
-              className={amountVoucherEur === amount ? "is-selected" : undefined}
-              onClick={() => setVoucherAmount(amount)}
-            >
-              {amount} EUR
-            </button>
-          ))}
-          <button type="button" onClick={() => setVoucherAmount(undefined)}>
-            0 EUR
-          </button>
+      <aside className="gift-preview" data-testid="gift-certificate-preview" aria-label={content.title}>
+        <div className="gift-preview-card">
+          <div className="gift-preview-topline">
+            <span>Magic Massage Natali</span>
+            <span>EUR</span>
+          </div>
+          <h3>{content.title}</h3>
+          <div className="gift-preview-recipient">
+            <span>{purchaseMode === "gift" ? content.giftModeLabel : content.selfModeLabel}</span>
+            <strong>{previewRecipientName}</strong>
+          </div>
+          <div className="gift-preview-lines">
+            {selectedMassageLines.map((line) => (
+              <div className="gift-preview-line" key={line.id}>
+                <span>
+                  {line.sessions} x {line.service.title}
+                </span>
+                <strong>{formatEur(line.lineTotalEurCents)}</strong>
+              </div>
+            ))}
+            {amountVoucherEur ? (
+              <div className="gift-preview-line">
+                <span>{content.amountTitle}</span>
+                <strong>{formatEur(amountVoucherEur * 100)}</strong>
+              </div>
+            ) : null}
+          </div>
+          <div className="gift-preview-total">
+            <span>{content.totalLabel}</span>
+            <strong>{formatEur(total.totalEurCents)}</strong>
+          </div>
+          {showBgn ? (
+            <div className="gift-preview-bgn">
+              <span>{content.bgnEquivalentLabel}</span>
+              <strong>{bgnEquivalent.formatted}</strong>
+            </div>
+          ) : null}
+          <p>
+            {content.validityNotice} {content.validityConfirmationNotice}
+          </p>
         </div>
-        <label>
-          <span>{content.customAmountLabel}</span>
-          <input
-            type="number"
-            min={content.amountMinEur}
-            max={content.amountMaxEur}
-            value={amountVoucherEur ?? ""}
-            onChange={(event) =>
-              setVoucherAmount(event.target.value ? Number(event.target.value) : undefined)
-            }
-          />
-        </label>
-      </div>
+      </aside>
 
-      <div className="gift-summary">
-        <div>
-          <span>{content.totalLabel}</span>
-          <strong>{formatEur(total.totalEurCents)}</strong>
-        </div>
-        {showBgn ? (
+      <section className="gift-form-step gift-payment-step">
+        <div className="gift-step-heading">
+          <span className="gift-step-number">3</span>
           <div>
-            <span>{content.bgnEquivalentLabel}</span>
-            <strong>{bgnEquivalent.formatted}</strong>
+            <p>{content.totalLabel}</p>
+            <h3>{content.paymentSectionTitle}</h3>
           </div>
-        ) : null}
-        <p>
-          {content.validityNotice} {content.validityConfirmationNotice}
-        </p>
-      </div>
+        </div>
 
-      <fieldset className="gift-payment-section" aria-label={content.paymentSectionTitle}>
-        <legend>{content.paymentSectionTitle}</legend>
-        <p>{content.paymentPrivacyNotice}</p>
-        {!stripePublishableKey || session?.mode === "demo" ? (
-          <p className="gift-demo-notice">{content.demoPaymentNotice}</p>
-        ) : null}
+        <fieldset className="gift-payment-section" aria-label={content.paymentSectionTitle}>
+          <legend className="sr-only">{content.paymentSectionTitle}</legend>
+          <p>{content.paymentPrivacyNotice}</p>
+          {!stripePublishableKey || session?.mode === "demo" ? (
+            <p className="gift-demo-notice">{content.demoPaymentNotice}</p>
+          ) : null}
 
-        {session?.clientSecret && stripePromise ? (
-          <Elements stripe={stripePromise} options={{ clientSecret: session.clientSecret }}>
-            <PaymentElement className="gift-payment-element" />
-            <StripePaymentButton content={content} disabled={!isValid} successUrl={successUrl} />
-          </Elements>
-        ) : (
-          <button
-            className="button gift-pay-button"
-            type="button"
-            disabled={!isValid || isPreparingPayment}
-            onClick={preparePayment}
-          >
-            {isPreparingPayment ? content.preparingPayment : content.payAction}
-          </button>
-        )}
-        {paymentError ? <p className="form-error">{paymentError}</p> : null}
-      </fieldset>
+          {session?.clientSecret && stripePromise ? (
+            <Elements stripe={stripePromise} options={{ clientSecret: session.clientSecret }}>
+              <PaymentElement className="gift-payment-element" />
+              <StripePaymentButton content={content} disabled={!isValid} successUrl={successUrl} />
+            </Elements>
+          ) : (
+            <button
+              className="button gift-pay-button"
+              type="button"
+              disabled={!isValid || isPreparingPayment}
+              onClick={preparePayment}
+            >
+              {isPreparingPayment ? content.preparingPayment : content.payAction}
+            </button>
+          )}
+          {paymentError ? (
+            <p className="form-error" aria-live="polite">
+              {paymentError}
+            </p>
+          ) : null}
+        </fieldset>
+      </section>
     </form>
   );
 }

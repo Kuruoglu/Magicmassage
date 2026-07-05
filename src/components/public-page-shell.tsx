@@ -31,8 +31,8 @@ export function PublicPageShell({
         localePaths={localePaths}
       />
       {children}
-      <SiteFooter content={content} />
       <CookieConsentBanner locale={locale} />
+      <SiteFooter content={content} />
     </div>
   );
 }
