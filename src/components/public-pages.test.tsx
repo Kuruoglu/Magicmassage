@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -64,6 +64,60 @@ describe("localized public page views", () => {
     expect(screen.getByRole("img", { name: content.about.imageAlt })).toBeInTheDocument();
     expect(screen.getByText(content.about.values[0])).toBeInTheDocument();
     expect(screen.getByText(content.about.values[2])).toBeInTheDocument();
+  });
+
+  it("renders About certificates as accessible lazy-loaded images", () => {
+    const content = getPublicPagesContent("en");
+    render(<AboutPageView locale="en" content={content.about} />);
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: content.about.certificates.title,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(content.about.certificates.description)).toBeInTheDocument();
+
+    for (const certificate of content.about.certificates.items) {
+      const image = screen.getByRole("img", { name: certificate.alt });
+      expect(decodeURIComponent(image.getAttribute("src") ?? "")).toContain(
+        certificate.image.src,
+      );
+      expect(image).toHaveAttribute("loading", "lazy");
+      expect(image).toHaveAttribute("width", String(certificate.image.width));
+      expect(image).toHaveAttribute("height", String(certificate.image.height));
+      expect(screen.getByText(certificate.caption)).toBeInTheDocument();
+    }
+  });
+
+  it("opens About certificates in a larger viewer", async () => {
+    const user = userEvent.setup();
+    const content = getPublicPagesContent("en");
+    const [firstCertificate, secondCertificate] = content.about.certificates.items;
+
+    render(<AboutPageView locale="en" content={content.about} />);
+
+    await user.click(
+      screen.getByRole("button", {
+        name: new RegExp(firstCertificate.caption, "i"),
+      }),
+    );
+
+    const dialog = screen.getByRole("dialog", {
+      name: content.about.certificates.viewerLabel,
+    });
+
+    expect(within(dialog).getByRole("img", { name: firstCertificate.alt })).toBeInTheDocument();
+    expect(within(dialog).getByText(firstCertificate.caption)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: content.about.certificates.nextLabel }));
+
+    expect(within(dialog).getByRole("img", { name: secondCertificate.alt })).toBeInTheDocument();
+    expect(within(dialog).getByText(secondCertificate.caption)).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: content.about.certificates.viewerLabel })).not.toBeInTheDocument();
   });
 
   it("renders contact facts and a direct call action", () => {

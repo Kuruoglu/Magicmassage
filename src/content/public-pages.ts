@@ -32,6 +32,17 @@ export type PublicPagesContent = {
     values: string[];
     imageAlt: string;
     studioImageAlt: string;
+    certificates: {
+      eyebrow: string;
+      title: string;
+      description: string;
+      viewerLabel: string;
+      openLabel: string;
+      closeLabel: string;
+      previousLabel: string;
+      nextLabel: string;
+      items: CertificateContent[];
+    };
   };
   contacts: {
     eyebrow: string;
@@ -49,6 +60,306 @@ export type PublicPagesContent = {
     mapDescription: string;
   };
 };
+
+type CertificateSlug =
+  | "body-chiromassage"
+  | "chiromassage-face"
+  | "lymphatic-partner-plus"
+  | "massage-therapist"
+  | "thai-massage"
+  | "professional-training-bg"
+  | "kinesiology-taping"
+  | "charm-device";
+
+export type CertificateContent = {
+  slug: CertificateSlug;
+  caption: string;
+  alt: string;
+  image: {
+    src: string;
+    width: number;
+    height: number;
+    orientation: "landscape" | "portrait";
+  };
+};
+
+const certificateOrder: CertificateSlug[] = [
+  "body-chiromassage",
+  "chiromassage-face",
+  "lymphatic-partner-plus",
+  "massage-therapist",
+  "thai-massage",
+  "professional-training-bg",
+  "kinesiology-taping",
+  "charm-device",
+];
+
+const certificateImages: Record<CertificateSlug, CertificateContent["image"]> = {
+  "body-chiromassage": {
+    src: "/media/about/certificates/09-body-chiromassage.webp",
+    width: 979,
+    height: 718,
+    orientation: "landscape",
+  },
+  "chiromassage-face": {
+    src: "/media/about/certificates/01-chiromassage-face.webp",
+    width: 995,
+    height: 707,
+    orientation: "landscape",
+  },
+  "lymphatic-partner-plus": {
+    src: "/media/about/certificates/03-lymphatic-partner-plus.webp",
+    width: 962,
+    height: 717,
+    orientation: "landscape",
+  },
+  "massage-therapist": {
+    src: "/media/about/certificates/04-massage-therapist.webp",
+    width: 981,
+    height: 708,
+    orientation: "landscape",
+  },
+  "thai-massage": {
+    src: "/media/about/certificates/07-thai-massage.webp",
+    width: 726,
+    height: 979,
+    orientation: "portrait",
+  },
+  "professional-training-bg": {
+    src: "/media/about/certificates/05-professional-training-bg.webp",
+    width: 710,
+    height: 980,
+    orientation: "portrait",
+  },
+  "kinesiology-taping": {
+    src: "/media/about/certificates/06-kinesiology-taping.webp",
+    width: 706,
+    height: 978,
+    orientation: "portrait",
+  },
+  "charm-device": {
+    src: "/media/about/certificates/02-charm-device.webp",
+    width: 916,
+    height: 670,
+    orientation: "landscape",
+  },
+};
+
+const certificateCopy: Record<
+  Locale,
+  {
+    eyebrow: string;
+    title: string;
+    description: string;
+    viewerLabel: string;
+    openLabel: string;
+    closeLabel: string;
+    previousLabel: string;
+    nextLabel: string;
+    items: Record<CertificateSlug, { caption: string; alt: string }>;
+  }
+> = {
+  bg: {
+    eyebrow: "Професионална основа",
+    title: "Сертификати на Натали",
+    description:
+      "Документите показват обученията и масажните направления, които Натали прилага внимателно в работата си в студиото.",
+    viewerLabel: "Преглед на сертификат",
+    openLabel: "Отвори сертификата",
+    closeLabel: "Затвори",
+    previousLabel: "Предишен сертификат",
+    nextLabel: "Следващ сертификат",
+    items: {
+      "body-chiromassage": {
+        caption: "Хиромасаж на тяло",
+        alt: "Сертификат на Наталия Бурачек за хиромасаж на тяло по испанска техника.",
+      },
+      "chiromassage-face": {
+        caption: "Хиромасаж на лице",
+        alt: "Сертификат на Наталия Бурачек за обучение по хиромасаж на лице.",
+      },
+      "lymphatic-partner-plus": {
+        caption: "Лимфодренажен масаж Partner+",
+        alt: "Сертификат на Наталия Бурачек за лимфодренажен масаж Partner+.",
+      },
+      "massage-therapist": {
+        caption: "Massage therapist",
+        alt: "Сертификат Massage Therapist на Наталия Бурачек от Partner Plus.",
+      },
+      "thai-massage": {
+        caption: "Тайландски масаж",
+        alt: "Сертификат на Наталия Бурачек за обучение по тайландски масаж.",
+      },
+      "professional-training-bg": {
+        caption: "Професионално обучение",
+        alt: "Удостоверение на Наталия Бурачек за професионално обучение в Бургас.",
+      },
+      "kinesiology-taping": {
+        caption: "Kinesiology taping",
+        alt: "Сертификат на Nataliia Burachek за професионален курс по кинезиологичен тейпинг.",
+      },
+      "charm-device": {
+        caption: "Аппаратни техники Charm",
+        alt: "Сертификат на Nataliia Burachek за работа с апаратни масажни техники Charm.",
+      },
+    },
+  },
+  ru: {
+    eyebrow: "Профессиональная база",
+    title: "Сертификаты Натальи",
+    description:
+      "Документы подтверждают обучение Натальи в массажных техниках, с которыми она работает в студии.",
+    viewerLabel: "Просмотр сертификата",
+    openLabel: "Открыть сертификат",
+    closeLabel: "Закрыть",
+    previousLabel: "Предыдущий сертификат",
+    nextLabel: "Следующий сертификат",
+    items: {
+      "body-chiromassage": {
+        caption: "Хиромассаж тела",
+        alt: "Сертификат Наталии Бурачек по хиромассажу тела в испанской технике.",
+      },
+      "chiromassage-face": {
+        caption: "Хиромассаж лица",
+        alt: "Сертификат Наталии Бурачек об обучении по программе хиромассаж лица.",
+      },
+      "lymphatic-partner-plus": {
+        caption: "Лимфодренажный массаж Partner+",
+        alt: "Сертификат Наталии Бурачек по лимфодренажному массажу Partner+.",
+      },
+      "massage-therapist": {
+        caption: "Massage therapist",
+        alt: "Сертификат Massage Therapist Наталии Бурачек от академии Partner Plus.",
+      },
+      "thai-massage": {
+        caption: "Тайландский массаж",
+        alt: "Сертификат Наталии Бурачек по обучению тайландскому массажу.",
+      },
+      "professional-training-bg": {
+        caption: "Профессиональное обучение",
+        alt: "Удостоверение Наталии Бурачек о профессиональном обучении в Бургасе.",
+      },
+      "kinesiology-taping": {
+        caption: "Kinesiology taping",
+        alt: "Сертификат Nataliia Burachek о прохождении курса по кинезиологическому тейпированию.",
+      },
+      "charm-device": {
+        caption: "Аппаратные техники Charm",
+        alt: "Сертификат Nataliia Burachek по массажным техникам на аппаратах Charm.",
+      },
+    },
+  },
+  ua: {
+    eyebrow: "Професійна основа",
+    title: "Сертифікати Наталі",
+    description:
+      "Документи підтверджують навчання Наталі в масажних техніках, з якими вона працює у студії.",
+    viewerLabel: "Перегляд сертифіката",
+    openLabel: "Відкрити сертифікат",
+    closeLabel: "Закрити",
+    previousLabel: "Попередній сертифікат",
+    nextLabel: "Наступний сертифікат",
+    items: {
+      "body-chiromassage": {
+        caption: "Хіромасаж тіла",
+        alt: "Сертифікат Наталії Бурачек з хіромасажу тіла в іспанській техніці.",
+      },
+      "chiromassage-face": {
+        caption: "Хіромасаж обличчя",
+        alt: "Сертифікат Наталії Бурачек про навчання за програмою хіромасаж обличчя.",
+      },
+      "lymphatic-partner-plus": {
+        caption: "Лімфодренажний масаж Partner+",
+        alt: "Сертифікат Наталії Бурачек з лімфодренажного масажу Partner+.",
+      },
+      "massage-therapist": {
+        caption: "Massage therapist",
+        alt: "Сертифікат Massage Therapist Наталії Бурачек від академії Partner Plus.",
+      },
+      "thai-massage": {
+        caption: "Тайський масаж",
+        alt: "Сертифікат Наталії Бурачек про навчання тайському масажу.",
+      },
+      "professional-training-bg": {
+        caption: "Професійне навчання",
+        alt: "Посвідчення Наталії Бурачек про професійне навчання в Бургасі.",
+      },
+      "kinesiology-taping": {
+        caption: "Kinesiology taping",
+        alt: "Сертифікат Nataliia Burachek про проходження курсу з кінезіологічного тейпування.",
+      },
+      "charm-device": {
+        caption: "Апаратні техніки Charm",
+        alt: "Сертифікат Nataliia Burachek з масажних технік на апаратах Charm.",
+      },
+    },
+  },
+  en: {
+    eyebrow: "Professional foundation",
+    title: "Natali's certificates",
+    description:
+      "These documents show Natali's training in the massage techniques she uses with care in the studio.",
+    viewerLabel: "Certificate viewer",
+    openLabel: "Open certificate",
+    closeLabel: "Close",
+    previousLabel: "Previous certificate",
+    nextLabel: "Next certificate",
+    items: {
+      "body-chiromassage": {
+        caption: "Body chiromassage",
+        alt: "Certificate for Nataliia Burachek in body chiromassage using the Spanish technique.",
+      },
+      "chiromassage-face": {
+        caption: "Face chiromassage",
+        alt: "Certificate for Nataliia Burachek for training in face chiromassage.",
+      },
+      "lymphatic-partner-plus": {
+        caption: "Lymphatic drainage massage Partner+",
+        alt: "Certificate for Nataliia Burachek in lymphatic drainage massage Partner+.",
+      },
+      "massage-therapist": {
+        caption: "Massage therapist",
+        alt: "Massage Therapist certificate for Nataliia Burachek from Partner Plus academy.",
+      },
+      "thai-massage": {
+        caption: "Thai massage",
+        alt: "Certificate for Natalia Burachek for training in Thai massage.",
+      },
+      "professional-training-bg": {
+        caption: "Professional training",
+        alt: "Professional training certificate for Natalia Burachek issued in Burgas.",
+      },
+      "kinesiology-taping": {
+        caption: "Kinesiology taping",
+        alt: "Certificate for Nataliia Burachek for completing a kinesiology taping course.",
+      },
+      "charm-device": {
+        caption: "Charm device techniques",
+        alt: "Certificate for Nataliia Burachek in massage techniques on Charm devices.",
+      },
+    },
+  },
+};
+
+function buildCertificates(locale: Locale): PublicPagesContent["about"]["certificates"] {
+  const copy = certificateCopy[locale];
+
+  return {
+    eyebrow: copy.eyebrow,
+    title: copy.title,
+    description: copy.description,
+    viewerLabel: copy.viewerLabel,
+    openLabel: copy.openLabel,
+    closeLabel: copy.closeLabel,
+    previousLabel: copy.previousLabel,
+    nextLabel: copy.nextLabel,
+    items: certificateOrder.map((slug) => ({
+      slug,
+      ...copy.items[slug],
+      image: certificateImages[slug],
+    })),
+  };
+}
 
 const content: Record<Locale, PublicPagesContent> = {
   bg: {
@@ -71,6 +382,7 @@ const content: Record<Locale, PublicPagesContent> = {
       values: ["7 години опит", "1000+ клиенти", "5000+ масажа", "Множество сертификати"],
       imageAlt: "Натали по време на масажна процедура",
       studioImageAlt: "Подаръчен ваучер за масаж в Magic Massage Natali",
+      certificates: buildCertificates("bg"),
     },
     contacts: {
       eyebrow: "Посетете студиото",
@@ -108,6 +420,7 @@ const content: Record<Locale, PublicPagesContent> = {
       values: ["7 лет опыта", "1000+ клиентов", "5000+ массажей", "Множество сертификатов"],
       imageAlt: "Натали во время массажной процедуры",
       studioImageAlt: "Подарочный ваучер на массаж в Magic Massage Natali",
+      certificates: buildCertificates("ru"),
     },
     contacts: {
       eyebrow: "Посетите салон",
@@ -145,6 +458,7 @@ const content: Record<Locale, PublicPagesContent> = {
       values: ["7 років досвіду", "1000+ клієнтів", "5000+ масажів", "Багато сертифікатів"],
       imageAlt: "Наталі під час масажної процедури",
       studioImageAlt: "Подарунковий ваучер на масаж у Magic Massage Natali",
+      certificates: buildCertificates("ua"),
     },
     contacts: {
       eyebrow: "Відвідайте салон",
@@ -182,6 +496,7 @@ const content: Record<Locale, PublicPagesContent> = {
       values: ["7 years of experience", "1000+ clients", "5000+ massages", "Many certificates"],
       imageAlt: "Natali during a massage treatment",
       studioImageAlt: "Massage gift voucher at Magic Massage Natali",
+      certificates: buildCertificates("en"),
     },
     contacts: {
       eyebrow: "Visit the studio",

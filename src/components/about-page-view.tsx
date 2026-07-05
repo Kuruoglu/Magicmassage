@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { CertificateGallery } from "@/components/certificate-gallery";
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
 
@@ -55,6 +56,18 @@ export function AboutPageView({ content }: AboutPageViewProps) {
               ))}
             </ul>
           </div>
+        </div>
+      </section>
+
+      <section className="certificates-section section-pad" aria-labelledby="about-certificates-title">
+        <div className="section-inner">
+          <div className="certificates-heading">
+            <p className="eyebrow eyebrow-light">{content.certificates.eyebrow}</p>
+            <h2 id="about-certificates-title">{content.certificates.title}</h2>
+            <p>{content.certificates.description}</p>
+          </div>
+
+          <CertificateGallery certificates={content.certificates} />
         </div>
       </section>
     </main>

@@ -580,6 +580,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .page-hero.section-pad,
 .catalog-section.section-pad,
 .story-section.section-pad,
+.certificates-section.section-pad,
 .contact-page.section-pad {
   padding-inline: 0;
 }
@@ -644,6 +645,242 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   padding-top: 14px;
 }
 .story-copy li span { color: var(--gold-light); }
+.certificates-section {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(160, 106, 203, 0.19), transparent 30%),
+    radial-gradient(circle at 96% 12%, rgba(176, 122, 221, 0.1), transparent 28%),
+    linear-gradient(135deg, #151116 0%, #211B26 62%, #130F16 100%);
+  border-top: 1px solid rgba(176, 122, 221, 0.18);
+  color: var(--white);
+  max-width: none;
+  overflow: hidden;
+  padding-bottom: 118px;
+  padding-top: 102px;
+  position: relative;
+}
+.certificates-section::before {
+  border: 1px solid rgba(160, 106, 203, 0.14);
+  border-radius: 999px;
+  content: "";
+  height: 460px;
+  pointer-events: none;
+  position: absolute;
+  right: -170px;
+  top: 40px;
+  width: 460px;
+}
+.certificates-section .section-inner {
+  position: relative;
+  z-index: 1;
+}
+.certificates-heading {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 42px;
+  max-width: 880px;
+}
+.certificates-heading h2 {
+  color: var(--white);
+  font-size: clamp(2.6rem, 5vw, 4.9rem);
+  line-height: 0.96;
+  max-width: 830px;
+}
+.certificates-heading > p:last-child {
+  color: #D8C6DF;
+  font-size: 1rem;
+  line-height: 1.75;
+  max-width: 720px;
+}
+.certificates-mosaic {
+  display: grid;
+  gap: 18px;
+}
+.certificates-top-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+}
+.certificates-side-stack {
+  display: grid;
+  gap: 18px;
+}
+.certificates-lower-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.certificate-card {
+  align-self: start;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035)),
+    rgba(19, 15, 23, 0.68);
+  border: 1px solid rgba(226, 191, 126, 0.23);
+  border-radius: 22px;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.3);
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  min-width: 0;
+  padding: 10px;
+}
+.certificate-open {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: zoom-in;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+.certificate-open:focus-visible {
+  border-radius: 18px;
+  outline: 3px solid rgba(226, 191, 126, 0.9);
+  outline-offset: 5px;
+}
+.certificate-media {
+  align-items: center;
+  aspect-ratio: var(--certificate-aspect);
+  background: #F7F0FA;
+  border-radius: 15px;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+.certificate-card img {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 180ms ease;
+  width: 100%;
+}
+.certificate-open:hover .certificate-media img {
+  transform: scale(1.015);
+}
+.certificate-caption {
+  color: #ECD8F0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.3;
+  min-height: 1.9em;
+  padding: 0 6px 4px;
+}
+.certificate-card-feature {
+  padding: 12px;
+}
+.certificate-card-feature .certificate-caption {
+  color: #F3DFBF;
+  font-size: 0.86rem;
+}
+.certificate-lightbox {
+  align-items: center;
+  background: rgba(11, 8, 13, 0.82);
+  backdrop-filter: blur(10px);
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: clamp(16px, 3vw, 34px);
+  position: fixed;
+  z-index: 1000;
+}
+.certificate-lightbox-backdrop {
+  background: transparent;
+  border: 0;
+  cursor: zoom-out;
+  inset: 0;
+  position: absolute;
+}
+.certificate-lightbox-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.045)),
+    #17121A;
+  border: 1px solid rgba(226, 191, 126, 0.28);
+  border-radius: 24px;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.48);
+  color: var(--white);
+  display: grid;
+  gap: 16px;
+  max-height: 92dvh;
+  overflow: auto;
+  padding: clamp(14px, 2vw, 22px);
+  position: relative;
+  width: min(1120px, 100%);
+}
+.certificate-lightbox-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+.certificate-lightbox-toolbar p {
+  color: #F3DFBF;
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
+}
+.certificate-lightbox-close,
+.certificate-lightbox-actions button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(226, 191, 126, 0.28);
+  border-radius: 999px;
+  color: var(--white);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 1.25rem;
+  font-weight: 800;
+  height: 44px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 44px;
+}
+.certificate-lightbox-close:hover,
+.certificate-lightbox-actions button:hover {
+  background: rgba(226, 191, 126, 0.18);
+}
+.certificate-lightbox-close:focus-visible,
+.certificate-lightbox-actions button:focus-visible {
+  outline: 3px solid rgba(226, 191, 126, 0.9);
+  outline-offset: 3px;
+}
+.certificate-lightbox-media {
+  align-items: center;
+  aspect-ratio: var(--certificate-aspect);
+  background: #F7F0FA;
+  border-radius: 16px;
+  display: flex;
+  justify-content: center;
+  max-height: 68dvh;
+  overflow: hidden;
+  width: 100%;
+}
+.certificate-lightbox-media img {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+.certificate-lightbox-actions {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+.certificate-lightbox-actions > span {
+  color: #D8C6DF;
+  font-size: 0.86rem;
+  font-weight: 800;
+  min-width: 58px;
+  text-align: center;
+}
 .contact-page {
   background: var(--cream);
   max-width: none;
@@ -2291,6 +2528,18 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .catalog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .certificates-top-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .certificates-side-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .certificates-lower-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1180px) {
@@ -2328,6 +2577,52 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .about-page-hero-visual {
     aspect-ratio: 1.08;
     border-radius: 26px;
+  }
+
+  .certificates-section {
+    padding-bottom: 82px;
+    padding-top: 76px;
+  }
+
+  .certificates-heading {
+    margin-bottom: 30px;
+  }
+
+  .certificates-heading h2 {
+    font-size: clamp(2.45rem, 10vw, 3.8rem);
+  }
+
+  .certificates-side-stack,
+  .certificates-lower-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .certificate-card {
+    border-radius: 18px;
+    padding: 8px;
+  }
+
+  .certificate-media {
+    border-radius: 12px;
+  }
+
+  .certificate-lightbox {
+    padding: 12px;
+  }
+
+  .certificate-lightbox-panel {
+    border-radius: 20px;
+    gap: 12px;
+    max-height: 94dvh;
+  }
+
+  .certificate-lightbox-toolbar {
+    align-items: flex-start;
+  }
+
+  .certificate-lightbox-media {
+    border-radius: 12px;
+    max-height: 66dvh;
   }
 }
 
