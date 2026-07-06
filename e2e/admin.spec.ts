@@ -91,6 +91,28 @@ test("calendar can create a new appointment", async ({ page }) => {
   await expect(page.getByLabel("Детали выбранной записи").getByText("SPA процедура")).toBeVisible();
 });
 
+test("calendar can edit and reschedule an appointment", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: /Olena K./ }).click();
+  await page.getByLabel("Детали выбранной записи").getByRole("button", { name: "Редактировать" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Редактировать запись" });
+  await expect(dialog.getByLabel("Клиент")).toHaveValue("Olena K.");
+  await dialog.getByLabel("Дата").fill("2026-07-13");
+  await dialog.getByLabel("Время").fill("16:45");
+  await dialog.getByLabel("Статус").selectOption("Ожидает");
+  await dialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  const details = page.getByLabel("Детали выбранной записи");
+  await expect(dialog).toHaveCount(0);
+  await expect(details.getByRole("heading", { name: "Olena K." })).toBeVisible();
+  await expect(details.getByText("13 июля")).toBeVisible();
+  await expect(details.getByText("16:45")).toBeVisible();
+  await expect(details.getByText("Ожидает")).toBeVisible();
+  await expect(page.getByRole("button", { name: /15:00Olena K./ })).toHaveCount(0);
+});
+
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin?section=calendar");

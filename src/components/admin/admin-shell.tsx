@@ -28,6 +28,7 @@ type AdminShellProps = {
 
 type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка";
 type Appointment = {
+  id?: string;
   date: string;
   time: string;
   client: string;
@@ -94,7 +95,20 @@ function matchesSearch(values: Array<string | number | undefined>, query: string
 }
 
 function appointmentKey(appointment: Appointment) {
-  return `${appointment.date}-${appointment.time}-${appointment.client}`;
+  return appointment.id ?? `${appointment.date}-${appointment.time}-${appointment.client}`;
+}
+
+function sortAppointments(appointments: Appointment[]) {
+  return [...appointments].sort((first, second) =>
+    `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
+  );
+}
+
+function buildInitialCalendarAppointments() {
+  return upcomingAppointments.map((appointment, index) => ({
+    ...appointment,
+    id: `demo-${index + 1}`,
+  }));
 }
 
 function calendarModeLabel(mode: CalendarMode) {
@@ -260,20 +274,24 @@ function QuickActionDialog({
 }
 
 function CalendarAppointmentDialog({
+  initialAppointment,
   onClose,
   onSave,
 }: {
+  initialAppointment?: Appointment;
   onClose: () => void;
   onSave: (appointment: Appointment) => void;
 }) {
   const [form, setForm] = useState<Appointment>({
-    client: "",
-    date: "2026-07-06",
-    service: appointmentServiceOptions[0],
-    status: "Новая заявка",
-    time: "14:00",
+    client: initialAppointment?.client ?? "",
+    date: initialAppointment?.date ?? "2026-07-06",
+    id: initialAppointment?.id,
+    service: initialAppointment?.service ?? appointmentServiceOptions[0],
+    status: initialAppointment?.status ?? "Новая заявка",
+    time: initialAppointment?.time ?? "14:00",
   });
   const [error, setError] = useState("");
+  const isEditing = Boolean(initialAppointment);
 
   function updateForm<Field extends keyof Appointment>(field: Field, value: Appointment[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -300,7 +318,7 @@ function CalendarAppointmentDialog({
         <div className="admin-panel-head">
           <div>
             <span className="admin-kicker">Календарь</span>
-            <h2 id="calendar-action-title">Новая запись</h2>
+            <h2 id="calendar-action-title">{isEditing ? "Редактировать запись" : "Новая запись"}</h2>
           </div>
           <button className="admin-icon-button" onClick={onClose} type="button">
             Закрыть
@@ -371,7 +389,7 @@ function CalendarAppointmentDialog({
           </div>
 
           <div className="admin-action-footer">
-            <button type="submit">Сохранить запись</button>
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить запись"}</button>
             <button className="admin-secondary-button" onClick={onClose} type="button">
               Отмена
             </button>
@@ -508,7 +526,15 @@ function ClientsWorkspace({ query }: { query: string }) {
   );
 }
 
-function CalendarWorkspace({ appointments, query }: { appointments: Appointment[]; query: string }) {
+function CalendarWorkspace({
+  appointments,
+  onEditAppointment,
+  query,
+}: {
+  appointments: Appointment[];
+  onEditAppointment: (appointment: Appointment) => void;
+  query: string;
+}) {
   const fallbackAppointment = appointments[0] ?? {
     client: "Нет записи",
     date: "2026-07-06",
@@ -655,7 +681,12 @@ function CalendarWorkspace({ appointments, query }: { appointments: Appointment[
           </>
         ) : (
           <>
-            <h2>{selectedAppointment.client}</h2>
+            <div className="admin-detail-heading">
+              <h2>{selectedAppointment.client}</h2>
+              <button className="admin-text-action" onClick={() => onEditAppointment(selectedAppointment)} type="button">
+                Редактировать
+              </button>
+            </div>
             <dl className="admin-detail-list">
               <div>
                 <dt>Дата</dt>
@@ -878,11 +909,13 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 
 function Workspace({
   appointments,
+  onEditAppointment,
   query,
   role,
   section,
 }: {
   appointments: Appointment[];
+  onEditAppointment: (appointment: Appointment) => void;
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
@@ -896,7 +929,7 @@ function Workspace({
   }
 
   if (section === "calendar") {
-    return <CalendarWorkspace appointments={appointments} query={query} />;
+    return <CalendarWorkspace appointments={appointments} onEditAppointment={onEditAppointment} query={query} />;
   }
 
   if (section === "finances") {
@@ -911,16 +944,54 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
   const activeModule = getAdminModule(activeSection);
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
-  const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() =>
-    upcomingAppointments.map((appointment) => ({ ...appointment })),
-  );
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
+  const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
 
   function handleAppointmentCreate(appointment: Appointment) {
     setCalendarAppointments((current) =>
-      [...current, appointment].sort((first, second) =>
-        `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
+      sortAppointments([
+        ...current,
+        {
+          ...appointment,
+          id: `custom-${current.length + 1}`,
+        },
+      ]),
+    );
+  }
+
+  function handleAppointmentUpdate(appointment: Appointment) {
+    setCalendarAppointments((current) =>
+      sortAppointments(
+        current.map((currentAppointment) =>
+          appointmentKey(currentAppointment) === appointmentKey(appointment) ? appointment : currentAppointment,
+        ),
       ),
     );
+  }
+
+  function openPrimaryAction() {
+    setEditingAppointment(undefined);
+    setIsActionOpen(true);
+  }
+
+  function openAppointmentEdit(appointment: Appointment) {
+    setEditingAppointment(appointment);
+    setIsActionOpen(true);
+  }
+
+  function closeActionDialog() {
+    setIsActionOpen(false);
+    setEditingAppointment(undefined);
+  }
+
+  function saveCalendarAppointment(appointment: Appointment) {
+    if (editingAppointment) {
+      handleAppointmentUpdate(appointment);
+    } else {
+      handleAppointmentCreate(appointment);
+    }
+
+    closeActionDialog();
   }
 
   return (
@@ -981,23 +1052,30 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
             <h1 id="admin-page-title">{activeModule.title}</h1>
             <p>{activeModule.description}</p>
           </div>
-          <button onClick={() => setIsActionOpen(true)} type="button">
+          <button onClick={openPrimaryAction} type="button">
             {activeModule.primaryAction}
           </button>
         </section>
 
-        <Workspace appointments={calendarAppointments} query={query} role={role} section={activeSection} />
+        <Workspace
+          appointments={calendarAppointments}
+          onEditAppointment={openAppointmentEdit}
+          query={query}
+          role={role}
+          section={activeSection}
+        />
 
         {isActionOpen && activeSection === "calendar" ? (
           <CalendarAppointmentDialog
-            onClose={() => setIsActionOpen(false)}
-            onSave={handleAppointmentCreate}
+            initialAppointment={editingAppointment}
+            onClose={closeActionDialog}
+            onSave={saveCalendarAppointment}
           />
         ) : isActionOpen ? (
           <QuickActionDialog
             action={activeModule.primaryAction}
             moduleTitle={activeModule.title}
-            onClose={() => setIsActionOpen(false)}
+            onClose={closeActionDialog}
           />
         ) : null}
       </main>

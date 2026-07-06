@@ -2822,6 +2822,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   color: #FFFFFF;
   cursor: pointer;
   display: inline-flex;
+  font-family: inherit;
   font-size: 0.82rem;
   font-weight: 800;
   justify-content: center;
@@ -3258,6 +3259,24 @@ button.admin-calendar-item[aria-pressed="true"] {
 .admin-detail-panel h2 {
   font-size: 1.28rem;
   margin: 6px 0 10px;
+}
+
+.admin-detail-heading {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.admin-detail-heading h2 {
+  margin: 0;
+}
+
+.admin-detail-heading .admin-text-action {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
 }
 
 .admin-detail-list {

@@ -138,6 +138,33 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("button", { name: /Ирина Тестова/ })).not.toBeInTheDocument();
   });
 
+  it("edits and reschedules the selected calendar appointment", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: /Olena K./ }));
+    await user.click(within(screen.getByLabelText("Детали выбранной записи")).getByRole("button", { name: "Редактировать" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Редактировать запись" });
+    expect(within(dialog).getByLabelText("Клиент")).toHaveValue("Olena K.");
+
+    await user.clear(within(dialog).getByLabelText("Дата"));
+    await user.type(within(dialog).getByLabelText("Дата"), "2026-07-13");
+    await user.clear(within(dialog).getByLabelText("Время"));
+    await user.type(within(dialog).getByLabelText("Время"), "16:45");
+    await user.selectOptions(within(dialog).getByLabelText("Статус"), "Ожидает");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    const details = screen.getByLabelText("Детали выбранной записи");
+    expect(screen.queryByRole("dialog", { name: "Редактировать запись" })).not.toBeInTheDocument();
+    expect(within(details).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(details).getByText("13 июля")).toBeInTheDocument();
+    expect(within(details).getByText("16:45")).toBeInTheDocument();
+    expect(within(details).getByText("Ожидает")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /15:00Olena K./ })).not.toBeInTheDocument();
+  });
+
   it("acknowledges CSV exports in the accountant finance workspace", async () => {
     const user = userEvent.setup();
 
