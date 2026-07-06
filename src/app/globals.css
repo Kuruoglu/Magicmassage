@@ -3077,6 +3077,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .admin-calendar-item,
 .admin-module-tile,
 .admin-icon-button,
+.admin-danger-button,
 .admin-action-footer button,
 .admin-filter-row button,
 .admin-export-actions button {
@@ -3273,10 +3274,45 @@ button.admin-calendar-item[aria-pressed="true"] {
   margin: 0;
 }
 
-.admin-detail-heading .admin-text-action {
+.admin-detail-actions {
+  align-items: center;
+  display: flex;
   flex: 0 0 auto;
-  min-height: 36px;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-detail-heading .admin-text-action,
+.admin-detail-heading .admin-danger-button {
+  flex: 0 0 auto;
+  min-height: 44px;
   padding: 0 12px;
+}
+
+.admin-danger-button {
+  align-items: center;
+  background: var(--admin-danger-bg);
+  border: 1px solid rgba(154, 45, 45, 0.28);
+  border-radius: 8px;
+  color: var(--admin-danger);
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.admin-danger-button:hover:not(:disabled),
+.admin-danger-button:focus-visible {
+  border-color: rgba(154, 45, 45, 0.5);
+  box-shadow: 0 10px 22px rgba(154, 45, 45, 0.12);
+  outline: 0;
+}
+
+.admin-danger-button:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .admin-detail-list {
@@ -3381,6 +3417,36 @@ button.admin-calendar-item[aria-pressed="true"] {
   margin: -4px 0 0;
 }
 
+.admin-confirm-copy {
+  color: var(--admin-muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin: 14px 0 0;
+}
+
+.admin-confirm-copy strong {
+  color: var(--admin-text);
+}
+
+.admin-confirm-summary {
+  align-items: center;
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.admin-confirm-summary > span:first-child {
+  color: var(--admin-text);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .admin-action-footer {
   display: flex;
   flex-wrap: wrap;
@@ -3405,6 +3471,12 @@ button.admin-calendar-item[aria-pressed="true"] {
 .admin-action-footer button:first-child {
   background: var(--admin-primary);
   border-color: var(--admin-primary);
+  color: #FFFFFF;
+}
+
+.admin-action-footer button.admin-danger-action {
+  background: var(--admin-danger);
+  border-color: var(--admin-danger);
   color: #FFFFFF;
 }
 

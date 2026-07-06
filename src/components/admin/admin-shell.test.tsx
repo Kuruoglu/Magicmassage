@@ -165,6 +165,34 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("button", { name: /15:00Olena K./ })).not.toBeInTheDocument();
   });
 
+  it("cancels the selected calendar appointment after confirmation", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: /Olena K./ }));
+
+    const details = screen.getByLabelText("Детали выбранной записи");
+    await user.click(within(details).getByRole("button", { name: "Отменить" }));
+
+    const firstDialog = screen.getByRole("dialog", { name: "Отменить запись" });
+    expect(within(firstDialog).getByText("Olena K.")).toBeInTheDocument();
+    await user.click(within(firstDialog).getByRole("button", { name: "Оставить запись" }));
+
+    expect(screen.queryByRole("dialog", { name: "Отменить запись" })).not.toBeInTheDocument();
+    expect(within(details).getByText("Подтверждена")).toBeInTheDocument();
+
+    await user.click(within(details).getByRole("button", { name: "Отменить" }));
+    const confirmationDialog = screen.getByRole("dialog", { name: "Отменить запись" });
+    await user.click(within(confirmationDialog).getByRole("button", { name: "Подтвердить отмену" }));
+
+    const updatedDetails = screen.getByLabelText("Детали выбранной записи");
+    const cancelledAppointment = screen.getByRole("button", { name: /Olena K./ });
+    expect(screen.queryByRole("dialog", { name: "Отменить запись" })).not.toBeInTheDocument();
+    expect(within(updatedDetails).getByText("Отменена")).toBeInTheDocument();
+    expect(within(cancelledAppointment).getByText("Отменена")).toBeInTheDocument();
+  });
+
   it("acknowledges CSV exports in the accountant finance workspace", async () => {
     const user = userEvent.setup();
 

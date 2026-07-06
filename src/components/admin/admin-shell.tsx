@@ -26,7 +26,7 @@ type AdminShellProps = {
   role: AdminRoleId;
 };
 
-type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка";
+type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
 type Appointment = {
   id?: string;
   date: string;
@@ -39,7 +39,7 @@ type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
 const appointmentServiceOptions = ["Классический массаж", "Лимфодренажный массаж", "Deep tissue massage", "SPA процедура"] as const;
-const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена"];
+const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена", "Отменена"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -400,6 +400,50 @@ function CalendarAppointmentDialog({
   );
 }
 
+function CalendarAppointmentCancelDialog({
+  appointment,
+  onClose,
+  onConfirm,
+}: {
+  appointment: Appointment;
+  onClose: () => void;
+  onConfirm: (appointment: Appointment) => void;
+}) {
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="calendar-cancel-title" aria-modal="true" className="admin-action-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Календарь</span>
+            <h2 id="calendar-cancel-title">Отменить запись</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <p className="admin-confirm-copy">
+          Запись клиента <strong>{appointment.client}</strong> на {formatCalendarDay(appointment.date)} в{" "}
+          <strong>{appointment.time}</strong> будет отмечена как отмененная. История останется в календаре.
+        </p>
+        <div className="admin-confirm-summary" aria-label="Запись для отмены">
+          <span>{appointment.service}</span>
+          <span className={statusClass(appointment.status)}>{appointment.status}</span>
+        </div>
+
+        <div className="admin-action-footer">
+          <button className="admin-danger-action" onClick={() => onConfirm(appointment)} type="button">
+            Подтвердить отмену
+          </button>
+          <button className="admin-secondary-button" onClick={onClose} type="button">
+            Оставить запись
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId }) {
   const filteredAppointments = upcomingAppointments.filter((appointment) =>
     matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
@@ -528,10 +572,12 @@ function ClientsWorkspace({ query }: { query: string }) {
 
 function CalendarWorkspace({
   appointments,
+  onCancelAppointment,
   onEditAppointment,
   query,
 }: {
   appointments: Appointment[];
+  onCancelAppointment: (appointment: Appointment) => void;
   onEditAppointment: (appointment: Appointment) => void;
   query: string;
 }) {
@@ -683,9 +729,20 @@ function CalendarWorkspace({
           <>
             <div className="admin-detail-heading">
               <h2>{selectedAppointment.client}</h2>
-              <button className="admin-text-action" onClick={() => onEditAppointment(selectedAppointment)} type="button">
-                Редактировать
-              </button>
+              <div className="admin-detail-actions">
+                <button className="admin-text-action" onClick={() => onEditAppointment(selectedAppointment)} type="button">
+                  Редактировать
+                </button>
+                {selectedAppointment.status === "Отменена" ? null : (
+                  <button
+                    className="admin-danger-button"
+                    onClick={() => onCancelAppointment(selectedAppointment)}
+                    type="button"
+                  >
+                    Отменить
+                  </button>
+                )}
+              </div>
             </div>
             <dl className="admin-detail-list">
               <div>
@@ -909,12 +966,14 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 
 function Workspace({
   appointments,
+  onCancelAppointment,
   onEditAppointment,
   query,
   role,
   section,
 }: {
   appointments: Appointment[];
+  onCancelAppointment: (appointment: Appointment) => void;
   onEditAppointment: (appointment: Appointment) => void;
   query: string;
   role: AdminRoleId;
@@ -929,7 +988,14 @@ function Workspace({
   }
 
   if (section === "calendar") {
-    return <CalendarWorkspace appointments={appointments} onEditAppointment={onEditAppointment} query={query} />;
+    return (
+      <CalendarWorkspace
+        appointments={appointments}
+        onCancelAppointment={onCancelAppointment}
+        onEditAppointment={onEditAppointment}
+        query={query}
+      />
+    );
   }
 
   if (section === "finances") {
@@ -944,6 +1010,7 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
   const activeModule = getAdminModule(activeSection);
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
+  const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
 
@@ -975,13 +1042,24 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
   }
 
   function openAppointmentEdit(appointment: Appointment) {
+    setCancellingAppointment(undefined);
     setEditingAppointment(appointment);
     setIsActionOpen(true);
+  }
+
+  function openAppointmentCancel(appointment: Appointment) {
+    setEditingAppointment(undefined);
+    setIsActionOpen(false);
+    setCancellingAppointment(appointment);
   }
 
   function closeActionDialog() {
     setIsActionOpen(false);
     setEditingAppointment(undefined);
+  }
+
+  function closeCancelDialog() {
+    setCancellingAppointment(undefined);
   }
 
   function saveCalendarAppointment(appointment: Appointment) {
@@ -992,6 +1070,11 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
     }
 
     closeActionDialog();
+  }
+
+  function cancelCalendarAppointment(appointment: Appointment) {
+    handleAppointmentUpdate({ ...appointment, status: "Отменена" });
+    closeCancelDialog();
   }
 
   return (
@@ -1059,6 +1142,7 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
 
         <Workspace
           appointments={calendarAppointments}
+          onCancelAppointment={openAppointmentCancel}
           onEditAppointment={openAppointmentEdit}
           query={query}
           role={role}
@@ -1076,6 +1160,13 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
             action={activeModule.primaryAction}
             moduleTitle={activeModule.title}
             onClose={closeActionDialog}
+          />
+        ) : null}
+        {cancellingAppointment ? (
+          <CalendarAppointmentCancelDialog
+            appointment={cancellingAppointment}
+            onClose={closeCancelDialog}
+            onConfirm={cancelCalendarAppointment}
           />
         ) : null}
       </main>

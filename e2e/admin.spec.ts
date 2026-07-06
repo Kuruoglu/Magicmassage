@@ -113,6 +113,30 @@ test("calendar can edit and reschedule an appointment", async ({ page }) => {
   await expect(page.getByRole("button", { name: /15:00Olena K./ })).toHaveCount(0);
 });
 
+test("calendar can cancel an appointment after confirmation", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: /Olena K./ }).click();
+
+  const details = page.getByLabel("Детали выбранной записи");
+  await details.getByRole("button", { name: "Отменить" }).click();
+
+  const firstDialog = page.getByRole("dialog", { name: "Отменить запись" });
+  await expect(firstDialog.getByText("Olena K.")).toBeVisible();
+  await firstDialog.getByRole("button", { name: "Оставить запись" }).click();
+
+  await expect(firstDialog).toHaveCount(0);
+  await expect(details.getByText("Подтверждена")).toBeVisible();
+
+  await details.getByRole("button", { name: "Отменить" }).click();
+  const confirmationDialog = page.getByRole("dialog", { name: "Отменить запись" });
+  await confirmationDialog.getByRole("button", { name: "Подтвердить отмену" }).click();
+
+  await expect(confirmationDialog).toHaveCount(0);
+  await expect(details.getByText("Отменена")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Olena K./ }).getByText("Отменена")).toBeVisible();
+});
+
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin?section=calendar");
