@@ -2777,7 +2777,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .admin-export-actions button:hover,
 .admin-filter-row button:hover,
 .admin-filter-row span:first-child,
-.admin-filter-row button:first-child {
+.admin-filter-row button[aria-pressed="true"] {
   background: var(--admin-primary);
   color: #FFFFFF;
 }
@@ -3093,6 +3093,127 @@ button.admin-calendar-item[aria-pressed="true"] {
   grid-template-columns: 64px minmax(0, 1fr) auto;
 }
 
+.admin-calendar-month-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.admin-calendar-weekday {
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  min-width: 0;
+  padding: 0 4px 2px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.admin-calendar-month-cell {
+  min-width: 0;
+}
+
+.admin-calendar-month-cell-empty {
+  min-height: 92px;
+}
+
+.admin-calendar-day-button {
+  align-content: start;
+  background: var(--admin-surface);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 6px;
+  min-height: 92px;
+  min-width: 0;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-calendar-day-button:hover,
+.admin-calendar-day-button:focus-visible,
+.admin-calendar-day-button[aria-pressed="true"] {
+  border-color: rgba(124, 77, 161, 0.42);
+  box-shadow: 0 14px 28px rgba(29, 20, 36, 0.1);
+  outline: 0;
+}
+
+.admin-calendar-day-button[aria-pressed="true"] {
+  background: rgba(124, 77, 161, 0.08);
+}
+
+.admin-calendar-day-button > strong {
+  font-size: 0.98rem;
+  line-height: 1;
+}
+
+.admin-calendar-day-button > small {
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.admin-month-count-compact {
+  display: none;
+}
+
+.admin-month-event {
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.1);
+  border-radius: 6px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px;
+}
+
+.admin-month-event time,
+.admin-month-event span {
+  font-size: 0.68rem;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-selected-day-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.admin-selected-day-item {
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 54px minmax(0, 1fr);
+  padding: 12px;
+}
+
+.admin-selected-day-item > span {
+  justify-self: start;
+}
+
+.admin-selected-day-item div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-selected-day-item div span {
+  color: var(--admin-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .admin-detail-panel {
   align-self: start;
 }
@@ -3313,6 +3434,49 @@ button.admin-calendar-item[aria-pressed="true"] {
   .admin-calendar-item,
   .admin-list-item {
     align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-calendar-month-grid {
+    gap: 4px;
+  }
+
+  .admin-calendar-weekday {
+    font-size: 0.64rem;
+    padding-inline: 0;
+  }
+
+  .admin-calendar-month-cell-empty {
+    min-height: 54px;
+  }
+
+  .admin-calendar-day-button {
+    gap: 4px;
+    min-height: 54px;
+    padding: 6px 4px;
+  }
+
+  .admin-calendar-day-button > strong {
+    font-size: 0.84rem;
+  }
+
+  .admin-calendar-day-button > small {
+    font-size: 0.7rem;
+  }
+
+  .admin-month-count-full {
+    display: none;
+  }
+
+  .admin-month-count-compact {
+    display: inline;
+  }
+
+  .admin-month-event {
+    display: none;
+  }
+
+  .admin-selected-day-item {
     grid-template-columns: 1fr;
   }
 

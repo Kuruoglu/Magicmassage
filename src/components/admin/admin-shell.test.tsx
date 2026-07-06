@@ -68,6 +68,23 @@ describe("AdminShell", () => {
     expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("Deep tissue massage")).toBeInTheDocument();
   });
 
+  it("switches the calendar to a month view with selectable days", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+
+    expect(screen.getByRole("heading", { name: "Июль 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("grid", { name: "Месяц Июль 2026" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /6 июля.*2 записи/ }));
+
+    expect(screen.getByRole("heading", { name: "6 июля" })).toBeInTheDocument();
+    expect(screen.getByText("Анна Петрова")).toBeInTheDocument();
+    expect(screen.getByText("Мария Иванова")).toBeInTheDocument();
+  });
+
   it("opens a quick action panel from the primary action", async () => {
     const user = userEvent.setup();
 

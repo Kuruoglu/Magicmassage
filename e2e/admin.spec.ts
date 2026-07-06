@@ -42,6 +42,20 @@ test("accountant CSV export provides visible feedback", async ({ page }) => {
   await expect(page.getByText("CSV отчет готов к скачиванию.")).toBeVisible();
 });
 
+test("calendar month view is selectable", async ({ page }) => {
+  await page.goto("/admin?section=calendar");
+
+  await page.getByRole("button", { name: "Месяц" }).click();
+
+  await expect(page.getByRole("heading", { name: "Июль 2026" })).toBeVisible();
+  await expect(page.getByRole("grid", { name: "Месяц Июль 2026" })).toBeVisible();
+
+  await page.getByRole("button", { name: /6 июля.*2 записи/ }).click();
+
+  await expect(page.getByRole("heading", { name: "6 июля" })).toBeVisible();
+  await expect(page.getByText("Мария Иванова")).toBeVisible();
+});
+
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin?section=calendar");

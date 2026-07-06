@@ -27,8 +27,26 @@ type AdminShellProps = {
 };
 
 type Appointment = (typeof upcomingAppointments)[number];
+type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
+const calendarModes: Array<{ id: CalendarMode; label: string }> = [
+  { id: "day", label: "День" },
+  { id: "week", label: "Неделя" },
+  { id: "month", label: "Месяц" },
+  { id: "list", label: "Список" },
+];
+const calendarMonthLabel = "Июль 2026";
+const calendarWeekdayLabels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const calendarMonthDays = Array.from({ length: 31 }, (_, index) => {
+  const day = index + 1;
+
+  return {
+    date: `2026-07-${String(day).padStart(2, "0")}`,
+    day,
+  };
+});
+const calendarLeadingBlankDays = 2;
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -67,7 +85,27 @@ function matchesSearch(values: Array<string | number | undefined>, query: string
 }
 
 function appointmentKey(appointment: Appointment) {
-  return `${appointment.time}-${appointment.client}`;
+  return `${appointment.date}-${appointment.time}-${appointment.client}`;
+}
+
+function calendarModeLabel(mode: CalendarMode) {
+  return calendarModes.find((item) => item.id === mode)?.label ?? "День";
+}
+
+function formatCalendarDay(date: string) {
+  return `${Number(date.slice(-2))} июля`;
+}
+
+function appointmentCountLabel(count: number) {
+  if (count === 1) {
+    return "1 запись";
+  }
+
+  if (count > 1 && count < 5) {
+    return `${count} записи`;
+  }
+
+  return `${count} записей`;
 }
 
 function csvCell(value: string | number | undefined) {
@@ -262,7 +300,9 @@ function ClientsWorkspace({ query }: { query: string }) {
       <div className="admin-panel-head">
         <h2 id="clients-heading">Клиентская база</h2>
         <div className="admin-filter-row" aria-label="Фильтры клиентов">
-          <button type="button">Все</button>
+          <button aria-pressed="true" type="button">
+            Все
+          </button>
           <button type="button">Активные</button>
           <button type="button">RU</button>
           <button type="button">BG</button>
@@ -299,69 +339,167 @@ function ClientsWorkspace({ query }: { query: string }) {
 
 function CalendarWorkspace({ query }: { query: string }) {
   const filteredAppointments = upcomingAppointments.filter((appointment) =>
-    matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
+    matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status], query),
   );
+  const [mode, setMode] = useState<CalendarMode>("day");
+  const [selectedDate, setSelectedDate] = useState("2026-07-06");
   const [selectedKey, setSelectedKey] = useState(() => appointmentKey(upcomingAppointments[1]));
+  const selectedDayAppointments = filteredAppointments.filter((appointment) => appointment.date === selectedDate);
   const selectedAppointment =
     filteredAppointments.find((appointment) => appointmentKey(appointment) === selectedKey) ??
+    selectedDayAppointments[0] ??
     filteredAppointments[0] ??
     upcomingAppointments[0];
+  const selectedAppointmentKey = appointmentKey(selectedAppointment);
+  const calendarHeading = mode === "month" ? calendarMonthLabel : calendarModeLabel(mode);
+
+  function selectAppointment(appointment: Appointment) {
+    setSelectedDate(appointment.date);
+    setSelectedKey(appointmentKey(appointment));
+  }
+
+  function selectDate(date: string, appointments: Appointment[]) {
+    setSelectedDate(date);
+
+    if (appointments[0]) {
+      setSelectedKey(appointmentKey(appointments[0]));
+    }
+  }
 
   return (
     <div className="admin-split-view">
       <section className="admin-panel admin-calendar-panel" aria-labelledby="calendar-heading">
         <div className="admin-panel-head">
-          <h2 id="calendar-heading">День</h2>
+          <h2 id="calendar-heading">{calendarHeading}</h2>
           <div className="admin-filter-row" aria-label="Режимы календаря">
-            <button type="button">День</button>
-            <button type="button">Неделя</button>
-            <button type="button">Список</button>
-          </div>
-        </div>
-        <div className="admin-calendar-list">
-          {filteredAppointments.map((appointment) => {
-            const key = appointmentKey(appointment);
-
-            return (
+            {calendarModes.map((calendarMode) => (
               <button
-                aria-pressed={key === appointmentKey(selectedAppointment)}
-                className="admin-calendar-item"
-                key={key}
-                onClick={() => setSelectedKey(key)}
+                aria-pressed={mode === calendarMode.id}
+                key={calendarMode.id}
+                onClick={() => setMode(calendarMode.id)}
                 type="button"
               >
-                <time className="admin-tabular">{appointment.time}</time>
-                <span>
-                  <strong>{appointment.client}</strong>
-                  <small>{appointment.service}</small>
-                </span>
-                <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                {calendarMode.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
+
+        {mode === "month" ? (
+          <div className="admin-calendar-month-grid" role="grid" aria-label={`Месяц ${calendarMonthLabel}`}>
+            {calendarWeekdayLabels.map((weekday) => (
+              <span className="admin-calendar-weekday" key={weekday} role="columnheader">
+                {weekday}
+              </span>
+            ))}
+            {Array.from({ length: calendarLeadingBlankDays }, (_, index) => (
+              <span aria-hidden="true" className="admin-calendar-month-cell admin-calendar-month-cell-empty" key={`blank-${index}`} role="gridcell" />
+            ))}
+            {calendarMonthDays.map((day) => {
+              const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
+              const countLabel = appointmentCountLabel(dayAppointments.length);
+
+              return (
+                <span className="admin-calendar-month-cell" key={day.date} role="gridcell">
+                  <button
+                    aria-label={`${day.day} июля, ${countLabel}`}
+                    aria-pressed={selectedDate === day.date}
+                    className="admin-calendar-day-button"
+                    onClick={() => selectDate(day.date, dayAppointments)}
+                    type="button"
+                  >
+                    <strong>{day.day}</strong>
+                    {dayAppointments.slice(0, 2).map((appointment) => (
+                      <span className="admin-month-event" key={appointmentKey(appointment)}>
+                        <time className="admin-tabular">{appointment.time}</time>
+                        <span>{appointment.service}</span>
+                      </span>
+                    ))}
+                    <small>
+                      <span className="admin-month-count-full">{countLabel}</span>
+                      <span className="admin-month-count-compact">{dayAppointments.length}</span>
+                    </small>
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="admin-calendar-list">
+            {filteredAppointments.map((appointment) => {
+              const key = appointmentKey(appointment);
+
+              return (
+                <button
+                  aria-pressed={key === selectedAppointmentKey}
+                  className="admin-calendar-item"
+                  key={key}
+                  onClick={() => selectAppointment(appointment)}
+                  type="button"
+                >
+                  <time className="admin-tabular">{appointment.time}</time>
+                  <span>
+                    <strong>{appointment.client}</strong>
+                    <small>
+                      {formatCalendarDay(appointment.date)} · {appointment.service}
+                    </small>
+                  </span>
+                  <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         {filteredAppointments.length === 0 ? <EmptyState label="Записи не найдены." /> : null}
       </section>
 
       <aside className="admin-panel admin-detail-panel" aria-label="Детали выбранной записи">
         <span className="admin-kicker">Правая панель</span>
-        <h2>{selectedAppointment.client}</h2>
-        <dl className="admin-detail-list">
-          <div>
-            <dt>Услуга</dt>
-            <dd>{selectedAppointment.service}</dd>
-          </div>
-          <div>
-            <dt>Статус</dt>
-            <dd>
-              <span className={statusClass(selectedAppointment.status)}>{selectedAppointment.status}</span>
-            </dd>
-          </div>
-          <div>
-            <dt>Время</dt>
-            <dd>{selectedAppointment.time}</dd>
-          </div>
-        </dl>
+        {mode === "month" ? (
+          <>
+            <h2>{formatCalendarDay(selectedDate)}</h2>
+            <div className="admin-selected-day-list">
+              {selectedDayAppointments.length > 0 ? (
+                selectedDayAppointments.map((appointment) => (
+                  <article className="admin-selected-day-item" key={appointmentKey(appointment)}>
+                    <time className="admin-tabular">{appointment.time}</time>
+                    <div>
+                      <strong>{appointment.client}</strong>
+                      <span>{appointment.service}</span>
+                    </div>
+                    <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                  </article>
+                ))
+              ) : (
+                <EmptyState label="На выбранный день записей нет." />
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <h2>{selectedAppointment.client}</h2>
+            <dl className="admin-detail-list">
+              <div>
+                <dt>Дата</dt>
+                <dd>{formatCalendarDay(selectedAppointment.date)}</dd>
+              </div>
+              <div>
+                <dt>Услуга</dt>
+                <dd>{selectedAppointment.service}</dd>
+              </div>
+              <div>
+                <dt>Статус</dt>
+                <dd>
+                  <span className={statusClass(selectedAppointment.status)}>{selectedAppointment.status}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Время</dt>
+                <dd>{selectedAppointment.time}</dd>
+              </div>
+            </dl>
+          </>
+        )}
       </aside>
     </div>
   );
@@ -493,7 +631,9 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
         <div className="admin-panel-head">
           <h2 id={`${section}-workspace-heading`}>Рабочий список</h2>
           <div className="admin-filter-row" aria-label="Фильтры раздела">
-            <button type="button">Все</button>
+            <button aria-pressed="true" type="button">
+              Все
+            </button>
             <button type="button">Активные</button>
             <button type="button">Черновики</button>
           </div>
