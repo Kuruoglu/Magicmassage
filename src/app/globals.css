@@ -2759,6 +2759,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 
 .admin-filter-row span,
+.admin-filter-row button,
 .admin-export-actions button {
   align-items: center;
   background: var(--admin-surface);
@@ -2768,12 +2769,15 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   display: inline-flex;
   font-size: 0.76rem;
   font-weight: 800;
+  font-family: inherit;
   min-height: 36px;
   padding: 0 12px;
 }
 
 .admin-export-actions button:hover,
-.admin-filter-row span:first-child {
+.admin-filter-row button:hover,
+.admin-filter-row span:first-child,
+.admin-filter-row button:first-child {
   background: var(--admin-primary);
   color: #FFFFFF;
 }
@@ -2823,6 +2827,12 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   justify-content: center;
   min-height: 42px;
   padding: 0 16px;
+}
+
+.admin-page-head button:hover,
+.admin-panel-head a:hover,
+.admin-text-action:hover {
+  background: var(--admin-primary-strong);
 }
 
 .admin-dashboard-grid,
@@ -2914,6 +2924,25 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   margin-top: 4px;
 }
 
+.admin-empty-state,
+.admin-export-notice {
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  color: var(--admin-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.admin-export-notice {
+  background: var(--admin-success-bg);
+  color: var(--admin-success);
+  font-weight: 800;
+  margin-bottom: 16px;
+  margin-top: 0;
+}
+
 .admin-table-scroll {
   border: 1px solid var(--admin-border);
   border-radius: 8px;
@@ -3001,10 +3030,47 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 }
 
 .admin-list-item div,
-.admin-calendar-item div {
+.admin-calendar-item > span {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+
+.admin-calendar-item,
+.admin-module-tile,
+.admin-icon-button,
+.admin-action-footer button,
+.admin-filter-row button,
+.admin-export-actions button {
+  cursor: pointer;
+}
+
+button.admin-calendar-item,
+button.admin-module-tile {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+button.admin-calendar-item:hover,
+button.admin-calendar-item:focus-visible,
+button.admin-calendar-item[aria-pressed="true"],
+button.admin-module-tile:hover,
+button.admin-module-tile:focus-visible {
+  border-color: rgba(124, 77, 161, 0.42);
+  box-shadow: 0 16px 34px rgba(29, 20, 36, 0.1);
+  outline: 0;
+}
+
+button.admin-calendar-item[aria-pressed="true"] {
+  background: rgba(124, 77, 161, 0.08);
+}
+
+.admin-calendar-item small {
+  color: var(--admin-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .admin-filter-row,
@@ -3065,6 +3131,82 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   gap: 8px;
   min-height: 104px;
   padding: 16px;
+}
+
+.admin-action-backdrop {
+  align-items: start;
+  background: rgba(20, 13, 27, 0.36);
+  display: grid;
+  inset: 0;
+  justify-items: end;
+  padding: 24px;
+  position: fixed;
+  z-index: 40;
+}
+
+.admin-action-dialog {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(20, 13, 27, 0.28);
+  max-width: 460px;
+  padding: 18px;
+  width: min(100%, 460px);
+}
+
+.admin-icon-button,
+.admin-secondary-button {
+  align-items: center;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-muted);
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.admin-action-body {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-action-body label {
+  color: var(--admin-muted);
+  display: grid;
+  font-size: 0.76rem;
+  font-weight: 800;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.admin-action-body input,
+.admin-action-body select {
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-text);
+  font: inherit;
+  min-height: 42px;
+  padding: 0 12px;
+  text-transform: none;
+}
+
+.admin-action-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: end;
+  margin-top: 16px;
+}
+
+.admin-action-footer button:first-child {
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+  color: #FFFFFF;
 }
 
 .admin-finance-summary {

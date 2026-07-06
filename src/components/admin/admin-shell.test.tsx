@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { AdminShell } from "./admin-shell";
@@ -43,5 +44,48 @@ describe("AdminShell", () => {
     expect(screen.getByText("Stripe fees")).toBeInTheDocument();
     expect(screen.getByText("550,00 €")).toBeInTheDocument();
     expect(screen.getByText("audit log")).toBeInTheDocument();
+  });
+
+  it("filters clients from the global admin search", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "Olena");
+
+    expect(screen.getByText("Olena K.")).toBeInTheDocument();
+    expect(screen.queryByText("Maria Georgieva")).not.toBeInTheDocument();
+  });
+
+  it("updates the calendar detail panel when an appointment is selected", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: /Olena K./ }));
+
+    expect(screen.getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("Deep tissue massage")).toBeInTheDocument();
+  });
+
+  it("opens a quick action panel from the primary action", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="dashboard" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    expect(screen.getByRole("dialog", { name: "Быстрое действие" })).toBeInTheDocument();
+    expect(screen.getByText("Создать запись")).toBeInTheDocument();
+  });
+
+  it("acknowledges CSV exports in the accountant finance workspace", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="finances" role="accountant" />);
+
+    await user.click(screen.getByRole("button", { name: "CSV" }));
+
+    expect(screen.getByText("CSV отчет готов к скачиванию.")).toBeInTheDocument();
   });
 });

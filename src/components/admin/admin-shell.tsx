@@ -1,18 +1,22 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import {
+  calculateFinanceSummary,
   getAdminModule,
   getAdminNavigationForRole,
   roleLabels,
   type AdminRoleId,
   type AdminSectionId,
+  type FinanceRow,
 } from "@/admin/config";
 import {
   certificateRows,
   clientRows,
   dashboardMetrics,
   financeRows,
-  financeSummary,
   sectionSamples,
   upcomingAppointments,
 } from "@/admin/demo-data";
@@ -21,6 +25,8 @@ type AdminShellProps = {
   activeSection: AdminSectionId;
   role: AdminRoleId;
 };
+
+type Appointment = (typeof upcomingAppointments)[number];
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
 
@@ -46,7 +52,135 @@ function statusClass(status: string) {
   return "admin-status admin-status-success";
 }
 
-function DashboardWorkspace({ role }: { role: AdminRoleId }) {
+function normalizeSearch(value: string) {
+  return value.trim().toLocaleLowerCase("ru-RU");
+}
+
+function matchesSearch(values: Array<string | number | undefined>, query: string) {
+  const normalizedQuery = normalizeSearch(query);
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return values.some((value) => String(value ?? "").toLocaleLowerCase("ru-RU").includes(normalizedQuery));
+}
+
+function appointmentKey(appointment: Appointment) {
+  return `${appointment.time}-${appointment.client}`;
+}
+
+function csvCell(value: string | number | undefined) {
+  const stringValue = String(value ?? "");
+
+  if (/[",\n\r]/.test(stringValue)) {
+    return `"${stringValue.replaceAll('"', '""')}"`;
+  }
+
+  return stringValue;
+}
+
+function buildFinanceCsv(rows: FinanceRow[]) {
+  const header = ["date", "payment_id", "certificate", "buyer", "gross_eur", "stripe_fee_eur", "refund_eur", "net_eur", "status"];
+  const body = rows.map((row) => [
+    row.date,
+    row.id,
+    row.certificateCode,
+    row.buyer,
+    row.gross.toFixed(2),
+    row.stripeFee.toFixed(2),
+    row.refund.toFixed(2),
+    (row.gross - row.refund - row.stripeFee).toFixed(2),
+    row.status,
+  ]);
+
+  return [header, ...body].map((line) => line.map(csvCell).join(",")).join("\r\n");
+}
+
+function downloadCsv(filename: string, csv: string) {
+  if (typeof window === "undefined" || typeof Blob === "undefined" || typeof URL.createObjectURL !== "function") {
+    return;
+  }
+
+  if (window.navigator.userAgent.toLowerCase().includes("jsdom")) {
+    return;
+  }
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function EmptyState({ label }: { label: string }) {
+  return <p className="admin-empty-state">{label}</p>;
+}
+
+function QuickActionDialog({
+  action,
+  moduleTitle,
+  onClose,
+}: {
+  action: string;
+  moduleTitle: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="admin-action-title" className="admin-action-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">{moduleTitle}</span>
+            <h2 id="admin-action-title">Быстрое действие</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <div className="admin-action-body">
+          <label>
+            Действие
+            <input readOnly value={action} />
+          </label>
+          <label>
+            Ответственный
+            <input readOnly value="Natali" />
+          </label>
+          <label>
+            Статус
+            <select defaultValue="draft">
+              <option value="draft">Черновик</option>
+              <option value="review">На проверке</option>
+              <option value="ready">Готово</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="admin-action-footer">
+          <button onClick={onClose} type="button">
+            Сохранить черновик
+          </button>
+          <button className="admin-secondary-button" onClick={onClose} type="button">
+            Отмена
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId }) {
+  const filteredAppointments = upcomingAppointments.filter((appointment) =>
+    matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
+  );
+  const filteredCertificates = certificateRows.filter((certificate) =>
+    matchesSearch([certificate.code, certificate.buyer, certificate.recipient, certificate.status], query),
+  );
+
   return (
     <div className="admin-dashboard-grid">
       <section className="admin-metric-row" aria-label="Ключевые показатели">
@@ -76,8 +210,8 @@ function DashboardWorkspace({ role }: { role: AdminRoleId }) {
               </tr>
             </thead>
             <tbody>
-              {upcomingAppointments.map((appointment) => (
-                <tr key={`${appointment.time}-${appointment.client}`}>
+              {filteredAppointments.map((appointment) => (
+                <tr key={appointmentKey(appointment)}>
                   <td className="admin-tabular">{appointment.time}</td>
                   <td>{appointment.client}</td>
                   <td>{appointment.service}</td>
@@ -89,6 +223,7 @@ function DashboardWorkspace({ role }: { role: AdminRoleId }) {
             </tbody>
           </table>
         </div>
+        {filteredAppointments.length === 0 ? <EmptyState label="По этому запросу записей нет." /> : null}
       </section>
 
       <section className="admin-panel" aria-labelledby="certificate-heading">
@@ -99,33 +234,38 @@ function DashboardWorkspace({ role }: { role: AdminRoleId }) {
           </Link>
         </div>
         <div className="admin-list">
-          {certificateRows.map((certificate) => (
+          {filteredCertificates.map((certificate) => (
             <article className="admin-list-item" key={certificate.code}>
               <div>
                 <strong>{certificate.code}</strong>
                 <span>
-                  {certificate.buyer} → {certificate.recipient}
+                  {certificate.buyer} {"->"} {certificate.recipient}
                 </span>
               </div>
               <span className={statusClass(certificate.status)}>{certificate.status}</span>
             </article>
           ))}
         </div>
+        {filteredCertificates.length === 0 ? <EmptyState label="Сертификаты не найдены." /> : null}
       </section>
     </div>
   );
 }
 
-function ClientsWorkspace() {
+function ClientsWorkspace({ query }: { query: string }) {
+  const filteredClients = clientRows.filter((client) =>
+    matchesSearch([client.name, client.phone, client.language, client.visits, client.next], query),
+  );
+
   return (
     <section className="admin-panel admin-panel-large" aria-labelledby="clients-heading">
       <div className="admin-panel-head">
         <h2 id="clients-heading">Клиентская база</h2>
         <div className="admin-filter-row" aria-label="Фильтры клиентов">
-          <span>Все</span>
-          <span>Активные</span>
-          <span>RU</span>
-          <span>BG</span>
+          <button type="button">Все</button>
+          <button type="button">Активные</button>
+          <button type="button">RU</button>
+          <button type="button">BG</button>
         </div>
       </div>
       <div className="admin-table-scroll">
@@ -140,7 +280,7 @@ function ClientsWorkspace() {
             </tr>
           </thead>
           <tbody>
-            {clientRows.map((client) => (
+            {filteredClients.map((client) => (
               <tr key={client.phone}>
                 <td>{client.name}</td>
                 <td className="admin-tabular">{client.phone}</td>
@@ -152,53 +292,74 @@ function ClientsWorkspace() {
           </tbody>
         </table>
       </div>
+      {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
     </section>
   );
 }
 
-function CalendarWorkspace() {
+function CalendarWorkspace({ query }: { query: string }) {
+  const filteredAppointments = upcomingAppointments.filter((appointment) =>
+    matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
+  );
+  const [selectedKey, setSelectedKey] = useState(() => appointmentKey(upcomingAppointments[1]));
+  const selectedAppointment =
+    filteredAppointments.find((appointment) => appointmentKey(appointment) === selectedKey) ??
+    filteredAppointments[0] ??
+    upcomingAppointments[0];
+
   return (
     <div className="admin-split-view">
       <section className="admin-panel admin-calendar-panel" aria-labelledby="calendar-heading">
         <div className="admin-panel-head">
           <h2 id="calendar-heading">День</h2>
           <div className="admin-filter-row" aria-label="Режимы календаря">
-            <span>День</span>
-            <span>Неделя</span>
-            <span>Список</span>
+            <button type="button">День</button>
+            <button type="button">Неделя</button>
+            <button type="button">Список</button>
           </div>
         </div>
         <div className="admin-calendar-list">
-          {upcomingAppointments.map((appointment) => (
-            <article className="admin-calendar-item" key={`${appointment.time}-${appointment.client}`}>
-              <time className="admin-tabular">{appointment.time}</time>
-              <div>
-                <strong>{appointment.client}</strong>
-                <span>{appointment.service}</span>
-              </div>
-              <span className={statusClass(appointment.status)}>{appointment.status}</span>
-            </article>
-          ))}
+          {filteredAppointments.map((appointment) => {
+            const key = appointmentKey(appointment);
+
+            return (
+              <button
+                aria-pressed={key === appointmentKey(selectedAppointment)}
+                className="admin-calendar-item"
+                key={key}
+                onClick={() => setSelectedKey(key)}
+                type="button"
+              >
+                <time className="admin-tabular">{appointment.time}</time>
+                <span>
+                  <strong>{appointment.client}</strong>
+                  <small>{appointment.service}</small>
+                </span>
+                <span className={statusClass(appointment.status)}>{appointment.status}</span>
+              </button>
+            );
+          })}
         </div>
+        {filteredAppointments.length === 0 ? <EmptyState label="Записи не найдены." /> : null}
       </section>
 
       <aside className="admin-panel admin-detail-panel" aria-label="Детали выбранной записи">
         <span className="admin-kicker">Правая панель</span>
-        <h2>Мария Иванова</h2>
+        <h2>{selectedAppointment.client}</h2>
         <dl className="admin-detail-list">
           <div>
             <dt>Услуга</dt>
-            <dd>Лимфодренажный массаж</dd>
+            <dd>{selectedAppointment.service}</dd>
           </div>
           <div>
             <dt>Статус</dt>
             <dd>
-              <span className="admin-status admin-status-warning">Ожидает</span>
+              <span className={statusClass(selectedAppointment.status)}>{selectedAppointment.status}</span>
             </dd>
           </div>
           <div>
-            <dt>Сертификат</dt>
-            <dd>MMN-2407-1022</dd>
+            <dt>Время</dt>
+            <dd>{selectedAppointment.time}</dd>
           </div>
         </dl>
       </aside>
@@ -206,7 +367,25 @@ function CalendarWorkspace() {
   );
 }
 
-function FinanceWorkspace() {
+function FinanceWorkspace({ query }: { query: string }) {
+  const [exportNotice, setExportNotice] = useState("");
+  const filteredFinanceRows = useMemo(
+    () =>
+      financeRows.filter((row) =>
+        matchesSearch([row.date, row.id, row.certificateCode, row.buyer, row.status, row.gross, row.refund], query),
+      ),
+    [query],
+  );
+  const currentSummary = useMemo(() => calculateFinanceSummary(filteredFinanceRows), [filteredFinanceRows]);
+
+  function handleExport(format: "CSV" | "XLSX" | "PDF") {
+    if (format === "CSV") {
+      downloadCsv("magic-massage-stripe-sales.csv", buildFinanceCsv(filteredFinanceRows));
+    }
+
+    setExportNotice(`${format} отчет готов к скачиванию.`);
+  }
+
   return (
     <section className="admin-panel admin-panel-large" aria-labelledby="finance-heading">
       <div className="admin-panel-head admin-panel-head-finance">
@@ -215,32 +394,44 @@ function FinanceWorkspace() {
           <p>Период считается по timezone бизнеса Europe/Sofia.</p>
         </div>
         <div className="admin-export-actions" aria-label="Форматы выгрузки">
-          <button type="button">CSV</button>
-          <button type="button">XLSX</button>
-          <button type="button">PDF</button>
+          <button onClick={() => handleExport("CSV")} type="button">
+            CSV
+          </button>
+          <button onClick={() => handleExport("XLSX")} type="button">
+            XLSX
+          </button>
+          <button onClick={() => handleExport("PDF")} type="button">
+            PDF
+          </button>
         </div>
       </div>
+
+      {exportNotice ? (
+        <p className="admin-export-notice" role="status">
+          {exportNotice}
+        </p>
+      ) : null}
 
       <div className="admin-finance-summary" aria-label="Finance summary">
         <article>
           <span>Gross</span>
-          <strong>{formatCurrency(financeSummary.gross)}</strong>
+          <strong>{formatCurrency(currentSummary.gross)}</strong>
         </article>
         <article>
           <span>Refunds</span>
-          <strong>{formatCurrency(financeSummary.refunds)}</strong>
+          <strong>{formatCurrency(currentSummary.refunds)}</strong>
         </article>
         <article>
           <span>Stripe fees</span>
-          <strong>{formatCurrency(financeSummary.stripeFees)}</strong>
+          <strong>{formatCurrency(currentSummary.stripeFees)}</strong>
         </article>
         <article>
           <span>Net</span>
-          <strong>{formatCurrency(financeSummary.net)}</strong>
+          <strong>{formatCurrency(currentSummary.net)}</strong>
         </article>
         <article>
           <span>Payments</span>
-          <strong>{financeSummary.payments}</strong>
+          <strong>{currentSummary.payments}</strong>
         </article>
       </div>
 
@@ -260,7 +451,7 @@ function FinanceWorkspace() {
             </tr>
           </thead>
           <tbody>
-            {financeRows.map((row) => (
+            {filteredFinanceRows.map((row) => (
               <tr key={row.id}>
                 <td className="admin-tabular">{row.date}</td>
                 <td className="admin-tabular">{row.id}</td>
@@ -278,17 +469,23 @@ function FinanceWorkspace() {
           </tbody>
         </table>
       </div>
+      {filteredFinanceRows.length === 0 ? <EmptyState label="Платежи не найдены." /> : null}
 
       <div className="admin-finance-footer">
         <span>Последняя выгрузка: 2026-07-03 18:20</span>
-        <span>Следующая выгрузка будет записана в <strong>audit log</strong></span>
+        <span>
+          Следующая выгрузка будет записана в <strong>audit log</strong>
+        </span>
       </div>
     </section>
   );
 }
 
-function GenericWorkspace({ section }: { section: AdminSectionId }) {
+function GenericWorkspace({ query, section }: { query: string; section: AdminSectionId }) {
   const sectionModule = getAdminModule(section);
+  const filteredItems = sectionSamples[section].filter((item) => matchesSearch([item, sectionModule.title], query));
+  const [selectedItem, setSelectedItem] = useState(filteredItems[0] ?? sectionSamples[section][0]);
+  const visibleSelectedItem = filteredItems.includes(selectedItem) ? selectedItem : filteredItems[0];
 
   return (
     <div className="admin-split-view">
@@ -296,24 +493,25 @@ function GenericWorkspace({ section }: { section: AdminSectionId }) {
         <div className="admin-panel-head">
           <h2 id={`${section}-workspace-heading`}>Рабочий список</h2>
           <div className="admin-filter-row" aria-label="Фильтры раздела">
-            <span>Все</span>
-            <span>Активные</span>
-            <span>Черновики</span>
+            <button type="button">Все</button>
+            <button type="button">Активные</button>
+            <button type="button">Черновики</button>
           </div>
         </div>
         <div className="admin-module-grid">
-          {sectionSamples[section].map((item) => (
-            <article className="admin-module-tile" key={item}>
+          {filteredItems.map((item) => (
+            <button className="admin-module-tile" key={item} onClick={() => setSelectedItem(item)} type="button">
               <strong>{item}</strong>
               <span>{sectionModule.title}</span>
-            </article>
+            </button>
           ))}
         </div>
+        {filteredItems.length === 0 ? <EmptyState label="Элементы не найдены." /> : null}
       </section>
 
       <aside className="admin-panel admin-detail-panel" aria-label="Детали выбранного объекта">
         <span className="admin-kicker">Детали</span>
-        <h2>{sectionModule.title}</h2>
+        <h2>{visibleSelectedItem ?? sectionModule.title}</h2>
         <p>{sectionModule.description}</p>
         <dl className="admin-detail-list">
           <div>
@@ -332,29 +530,31 @@ function GenericWorkspace({ section }: { section: AdminSectionId }) {
   );
 }
 
-function Workspace({ role, section }: { role: AdminRoleId; section: AdminSectionId }) {
+function Workspace({ query, role, section }: { query: string; role: AdminRoleId; section: AdminSectionId }) {
   if (section === "dashboard") {
-    return <DashboardWorkspace role={role} />;
+    return <DashboardWorkspace query={query} role={role} />;
   }
 
   if (section === "clients") {
-    return <ClientsWorkspace />;
+    return <ClientsWorkspace query={query} />;
   }
 
   if (section === "calendar") {
-    return <CalendarWorkspace />;
+    return <CalendarWorkspace query={query} />;
   }
 
   if (section === "finances") {
-    return <FinanceWorkspace />;
+    return <FinanceWorkspace query={query} />;
   }
 
-  return <GenericWorkspace section={section} />;
+  return <GenericWorkspace query={query} section={section} />;
 }
 
 export function AdminShell({ activeSection, role }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
+  const [query, setQuery] = useState("");
+  const [isActionOpen, setIsActionOpen] = useState(false);
 
   return (
     <div className="admin-shell">
@@ -394,7 +594,13 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
         <header className="admin-topbar">
           <div className="admin-search" role="search">
             <label htmlFor="admin-search-input">Поиск</label>
-            <input id="admin-search-input" placeholder="Клиент, сертификат, платеж" type="search" />
+            <input
+              id="admin-search-input"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Клиент, сертификат, платеж"
+              type="search"
+              value={query}
+            />
           </div>
           <div className="admin-user-chip" aria-label="Текущая роль и профиль">
             <span>{roleLabels[role]}</span>
@@ -408,10 +614,20 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
             <h1 id="admin-page-title">{activeModule.title}</h1>
             <p>{activeModule.description}</p>
           </div>
-          <button type="button">{activeModule.primaryAction}</button>
+          <button onClick={() => setIsActionOpen(true)} type="button">
+            {activeModule.primaryAction}
+          </button>
         </section>
 
-        <Workspace role={role} section={activeSection} />
+        <Workspace query={query} role={role} section={activeSection} />
+
+        {isActionOpen ? (
+          <QuickActionDialog
+            action={activeModule.primaryAction}
+            moduleTitle={activeModule.title}
+            onClose={() => setIsActionOpen(false)}
+          />
+        ) : null}
       </main>
     </div>
   );

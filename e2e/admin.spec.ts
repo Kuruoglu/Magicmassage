@@ -21,6 +21,27 @@ test("accountant view exposes only finance navigation", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Выгрузить отчет" })).toBeVisible();
 });
 
+test("admin search and action panel are interactive", async ({ page }) => {
+  await page.goto("/admin?section=clients");
+
+  await page.getByRole("searchbox", { name: "Поиск" }).fill("Olena");
+
+  await expect(page.getByText("Olena K.")).toBeVisible();
+  await expect(page.getByText("Maria Georgieva")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Добавить клиента" }).click();
+
+  await expect(page.getByRole("dialog", { name: "Быстрое действие" })).toBeVisible();
+});
+
+test("accountant CSV export provides visible feedback", async ({ page }) => {
+  await page.goto("/admin?role=accountant");
+
+  await page.getByRole("button", { name: "CSV" }).click();
+
+  await expect(page.getByText("CSV отчет готов к скачиванию.")).toBeVisible();
+});
+
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin?section=calendar");
