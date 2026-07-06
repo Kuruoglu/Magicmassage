@@ -41,6 +41,7 @@ describe("AdminShell", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Финансы" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Выгрузить отчет" })).toBeInTheDocument();
     expect(screen.getByText("Stripe fees")).toBeInTheDocument();
+    expect(screen.getByText("550,00 €")).toBeInTheDocument();
     expect(screen.getByText("audit log")).toBeInTheDocument();
   });
 });

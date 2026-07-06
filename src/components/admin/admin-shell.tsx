@@ -26,7 +26,7 @@ const groupedNavigation = ["Операции", "Контент", "Финансы
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
-    currency: "BGN",
+    currency: "EUR",
     maximumFractionDigits: 2,
     style: "currency",
   }).format(value);

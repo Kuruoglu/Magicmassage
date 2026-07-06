@@ -4,7 +4,7 @@ export const dashboardMetrics = [
   { label: "Сегодня", value: "8 записей", tone: "info" },
   { label: "Ждут подтверждения", value: "3 заявки", tone: "warning" },
   { label: "Сертификаты", value: "5 оплачено", tone: "success" },
-  { label: "Stripe за месяц", value: "1 240 лв", tone: "neutral" },
+  { label: "Stripe за месяц", value: "1 240 €", tone: "neutral" },
 ] as const;
 
 export const upcomingAppointments = [
@@ -21,9 +21,9 @@ export const clientRows = [
 ] as const;
 
 export const certificateRows = [
-  { code: "MMN-2407-1021", buyer: "Anna P.", recipient: "Elena", amount: "120 лв", status: "Оплачено" },
-  { code: "MMN-2407-1022", buyer: "Ivan D.", recipient: "Maria", amount: "180 лв", status: "Отправлен" },
-  { code: "MMN-2407-1023", buyer: "Oksana", recipient: "Self", amount: "250 лв", status: "Ожидает PDF" },
+  { code: "MMN-2407-1021", buyer: "Anna P.", recipient: "Elena", amount: "120 €", status: "Оплачено" },
+  { code: "MMN-2407-1022", buyer: "Ivan D.", recipient: "Maria", amount: "180 €", status: "Отправлен" },
+  { code: "MMN-2407-1023", buyer: "Oksana", recipient: "Self", amount: "250 €", status: "Ожидает PDF" },
 ] as const;
 
 export const financeRows: FinanceRow[] = [
