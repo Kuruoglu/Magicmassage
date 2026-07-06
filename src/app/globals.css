@@ -3293,6 +3293,47 @@ button.admin-calendar-item[aria-pressed="true"] {
   line-height: 1.5;
 }
 
+.admin-client-certificates {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.admin-client-certificates li {
+  align-items: center;
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px;
+}
+
+.admin-client-certificates li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-client-certificates li > div:last-child {
+  justify-items: end;
+}
+
+.admin-client-certificates strong {
+  color: var(--admin-text);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-certificates span:not(.admin-status) {
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .admin-client-section-head {
   align-items: center;
   display: flex;

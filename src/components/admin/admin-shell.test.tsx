@@ -53,8 +53,31 @@ describe("AdminShell", () => {
 
     await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "Olena");
 
-    expect(screen.getByText("Olena K.")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "Olena K." })).toBeInTheDocument();
     expect(screen.queryByText("Maria Georgieva")).not.toBeInTheDocument();
+  });
+
+  it("filters clients with segmented controls", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    const filters = screen.getByLabelText("Фильтры клиентов");
+    const table = screen.getByRole("table");
+    await user.click(within(filters).getByRole("button", { name: "BG" }));
+
+    expect(within(filters).getByRole("button", { name: "BG" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Maria Georgieva" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Анна Петрова" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Olena K." })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Карточка клиента")).getByRole("heading", { name: "Maria Georgieva" })).toBeInTheDocument();
+
+    await user.click(within(filters).getByRole("button", { name: "Активные" }));
+
+    expect(within(filters).getByRole("button", { name: "Активные" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Анна Петрова" })).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Maria Georgieva" })).not.toBeInTheDocument();
   });
 
   it("shows the selected client detail card from the client query", () => {
@@ -69,6 +92,17 @@ describe("AdminShell", () => {
     expect(within(card).getAllByText("Deep tissue massage").length).toBeGreaterThan(0);
     expect(within(card).getByText("8 июля, 15:00")).toBeInTheDocument();
     expect(within(card).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
+  });
+
+  it("shows certificates linked to the selected client", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByLabelText("Карточка клиента");
+    expect(within(card).getByRole("heading", { name: "Сертификаты" })).toBeInTheDocument();
+    expect(within(card).getByText("MMN-2407-1023")).toBeInTheDocument();
+    expect(within(card).getByText("Oksana → Self")).toBeInTheDocument();
+    expect(within(card).getByText("250 €")).toBeInTheDocument();
+    expect(within(card).getByText("Ожидает PDF")).toBeInTheDocument();
   });
 
   it("shows quick contact actions in the selected client card", () => {

@@ -72,9 +72,9 @@ export const clientRows = [
 ] as const;
 
 export const certificateRows = [
-  { code: "MMN-2407-1021", buyer: "Anna P.", recipient: "Elena", amount: "120 €", status: "Оплачено" },
-  { code: "MMN-2407-1022", buyer: "Ivan D.", recipient: "Maria", amount: "180 €", status: "Отправлен" },
-  { code: "MMN-2407-1023", buyer: "Oksana", recipient: "Self", amount: "250 €", status: "Ожидает PDF" },
+  { code: "MMN-2407-1021", buyer: "Anna P.", clientName: "Анна Петрова", recipient: "Elena", amount: "120 €", status: "Оплачено" },
+  { code: "MMN-2407-1022", buyer: "Ivan D.", clientName: "Maria Georgieva", recipient: "Maria", amount: "180 €", status: "Отправлен" },
+  { code: "MMN-2407-1023", buyer: "Oksana", clientName: "Olena K.", recipient: "Self", amount: "250 €", status: "Ожидает PDF" },
 ] as const;
 
 export const financeRows: FinanceRow[] = [

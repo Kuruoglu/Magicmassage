@@ -57,8 +57,16 @@ type ClientRecord = {
   visits: number;
 };
 type CalendarMode = "day" | "week" | "month" | "list";
+type ClientCertificate = (typeof certificateRows)[number];
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
+const clientFilterOptions = [
+  { id: "all", label: "Все" },
+  { id: "active", label: "Активные" },
+  { id: "ru", label: "RU" },
+  { id: "bg", label: "BG" },
+] as const;
+type ClientFilterId = (typeof clientFilterOptions)[number]["id"];
 const appointmentServiceOptions = ["Классический массаж", "Лимфодренажный массаж", "Deep tissue massage", "SPA процедура"] as const;
 const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена", "Отменена"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
@@ -131,6 +139,24 @@ function findClientByName(clients: ClientRecord[], name: string | undefined) {
   }
 
   return clients.find((client) => normalizeSearch(client.name) === normalizedName);
+}
+
+function findClientCertificates(clientName: string): ClientCertificate[] {
+  const normalizedName = normalizeSearch(clientName);
+
+  return certificateRows.filter((certificate) => normalizeSearch(certificate.clientName) === normalizedName);
+}
+
+function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
+  if (filter === "active") {
+    return normalizeSearch(client.status).startsWith("актив");
+  }
+
+  if (filter === "ru" || filter === "bg") {
+    return normalizeSearch(client.language) === filter;
+  }
+
+  return true;
 }
 
 function clientProfileHref(clientName: string, role: AdminRoleId) {
@@ -496,7 +522,7 @@ function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId 
     matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
   );
   const filteredCertificates = certificateRows.filter((certificate) =>
-    matchesSearch([certificate.code, certificate.buyer, certificate.recipient, certificate.status], query),
+    matchesSearch([certificate.code, certificate.buyer, certificate.clientName, certificate.recipient, certificate.status], query),
   );
 
   return (
@@ -571,9 +597,11 @@ function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId 
 }
 
 function ClientDetailCard({
+  certificates,
   client,
   onSaveNote,
 }: {
+  certificates: ClientCertificate[];
   client: ClientRecord;
   onSaveNote: (clientName: string, note: string) => void;
 }) {
@@ -681,6 +709,30 @@ function ClientDetailCard({
       </section>
 
       <section className="admin-client-section">
+        <h3>Сертификаты</h3>
+        {certificates.length > 0 ? (
+          <ul className="admin-client-certificates">
+            {certificates.map((certificate) => (
+              <li key={certificate.code}>
+                <div>
+                  <strong>{certificate.code}</strong>
+                  <span>
+                    {certificate.buyer} → {certificate.recipient}
+                  </span>
+                </div>
+                <div>
+                  <strong>{certificate.amount}</strong>
+                  <span className={statusClass(certificate.status)}>{certificate.status}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>Сертификатов пока нет.</p>
+        )}
+      </section>
+
+      <section className="admin-client-section">
         <div className="admin-client-section-head">
           <h3>Заметки</h3>
           {isEditingNote ? null : (
@@ -738,23 +790,27 @@ function ClientsWorkspace({
 }) {
   const initialSelectedClientName = findClientByName(clients, selectedClientName)?.name ?? clients[0]?.name ?? "";
   const [selectedName, setSelectedName] = useState(initialSelectedClientName);
-  const filteredClients = clients.filter((client) =>
-    matchesSearch(
-      [
-        client.name,
-        client.phone,
-        client.email,
-        client.language,
-        client.visits,
-        client.next,
-        client.status,
-        client.preferredContact,
-        client.note,
-      ],
-      query,
-    ),
+  const [clientFilter, setClientFilter] = useState<ClientFilterId>("all");
+  const filteredClients = clients.filter(
+    (client) =>
+      matchesClientFilter(client, clientFilter) &&
+      matchesSearch(
+        [
+          client.name,
+          client.phone,
+          client.email,
+          client.language,
+          client.visits,
+          client.next,
+          client.status,
+          client.preferredContact,
+          client.note,
+        ],
+        query,
+      ),
   );
-  const selectedClient = findClientByName(clients, selectedName) ?? clients[0];
+  const selectedClient =
+    findClientByName(filteredClients, selectedName) ?? filteredClients[0] ?? findClientByName(clients, selectedName) ?? clients[0];
 
   if (!selectedClient) {
     return <EmptyState label="Клиенты не найдены." />;
@@ -766,12 +822,16 @@ function ClientsWorkspace({
         <div className="admin-panel-head">
           <h2 id="clients-heading">Клиентская база</h2>
           <div className="admin-filter-row" aria-label="Фильтры клиентов">
-            <button aria-pressed="true" type="button">
-              Все
-            </button>
-            <button type="button">Активные</button>
-            <button type="button">RU</button>
-            <button type="button">BG</button>
+            {clientFilterOptions.map((filter) => (
+              <button
+                aria-pressed={clientFilter === filter.id}
+                key={filter.id}
+                onClick={() => setClientFilter(filter.id)}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            ))}
           </div>
         </div>
         <div className="admin-table-scroll">
@@ -805,7 +865,12 @@ function ClientsWorkspace({
         {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
       </section>
 
-      <ClientDetailCard key={selectedClient.name} client={selectedClient} onSaveNote={onSaveClientNote} />
+      <ClientDetailCard
+        certificates={findClientCertificates(selectedClient.name)}
+        key={selectedClient.name}
+        client={selectedClient}
+        onSaveNote={onSaveClientNote}
+      />
     </div>
   );
 }

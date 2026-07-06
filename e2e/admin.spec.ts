@@ -26,8 +26,9 @@ test("admin search and action panel are interactive", async ({ page }) => {
 
   await page.getByRole("searchbox", { name: "Поиск" }).fill("Olena");
 
-  await expect(page.getByText("Olena K.")).toBeVisible();
-  await expect(page.getByText("Maria Georgieva")).toHaveCount(0);
+  const table = page.getByRole("table");
+  await expect(table.getByRole("row", { name: /Olena K./ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Добавить клиента" }).click();
 
@@ -169,6 +170,26 @@ test("client profile saves a note and exposes contact actions", async ({ page })
 
   await expect(card.getByRole("status")).toHaveText("Заметка сохранена.");
   await expect(card.getByText("Клиентка просит напоминать за 2 часа.")).toBeVisible();
+});
+
+test("client filters update the table and profile certificate block", async ({ page }) => {
+  await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
+
+  const table = page.getByRole("table");
+  const card = page.getByLabel("Карточка клиента");
+
+  await page.getByRole("button", { name: "BG" }).click();
+  await expect(page.getByRole("button", { name: "BG" })).toHaveAttribute("aria-pressed", "true");
+  await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Olena K./ })).toHaveCount(0);
+  await expect(card.getByRole("heading", { name: "Maria Georgieva" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Все" }).click();
+  await page.getByRole("button", { name: "Olena K." }).click();
+
+  await expect(card.getByRole("heading", { name: "Сертификаты" })).toBeVisible();
+  await expect(card.getByText("MMN-2407-1023")).toBeVisible();
+  await expect(card.getByText("250 €")).toBeVisible();
 });
 
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
