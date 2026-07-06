@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 
 import {
   calculateFinanceSummary,
@@ -26,10 +26,19 @@ type AdminShellProps = {
   role: AdminRoleId;
 };
 
-type Appointment = (typeof upcomingAppointments)[number];
+type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка";
+type Appointment = {
+  date: string;
+  time: string;
+  client: string;
+  service: string;
+  status: AppointmentStatus;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
+const appointmentServiceOptions = ["Классический массаж", "Лимфодренажный массаж", "Deep tissue massage", "SPA процедура"] as const;
+const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -250,6 +259,129 @@ function QuickActionDialog({
   );
 }
 
+function CalendarAppointmentDialog({
+  onClose,
+  onSave,
+}: {
+  onClose: () => void;
+  onSave: (appointment: Appointment) => void;
+}) {
+  const [form, setForm] = useState<Appointment>({
+    client: "",
+    date: "2026-07-06",
+    service: appointmentServiceOptions[0],
+    status: "Новая заявка",
+    time: "14:00",
+  });
+  const [error, setError] = useState("");
+
+  function updateForm<Field extends keyof Appointment>(field: Field, value: Appointment[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const client = form.client.trim();
+
+    if (!client || !form.date || !form.time) {
+      setError("Укажите клиента, дату и время.");
+      return;
+    }
+
+    onSave({ ...form, client });
+    onClose();
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="calendar-action-title" aria-modal="true" className="admin-action-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Календарь</span>
+            <h2 id="calendar-action-title">Новая запись</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body">
+            <label>
+              Клиент
+              <input
+                aria-invalid={error && !form.client.trim() ? "true" : undefined}
+                autoComplete="name"
+                onChange={(event) => updateForm("client", event.target.value)}
+                required
+                type="text"
+                value={form.client}
+              />
+            </label>
+            {error ? (
+              <p className="admin-form-alert" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Услуга
+              <select onChange={(event) => updateForm("service", event.target.value)} value={form.service}>
+                {appointmentServiceOptions.map((service) => (
+                  <option key={service} value={service}>
+                    {service}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Дата
+              <input
+                aria-invalid={error && !form.date ? "true" : undefined}
+                onChange={(event) => updateForm("date", event.target.value)}
+                required
+                type="date"
+                value={form.date}
+              />
+            </label>
+            <label>
+              Время
+              <input
+                aria-invalid={error && !form.time ? "true" : undefined}
+                onChange={(event) => updateForm("time", event.target.value)}
+                required
+                type="time"
+                value={form.time}
+              />
+            </label>
+            <label>
+              Статус
+              <select
+                onChange={(event) => updateForm("status", event.target.value as AppointmentStatus)}
+                value={form.status}
+              >
+                {appointmentStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">Сохранить запись</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId }) {
   const filteredAppointments = upcomingAppointments.filter((appointment) =>
     matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
@@ -376,19 +508,26 @@ function ClientsWorkspace({ query }: { query: string }) {
   );
 }
 
-function CalendarWorkspace({ query }: { query: string }) {
-  const filteredAppointments = upcomingAppointments.filter((appointment) =>
+function CalendarWorkspace({ appointments, query }: { appointments: Appointment[]; query: string }) {
+  const fallbackAppointment = appointments[0] ?? {
+    client: "Нет записи",
+    date: "2026-07-06",
+    service: "Не выбрано",
+    status: "Новая заявка" as const,
+    time: "00:00",
+  };
+  const filteredAppointments = appointments.filter((appointment) =>
     matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status], query),
   );
   const [mode, setMode] = useState<CalendarMode>("day");
   const [selectedDate, setSelectedDate] = useState("2026-07-06");
-  const [selectedKey, setSelectedKey] = useState(() => appointmentKey(upcomingAppointments[1]));
+  const [selectedKey, setSelectedKey] = useState(() => appointmentKey(appointments[1] ?? fallbackAppointment));
   const selectedDayAppointments = filteredAppointments.filter((appointment) => appointment.date === selectedDate);
   const selectedAppointment =
     filteredAppointments.find((appointment) => appointmentKey(appointment) === selectedKey) ??
     selectedDayAppointments[0] ??
     filteredAppointments[0] ??
-    upcomingAppointments[0];
+    fallbackAppointment;
   const selectedAppointmentKey = appointmentKey(selectedAppointment);
   const calendarHeading = mode === "month" ? calendarMonthLabel : calendarModeLabel(mode);
 
@@ -737,7 +876,17 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
   );
 }
 
-function Workspace({ query, role, section }: { query: string; role: AdminRoleId; section: AdminSectionId }) {
+function Workspace({
+  appointments,
+  query,
+  role,
+  section,
+}: {
+  appointments: Appointment[];
+  query: string;
+  role: AdminRoleId;
+  section: AdminSectionId;
+}) {
   if (section === "dashboard") {
     return <DashboardWorkspace query={query} role={role} />;
   }
@@ -747,7 +896,7 @@ function Workspace({ query, role, section }: { query: string; role: AdminRoleId;
   }
 
   if (section === "calendar") {
-    return <CalendarWorkspace query={query} />;
+    return <CalendarWorkspace appointments={appointments} query={query} />;
   }
 
   if (section === "finances") {
@@ -762,6 +911,17 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
   const activeModule = getAdminModule(activeSection);
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
+  const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() =>
+    upcomingAppointments.map((appointment) => ({ ...appointment })),
+  );
+
+  function handleAppointmentCreate(appointment: Appointment) {
+    setCalendarAppointments((current) =>
+      [...current, appointment].sort((first, second) =>
+        `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
+      ),
+    );
+  }
 
   return (
     <div className="admin-shell">
@@ -826,9 +986,14 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
           </button>
         </section>
 
-        <Workspace query={query} role={role} section={activeSection} />
+        <Workspace appointments={calendarAppointments} query={query} role={role} section={activeSection} />
 
-        {isActionOpen ? (
+        {isActionOpen && activeSection === "calendar" ? (
+          <CalendarAppointmentDialog
+            onClose={() => setIsActionOpen(false)}
+            onSave={handleAppointmentCreate}
+          />
+        ) : isActionOpen ? (
           <QuickActionDialog
             action={activeModule.primaryAction}
             moduleTitle={activeModule.title}

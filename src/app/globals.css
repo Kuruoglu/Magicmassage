@@ -3307,7 +3307,9 @@ button.admin-calendar-item[aria-pressed="true"] {
   border: 1px solid var(--admin-border);
   border-radius: 8px;
   box-shadow: 0 24px 70px rgba(20, 13, 27, 0.28);
+  max-height: calc(100dvh - 48px);
   max-width: 460px;
+  overflow: auto;
   padding: 18px;
   width: min(100%, 460px);
 }
@@ -3353,12 +3355,32 @@ button.admin-calendar-item[aria-pressed="true"] {
   text-transform: none;
 }
 
+.admin-form-alert {
+  color: #9F1D2A;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin: -4px 0 0;
+}
+
 .admin-action-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: end;
   margin-top: 16px;
+}
+
+.admin-action-footer button {
+  align-items: center;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
 }
 
 .admin-action-footer button:first-child {

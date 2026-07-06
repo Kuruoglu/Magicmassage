@@ -72,6 +72,25 @@ test("calendar month view is selectable", async ({ page }) => {
   await expect(page.getByText("Мария Иванова")).toBeVisible();
 });
 
+test("calendar can create a new appointment", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Создать запись" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Новая запись" });
+  await dialog.getByLabel("Клиент").fill("Ирина Тестова");
+  await dialog.getByLabel("Услуга").selectOption("SPA процедура");
+  await dialog.getByLabel("Дата").fill("2026-07-12");
+  await dialog.getByLabel("Время").fill("11:15");
+  await dialog.getByLabel("Статус").selectOption("Подтверждена");
+  await dialog.getByRole("button", { name: "Сохранить запись" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: /Ирина Тестова/ }).click();
+  await expect(page.getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
+  await expect(page.getByLabel("Детали выбранной записи").getByText("SPA процедура")).toBeVisible();
+});
+
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin?section=calendar");

@@ -96,6 +96,48 @@ describe("AdminShell", () => {
     expect(screen.getByText("Создать запись")).toBeInTheDocument();
   });
 
+  it("creates a calendar appointment from the primary action", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    await user.type(within(dialog).getByLabelText("Клиент"), "Ирина Тестова");
+    await user.selectOptions(within(dialog).getByLabelText("Услуга"), "SPA процедура");
+    await user.clear(within(dialog).getByLabelText("Дата"));
+    await user.type(within(dialog).getByLabelText("Дата"), "2026-07-12");
+    await user.clear(within(dialog).getByLabelText("Время"));
+    await user.type(within(dialog).getByLabelText("Время"), "11:15");
+    await user.selectOptions(within(dialog).getByLabelText("Статус"), "Подтверждена");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новая запись" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Ирина Тестова/ }));
+
+    expect(screen.getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("SPA процедура")).toBeInTheDocument();
+  });
+
+  it("keeps the calendar appointment dialog open when required fields are missing", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    await user.type(within(dialog).getByLabelText("Клиент"), "Ирина Тестова");
+    await user.clear(within(dialog).getByLabelText("Дата"));
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Укажите клиента, дату и время.");
+    expect(screen.getByRole("dialog", { name: "Новая запись" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ирина Тестова/ })).not.toBeInTheDocument();
+  });
+
   it("acknowledges CSV exports in the accountant finance workspace", async () => {
     const user = userEvent.setup();
 
