@@ -36,6 +36,26 @@ type Appointment = {
   service: string;
   status: AppointmentStatus;
 };
+type ClientVisit = {
+  date: string;
+  service: string;
+  status: string;
+};
+type ClientRecord = {
+  email: string;
+  history: ClientVisit[];
+  language: string;
+  name: string;
+  next: string;
+  note: string;
+  phone: string;
+  preferredContact: string;
+  status: string;
+  tags: string[];
+  telegram: string;
+  totalSpend: string;
+  visits: number;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
@@ -95,18 +115,30 @@ function matchesSearch(values: Array<string | number | undefined>, query: string
   return values.some((value) => String(value ?? "").toLocaleLowerCase("ru-RU").includes(normalizedQuery));
 }
 
-function findClientByName(name: string | undefined) {
+function buildInitialClientRows(): ClientRecord[] {
+  return clientRows.map((client) => ({
+    ...client,
+    history: client.history.map((visit) => ({ ...visit })),
+    tags: [...client.tags],
+  }));
+}
+
+function findClientByName(clients: ClientRecord[], name: string | undefined) {
   const normalizedName = name ? normalizeSearch(name) : "";
 
   if (!normalizedName) {
     return undefined;
   }
 
-  return clientRows.find((client) => normalizeSearch(client.name) === normalizedName);
+  return clients.find((client) => normalizeSearch(client.name) === normalizedName);
 }
 
 function clientProfileHref(clientName: string, role: AdminRoleId) {
   return `/admin?section=clients&role=${role}&client=${encodeURIComponent(clientName)}`;
+}
+
+function phoneHref(phone: string) {
+  return `tel:${phone.replace(/[^\d+]/g, "")}`;
 }
 
 function appointmentKey(appointment: Appointment) {
@@ -538,13 +570,43 @@ function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId 
   );
 }
 
-function ClientDetailCard({ client }: { client: (typeof clientRows)[number] }) {
+function ClientDetailCard({
+  client,
+  onSaveNote,
+}: {
+  client: ClientRecord;
+  onSaveNote: (clientName: string, note: string) => void;
+}) {
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [draftNote, setDraftNote] = useState(client.note);
+  const [saveNotice, setSaveNotice] = useState("");
   const clientInitials = client.name
     .split(/\s+/)
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  function startNoteEdit() {
+    setDraftNote(client.note);
+    setSaveNotice("");
+    setIsEditingNote(true);
+  }
+
+  function cancelNoteEdit() {
+    setDraftNote(client.note);
+    setIsEditingNote(false);
+  }
+
+  function handleNoteSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const nextNote = draftNote.trim();
+    onSaveNote(client.name, nextNote);
+    setDraftNote(nextNote);
+    setIsEditingNote(false);
+    setSaveNotice("Заметка сохранена.");
+  }
 
   return (
     <aside className="admin-panel admin-client-card" aria-label="Карточка клиента">
@@ -575,6 +637,18 @@ function ClientDetailCard({ client }: { client: (typeof clientRows)[number] }) {
           <dd>{client.preferredContact}</dd>
         </div>
       </dl>
+
+      <div className="admin-client-actions" aria-label="Быстрые действия клиента">
+        <a className="admin-outline-action" href={phoneHref(client.phone)}>
+          Позвонить
+        </a>
+        <a className="admin-outline-action" href={`mailto:${client.email}`}>
+          Email
+        </a>
+        <a className="admin-outline-action" href={client.telegram} rel="noreferrer" target="_blank">
+          Telegram
+        </a>
+      </div>
 
       <div className="admin-client-metrics" aria-label="Показатели клиента">
         <div>
@@ -607,8 +681,40 @@ function ClientDetailCard({ client }: { client: (typeof clientRows)[number] }) {
       </section>
 
       <section className="admin-client-section">
-        <h3>Заметки</h3>
-        <p>{client.note}</p>
+        <div className="admin-client-section-head">
+          <h3>Заметки</h3>
+          {isEditingNote ? null : (
+            <button className="admin-outline-action" onClick={startNoteEdit} type="button">
+              Редактировать заметку
+            </button>
+          )}
+        </div>
+        {isEditingNote ? (
+          <form className="admin-client-note-form" onSubmit={handleNoteSubmit}>
+            <label htmlFor="admin-client-note-editor">Заметка клиента</label>
+            <textarea
+              id="admin-client-note-editor"
+              onChange={(event) => setDraftNote(event.target.value)}
+              rows={5}
+              value={draftNote}
+            />
+            <div className="admin-client-note-actions">
+              <button className="admin-text-action" type="submit">
+                Сохранить заметку
+              </button>
+              <button className="admin-outline-action" onClick={cancelNoteEdit} type="button">
+                Отмена
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p>{client.note || "Заметка пока пустая."}</p>
+        )}
+        {saveNotice ? (
+          <p className="admin-client-save-notice" role="status">
+            {saveNotice}
+          </p>
+        ) : null}
         <div className="admin-client-tags" aria-label="Теги клиента">
           {client.tags.map((tag) => (
             <span key={tag}>{tag}</span>
@@ -619,10 +725,20 @@ function ClientDetailCard({ client }: { client: (typeof clientRows)[number] }) {
   );
 }
 
-function ClientsWorkspace({ query, selectedClientName }: { query: string; selectedClientName?: string }) {
-  const initialSelectedClientName = findClientByName(selectedClientName)?.name ?? clientRows[0].name;
+function ClientsWorkspace({
+  clients,
+  onSaveClientNote,
+  query,
+  selectedClientName,
+}: {
+  clients: ClientRecord[];
+  onSaveClientNote: (clientName: string, note: string) => void;
+  query: string;
+  selectedClientName?: string;
+}) {
+  const initialSelectedClientName = findClientByName(clients, selectedClientName)?.name ?? clients[0]?.name ?? "";
   const [selectedName, setSelectedName] = useState(initialSelectedClientName);
-  const filteredClients = clientRows.filter((client) =>
+  const filteredClients = clients.filter((client) =>
     matchesSearch(
       [
         client.name,
@@ -638,7 +754,11 @@ function ClientsWorkspace({ query, selectedClientName }: { query: string; select
       query,
     ),
   );
-  const selectedClient = findClientByName(selectedName) ?? clientRows[0];
+  const selectedClient = findClientByName(clients, selectedName) ?? clients[0];
+
+  if (!selectedClient) {
+    return <EmptyState label="Клиенты не найдены." />;
+  }
 
   return (
     <div className="admin-split-view admin-clients-workspace">
@@ -685,19 +805,21 @@ function ClientsWorkspace({ query, selectedClientName }: { query: string; select
         {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
       </section>
 
-      <ClientDetailCard client={selectedClient} />
+      <ClientDetailCard key={selectedClient.name} client={selectedClient} onSaveNote={onSaveClientNote} />
     </div>
   );
 }
 
 function CalendarWorkspace({
   appointments,
+  clients,
   onCancelAppointment,
   onEditAppointment,
   query,
   role,
 }: {
   appointments: Appointment[];
+  clients: ClientRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onEditAppointment: (appointment: Appointment) => void;
   query: string;
@@ -724,7 +846,7 @@ function CalendarWorkspace({
     fallbackAppointment;
   const selectedAppointmentKey = appointmentKey(selectedAppointment);
   const calendarHeading = mode === "month" ? calendarMonthLabel : calendarModeLabel(mode);
-  const selectedAppointmentClient = findClientByName(selectedAppointment.client);
+  const selectedAppointmentClient = findClientByName(clients, selectedAppointment.client);
 
   function selectAppointment(appointment: Appointment) {
     setSelectedDate(appointment.date);
@@ -1094,16 +1216,20 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 
 function Workspace({
   appointments,
+  clients,
   onCancelAppointment,
   onEditAppointment,
+  onSaveClientNote,
   query,
   role,
   section,
   selectedClientName,
 }: {
   appointments: Appointment[];
+  clients: ClientRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onSaveClientNote: (clientName: string, note: string) => void;
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
@@ -1114,13 +1240,22 @@ function Workspace({
   }
 
   if (section === "clients") {
-    return <ClientsWorkspace key={selectedClientName ?? "default-client"} query={query} selectedClientName={selectedClientName} />;
+    return (
+      <ClientsWorkspace
+        clients={clients}
+        key={selectedClientName ?? "default-client"}
+        onSaveClientNote={onSaveClientNote}
+        query={query}
+        selectedClientName={selectedClientName}
+      />
+    );
   }
 
   if (section === "calendar") {
     return (
       <CalendarWorkspace
         appointments={appointments}
+        clients={clients}
         onCancelAppointment={onCancelAppointment}
         onEditAppointment={onEditAppointment}
         query={query}
@@ -1144,6 +1279,7 @@ export function AdminShell({ activeSection, role, selectedClientName }: AdminShe
   const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
+  const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows());
 
   function handleAppointmentCreate(appointment: Appointment) {
     setCalendarAppointments((current) =>
@@ -1206,6 +1342,12 @@ export function AdminShell({ activeSection, role, selectedClientName }: AdminShe
   function cancelCalendarAppointment(appointment: Appointment) {
     handleAppointmentUpdate({ ...appointment, status: "Отменена" });
     closeCancelDialog();
+  }
+
+  function saveClientNote(clientName: string, note: string) {
+    setClients((current) =>
+      current.map((client) => (normalizeSearch(client.name) === normalizeSearch(clientName) ? { ...client, note } : client)),
+    );
   }
 
   return (
@@ -1273,8 +1415,10 @@ export function AdminShell({ activeSection, role, selectedClientName }: AdminShe
 
         <Workspace
           appointments={calendarAppointments}
+          clients={clients}
           onCancelAppointment={openAppointmentCancel}
           onEditAppointment={openAppointmentEdit}
+          onSaveClientNote={saveClientNote}
           query={query}
           role={role}
           section={activeSection}

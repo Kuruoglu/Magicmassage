@@ -71,6 +71,36 @@ describe("AdminShell", () => {
     expect(within(card).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
   });
 
+  it("shows quick contact actions in the selected client card", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByLabelText("Карточка клиента");
+    expect(within(card).getByRole("link", { name: "Позвонить" })).toHaveAttribute("href", "tel:+359873334411");
+    expect(within(card).getByRole("link", { name: "Email" })).toHaveAttribute("href", "mailto:olena.k@example.com");
+    expect(within(card).getByRole("link", { name: "Telegram" })).toHaveAttribute(
+      "href",
+      "https://t.me/olena_k_demo",
+    );
+  });
+
+  it("edits and saves the selected client note", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByLabelText("Карточка клиента");
+    await user.click(within(card).getByRole("button", { name: "Редактировать заметку" }));
+
+    const noteEditor = within(card).getByLabelText("Заметка клиента");
+    await user.clear(noteEditor);
+    await user.type(noteEditor, "Клиентка просит напоминать за 2 часа и готовит плечи к deep tissue.");
+    await user.click(within(card).getByRole("button", { name: "Сохранить заметку" }));
+
+    expect(within(card).getByRole("status")).toHaveTextContent("Заметка сохранена.");
+    expect(within(card).getByText(/напоминать за 2 часа/)).toBeInTheDocument();
+    expect(within(card).queryByLabelText("Заметка клиента")).not.toBeInTheDocument();
+  });
+
   it("updates the calendar detail panel when an appointment is selected", async () => {
     const user = userEvent.setup();
 

@@ -152,6 +152,25 @@ test("calendar links an appointment to the matching client profile", async ({ pa
   await expect(card.getByText("Deep tissue massage").first()).toBeVisible();
 });
 
+test("client profile saves a note and exposes contact actions", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const card = page.getByLabel("Карточка клиента");
+  await expect(card.getByRole("link", { name: "Позвонить" })).toHaveAttribute("href", "tel:+359873334411");
+  await expect(card.getByRole("link", { name: "Email" })).toHaveAttribute("href", "mailto:olena.k@example.com");
+  await expect(card.getByRole("link", { name: "Telegram" })).toHaveAttribute(
+    "href",
+    "https://t.me/olena_k_demo",
+  );
+
+  await card.getByRole("button", { name: "Редактировать заметку" }).click();
+  await card.getByLabel("Заметка клиента").fill("Клиентка просит напоминать за 2 часа.");
+  await card.getByRole("button", { name: "Сохранить заметку" }).click();
+
+  await expect(card.getByRole("status")).toHaveText("Заметка сохранена.");
+  await expect(card.getByText("Клиентка просит напоминать за 2 часа.")).toBeVisible();
+});
+
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin?section=calendar");

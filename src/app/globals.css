@@ -3223,6 +3223,13 @@ button.admin-calendar-item[aria-pressed="true"] {
   gap: 4px;
 }
 
+.admin-client-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .admin-client-contact-list dt,
 .admin-client-metrics span,
 .admin-client-section h3 {
@@ -3286,8 +3293,66 @@ button.admin-calendar-item[aria-pressed="true"] {
   line-height: 1.5;
 }
 
+.admin-client-section-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.admin-client-section-head h3 {
+  margin: 0;
+}
+
+.admin-client-section-head .admin-outline-action {
+  min-height: 36px;
+  padding-inline: 12px;
+}
+
 .admin-client-section p {
   margin-top: 10px;
+}
+
+.admin-client-note-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-client-note-form label {
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.admin-client-note-form textarea {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-text);
+  font: inherit;
+  line-height: 1.5;
+  min-height: 126px;
+  padding: 11px 12px;
+  resize: vertical;
+  width: 100%;
+}
+
+.admin-client-note-form textarea:focus-visible {
+  border-color: rgba(124, 77, 161, 0.54);
+  box-shadow: 0 0 0 3px rgba(124, 77, 161, 0.14);
+  outline: 0;
+}
+
+.admin-client-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-client-save-notice {
+  color: var(--admin-primary-strong);
+  font-weight: 800;
 }
 
 .admin-client-tags {
