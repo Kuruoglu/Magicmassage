@@ -35,6 +35,7 @@ type Appointment = {
   date: string;
   time: string;
   client: string;
+  note: string;
   service: string;
   status: AppointmentStatus;
 };
@@ -79,6 +80,9 @@ const calendarModes: Array<{ id: CalendarMode; label: string }> = [
 ];
 const calendarMonthLabel = "Июль 2026";
 const calendarWeekdayLabels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const calendarWeekLabel = "Неделя 6-12 июля";
+const calendarDayCapacity = 4;
+const appointmentBufferMinutes = 30;
 const calendarMonthDays = Array.from({ length: 31 }, (_, index) => {
   const day = index + 1;
 
@@ -151,7 +155,7 @@ function findClientCertificates(clientName: string): ClientCertificate[] {
 
 function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
   if (filter === "active") {
-    return normalizeSearch(client.status).startsWith("актив");
+    return isActiveClient(client);
   }
 
   if (filter === "ru" || filter === "bg") {
@@ -159,6 +163,10 @@ function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
   }
 
   return true;
+}
+
+function isActiveClient(client: ClientRecord) {
+  return normalizeSearch(client.status).startsWith("актив") && client.visits >= 5;
 }
 
 function clientProfileHref(clientName: string, role: AdminRoleId) {
@@ -190,12 +198,28 @@ function buildInitialCalendarAppointments() {
   }));
 }
 
-function calendarModeLabel(mode: CalendarMode) {
-  return calendarModes.find((item) => item.id === mode)?.label ?? "День";
+function calendarHeadingLabel(mode: CalendarMode, selectedDate: string) {
+  if (mode === "month") {
+    return calendarMonthLabel;
+  }
+
+  if (mode === "week") {
+    return calendarWeekLabel;
+  }
+
+  if (mode === "list") {
+    return "Список записей";
+  }
+
+  return formatCalendarDay(selectedDate);
 }
 
 function formatCalendarDay(date: string) {
   return `${Number(date.slice(-2))} июля`;
+}
+
+function formatCalendarShortDay(date: string) {
+  return `${Number(date.slice(-2))} июл`;
 }
 
 function appointmentCountLabel(count: number) {
@@ -208,6 +232,22 @@ function appointmentCountLabel(count: number) {
   }
 
   return `${count} записей`;
+}
+
+function freeSlotCount(appointmentCount: number) {
+  return Math.max(0, calendarDayCapacity - appointmentCount);
+}
+
+function freeSlotLabel(count: number) {
+  if (count === 1) {
+    return "1 свободный слот";
+  }
+
+  if (count > 1 && count < 5) {
+    return `${count} свободных слота`;
+  }
+
+  return `${count} свободных слотов`;
 }
 
 function paymentCountLabel(count: number) {
@@ -353,11 +393,13 @@ function QuickActionDialog({
 }
 
 function CalendarAppointmentDialog({
+  clients,
   initialAppointment,
   onClose,
   onSave,
   prefillClientName,
 }: {
+  clients: ClientRecord[];
   initialAppointment?: Appointment;
   onClose: () => void;
   onSave: (appointment: Appointment) => void;
@@ -367,16 +409,35 @@ function CalendarAppointmentDialog({
     client: initialAppointment?.client ?? prefillClientName ?? "",
     date: initialAppointment?.date ?? "2026-07-06",
     id: initialAppointment?.id,
+    note: initialAppointment?.note ?? "",
     service: initialAppointment?.service ?? appointmentServiceOptions[0],
     status: initialAppointment?.status ?? "Новая заявка",
     time: initialAppointment?.time ?? "14:00",
   });
   const [error, setError] = useState("");
   const isEditing = Boolean(initialAppointment);
+  const normalizedClientQuery = normalizeSearch(form.client);
+  const clientSuggestions =
+    normalizedClientQuery.length > 0
+      ? clients
+          .filter(
+            (client) =>
+              normalizeSearch(client.name).includes(normalizedClientQuery) ||
+              normalizeSearch(client.phone).includes(normalizedClientQuery) ||
+              normalizeSearch(client.email).includes(normalizedClientQuery),
+          )
+          .filter((client) => normalizeSearch(client.name) !== normalizedClientQuery)
+          .sort((first, second) => first.name.localeCompare(second.name, "ru"))
+          .slice(0, 4)
+      : [];
 
   function updateForm<Field extends keyof Appointment>(field: Field, value: Appointment[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
     setError("");
+  }
+
+  function selectClient(client: ClientRecord) {
+    updateForm("client", client.name);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -389,7 +450,7 @@ function CalendarAppointmentDialog({
       return;
     }
 
-    onSave({ ...form, client });
+    onSave({ ...form, client, note: form.note.trim() });
     onClose();
   }
 
@@ -419,6 +480,24 @@ function CalendarAppointmentDialog({
                 value={form.client}
               />
             </label>
+            {clientSuggestions.length > 0 ? (
+              <div aria-label="Найденные клиенты" className="admin-client-suggestions" role="listbox">
+                {clientSuggestions.map((client) => (
+                  <button
+                    aria-selected="false"
+                    key={client.name}
+                    onClick={() => selectClient(client)}
+                    role="option"
+                    type="button"
+                  >
+                    <span>{client.name}</span>
+                    <small>
+                      {client.phone} · {client.language.toUpperCase()}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {error ? (
               <p className="admin-form-alert" role="alert">
                 {error}
@@ -466,6 +545,14 @@ function CalendarAppointmentDialog({
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              Комментарий к записи
+              <textarea
+                onChange={(event) => updateForm("note", event.target.value)}
+                rows={3}
+                value={form.note}
+              />
             </label>
           </div>
 
@@ -608,12 +695,14 @@ function ClientDetailCard({
   certificates,
   client,
   onCalendarCreateIntent,
+  onClose,
   onSaveNote,
   role,
 }: {
   certificates: ClientCertificate[];
   client: ClientRecord;
   onCalendarCreateIntent: () => void;
+  onClose: () => void;
   onSaveNote: (clientName: string, note: string) => void;
   role: AdminRoleId;
 }) {
@@ -649,14 +738,24 @@ function ClientDetailCard({
   }
 
   return (
-    <aside className="admin-panel admin-client-card" aria-label="Карточка клиента">
-      <span className="admin-kicker">Карточка клиента</span>
+    <aside
+      aria-label="Карточка клиента"
+      aria-modal="true"
+      className="admin-panel admin-client-card admin-drawer-panel"
+      role="dialog"
+    >
+      <div className="admin-panel-head">
+        <span className="admin-kicker">Карточка клиента</span>
+        <button className="admin-icon-button" onClick={onClose} type="button">
+          Закрыть
+        </button>
+      </div>
       <div className="admin-client-profile-head">
         <span className="admin-client-avatar" aria-hidden="true">
           {clientInitials}
         </span>
         <div>
-          <h2>{client.name}</h2>
+          <h2 id="admin-client-card-title">{client.name}</h2>
           <p>
             {client.language.toUpperCase()} · {client.status}
           </p>
@@ -809,6 +908,7 @@ function ClientsWorkspace({
 }) {
   const initialSelectedClientName = findClientByName(clients, selectedClientName)?.name ?? clients[0]?.name ?? "";
   const [selectedName, setSelectedName] = useState(initialSelectedClientName);
+  const [isClientDrawerOpen, setIsClientDrawerOpen] = useState(Boolean(selectedClientName));
   const [clientFilter, setClientFilter] = useState<ClientFilterId>("all");
   const filteredClients = clients.filter(
     (client) =>
@@ -828,8 +928,12 @@ function ClientsWorkspace({
         query,
       ),
   );
-  const selectedClient =
-    findClientByName(filteredClients, selectedName) ?? filteredClients[0] ?? findClientByName(clients, selectedName) ?? clients[0];
+  const selectedClient = findClientByName(clients, selectedName) ?? filteredClients[0] ?? clients[0];
+
+  function openClient(clientName: string) {
+    setSelectedName(clientName);
+    setIsClientDrawerOpen(true);
+  }
 
   if (!selectedClient) {
     return <EmptyState label="Клиенты не найдены." />;
@@ -852,6 +956,7 @@ function ClientsWorkspace({
               </button>
             ))}
           </div>
+          <p className="admin-filter-help">Активные = 5+ визитов и статус &quot;Активный клиент&quot;.</p>
         </div>
         <div className="admin-table-scroll">
           <table className="admin-data-table">
@@ -868,7 +973,7 @@ function ClientsWorkspace({
               {filteredClients.map((client) => (
                 <tr aria-selected={client.name === selectedClient.name} key={client.phone}>
                   <td>
-                    <button className="admin-row-action" onClick={() => setSelectedName(client.name)} type="button">
+                    <button className="admin-row-action" onClick={() => openClient(client.name)} type="button">
                       {client.name}
                     </button>
                   </td>
@@ -884,14 +989,19 @@ function ClientsWorkspace({
         {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
       </section>
 
-      <ClientDetailCard
-        certificates={findClientCertificates(selectedClient.name)}
-        key={selectedClient.name}
-        client={selectedClient}
-        onCalendarCreateIntent={onCalendarCreateIntent}
-        onSaveNote={onSaveClientNote}
-        role={role}
-      />
+      {isClientDrawerOpen ? (
+        <div className="admin-drawer-backdrop">
+          <ClientDetailCard
+            certificates={findClientCertificates(selectedClient.name)}
+            key={selectedClient.name}
+            client={selectedClient}
+            onCalendarCreateIntent={onCalendarCreateIntent}
+            onClose={() => setIsClientDrawerOpen(false)}
+            onSaveNote={onSaveClientNote}
+            role={role}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -914,36 +1024,45 @@ function CalendarWorkspace({
   const fallbackAppointment = appointments[0] ?? {
     client: "Нет записи",
     date: "2026-07-06",
+    note: "",
     service: "Не выбрано",
     status: "Новая заявка" as const,
     time: "00:00",
   };
   const filteredAppointments = appointments.filter((appointment) =>
-    matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status], query),
+    matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status, appointment.note], query),
   );
   const [mode, setMode] = useState<CalendarMode>("day");
   const [selectedDate, setSelectedDate] = useState("2026-07-06");
   const [selectedKey, setSelectedKey] = useState(() => appointmentKey(appointments[1] ?? fallbackAppointment));
   const selectedDayAppointments = filteredAppointments.filter((appointment) => appointment.date === selectedDate);
+  const visibleAppointments = mode === "day" ? selectedDayAppointments : filteredAppointments;
+  const appointmentDetailPool = mode === "day" ? selectedDayAppointments : filteredAppointments;
+  const hasVisibleAppointments = visibleAppointments.length > 0;
   const selectedAppointment =
-    filteredAppointments.find((appointment) => appointmentKey(appointment) === selectedKey) ??
-    selectedDayAppointments[0] ??
-    filteredAppointments[0] ??
-    fallbackAppointment;
-  const selectedAppointmentKey = appointmentKey(selectedAppointment);
-  const calendarHeading = mode === "month" ? calendarMonthLabel : calendarModeLabel(mode);
+    hasVisibleAppointments
+      ? (appointmentDetailPool.find((appointment) => appointmentKey(appointment) === selectedKey) ??
+        appointmentDetailPool[0] ??
+        fallbackAppointment)
+      : fallbackAppointment;
+  const selectedAppointmentKey = hasVisibleAppointments ? appointmentKey(selectedAppointment) : "";
+  const calendarHeading = calendarHeadingLabel(mode, selectedDate);
   const selectedAppointmentClient = findClientByName(clients, selectedAppointment.client);
+  const weekDays = calendarMonthDays.slice(5, 12);
 
   function selectAppointment(appointment: Appointment) {
     setSelectedDate(appointment.date);
     setSelectedKey(appointmentKey(appointment));
   }
 
-  function selectDate(date: string, appointments: Appointment[]) {
+  function selectDate(date: string, appointments: Appointment[], nextMode: CalendarMode = mode) {
     setSelectedDate(date);
+    setMode(nextMode);
 
     if (appointments[0]) {
       setSelectedKey(appointmentKey(appointments[0]));
+    } else {
+      setSelectedKey("");
     }
   }
 
@@ -979,35 +1098,72 @@ function CalendarWorkspace({
             {calendarMonthDays.map((day) => {
               const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
               const countLabel = appointmentCountLabel(dayAppointments.length);
+              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length));
 
               return (
                 <span className="admin-calendar-month-cell" key={day.date} role="gridcell">
                   <button
-                    aria-label={`${day.day} июля, ${countLabel}`}
+                    aria-label={`${day.day} июля, ${countLabel}, ${freeLabel}`}
                     aria-pressed={selectedDate === day.date}
                     className="admin-calendar-day-button"
-                    onClick={() => selectDate(day.date, dayAppointments)}
+                    onClick={() => selectDate(day.date, dayAppointments, "day")}
                     type="button"
                   >
                     <strong>{day.day}</strong>
-                    {dayAppointments.slice(0, 2).map((appointment) => (
-                      <span className="admin-month-event" key={appointmentKey(appointment)}>
-                        <time className="admin-tabular">{appointment.time}</time>
-                        <span>{appointment.service}</span>
-                      </span>
-                    ))}
                     <small>
                       <span className="admin-month-count-full">{countLabel}</span>
                       <span className="admin-month-count-compact">{dayAppointments.length}</span>
+                      <span>{freeLabel}</span>
                     </small>
                   </button>
                 </span>
               );
             })}
           </div>
+        ) : mode === "week" ? (
+          <div className="admin-calendar-week-grid" role="grid" aria-label={calendarWeekLabel}>
+            {weekDays.map((day) => {
+              const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
+              const countLabel = appointmentCountLabel(dayAppointments.length);
+              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length));
+
+              return (
+                <section className="admin-calendar-week-day" key={day.date} role="gridcell">
+                  <button className="admin-week-day-head" onClick={() => selectDate(day.date, dayAppointments, "day")} type="button">
+                    <strong>{formatCalendarShortDay(day.date)}</strong>
+                    <span>{countLabel}</span>
+                    <small>{freeLabel}</small>
+                  </button>
+                  <div className="admin-week-appointment-list">
+                    {dayAppointments.length > 0 ? (
+                      dayAppointments.map((appointment) => {
+                        const key = appointmentKey(appointment);
+
+                        return (
+                          <button
+                            aria-pressed={key === selectedAppointmentKey}
+                            className="admin-week-appointment"
+                            key={key}
+                            onClick={() => selectAppointment(appointment)}
+                            type="button"
+                          >
+                            <time className="admin-tabular">{appointment.time}</time>
+                            <strong>{appointment.client}</strong>
+                            <span>{appointment.service}</span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <span className="admin-week-empty">Свободно</span>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         ) : (
-          <div className="admin-calendar-list">
-            {filteredAppointments.map((appointment) => {
+          <div className="admin-calendar-list" aria-label={mode === "day" ? `Записи на ${formatCalendarDay(selectedDate)}` : "Все записи"}>
+            {visibleAppointments.map((appointment) => {
               const key = appointmentKey(appointment);
 
               return (
@@ -1031,30 +1187,32 @@ function CalendarWorkspace({
             })}
           </div>
         )}
-        {filteredAppointments.length === 0 ? <EmptyState label="Записи не найдены." /> : null}
+        {mode !== "month" && mode !== "week" && visibleAppointments.length === 0 ? <EmptyState label="Записи не найдены." /> : null}
       </section>
 
       <aside className="admin-panel admin-detail-panel" aria-label="Детали выбранной записи">
         <span className="admin-kicker">Правая панель</span>
         {mode === "month" ? (
           <>
-            <h2>{formatCalendarDay(selectedDate)}</h2>
-            <div className="admin-selected-day-list">
-              {selectedDayAppointments.length > 0 ? (
-                selectedDayAppointments.map((appointment) => (
-                  <article className="admin-selected-day-item" key={appointmentKey(appointment)}>
-                    <time className="admin-tabular">{appointment.time}</time>
-                    <div>
-                      <strong>{appointment.client}</strong>
-                      <span>{appointment.service}</span>
-                    </div>
-                    <span className={statusClass(appointment.status)}>{appointment.status}</span>
-                  </article>
-                ))
-              ) : (
-                <EmptyState label="На выбранный день записей нет." />
-              )}
-            </div>
+            <h2>План месяца</h2>
+            <p>
+              В ячейках месяца показаны только количество записей и свободные слоты. Нажатие на день открывает дневной режим.
+            </p>
+            <dl className="admin-detail-list">
+              <div>
+                <dt>Расчет слотов</dt>
+                <dd>{calendarDayCapacity} слота в день</dd>
+              </div>
+              <div>
+                <dt>Буфер между сеансами</dt>
+                <dd>{appointmentBufferMinutes} минут, позже в Настройки → Запись</dd>
+              </div>
+            </dl>
+          </>
+        ) : !hasVisibleAppointments ? (
+          <>
+            <h2>Записей нет</h2>
+            <p>{mode === "day" ? "На выбранный день записей нет." : "По текущему фильтру записей нет."}</p>
           </>
         ) : (
           <>
@@ -1098,6 +1256,10 @@ function CalendarWorkspace({
               <div>
                 <dt>Время</dt>
                 <dd>{selectedAppointment.time}</dd>
+              </div>
+              <div>
+                <dt>Комментарий</dt>
+                <dd>{selectedAppointment.note || "Комментарий к записи пока пуст."}</dd>
               </div>
             </dl>
           </>
@@ -1375,6 +1537,12 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
   const isCalendarActionDialogOpen = activeSection === "calendar" && (isActionOpen || shouldOpenCalendarCreateDialog);
+  const shouldPrefillCalendarClient = shouldOpenCalendarCreateDialog && !isActionOpen && !editingAppointment;
+  const calendarDialogKey = editingAppointment
+    ? `edit-${appointmentKey(editingAppointment)}`
+    : shouldPrefillCalendarClient
+      ? `prefill-${calendarActionKey}`
+      : "new-empty-appointment";
 
   function handleAppointmentCreate(appointment: Appointment) {
     setCalendarAppointments((current) =>
@@ -1531,10 +1699,12 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
 
         {isCalendarActionDialogOpen ? (
           <CalendarAppointmentDialog
+            clients={clients}
             initialAppointment={editingAppointment}
+            key={calendarDialogKey}
             onClose={closeActionDialog}
             onSave={saveCalendarAppointment}
-            prefillClientName={editingAppointment ? undefined : selectedClientName}
+            prefillClientName={shouldPrefillCalendarClient ? selectedClientName : undefined}
           />
         ) : isActionOpen ? (
           <QuickActionDialog

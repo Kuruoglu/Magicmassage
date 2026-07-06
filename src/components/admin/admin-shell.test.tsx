@@ -70,7 +70,10 @@ describe("AdminShell", () => {
     expect(within(table).getByRole("button", { name: "Maria Georgieva" })).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Анна Петрова" })).not.toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Olena K." })).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Карточка клиента")).getByRole("heading", { name: "Maria Georgieva" })).toBeInTheDocument();
+
+    await user.click(within(table).getByRole("button", { name: "Maria Georgieva" }));
+    expect(within(screen.getByRole("dialog", { name: "Карточка клиента" })).getByRole("heading", { name: "Maria Georgieva" })).toBeInTheDocument();
+    await user.click(within(screen.getByRole("dialog", { name: "Карточка клиента" })).getByRole("button", { name: "Закрыть" }));
 
     await user.click(within(filters).getByRole("button", { name: "Активные" }));
 
@@ -80,10 +83,16 @@ describe("AdminShell", () => {
     expect(within(table).queryByRole("button", { name: "Maria Georgieva" })).not.toBeInTheDocument();
   });
 
+  it("explains how the active client filter is calculated", () => {
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    expect(screen.getByText("Активные = 5+ визитов и статус \"Активный клиент\".")).toBeInTheDocument();
+  });
+
   it("shows the selected client detail card from the client query", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
-    const card = screen.getByLabelText("Карточка клиента");
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
     expect(within(card).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
     expect(within(card).getByText("+359 87 333 4411")).toBeInTheDocument();
     expect(within(card).getByText("olena.k@example.com")).toBeInTheDocument();
@@ -97,7 +106,7 @@ describe("AdminShell", () => {
   it("shows certificates linked to the selected client", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
-    const card = screen.getByLabelText("Карточка клиента");
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
     expect(within(card).getByRole("heading", { name: "Сертификаты" })).toBeInTheDocument();
     expect(within(card).getByText("MMN-2407-1023")).toBeInTheDocument();
     expect(within(card).getByText("Oksana → Self")).toBeInTheDocument();
@@ -108,7 +117,7 @@ describe("AdminShell", () => {
   it("shows quick contact actions in the selected client card", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
-    const card = screen.getByLabelText("Карточка клиента");
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
     expect(within(card).getByRole("link", { name: "Позвонить" })).toHaveAttribute("href", "tel:+359873334411");
     expect(within(card).getByRole("link", { name: "Email" })).toHaveAttribute("href", "mailto:olena.k@example.com");
     expect(within(card).getByRole("link", { name: "Telegram" })).toHaveAttribute(
@@ -120,7 +129,7 @@ describe("AdminShell", () => {
   it("links from the selected client card to prefilled appointment creation", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
-    const card = screen.getByLabelText("Карточка клиента");
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
     expect(within(card).getByRole("link", { name: "Записать клиента" })).toHaveAttribute(
       "href",
       "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
@@ -132,7 +141,7 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
-    const card = screen.getByLabelText("Карточка клиента");
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
     await user.click(within(card).getByRole("button", { name: "Редактировать заметку" }));
 
     const noteEditor = within(card).getByLabelText("Заметка клиента");
@@ -150,10 +159,12 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="calendar" role="owner" />);
 
+    await user.click(screen.getByRole("button", { name: "Список" }));
     await user.click(screen.getByRole("button", { name: /Olena K./ }));
 
     expect(screen.getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
     expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("Deep tissue massage")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали выбранной записи")).getByText(/Уточнить шею и плечи/)).toBeInTheDocument();
   });
 
   it("links from a calendar appointment to the matching client card", async () => {
@@ -161,6 +172,7 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="calendar" role="owner" />);
 
+    await user.click(screen.getByRole("button", { name: "Список" }));
     await user.click(screen.getByRole("button", { name: /Olena K./ }));
 
     expect(
@@ -176,13 +188,63 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Месяц" }));
 
     expect(screen.getByRole("heading", { name: "Июль 2026" })).toBeInTheDocument();
-    expect(screen.getByRole("grid", { name: "Месяц Июль 2026" })).toBeInTheDocument();
+    const monthGrid = screen.getByRole("grid", { name: "Месяц Июль 2026" });
+    expect(monthGrid).toBeInTheDocument();
+    expect(within(monthGrid).queryByText("Классический массаж")).not.toBeInTheDocument();
+    expect(within(monthGrid).getByText("2 записи")).toBeInTheDocument();
+    expect(within(monthGrid).getAllByText("2 свободных слота").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /6 июля.*2 записи/ }));
 
     expect(screen.getByRole("heading", { name: "6 июля" })).toBeInTheDocument();
-    expect(screen.getByText("Анна Петрова")).toBeInTheDocument();
-    expect(screen.getByText("Мария Иванова")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "День" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Анна Петрова/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Мария Иванова/ })).toBeInTheDocument();
+  });
+
+  it("shows a real weekly calendar view", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Неделя" }));
+
+    const weekGrid = screen.getByRole("grid", { name: "Неделя 6-12 июля" });
+    expect(screen.getByRole("heading", { name: "Неделя 6-12 июля" })).toBeInTheDocument();
+    expect(within(weekGrid).getByText("6 июл")).toBeInTheDocument();
+    expect(within(weekGrid).getByText("10 июл")).toBeInTheDocument();
+    expect(within(weekGrid).getByText("Анна Петрова")).toBeInTheDocument();
+    expect(within(weekGrid).getByText("SPA процедура")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when a month day has no appointments", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    await user.click(screen.getByRole("button", { name: /^7 июля.*0 записей/ }));
+
+    const details = screen.getByLabelText("Детали выбранной записи");
+    expect(screen.getByRole("heading", { name: "7 июля" })).toBeInTheDocument();
+    expect(screen.getByText("Записи не найдены.")).toBeInTheDocument();
+    expect(within(details).getByRole("heading", { name: "Записей нет" })).toBeInTheDocument();
+    expect(within(details).getByText("На выбранный день записей нет.")).toBeInTheDocument();
+    expect(within(details).queryByText("Анна Петрова")).not.toBeInTheDocument();
+  });
+
+  it("keeps day mode focused on one day and list mode on all appointments", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    expect(screen.getByRole("heading", { name: "6 июля" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Olena K./ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Список" }));
+
+    expect(screen.getByRole("heading", { name: "Список записей" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Olena K./ })).toBeInTheDocument();
   });
 
   it("opens a quick action panel from the primary action", async () => {
@@ -215,10 +277,42 @@ describe("AdminShell", () => {
 
     expect(screen.queryByRole("dialog", { name: "Новая запись" })).not.toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "Список" }));
     await user.click(screen.getByRole("button", { name: /Ирина Тестова/ }));
 
     expect(screen.getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
     expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("SPA процедура")).toBeInTheDocument();
+  });
+
+  it("opens primary appointment creation with an empty client after a prefilled dialog was closed", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" calendarAction="create" role="owner" selectedClientName="Olena K." />);
+
+    await user.click(within(screen.getByRole("dialog", { name: "Новая запись" })).getByRole("button", { name: "Закрыть" }));
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    expect(within(dialog).getByLabelText("Клиент")).toHaveValue("");
+  });
+
+  it("filters existing clients while creating an appointment", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    await user.type(within(dialog).getByLabelText("Клиент"), "ole");
+
+    const suggestions = within(dialog).getByRole("listbox", { name: "Найденные клиенты" });
+    expect(within(suggestions).getByRole("option", { name: /Olena K./ })).toBeInTheDocument();
+    expect(within(suggestions).queryByRole("option", { name: /Анна Петрова/ })).not.toBeInTheDocument();
+
+    await user.click(within(suggestions).getByRole("option", { name: /Olena K./ }));
+
+    expect(within(dialog).getByLabelText("Клиент")).toHaveValue("Olena K.");
   });
 
   it("opens a prefilled calendar appointment dialog from the action query", () => {
@@ -238,7 +332,7 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("dialog", { name: "Новая запись" })).not.toBeInTheDocument();
 
     rerender(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
-    const calendarCreateLink = within(screen.getByLabelText("Карточка клиента")).getByRole("link", {
+    const calendarCreateLink = within(screen.getByRole("dialog", { name: "Карточка клиента" })).getByRole("link", {
       name: "Записать клиента",
     });
     calendarCreateLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
@@ -271,6 +365,7 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="calendar" role="owner" />);
 
+    await user.click(screen.getByRole("button", { name: "Список" }));
     await user.click(screen.getByRole("button", { name: /Olena K./ }));
     await user.click(within(screen.getByLabelText("Детали выбранной записи")).getByRole("button", { name: "Редактировать" }));
 
@@ -298,6 +393,7 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="calendar" role="owner" />);
 
+    await user.click(screen.getByRole("button", { name: "Список" }));
     await user.click(screen.getByRole("button", { name: /Olena K./ }));
 
     const details = screen.getByLabelText("Детали выбранной записи");

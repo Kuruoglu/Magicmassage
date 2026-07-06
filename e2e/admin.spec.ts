@@ -65,12 +65,35 @@ test("calendar month view is selectable", async ({ page }) => {
   await page.getByRole("button", { name: "Месяц" }).click();
 
   await expect(page.getByRole("heading", { name: "Июль 2026" })).toBeVisible();
-  await expect(page.getByRole("grid", { name: "Месяц Июль 2026" })).toBeVisible();
+  const monthGrid = page.getByRole("grid", { name: "Месяц Июль 2026" });
+  await expect(monthGrid).toBeVisible();
+  await expect(monthGrid.getByText("Классический массаж")).toHaveCount(0);
+  await expect(monthGrid.getByText("2 записи")).toBeVisible();
+  await expect(monthGrid.getByText("2 свободных слота").first()).toBeVisible();
 
   await page.getByRole("button", { name: /6 июля.*2 записи/ }).click();
 
   await expect(page.getByRole("heading", { name: "6 июля" })).toBeVisible();
-  await expect(page.getByText("Мария Иванова")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Мария Иванова/ })).toBeVisible();
+});
+
+test("calendar week and list modes are distinct", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("heading", { name: "6 июля" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Olena K./ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Неделя" }).click();
+
+  const weekGrid = page.getByRole("grid", { name: "Неделя 6-12 июля" });
+  await expect(page.getByRole("heading", { name: "Неделя 6-12 июля" })).toBeVisible();
+  await expect(weekGrid.getByText("10 июл")).toBeVisible();
+  await expect(weekGrid.getByText("SPA процедура")).toBeVisible();
+
+  await page.getByRole("button", { name: "Список" }).click();
+
+  await expect(page.getByRole("heading", { name: "Список записей" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Olena K./ })).toBeVisible();
 });
 
 test("calendar can create a new appointment", async ({ page }) => {
@@ -87,14 +110,35 @@ test("calendar can create a new appointment", async ({ page }) => {
   await dialog.getByRole("button", { name: "Сохранить запись" }).click();
 
   await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Список" }).click();
   await page.getByRole("button", { name: /Ирина Тестова/ }).click();
   await expect(page.getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
   await expect(page.getByLabel("Детали выбранной записи").getByText("SPA процедура")).toBeVisible();
 });
 
+test("calendar creation resets client field and suggests existing clients", async ({ page }) => {
+  await page.goto("/admin?section=calendar&client=Olena%20K.&action=create", { waitUntil: "networkidle" });
+
+  await page.getByRole("dialog", { name: "Новая запись" }).getByRole("button", { name: "Закрыть" }).click();
+  await page.getByRole("button", { name: "Создать запись" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Новая запись" });
+  await expect(dialog.getByLabel("Клиент")).toHaveValue("");
+
+  await dialog.getByLabel("Клиент").fill("ole");
+
+  const suggestions = dialog.getByRole("listbox", { name: "Найденные клиенты" });
+  await expect(suggestions.getByRole("option", { name: /Olena K./ })).toBeVisible();
+  await expect(suggestions.getByRole("option", { name: /Анна Петрова/ })).toHaveCount(0);
+
+  await suggestions.getByRole("option", { name: /Olena K./ }).click();
+  await expect(dialog.getByLabel("Клиент")).toHaveValue("Olena K.");
+});
+
 test("calendar can edit and reschedule an appointment", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 
+  await page.getByRole("button", { name: "Список" }).click();
   await page.getByRole("button", { name: /Olena K./ }).click();
   await page.getByLabel("Детали выбранной записи").getByRole("button", { name: "Редактировать" }).click();
 
@@ -117,6 +161,7 @@ test("calendar can edit and reschedule an appointment", async ({ page }) => {
 test("calendar can cancel an appointment after confirmation", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 
+  await page.getByRole("button", { name: "Список" }).click();
   await page.getByRole("button", { name: /Olena K./ }).click();
 
   const details = page.getByLabel("Детали выбранной записи");
@@ -141,12 +186,13 @@ test("calendar can cancel an appointment after confirmation", async ({ page }) =
 test("calendar links an appointment to the matching client profile", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 
+  await page.getByRole("button", { name: "Список" }).click();
   await page.getByRole("button", { name: /Olena K./ }).click();
   await page.getByLabel("Детали выбранной записи").getByRole("link", { name: "Открыть клиента" }).click();
 
   await expect(page).toHaveURL(/section=clients/);
 
-  const card = page.getByLabel("Карточка клиента");
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await expect(card.getByRole("heading", { name: "Olena K." })).toBeVisible();
   await expect(card.getByText("olena.k@example.com")).toBeVisible();
   await expect(card.getByRole("heading", { name: "История визитов" })).toBeVisible();
@@ -156,7 +202,7 @@ test("calendar links an appointment to the matching client profile", async ({ pa
 test("client profile saves a note and exposes contact actions", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 
-  const card = page.getByLabel("Карточка клиента");
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await expect(card.getByRole("link", { name: "Позвонить" })).toHaveAttribute("href", "tel:+359873334411");
   await expect(card.getByRole("link", { name: "Email" })).toHaveAttribute("href", "mailto:olena.k@example.com");
   await expect(card.getByRole("link", { name: "Telegram" })).toHaveAttribute(
@@ -175,7 +221,7 @@ test("client profile saves a note and exposes contact actions", async ({ page })
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 
-  const card = page.getByLabel("Карточка клиента");
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await card.getByRole("link", { name: "Записать клиента" }).click();
 
   await expect(page).toHaveURL(/section=calendar/);
@@ -190,13 +236,17 @@ test("client filters update the table and profile certificate block", async ({ p
   await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
 
   const table = page.getByRole("table");
-  const card = page.getByLabel("Карточка клиента");
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
 
   await page.getByRole("button", { name: "BG" }).click();
   await expect(page.getByRole("button", { name: "BG" })).toHaveAttribute("aria-pressed", "true");
   await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toBeVisible();
   await expect(table.getByRole("row", { name: /Olena K./ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Maria Georgieva" }).click();
   await expect(card.getByRole("heading", { name: "Maria Georgieva" })).toBeVisible();
+
+  await card.getByRole("button", { name: "Закрыть" }).click();
+  await expect(card).toHaveCount(0);
 
   await page.getByRole("button", { name: "Все" }).click();
   await page.getByRole("button", { name: "Olena K." }).click();

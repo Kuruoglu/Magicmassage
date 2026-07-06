@@ -3168,7 +3168,7 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-clients-workspace {
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .admin-client-card {
@@ -3229,6 +3229,20 @@ button.admin-calendar-item[aria-pressed="true"] {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
+}
+
+.admin-client-actions .admin-text-action,
+.admin-client-actions .admin-outline-action {
+  flex: 1 1 150px;
+}
+
+.admin-filter-help {
+  color: var(--admin-muted);
+  flex-basis: 100%;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .admin-client-contact-list dt,
@@ -3485,8 +3499,10 @@ button.admin-calendar-item[aria-pressed="true"] {
 
 .admin-calendar-day-button > small {
   color: var(--admin-muted);
+  display: grid;
   font-size: 0.68rem;
   font-weight: 800;
+  gap: 2px;
   line-height: 1.2;
 }
 
@@ -3494,24 +3510,81 @@ button.admin-calendar-item[aria-pressed="true"] {
   display: none;
 }
 
-.admin-month-event {
-  background: var(--admin-surface-muted);
-  border: 1px solid rgba(124, 77, 161, 0.1);
-  border-radius: 6px;
+.admin-calendar-week-grid {
   display: grid;
-  gap: 2px;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   min-width: 0;
-  padding: 5px;
+  overflow-x: visible;
+  padding-bottom: 4px;
 }
 
-.admin-month-event time,
-.admin-month-event span {
-  font-size: 0.68rem;
-  line-height: 1.2;
+.admin-calendar-week-day {
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 10px;
+}
+
+.admin-week-day-head {
+  background: var(--admin-surface);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 4px;
+  min-height: 70px;
+  padding: 8px;
+  text-align: left;
+}
+
+.admin-week-day-head strong,
+.admin-week-appointment strong {
+  color: var(--admin-text);
+}
+
+.admin-week-day-head span,
+.admin-week-day-head small,
+.admin-week-appointment span,
+.admin-week-empty {
+  color: var(--admin-muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-week-appointment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-week-appointment {
+  background: var(--admin-surface);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  text-align: left;
+}
+
+.admin-week-appointment:hover,
+.admin-week-appointment:focus-visible,
+.admin-week-appointment[aria-pressed="true"],
+.admin-week-day-head:hover,
+.admin-week-day-head:focus-visible {
+  border-color: rgba(124, 77, 161, 0.42);
+  box-shadow: 0 12px 24px rgba(29, 20, 36, 0.08);
+  outline: 0;
 }
 
 .admin-selected-day-list {
@@ -3556,9 +3629,8 @@ button.admin-calendar-item[aria-pressed="true"] {
 
 .admin-detail-heading {
   align-items: start;
-  display: flex;
+  display: grid;
   gap: 10px;
-  justify-content: space-between;
   margin-top: 6px;
 }
 
@@ -3569,16 +3641,16 @@ button.admin-calendar-item[aria-pressed="true"] {
 .admin-detail-actions {
   align-items: center;
   display: flex;
-  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: start;
+  min-width: 0;
 }
 
 .admin-detail-heading .admin-text-action,
 .admin-detail-heading .admin-outline-action,
 .admin-detail-heading .admin-danger-button {
-  flex: 0 0 auto;
+  flex: 1 1 136px;
   min-height: 44px;
   padding: 0 12px;
 }
@@ -3692,7 +3764,8 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-action-body input,
-.admin-action-body select {
+.admin-action-body select,
+.admin-action-body textarea {
   background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   border-radius: 8px;
@@ -3796,6 +3869,69 @@ button.admin-calendar-item[aria-pressed="true"] {
   gap: 12px;
   justify-content: space-between;
   margin-top: 14px;
+}
+
+.admin-action-body textarea {
+  line-height: 1.5;
+  min-height: 88px;
+  resize: vertical;
+  text-transform: none;
+}
+
+.admin-client-suggestions {
+  border: 1px solid rgba(124, 77, 161, 0.18);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  margin-top: -6px;
+  padding: 8px;
+}
+
+.admin-client-suggestions button {
+  background: var(--admin-surface);
+  border: 1px solid rgba(124, 77, 161, 0.12);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 2px;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.admin-client-suggestions button:hover,
+.admin-client-suggestions button:focus-visible {
+  border-color: rgba(124, 77, 161, 0.42);
+  outline: 0;
+}
+
+.admin-client-suggestions span {
+  color: var(--admin-text);
+  font-weight: 800;
+}
+
+.admin-client-suggestions small {
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+}
+
+.admin-drawer-backdrop {
+  align-items: stretch;
+  background: rgba(20, 13, 27, 0.24);
+  display: grid;
+  inset: 0;
+  justify-items: end;
+  position: fixed;
+  z-index: 35;
+}
+
+.admin-drawer-panel {
+  border-radius: 8px 0 0 8px;
+  box-shadow: 0 24px 70px rgba(20, 13, 27, 0.28);
+  max-height: 100dvh;
+  overflow: auto;
+  width: min(100%, 560px);
 }
 
 @media (max-width: 1100px) {

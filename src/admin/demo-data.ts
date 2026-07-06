@@ -8,10 +8,38 @@ export const dashboardMetrics = [
 ] as const;
 
 export const upcomingAppointments = [
-  { date: "2026-07-06", time: "10:00", client: "Анна Петрова", service: "Классический массаж", status: "Подтверждена" },
-  { date: "2026-07-06", time: "12:30", client: "Мария Иванова", service: "Лимфодренажный массаж", status: "Ожидает" },
-  { date: "2026-07-08", time: "15:00", client: "Olena K.", service: "Deep tissue massage", status: "Подтверждена" },
-  { date: "2026-07-10", time: "17:30", client: "Светлана", service: "SPA процедура", status: "Новая заявка" },
+  {
+    date: "2026-07-06",
+    time: "10:00",
+    client: "Анна Петрова",
+    service: "Классический массаж",
+    status: "Подтверждена",
+    note: "Попросила спокойный темп и напоминание за день.",
+  },
+  {
+    date: "2026-07-06",
+    time: "12:30",
+    client: "Мария Иванова",
+    service: "Лимфодренажный массаж",
+    status: "Ожидает",
+    note: "Подтвердить самочувствие утром перед визитом.",
+  },
+  {
+    date: "2026-07-08",
+    time: "15:00",
+    client: "Olena K.",
+    service: "Deep tissue massage",
+    status: "Подтверждена",
+    note: "Уточнить шею и плечи перед началом сеанса.",
+  },
+  {
+    date: "2026-07-10",
+    time: "17:30",
+    client: "Светлана",
+    service: "SPA процедура",
+    status: "Новая заявка",
+    note: "Новая заявка, нужно подтвердить услугу и длительность.",
+  },
 ] as const;
 
 export const clientRows = [
