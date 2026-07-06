@@ -2826,6 +2826,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   justify-content: center;
   min-height: 42px;
   padding: 0 16px;
+  text-decoration: none;
 }
 
 .admin-page-head button,

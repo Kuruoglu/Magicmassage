@@ -117,6 +117,16 @@ describe("AdminShell", () => {
     );
   });
 
+  it("links from the selected client card to prefilled appointment creation", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByLabelText("Карточка клиента");
+    expect(within(card).getByRole("link", { name: "Записать клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+    );
+  });
+
   it("edits and saves the selected client note", async () => {
     const user = userEvent.setup();
 
@@ -209,6 +219,34 @@ describe("AdminShell", () => {
 
     expect(screen.getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
     expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("SPA процедура")).toBeInTheDocument();
+  });
+
+  it("opens a prefilled calendar appointment dialog from the action query", () => {
+    render(<AdminShell activeSection="calendar" calendarAction="create" role="owner" selectedClientName="Olena K." />);
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    expect(within(dialog).getByLabelText("Клиент")).toHaveValue("Olena K.");
+  });
+
+  it("reopens the prefilled appointment dialog after leaving and returning to the action link", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AdminShell activeSection="calendar" calendarAction="create" role="owner" selectedClientName="Olena K." />,
+    );
+
+    await user.click(within(screen.getByRole("dialog", { name: "Новая запись" })).getByRole("button", { name: "Закрыть" }));
+    expect(screen.queryByRole("dialog", { name: "Новая запись" })).not.toBeInTheDocument();
+
+    rerender(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+    const calendarCreateLink = within(screen.getByLabelText("Карточка клиента")).getByRole("link", {
+      name: "Записать клиента",
+    });
+    calendarCreateLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(calendarCreateLink);
+    rerender(<AdminShell activeSection="calendar" calendarAction="create" role="owner" selectedClientName="Olena K." />);
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    expect(within(dialog).getByLabelText("Клиент")).toHaveValue("Olena K.");
   });
 
   it("keeps the calendar appointment dialog open when required fields are missing", async () => {

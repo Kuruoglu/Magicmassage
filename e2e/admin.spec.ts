@@ -172,6 +172,20 @@ test("client profile saves a note and exposes contact actions", async ({ page })
   await expect(card.getByText("Клиентка просит напоминать за 2 часа.")).toBeVisible();
 });
 
+test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const card = page.getByLabel("Карточка клиента");
+  await card.getByRole("link", { name: "Записать клиента" }).click();
+
+  await expect(page).toHaveURL(/section=calendar/);
+  await expect(page).toHaveURL(/action=create/);
+
+  const dialog = page.getByRole("dialog", { name: "Новая запись" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Клиент")).toHaveValue("Olena K.");
+});
+
 test("client filters update the table and profile certificate block", async ({ page }) => {
   await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
 

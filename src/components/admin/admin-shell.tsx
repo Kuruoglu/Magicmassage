@@ -21,8 +21,10 @@ import {
   upcomingAppointments,
 } from "@/admin/demo-data";
 
+type AdminCalendarAction = "create";
 type AdminShellProps = {
   activeSection: AdminSectionId;
+  calendarAction?: AdminCalendarAction;
   role: AdminRoleId;
   selectedClientName?: string;
 };
@@ -161,6 +163,10 @@ function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
 
 function clientProfileHref(clientName: string, role: AdminRoleId) {
   return `/admin?section=clients&role=${role}&client=${encodeURIComponent(clientName)}`;
+}
+
+function calendarCreateHref(clientName: string, role: AdminRoleId) {
+  return `/admin?section=calendar&role=${role}&client=${encodeURIComponent(clientName)}&action=create`;
 }
 
 function phoneHref(phone: string) {
@@ -350,13 +356,15 @@ function CalendarAppointmentDialog({
   initialAppointment,
   onClose,
   onSave,
+  prefillClientName,
 }: {
   initialAppointment?: Appointment;
   onClose: () => void;
   onSave: (appointment: Appointment) => void;
+  prefillClientName?: string;
 }) {
   const [form, setForm] = useState<Appointment>({
-    client: initialAppointment?.client ?? "",
+    client: initialAppointment?.client ?? prefillClientName ?? "",
     date: initialAppointment?.date ?? "2026-07-06",
     id: initialAppointment?.id,
     service: initialAppointment?.service ?? appointmentServiceOptions[0],
@@ -599,11 +607,15 @@ function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId 
 function ClientDetailCard({
   certificates,
   client,
+  onCalendarCreateIntent,
   onSaveNote,
+  role,
 }: {
   certificates: ClientCertificate[];
   client: ClientRecord;
+  onCalendarCreateIntent: () => void;
   onSaveNote: (clientName: string, note: string) => void;
+  role: AdminRoleId;
 }) {
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [draftNote, setDraftNote] = useState(client.note);
@@ -667,6 +679,9 @@ function ClientDetailCard({
       </dl>
 
       <div className="admin-client-actions" aria-label="Быстрые действия клиента">
+        <Link className="admin-text-action" href={calendarCreateHref(client.name, role)} onClick={onCalendarCreateIntent}>
+          Записать клиента
+        </Link>
         <a className="admin-outline-action" href={phoneHref(client.phone)}>
           Позвонить
         </a>
@@ -779,13 +794,17 @@ function ClientDetailCard({
 
 function ClientsWorkspace({
   clients,
+  onCalendarCreateIntent,
   onSaveClientNote,
   query,
+  role,
   selectedClientName,
 }: {
   clients: ClientRecord[];
+  onCalendarCreateIntent: () => void;
   onSaveClientNote: (clientName: string, note: string) => void;
   query: string;
+  role: AdminRoleId;
   selectedClientName?: string;
 }) {
   const initialSelectedClientName = findClientByName(clients, selectedClientName)?.name ?? clients[0]?.name ?? "";
@@ -869,7 +888,9 @@ function ClientsWorkspace({
         certificates={findClientCertificates(selectedClient.name)}
         key={selectedClient.name}
         client={selectedClient}
+        onCalendarCreateIntent={onCalendarCreateIntent}
         onSaveNote={onSaveClientNote}
+        role={role}
       />
     </div>
   );
@@ -1283,6 +1304,7 @@ function Workspace({
   appointments,
   clients,
   onCancelAppointment,
+  onCalendarCreateIntent,
   onEditAppointment,
   onSaveClientNote,
   query,
@@ -1293,6 +1315,7 @@ function Workspace({
   appointments: Appointment[];
   clients: ClientRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
+  onCalendarCreateIntent: () => void;
   onEditAppointment: (appointment: Appointment) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
   query: string;
@@ -1309,8 +1332,10 @@ function Workspace({
       <ClientsWorkspace
         clients={clients}
         key={selectedClientName ?? "default-client"}
+        onCalendarCreateIntent={onCalendarCreateIntent}
         onSaveClientNote={onSaveClientNote}
         query={query}
+        role={role}
         selectedClientName={selectedClientName}
       />
     );
@@ -1336,15 +1361,20 @@ function Workspace({
   return <GenericWorkspace query={query} section={section} />;
 }
 
-export function AdminShell({ activeSection, role, selectedClientName }: AdminShellProps) {
+export function AdminShell({ activeSection, calendarAction, role, selectedClientName }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
+  const [dismissedCalendarActionKey, setDismissedCalendarActionKey] = useState("");
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
   const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows());
+  const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
+  const shouldOpenCalendarCreateDialog =
+    activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
+  const isCalendarActionDialogOpen = activeSection === "calendar" && (isActionOpen || shouldOpenCalendarCreateDialog);
 
   function handleAppointmentCreate(appointment: Appointment) {
     setCalendarAppointments((current) =>
@@ -1385,7 +1415,15 @@ export function AdminShell({ activeSection, role, selectedClientName }: AdminShe
     setCancellingAppointment(appointment);
   }
 
+  function prepareCalendarCreateFromClient() {
+    setDismissedCalendarActionKey("");
+    setCancellingAppointment(undefined);
+    setEditingAppointment(undefined);
+    setIsActionOpen(false);
+  }
+
   function closeActionDialog() {
+    setDismissedCalendarActionKey(calendarActionKey);
     setIsActionOpen(false);
     setEditingAppointment(undefined);
   }
@@ -1482,6 +1520,7 @@ export function AdminShell({ activeSection, role, selectedClientName }: AdminShe
           appointments={calendarAppointments}
           clients={clients}
           onCancelAppointment={openAppointmentCancel}
+          onCalendarCreateIntent={prepareCalendarCreateFromClient}
           onEditAppointment={openAppointmentEdit}
           onSaveClientNote={saveClientNote}
           query={query}
@@ -1490,11 +1529,12 @@ export function AdminShell({ activeSection, role, selectedClientName }: AdminShe
           selectedClientName={selectedClientName}
         />
 
-        {isActionOpen && activeSection === "calendar" ? (
+        {isCalendarActionDialogOpen ? (
           <CalendarAppointmentDialog
             initialAppointment={editingAppointment}
             onClose={closeActionDialog}
             onSave={saveCalendarAppointment}
+            prefillClientName={editingAppointment ? undefined : selectedClientName}
           />
         ) : isActionOpen ? (
           <QuickActionDialog

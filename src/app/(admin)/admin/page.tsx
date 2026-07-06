@@ -13,7 +13,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const query = await searchParams;
   const role = resolveAdminRole(firstQueryValue(query.role));
   const activeSection = resolveAdminSection(firstQueryValue(query.section), role);
+  const calendarAction = firstQueryValue(query.action) === "create" ? "create" : undefined;
   const selectedClientName = firstQueryValue(query.client);
 
-  return <AdminShell activeSection={activeSection} role={role} selectedClientName={selectedClientName} />;
+  return (
+    <AdminShell
+      activeSection={activeSection}
+      calendarAction={calendarAction}
+      role={role}
+      selectedClientName={selectedClientName}
+    />
+  );
 }
