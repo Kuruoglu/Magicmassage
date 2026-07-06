@@ -15,9 +15,57 @@ export const upcomingAppointments = [
 ] as const;
 
 export const clientRows = [
-  { name: "Анна Петрова", phone: "+359 88 111 2233", language: "ru", visits: 7, next: "Сегодня 10:00" },
-  { name: "Maria Georgieva", phone: "+359 89 555 0099", language: "bg", visits: 3, next: "12 Jul 14:00" },
-  { name: "Olena K.", phone: "+359 87 333 4411", language: "ua", visits: 5, next: "15 Jul 11:30" },
+  {
+    name: "Анна Петрова",
+    phone: "+359 88 111 2233",
+    email: "anna.petrova@example.com",
+    language: "ru",
+    visits: 7,
+    next: "Сегодня 10:00",
+    status: "Активный клиент",
+    preferredContact: "Телефон",
+    totalSpend: "640 €",
+    tags: ["RU", "классический массаж", "регулярно"],
+    note: "Любит спокойный темп общения и напоминание за день до визита.",
+    history: [
+      { date: "6 июля, 10:00", service: "Классический массаж", status: "Подтверждена" },
+      { date: "22 июня, 10:30", service: "Классический массаж", status: "Завершен" },
+    ],
+  },
+  {
+    name: "Maria Georgieva",
+    phone: "+359 89 555 0099",
+    email: "maria.georgieva@example.com",
+    language: "bg",
+    visits: 3,
+    next: "12 Jul 14:00",
+    status: "Новый клиент",
+    preferredContact: "Viber",
+    totalSpend: "270 €",
+    tags: ["BG", "лимфодренаж", "новый курс"],
+    note: "Уточнить самочувствие после последнего лимфодренажного массажа.",
+    history: [
+      { date: "2 июля, 14:00", service: "Лимфодренажный массаж", status: "Завершен" },
+      { date: "18 июня, 13:30", service: "Классический массаж", status: "Завершен" },
+    ],
+  },
+  {
+    name: "Olena K.",
+    phone: "+359 87 333 4411",
+    email: "olena.k@example.com",
+    language: "ua",
+    visits: 5,
+    next: "15 Jul 11:30",
+    status: "Активный клиент",
+    preferredContact: "Telegram",
+    totalSpend: "520 €",
+    tags: ["UA", "deep tissue", "вечер"],
+    note: "Предпочитает вечерние слоты и сильное давление, перед визитом уточнить шею и плечи.",
+    history: [
+      { date: "8 июля, 15:00", service: "Deep tissue massage", status: "Подтверждена" },
+      { date: "24 июня, 18:30", service: "Deep tissue massage", status: "Завершен" },
+    ],
+  },
 ] as const;
 
 export const certificateRows = [

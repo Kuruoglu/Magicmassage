@@ -24,6 +24,7 @@ import {
 type AdminShellProps = {
   activeSection: AdminSectionId;
   role: AdminRoleId;
+  selectedClientName?: string;
 };
 
 type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
@@ -92,6 +93,20 @@ function matchesSearch(values: Array<string | number | undefined>, query: string
   }
 
   return values.some((value) => String(value ?? "").toLocaleLowerCase("ru-RU").includes(normalizedQuery));
+}
+
+function findClientByName(name: string | undefined) {
+  const normalizedName = name ? normalizeSearch(name) : "";
+
+  if (!normalizedName) {
+    return undefined;
+  }
+
+  return clientRows.find((client) => normalizeSearch(client.name) === normalizedName);
+}
+
+function clientProfileHref(clientName: string, role: AdminRoleId) {
+  return `/admin?section=clients&role=${role}&client=${encodeURIComponent(clientName)}`;
 }
 
 function appointmentKey(appointment: Appointment) {
@@ -523,50 +538,155 @@ function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId 
   );
 }
 
-function ClientsWorkspace({ query }: { query: string }) {
-  const filteredClients = clientRows.filter((client) =>
-    matchesSearch([client.name, client.phone, client.language, client.visits, client.next], query),
-  );
+function ClientDetailCard({ client }: { client: (typeof clientRows)[number] }) {
+  const clientInitials = client.name
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
-    <section className="admin-panel admin-panel-large" aria-labelledby="clients-heading">
-      <div className="admin-panel-head">
-        <h2 id="clients-heading">Клиентская база</h2>
-        <div className="admin-filter-row" aria-label="Фильтры клиентов">
-          <button aria-pressed="true" type="button">
-            Все
-          </button>
-          <button type="button">Активные</button>
-          <button type="button">RU</button>
-          <button type="button">BG</button>
+    <aside className="admin-panel admin-client-card" aria-label="Карточка клиента">
+      <span className="admin-kicker">Карточка клиента</span>
+      <div className="admin-client-profile-head">
+        <span className="admin-client-avatar" aria-hidden="true">
+          {clientInitials}
+        </span>
+        <div>
+          <h2>{client.name}</h2>
+          <p>
+            {client.language.toUpperCase()} · {client.status}
+          </p>
         </div>
       </div>
-      <div className="admin-table-scroll">
-        <table className="admin-data-table">
-          <thead>
-            <tr>
-              <th>Клиент</th>
-              <th>Телефон</th>
-              <th>Язык</th>
-              <th>Визиты</th>
-              <th>Следующий визит</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredClients.map((client) => (
-              <tr key={client.phone}>
-                <td>{client.name}</td>
-                <td className="admin-tabular">{client.phone}</td>
-                <td>{client.language.toUpperCase()}</td>
-                <td className="admin-tabular">{client.visits}</td>
-                <td>{client.next}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <dl className="admin-client-contact-list">
+        <div>
+          <dt>Телефон</dt>
+          <dd className="admin-tabular">{client.phone}</dd>
+        </div>
+        <div>
+          <dt>Email</dt>
+          <dd>{client.email}</dd>
+        </div>
+        <div>
+          <dt>Канал связи</dt>
+          <dd>{client.preferredContact}</dd>
+        </div>
+      </dl>
+
+      <div className="admin-client-metrics" aria-label="Показатели клиента">
+        <div>
+          <span>Визиты</span>
+          <strong>{client.visits}</strong>
+        </div>
+        <div>
+          <span>Следующий</span>
+          <strong>{client.next}</strong>
+        </div>
+        <div>
+          <span>Сумма</span>
+          <strong>{client.totalSpend}</strong>
+        </div>
       </div>
-      {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
-    </section>
+
+      <section className="admin-client-section">
+        <h3>История визитов</h3>
+        <ol className="admin-client-history">
+          {client.history.map((visit) => (
+            <li key={`${visit.date}-${visit.service}`}>
+              <div>
+                <strong>{visit.service}</strong>
+                <span>{visit.date}</span>
+              </div>
+              <span className={statusClass(visit.status)}>{visit.status}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="admin-client-section">
+        <h3>Заметки</h3>
+        <p>{client.note}</p>
+        <div className="admin-client-tags" aria-label="Теги клиента">
+          {client.tags.map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
+        </div>
+      </section>
+    </aside>
+  );
+}
+
+function ClientsWorkspace({ query, selectedClientName }: { query: string; selectedClientName?: string }) {
+  const initialSelectedClientName = findClientByName(selectedClientName)?.name ?? clientRows[0].name;
+  const [selectedName, setSelectedName] = useState(initialSelectedClientName);
+  const filteredClients = clientRows.filter((client) =>
+    matchesSearch(
+      [
+        client.name,
+        client.phone,
+        client.email,
+        client.language,
+        client.visits,
+        client.next,
+        client.status,
+        client.preferredContact,
+        client.note,
+      ],
+      query,
+    ),
+  );
+  const selectedClient = findClientByName(selectedName) ?? clientRows[0];
+
+  return (
+    <div className="admin-split-view admin-clients-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="clients-heading">
+        <div className="admin-panel-head">
+          <h2 id="clients-heading">Клиентская база</h2>
+          <div className="admin-filter-row" aria-label="Фильтры клиентов">
+            <button aria-pressed="true" type="button">
+              Все
+            </button>
+            <button type="button">Активные</button>
+            <button type="button">RU</button>
+            <button type="button">BG</button>
+          </div>
+        </div>
+        <div className="admin-table-scroll">
+          <table className="admin-data-table">
+            <thead>
+              <tr>
+                <th>Клиент</th>
+                <th>Телефон</th>
+                <th>Язык</th>
+                <th>Визиты</th>
+                <th>Следующий визит</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClients.map((client) => (
+                <tr aria-selected={client.name === selectedClient.name} key={client.phone}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => setSelectedName(client.name)} type="button">
+                      {client.name}
+                    </button>
+                  </td>
+                  <td className="admin-tabular">{client.phone}</td>
+                  <td>{client.language.toUpperCase()}</td>
+                  <td className="admin-tabular">{client.visits}</td>
+                  <td>{client.next}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
+      </section>
+
+      <ClientDetailCard client={selectedClient} />
+    </div>
   );
 }
 
@@ -575,11 +695,13 @@ function CalendarWorkspace({
   onCancelAppointment,
   onEditAppointment,
   query,
+  role,
 }: {
   appointments: Appointment[];
   onCancelAppointment: (appointment: Appointment) => void;
   onEditAppointment: (appointment: Appointment) => void;
   query: string;
+  role: AdminRoleId;
 }) {
   const fallbackAppointment = appointments[0] ?? {
     client: "Нет записи",
@@ -602,6 +724,7 @@ function CalendarWorkspace({
     fallbackAppointment;
   const selectedAppointmentKey = appointmentKey(selectedAppointment);
   const calendarHeading = mode === "month" ? calendarMonthLabel : calendarModeLabel(mode);
+  const selectedAppointmentClient = findClientByName(selectedAppointment.client);
 
   function selectAppointment(appointment: Appointment) {
     setSelectedDate(appointment.date);
@@ -730,6 +853,11 @@ function CalendarWorkspace({
             <div className="admin-detail-heading">
               <h2>{selectedAppointment.client}</h2>
               <div className="admin-detail-actions">
+                {selectedAppointmentClient ? (
+                  <Link className="admin-outline-action" href={clientProfileHref(selectedAppointment.client, role)}>
+                    Открыть клиента
+                  </Link>
+                ) : null}
                 <button className="admin-text-action" onClick={() => onEditAppointment(selectedAppointment)} type="button">
                   Редактировать
                 </button>
@@ -971,6 +1099,7 @@ function Workspace({
   query,
   role,
   section,
+  selectedClientName,
 }: {
   appointments: Appointment[];
   onCancelAppointment: (appointment: Appointment) => void;
@@ -978,13 +1107,14 @@ function Workspace({
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
+  selectedClientName?: string;
 }) {
   if (section === "dashboard") {
     return <DashboardWorkspace query={query} role={role} />;
   }
 
   if (section === "clients") {
-    return <ClientsWorkspace query={query} />;
+    return <ClientsWorkspace key={selectedClientName ?? "default-client"} query={query} selectedClientName={selectedClientName} />;
   }
 
   if (section === "calendar") {
@@ -994,6 +1124,7 @@ function Workspace({
         onCancelAppointment={onCancelAppointment}
         onEditAppointment={onEditAppointment}
         query={query}
+        role={role}
       />
     );
   }
@@ -1005,7 +1136,7 @@ function Workspace({
   return <GenericWorkspace query={query} section={section} />;
 }
 
-export function AdminShell({ activeSection, role }: AdminShellProps) {
+export function AdminShell({ activeSection, role, selectedClientName }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
   const [query, setQuery] = useState("");
@@ -1147,6 +1278,7 @@ export function AdminShell({ activeSection, role }: AdminShellProps) {
           query={query}
           role={role}
           section={activeSection}
+          selectedClientName={selectedClientName}
         />
 
         {isActionOpen && activeSection === "calendar" ? (

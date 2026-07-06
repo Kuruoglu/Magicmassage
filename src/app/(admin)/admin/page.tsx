@@ -13,6 +13,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const query = await searchParams;
   const role = resolveAdminRole(firstQueryValue(query.role));
   const activeSection = resolveAdminSection(firstQueryValue(query.section), role);
+  const selectedClientName = firstQueryValue(query.client);
 
-  return <AdminShell activeSection={activeSection} role={role} />;
+  return <AdminShell activeSection={activeSection} role={role} selectedClientName={selectedClientName} />;
 }

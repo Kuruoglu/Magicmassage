@@ -57,6 +57,20 @@ describe("AdminShell", () => {
     expect(screen.queryByText("Maria Georgieva")).not.toBeInTheDocument();
   });
 
+  it("shows the selected client detail card from the client query", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByLabelText("Карточка клиента");
+    expect(within(card).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(card).getByText("+359 87 333 4411")).toBeInTheDocument();
+    expect(within(card).getByText("olena.k@example.com")).toBeInTheDocument();
+    expect(within(card).getByText("UA")).toBeInTheDocument();
+    expect(within(card).getByRole("heading", { name: "История визитов" })).toBeInTheDocument();
+    expect(within(card).getAllByText("Deep tissue massage").length).toBeGreaterThan(0);
+    expect(within(card).getByText("8 июля, 15:00")).toBeInTheDocument();
+    expect(within(card).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
+  });
+
   it("updates the calendar detail panel when an appointment is selected", async () => {
     const user = userEvent.setup();
 
@@ -66,6 +80,18 @@ describe("AdminShell", () => {
 
     expect(screen.getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
     expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("Deep tissue massage")).toBeInTheDocument();
+  });
+
+  it("links from a calendar appointment to the matching client card", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: /Olena K./ }));
+
+    expect(
+      within(screen.getByLabelText("Детали выбранной записи")).getByRole("link", { name: "Открыть клиента" }),
+    ).toHaveAttribute("href", "/admin?section=clients&role=owner&client=Olena%20K.");
   });
 
   it("switches the calendar to a month view with selectable days", async () => {

@@ -2814,12 +2814,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
 .admin-page-head button,
 .admin-panel-head a,
-.admin-text-action {
+.admin-text-action,
+.admin-outline-action {
   align-items: center;
-  background: var(--admin-primary);
-  border: 1px solid var(--admin-primary);
   border-radius: 8px;
-  color: #FFFFFF;
   cursor: pointer;
   display: inline-flex;
   font-family: inherit;
@@ -2830,10 +2828,32 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   padding: 0 16px;
 }
 
+.admin-page-head button,
+.admin-panel-head a,
+.admin-text-action {
+  background: var(--admin-primary);
+  border: 1px solid var(--admin-primary);
+  color: #FFFFFF;
+}
+
 .admin-page-head button:hover,
 .admin-panel-head a:hover,
 .admin-text-action:hover {
   background: var(--admin-primary-strong);
+}
+
+.admin-outline-action {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-primary-strong);
+  text-decoration: none;
+}
+
+.admin-outline-action:hover,
+.admin-outline-action:focus-visible {
+  border-color: rgba(124, 77, 161, 0.42);
+  box-shadow: 0 10px 22px rgba(29, 20, 36, 0.08);
+  outline: 0;
 }
 
 .admin-dashboard-grid,
@@ -3016,6 +3036,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   border-bottom: 0;
 }
 
+.admin-data-table tr[aria-selected="true"] td {
+  background: rgba(124, 77, 161, 0.08);
+}
+
 .admin-tabular {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -3078,10 +3102,29 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .admin-module-tile,
 .admin-icon-button,
 .admin-danger-button,
+.admin-row-action,
 .admin-action-footer button,
 .admin-filter-row button,
 .admin-export-actions button {
   cursor: pointer;
+}
+
+.admin-row-action {
+  background: transparent;
+  border: 0;
+  color: var(--admin-text);
+  font: inherit;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 0;
+  text-align: left;
+}
+
+.admin-row-action:hover,
+.admin-row-action:focus-visible {
+  color: var(--admin-primary-strong);
+  outline: 0;
+  text-decoration: underline;
 }
 
 button.admin-calendar-item,
@@ -3121,6 +3164,148 @@ button.admin-calendar-item[aria-pressed="true"] {
 
 .admin-split-view {
   grid-template-columns: minmax(0, 1fr) minmax(270px, 340px);
+}
+
+.admin-clients-workspace {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+}
+
+.admin-client-card {
+  align-self: start;
+}
+
+.admin-client-profile-head {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 52px minmax(0, 1fr);
+  margin-top: 8px;
+}
+
+.admin-client-avatar {
+  align-items: center;
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.2);
+  border-radius: 8px;
+  color: var(--admin-primary-strong);
+  display: inline-flex;
+  font-size: 0.92rem;
+  font-weight: 900;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+
+.admin-client-profile-head h2 {
+  font-size: 1.24rem;
+  margin: 0;
+}
+
+.admin-client-profile-head p {
+  margin-top: 3px;
+}
+
+.admin-client-contact-list,
+.admin-client-metrics,
+.admin-client-section {
+  border-top: 1px solid rgba(124, 77, 161, 0.14);
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.admin-client-contact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-client-contact-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-client-contact-list dt,
+.admin-client-metrics span,
+.admin-client-section h3 {
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-client-contact-list dd,
+.admin-client-metrics strong {
+  color: var(--admin-text);
+  font-size: 0.9rem;
+  font-weight: 800;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-metrics {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-client-metrics div {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-client-history {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.admin-client-history li {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-client-history div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-client-history strong {
+  color: var(--admin-text);
+  font-size: 0.86rem;
+}
+
+.admin-client-history div span,
+.admin-client-section p {
+  color: var(--admin-muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.admin-client-section p {
+  margin-top: 10px;
+}
+
+.admin-client-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-client-tags span {
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 999px;
+  color: var(--admin-primary-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  min-height: 26px;
+  padding: 4px 9px;
 }
 
 .admin-calendar-list {
@@ -3284,6 +3469,7 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-detail-heading .admin-text-action,
+.admin-detail-heading .admin-outline-action,
 .admin-detail-heading .admin-danger-button {
   flex: 0 0 auto;
   min-height: 44px;

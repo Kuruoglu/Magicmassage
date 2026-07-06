@@ -137,6 +137,21 @@ test("calendar can cancel an appointment after confirmation", async ({ page }) =
   await expect(page.getByRole("button", { name: /Olena K./ }).getByText("Отменена")).toBeVisible();
 });
 
+test("calendar links an appointment to the matching client profile", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: /Olena K./ }).click();
+  await page.getByLabel("Детали выбранной записи").getByRole("link", { name: "Открыть клиента" }).click();
+
+  await expect(page).toHaveURL(/section=clients/);
+
+  const card = page.getByLabel("Карточка клиента");
+  await expect(card.getByRole("heading", { name: "Olena K." })).toBeVisible();
+  await expect(card.getByText("olena.k@example.com")).toBeVisible();
+  await expect(card.getByRole("heading", { name: "История визитов" })).toBeVisible();
+  await expect(card.getByText("Deep tissue massage").first()).toBeVisible();
+});
+
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin?section=calendar");
