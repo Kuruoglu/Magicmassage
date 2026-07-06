@@ -56,6 +56,16 @@ The target admin version migrates booking away from Studio24 to an internal
 request-based booking flow. Until that work begins, the current public-site MVP
 can continue to use Studio24 as documented below.
 
+Calendar integration order is approved as follows:
+
+1. Build the full internal admin calendar first, including day, week, month, and
+   list views.
+2. Add one-way synchronization from the admin calendar to Google Calendar after
+   the internal booking/calendar model is stable.
+3. Treat two-way synchronization from Google Calendar back to the admin calendar
+   as a separate later decision because it needs conflict handling, webhook/watch
+   reliability, and audit logging.
+
 ## MVP Definition
 
 The first production release includes:
@@ -196,7 +206,8 @@ Remaining later-release candidates include:
 - Package management beyond the v1 certificate flow.
 - Promotion codes.
 - Waiting list for occupied slots.
-- Calendar synchronization and export.
+- Calendar integrations beyond the approved admin-to-Google-Calendar sync
+  sequence.
 - Loyalty and repeat-customer features.
 - Business analytics dashboards.
 - AI-assisted translation drafts.
