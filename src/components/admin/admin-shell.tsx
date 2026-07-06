@@ -108,6 +108,45 @@ function appointmentCountLabel(count: number) {
   return `${count} записей`;
 }
 
+function paymentCountLabel(count: number) {
+  if (count === 1) {
+    return "1 платеж";
+  }
+
+  if (count > 1 && count < 5) {
+    return `${count} платежа`;
+  }
+
+  return `${count} платежей`;
+}
+
+function matchesDatePeriod(date: string | undefined, startDate: string, endDate: string) {
+  if (!date) {
+    return false;
+  }
+
+  const startsAfterOrAtStart = startDate ? date >= startDate : true;
+  const endsBeforeOrAtEnd = endDate ? date <= endDate : true;
+
+  return startsAfterOrAtStart && endsBeforeOrAtEnd;
+}
+
+function formatFinancePeriod(startDate: string, endDate: string) {
+  if (startDate && endDate) {
+    return `${startDate} - ${endDate}`;
+  }
+
+  if (startDate) {
+    return `с ${startDate}`;
+  }
+
+  if (endDate) {
+    return `по ${endDate}`;
+  }
+
+  return "весь период";
+}
+
 function csvCell(value: string | number | undefined) {
   const stringValue = String(value ?? "");
 
@@ -507,21 +546,25 @@ function CalendarWorkspace({ query }: { query: string }) {
 
 function FinanceWorkspace({ query }: { query: string }) {
   const [exportNotice, setExportNotice] = useState("");
+  const [periodStart, setPeriodStart] = useState("2026-07-01");
+  const [periodEnd, setPeriodEnd] = useState("2026-07-03");
   const filteredFinanceRows = useMemo(
     () =>
       financeRows.filter((row) =>
+        matchesDatePeriod(row.date, periodStart, periodEnd) &&
         matchesSearch([row.date, row.id, row.certificateCode, row.buyer, row.status, row.gross, row.refund], query),
       ),
-    [query],
+    [periodEnd, periodStart, query],
   );
   const currentSummary = useMemo(() => calculateFinanceSummary(filteredFinanceRows), [filteredFinanceRows]);
+  const financePeriod = formatFinancePeriod(periodStart, periodEnd);
 
   function handleExport(format: "CSV" | "XLSX" | "PDF") {
     if (format === "CSV") {
       downloadCsv("magic-massage-stripe-sales.csv", buildFinanceCsv(filteredFinanceRows));
     }
 
-    setExportNotice(`${format} отчет готов к скачиванию.`);
+    setExportNotice(`${format} отчет за ${financePeriod} готов к скачиванию.`);
   }
 
   return (
@@ -542,6 +585,30 @@ function FinanceWorkspace({ query }: { query: string }) {
             PDF
           </button>
         </div>
+      </div>
+
+      <div className="admin-finance-period" aria-label="Период продаж Stripe">
+        <label>
+          <span>С</span>
+          <input
+            aria-label="Начало периода"
+            onChange={(event) => setPeriodStart(event.target.value)}
+            type="date"
+            value={periodStart}
+          />
+        </label>
+        <label>
+          <span>По</span>
+          <input
+            aria-label="Конец периода"
+            onChange={(event) => setPeriodEnd(event.target.value)}
+            type="date"
+            value={periodEnd}
+          />
+        </label>
+        <p>
+          Показано <strong>{paymentCountLabel(currentSummary.payments)}</strong> за <strong>{financePeriod}</strong>.
+        </p>
       </div>
 
       {exportNotice ? (

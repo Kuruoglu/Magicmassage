@@ -2943,6 +2943,43 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   margin-top: 0;
 }
 
+.admin-finance-period {
+  align-items: end;
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(160px, 220px)) minmax(0, 1fr);
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.admin-finance-period label {
+  color: var(--admin-muted);
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 800;
+  gap: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-finance-period input {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-text);
+  font: inherit;
+  min-height: 42px;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.admin-finance-period p {
+  margin: 0;
+}
+
 .admin-table-scroll {
   border: 1px solid var(--admin-border);
   border-radius: 8px;
@@ -3394,6 +3431,14 @@ button.admin-calendar-item[aria-pressed="true"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-finance-period {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-finance-period p {
+    grid-column: 1 / -1;
+  }
+
   .admin-module-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3427,8 +3472,13 @@ button.admin-calendar-item[aria-pressed="true"] {
 
   .admin-metric-row,
   .admin-finance-summary,
+  .admin-finance-period,
   .admin-module-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-finance-period p {
+    grid-column: auto;
   }
 
   .admin-calendar-item,

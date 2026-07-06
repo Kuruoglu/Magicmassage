@@ -103,6 +103,29 @@ describe("AdminShell", () => {
 
     await user.click(screen.getByRole("button", { name: "CSV" }));
 
-    expect(screen.getByText("CSV отчет готов к скачиванию.")).toBeInTheDocument();
+    expect(screen.getByText("CSV отчет за 2026-07-01 - 2026-07-03 готов к скачиванию.")).toBeInTheDocument();
+  });
+
+  it("filters accountant Stripe rows by selected period", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="finances" role="accountant" />);
+
+    await user.clear(screen.getByLabelText("Начало периода"));
+    await user.type(screen.getByLabelText("Начало периода"), "2026-07-02");
+    await user.clear(screen.getByLabelText("Конец периода"));
+    await user.type(screen.getByLabelText("Конец периода"), "2026-07-02");
+
+    const summary = screen.getByLabelText("Finance summary");
+    expect(within(summary).getByText("180,00 €")).toBeInTheDocument();
+    expect(within(summary).getByText("1")).toBeInTheDocument();
+
+    expect(screen.getByText("pi_3QMMN1022")).toBeInTheDocument();
+    expect(screen.queryByText("pi_3QMMN1021")).not.toBeInTheDocument();
+    expect(screen.queryByText("pi_3QMMN1023")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "CSV" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("CSV отчет за 2026-07-02 - 2026-07-02 готов к скачиванию.");
   });
 });

@@ -39,7 +39,23 @@ test("accountant CSV export provides visible feedback", async ({ page }) => {
 
   await page.getByRole("button", { name: "CSV" }).click();
 
-  await expect(page.getByText("CSV отчет готов к скачиванию.")).toBeVisible();
+  await expect(page.getByText("CSV отчет за 2026-07-01 - 2026-07-03 готов к скачиванию.")).toBeVisible();
+});
+
+test("accountant filters Stripe sales by tax period", async ({ page }) => {
+  await page.goto("/admin?role=accountant", { waitUntil: "networkidle" });
+
+  await page.getByLabel("Начало периода").fill("2026-07-02");
+  await page.getByLabel("Конец периода").fill("2026-07-02");
+
+  await expect(page.getByText("pi_3QMMN1022")).toBeVisible();
+  await expect(page.getByText("pi_3QMMN1021")).toHaveCount(0);
+  await expect(page.getByText("pi_3QMMN1023")).toHaveCount(0);
+  await expect(page.getByLabel("Finance summary").getByText("180,00 €")).toBeVisible();
+
+  await page.getByRole("button", { name: "CSV" }).click();
+
+  await expect(page.getByRole("status")).toHaveText("CSV отчет за 2026-07-02 - 2026-07-02 готов к скачиванию.");
 });
 
 test("calendar month view is selectable", async ({ page }) => {
