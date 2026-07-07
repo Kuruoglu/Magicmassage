@@ -1219,6 +1219,10 @@ function calendarDateHref(date: string, role: AdminRoleId) {
   return `/admin?section=calendar&role=${role}&date=${encodeURIComponent(date)}`;
 }
 
+function calendarAppointmentHref(appointment: Appointment, role: AdminRoleId) {
+  return calendarDateHref(appointment.date, role);
+}
+
 function certificateDetailHref(certificateCode: string, role: AdminRoleId) {
   return `/admin?section=certificates&role=${role}&certificate=${encodeURIComponent(certificateCode)}`;
 }
@@ -1233,6 +1237,23 @@ function phoneHref(phone: string) {
 
 function appointmentKey(appointment: Appointment) {
   return appointment.id ?? `${appointment.date}-${appointment.time}-${appointment.client}`;
+}
+
+function appointmentVisitLabel(appointment: Appointment) {
+  return `${formatCalendarDay(appointment.date)}, ${appointment.time}`;
+}
+
+function findClientVisitAppointment(clientName: string, visit: ClientVisit, appointments: Appointment[]) {
+  const normalizedClientName = normalizeSearch(clientName);
+  const normalizedVisitDate = normalizeSearch(visit.date);
+  const normalizedVisitService = normalizeSearch(visit.service);
+
+  return appointments.find(
+    (appointment) =>
+      normalizeSearch(appointment.client) === normalizedClientName &&
+      normalizeSearch(appointment.service) === normalizedVisitService &&
+      normalizeSearch(appointmentVisitLabel(appointment)) === normalizedVisitDate,
+  );
 }
 
 function sortAppointments(appointments: Appointment[]) {
@@ -3385,6 +3406,7 @@ function DashboardWorkspace({ certificates, query, role }: { certificates: Certi
 }
 
 function ClientDetailCard({
+  appointments,
   certificates,
   client,
   onCalendarCreateIntent,
@@ -3393,6 +3415,7 @@ function ClientDetailCard({
   onSaveNote,
   role,
 }: {
+  appointments: Appointment[];
   certificates: CertificateRecord[];
   client: ClientRecord;
   onCalendarCreateIntent: () => void;
@@ -3518,15 +3541,30 @@ function ClientDetailCard({
       <section className="admin-client-section">
         <h3>История визитов</h3>
         <ol className="admin-client-history">
-          {client.history.map((visit) => (
-            <li key={`${visit.date}-${visit.service}`}>
-              <div>
-                <strong>{visit.service}</strong>
-                <span>{visit.date}</span>
-              </div>
-              <span className={statusClass(visit.status)}>{visit.status}</span>
-            </li>
-          ))}
+          {client.history.map((visit) => {
+            const linkedAppointment = findClientVisitAppointment(client.name, visit, appointments);
+
+            return (
+              <li key={`${visit.date}-${visit.service}`}>
+                <div>
+                  <strong>{visit.service}</strong>
+                  <span>{visit.date}</span>
+                </div>
+                <span className="admin-client-history-actions">
+                  <span className={statusClass(visit.status)}>{visit.status}</span>
+                  {linkedAppointment ? (
+                    <Link
+                      aria-label={`Открыть запись ${visit.date}`}
+                      className="admin-client-inline-link"
+                      href={calendarAppointmentHref(linkedAppointment, role)}
+                    >
+                      Открыть запись
+                    </Link>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
         </ol>
       </section>
 
@@ -3537,7 +3575,9 @@ function ClientDetailCard({
             {certificates.map((certificate) => (
               <li key={certificate.code}>
                 <div>
-                  <strong>{certificate.code}</strong>
+                  <Link className="admin-client-certificate-code" href={certificateDetailHref(certificate.code, role)}>
+                    {certificate.code}
+                  </Link>
                   <span>
                     {certificate.buyer} → {certificate.recipient}
                   </span>
@@ -3600,6 +3640,7 @@ function ClientDetailCard({
 }
 
 function ClientsWorkspace({
+  appointments,
   certificates,
   clients,
   isClientCreateOpen,
@@ -3611,6 +3652,7 @@ function ClientsWorkspace({
   role,
   selectedClientName,
 }: {
+  appointments: Appointment[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
   isClientCreateOpen: boolean;
@@ -3773,6 +3815,7 @@ function ClientsWorkspace({
       {isClientDrawerOpen ? (
         <div className="admin-drawer-backdrop">
           <ClientDetailCard
+            appointments={appointments}
             certificates={findClientCertificates(certificates, selectedClient.name)}
             key={selectedClient.name}
             client={selectedClient}
@@ -6329,6 +6372,7 @@ function Workspace({
   if (section === "clients") {
     return (
       <ClientsWorkspace
+        appointments={appointments}
         certificates={certificates}
         clients={clients}
         isClientCreateOpen={isClientCreateOpen}

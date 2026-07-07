@@ -3478,6 +3478,13 @@ button.admin-calendar-item[aria-pressed="true"] {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.admin-client-history-actions {
+  align-items: end;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
 .admin-client-history div {
   display: grid;
   gap: 3px;
@@ -3494,6 +3501,28 @@ button.admin-calendar-item[aria-pressed="true"] {
   color: var(--admin-muted);
   font-size: 0.84rem;
   line-height: 1.5;
+}
+
+.admin-client-inline-link,
+.admin-client-certificate-code {
+  color: var(--admin-primary-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.admin-client-certificate-code {
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-inline-link:hover,
+.admin-client-inline-link:focus-visible,
+.admin-client-certificate-code:hover,
+.admin-client-certificate-code:focus-visible {
+  outline: 0;
+  text-decoration: underline;
 }
 
 .admin-client-certificates {

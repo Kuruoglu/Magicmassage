@@ -167,6 +167,10 @@ describe("AdminShell", () => {
     expect(within(card).getByRole("heading", { name: "История визитов" })).toBeInTheDocument();
     expect(within(card).getAllByText("Deep tissue massage").length).toBeGreaterThan(0);
     expect(within(card).getByText("8 июля, 15:00")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&date=2026-07-08",
+    );
     expect(within(card).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
   });
 
@@ -175,7 +179,10 @@ describe("AdminShell", () => {
 
     const card = screen.getByRole("dialog", { name: "Карточка клиента" });
     expect(within(card).getByRole("heading", { name: "Сертификаты" })).toBeInTheDocument();
-    expect(within(card).getByText("MMN-2407-1023")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "MMN-2407-1023" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+    );
     expect(within(card).getByText("Oksana → Self")).toBeInTheDocument();
     expect(within(card).getByText("250 €")).toBeInTheDocument();
     expect(within(card).getByText("Ожидает PDF")).toBeInTheDocument();

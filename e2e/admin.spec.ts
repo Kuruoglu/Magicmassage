@@ -391,6 +391,25 @@ test("client profile saves a note and exposes contact actions", async ({ page })
   await expect(card.getByText("Клиентка просит напоминать за 2 часа.")).toBeVisible();
 });
 
+test("client profile links visit history and certificates to their workspaces", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
+  await card.getByRole("link", { name: "Открыть запись 8 июля, 15:00" }).click();
+
+  await expect(page).toHaveURL(/section=calendar/);
+  await expect(page).toHaveURL(/date=2026-07-08/);
+  await page.getByRole("button", { name: "Список" }).click();
+  await expect(page.getByRole("button", { name: /Olena K.*8 июля.*Deep tissue massage/ })).toBeVisible();
+
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.getByRole("dialog", { name: "Карточка клиента" }).getByRole("link", { name: "MMN-2407-1023" }).click();
+
+  await expect(page).toHaveURL(/section=certificates/);
+  await expect(page).toHaveURL(/certificate=MMN-2407-1023/);
+  await expect(page.getByLabel("Детали сертификата").getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
+});
+
 test("client form creates and edits a client profile", async ({ page }) => {
   await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
 
