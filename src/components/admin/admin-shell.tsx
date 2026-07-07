@@ -70,6 +70,28 @@ const clientFilterOptions = [
   { id: "bg", label: "BG" },
 ] as const;
 type ClientFilterId = (typeof clientFilterOptions)[number]["id"];
+const clientLanguageOptions = [
+  { label: "RU", value: "ru" },
+  { label: "BG", value: "bg" },
+  { label: "UA", value: "ua" },
+  { label: "EN", value: "en" },
+] as const;
+const clientContactOptions = ["Телефон", "Telegram", "Viber", "Email"] as const;
+const clientStatusOptions = ["Новый клиент", "Активный клиент", "Пауза"] as const;
+type ClientFormState = {
+  email: string;
+  language: string;
+  name: string;
+  next: string;
+  note: string;
+  phone: string;
+  preferredContact: string;
+  status: string;
+  tags: string;
+  telegram: string;
+  totalSpend: string;
+  visits: string;
+};
 const appointmentServiceOptions = ["Классический массаж", "Лимфодренажный массаж", "Deep tissue massage", "SPA процедура"] as const;
 const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена", "Отменена"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
@@ -135,6 +157,30 @@ function buildInitialClientRows(): ClientRecord[] {
     history: client.history.map((visit) => ({ ...visit })),
     tags: [...client.tags],
   }));
+}
+
+function buildClientFormState(client?: ClientRecord): ClientFormState {
+  return {
+    email: client?.email ?? "",
+    language: client?.language ?? "ru",
+    name: client?.name ?? "",
+    next: client?.next ?? "",
+    note: client?.note ?? "",
+    phone: client?.phone ?? "",
+    preferredContact: client?.preferredContact ?? "Телефон",
+    status: client?.status ?? "Новый клиент",
+    tags: client?.tags.join(", ") ?? "",
+    telegram: client?.telegram ?? "",
+    totalSpend: client?.totalSpend ?? "0 €",
+    visits: String(client?.visits ?? 0),
+  };
+}
+
+function parseClientTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 function findClientByName(clients: ClientRecord[], name: string | undefined) {
@@ -387,6 +433,181 @@ function QuickActionDialog({
             Отмена
           </button>
         </div>
+      </section>
+    </div>
+  );
+}
+
+function ClientFormDialog({
+  initialClient,
+  onClose,
+  onSave,
+}: {
+  initialClient?: ClientRecord;
+  onClose: () => void;
+  onSave: (client: ClientRecord, originalClientName?: string) => void;
+}) {
+  const [form, setForm] = useState<ClientFormState>(() => buildClientFormState(initialClient));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialClient);
+
+  function updateForm<Field extends keyof ClientFormState>(field: Field, value: ClientFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = form.name.trim();
+    const phone = form.phone.trim();
+
+    if (!name || !phone) {
+      setError("Укажите имя и телефон клиента.");
+      return;
+    }
+
+    const visits = Number.parseInt(form.visits, 10);
+
+    onSave(
+      {
+        email: form.email.trim(),
+        history: initialClient?.history.map((visit) => ({ ...visit })) ?? [],
+        language: form.language,
+        name,
+        next: form.next.trim() || "Не назначен",
+        note: form.note.trim(),
+        phone,
+        preferredContact: form.preferredContact,
+        status: form.status,
+        tags: parseClientTags(form.tags),
+        telegram: form.telegram.trim(),
+        totalSpend: form.totalSpend.trim() || "0 €",
+        visits: Number.isFinite(visits) ? Math.max(visits, 0) : 0,
+      },
+      initialClient?.name,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="client-action-title" aria-modal="true" className="admin-action-dialog admin-client-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Клиенты</span>
+            <h2 id="client-action-title">{isEditing ? "Редактировать клиента" : "Новый клиент"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-client-form-grid">
+            <label>
+              Имя
+              <input
+                aria-invalid={error && !form.name.trim() ? "true" : undefined}
+                autoComplete="name"
+                onChange={(event) => updateForm("name", event.target.value)}
+                required
+                type="text"
+                value={form.name}
+              />
+            </label>
+            <label>
+              Телефон
+              <input
+                aria-invalid={error && !form.phone.trim() ? "true" : undefined}
+                autoComplete="tel"
+                onChange={(event) => updateForm("phone", event.target.value)}
+                required
+                type="tel"
+                value={form.phone}
+              />
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Email
+              <input
+                autoComplete="email"
+                onChange={(event) => updateForm("email", event.target.value)}
+                type="email"
+                value={form.email}
+              />
+            </label>
+            <label>
+              Telegram
+              <input
+                autoComplete="url"
+                onChange={(event) => updateForm("telegram", event.target.value)}
+                type="url"
+                value={form.telegram}
+              />
+            </label>
+            <label>
+              Язык
+              <select onChange={(event) => updateForm("language", event.target.value)} value={form.language}>
+                {clientLanguageOptions.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Канал связи
+              <select onChange={(event) => updateForm("preferredContact", event.target.value)} value={form.preferredContact}>
+                {clientContactOptions.map((contact) => (
+                  <option key={contact} value={contact}>
+                    {contact}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value)} value={form.status}>
+                {clientStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Следующий визит
+              <input onChange={(event) => updateForm("next", event.target.value)} type="text" value={form.next} />
+            </label>
+            <label>
+              Визиты
+              <input min="0" onChange={(event) => updateForm("visits", event.target.value)} type="number" value={form.visits} />
+            </label>
+            <label>
+              Сумма
+              <input onChange={(event) => updateForm("totalSpend", event.target.value)} type="text" value={form.totalSpend} />
+            </label>
+            <label className="admin-form-wide">
+              Заметка клиента
+              <textarea onChange={(event) => updateForm("note", event.target.value)} rows={4} value={form.note} />
+            </label>
+            <label className="admin-form-wide">
+              Теги
+              <input onChange={(event) => updateForm("tags", event.target.value)} type="text" value={form.tags} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить клиента"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
       </section>
     </div>
   );
@@ -696,6 +917,7 @@ function ClientDetailCard({
   client,
   onCalendarCreateIntent,
   onClose,
+  onEditClient,
   onSaveNote,
   role,
 }: {
@@ -703,6 +925,7 @@ function ClientDetailCard({
   client: ClientRecord;
   onCalendarCreateIntent: () => void;
   onClose: () => void;
+  onEditClient: (client: ClientRecord) => void;
   onSaveNote: (clientName: string, note: string) => void;
   role: AdminRoleId;
 }) {
@@ -781,6 +1004,9 @@ function ClientDetailCard({
         <Link className="admin-text-action" href={calendarCreateHref(client.name, role)} onClick={onCalendarCreateIntent}>
           Записать клиента
         </Link>
+        <button className="admin-outline-action" onClick={() => onEditClient(client)} type="button">
+          Редактировать клиента
+        </button>
         <a className="admin-outline-action" href={phoneHref(client.phone)}>
           Позвонить
         </a>
@@ -893,14 +1119,20 @@ function ClientDetailCard({
 
 function ClientsWorkspace({
   clients,
+  isClientCreateOpen,
   onCalendarCreateIntent,
+  onCloseClientCreate,
+  onSaveClient,
   onSaveClientNote,
   query,
   role,
   selectedClientName,
 }: {
   clients: ClientRecord[];
+  isClientCreateOpen: boolean;
   onCalendarCreateIntent: () => void;
+  onCloseClientCreate: () => void;
+  onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
   query: string;
   role: AdminRoleId;
@@ -909,6 +1141,7 @@ function ClientsWorkspace({
   const initialSelectedClientName = findClientByName(clients, selectedClientName)?.name ?? clients[0]?.name ?? "";
   const [selectedName, setSelectedName] = useState(initialSelectedClientName);
   const [isClientDrawerOpen, setIsClientDrawerOpen] = useState(Boolean(selectedClientName));
+  const [editingClient, setEditingClient] = useState<ClientRecord | undefined>();
   const [clientFilter, setClientFilter] = useState<ClientFilterId>("all");
   const filteredClients = clients.filter(
     (client) =>
@@ -929,10 +1162,28 @@ function ClientsWorkspace({
       ),
   );
   const selectedClient = findClientByName(clients, selectedName) ?? filteredClients[0] ?? clients[0];
+  const isClientFormOpen = isClientCreateOpen || Boolean(editingClient);
 
   function openClient(clientName: string) {
     setSelectedName(clientName);
     setIsClientDrawerOpen(true);
+  }
+
+  function openClientEdit(client: ClientRecord) {
+    onCloseClientCreate();
+    setEditingClient(client);
+  }
+
+  function closeClientForm() {
+    setEditingClient(undefined);
+    onCloseClientCreate();
+  }
+
+  function saveClientForm(client: ClientRecord, originalClientName?: string) {
+    onSaveClient(client, originalClientName);
+    setSelectedName(client.name);
+    setIsClientDrawerOpen(true);
+    closeClientForm();
   }
 
   if (!selectedClient) {
@@ -997,10 +1248,19 @@ function ClientsWorkspace({
             client={selectedClient}
             onCalendarCreateIntent={onCalendarCreateIntent}
             onClose={() => setIsClientDrawerOpen(false)}
+            onEditClient={openClientEdit}
             onSaveNote={onSaveClientNote}
             role={role}
           />
         </div>
+      ) : null}
+      {isClientFormOpen ? (
+        <ClientFormDialog
+          initialClient={editingClient}
+          key={editingClient?.name ?? "new-client"}
+          onClose={closeClientForm}
+          onSave={saveClientForm}
+        />
       ) : null}
     </div>
   );
@@ -1465,9 +1725,12 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 function Workspace({
   appointments,
   clients,
+  isClientCreateOpen,
   onCancelAppointment,
   onCalendarCreateIntent,
+  onCloseClientCreate,
   onEditAppointment,
+  onSaveClient,
   onSaveClientNote,
   query,
   role,
@@ -1476,9 +1739,12 @@ function Workspace({
 }: {
   appointments: Appointment[];
   clients: ClientRecord[];
+  isClientCreateOpen: boolean;
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
+  onCloseClientCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
   query: string;
   role: AdminRoleId;
@@ -1493,8 +1759,11 @@ function Workspace({
     return (
       <ClientsWorkspace
         clients={clients}
+        isClientCreateOpen={isClientCreateOpen}
         key={selectedClientName ?? "default-client"}
         onCalendarCreateIntent={onCalendarCreateIntent}
+        onCloseClientCreate={onCloseClientCreate}
+        onSaveClient={onSaveClient}
         onSaveClientNote={onSaveClientNote}
         query={query}
         role={role}
@@ -1533,6 +1802,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
   const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows());
+  const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -1568,6 +1838,14 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
 
   function openPrimaryAction() {
     setEditingAppointment(undefined);
+
+    if (activeSection === "clients") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsClientCreateOpen(true);
+      return;
+    }
+
     setIsActionOpen(true);
   }
 
@@ -1593,6 +1871,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   function closeActionDialog() {
     setDismissedCalendarActionKey(calendarActionKey);
     setIsActionOpen(false);
+    setIsClientCreateOpen(false);
     setEditingAppointment(undefined);
   }
 
@@ -1619,6 +1898,27 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setClients((current) =>
       current.map((client) => (normalizeSearch(client.name) === normalizeSearch(clientName) ? { ...client, note } : client)),
     );
+  }
+
+  function saveClientRecord(client: ClientRecord, originalClientName?: string) {
+    setClients((current) => {
+      const originalKey = originalClientName ? normalizeSearch(originalClientName) : "";
+      const nextKey = normalizeSearch(client.name);
+      const nextPhone = normalizeSearch(client.phone);
+      const existingIndex = current.findIndex((currentClient) => {
+        if (originalKey) {
+          return normalizeSearch(currentClient.name) === originalKey;
+        }
+
+        return normalizeSearch(currentClient.name) === nextKey || normalizeSearch(currentClient.phone) === nextPhone;
+      });
+
+      if (existingIndex === -1) {
+        return [...current, client];
+      }
+
+      return current.map((currentClient, index) => (index === existingIndex ? client : currentClient));
+    });
   }
 
   return (
@@ -1687,9 +1987,12 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
         <Workspace
           appointments={calendarAppointments}
           clients={clients}
+          isClientCreateOpen={isClientCreateOpen}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
+          onCloseClientCreate={() => setIsClientCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
+          onSaveClient={saveClientRecord}
           onSaveClientNote={saveClientNote}
           query={query}
           role={role}

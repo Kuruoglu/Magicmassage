@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -152,6 +152,73 @@ describe("AdminShell", () => {
     expect(within(card).getByRole("status")).toHaveTextContent("Заметка сохранена.");
     expect(within(card).getByText(/напоминать за 2 часа/)).toBeInTheDocument();
     expect(within(card).queryByLabelText("Заметка клиента")).not.toBeInTheDocument();
+  });
+
+  it("creates a client from the client primary action and opens its card", () => {
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новый клиент" });
+    fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Ирина Тестова" } });
+    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359 88 777 1122" } });
+    fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "irina@example.com" } });
+    fireEvent.change(within(dialog).getByLabelText("Язык"), { target: { value: "bg" } });
+    fireEvent.change(within(dialog).getByLabelText("Канал связи"), { target: { value: "Telegram" } });
+    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Новый клиент" } });
+    fireEvent.change(within(dialog).getByLabelText("Telegram"), { target: { value: "https://t.me/irina_demo" } });
+    fireEvent.change(within(dialog).getByLabelText("Следующий визит"), { target: { value: "Не назначен" } });
+    fireEvent.change(within(dialog).getByLabelText("Визиты"), { target: { value: "0" } });
+    fireEvent.change(within(dialog).getByLabelText("Сумма"), { target: { value: "0 €" } });
+    fireEvent.change(within(dialog).getByLabelText("Заметка клиента"), { target: { value: "Новая клиентка, предпочитает дневные слоты." } });
+    fireEvent.change(within(dialog).getByLabelText("Теги"), { target: { value: "BG, new" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новый клиент" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "Ирина Тестова" })).toBeInTheDocument();
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    expect(within(card).getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
+    expect(within(card).getByText("+359 88 777 1122")).toBeInTheDocument();
+    expect(within(card).getByText("irina@example.com")).toBeInTheDocument();
+    expect(within(card).getByText("BG · Новый клиент")).toBeInTheDocument();
+    expect(within(card).getByText(/предпочитает дневные слоты/)).toBeInTheDocument();
+    expect(within(card).getByText("new")).toBeInTheDocument();
+  });
+
+  it("validates required client fields before saving", () => {
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Новый клиент" })).getByRole("button", { name: "Сохранить клиента" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Укажите имя и телефон клиента.");
+    expect(within(screen.getByRole("table")).queryByRole("button", { name: "" })).not.toBeInTheDocument();
+  });
+
+  it("edits an existing client from the right drawer without creating a duplicate", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    fireEvent.click(within(card).getByRole("button", { name: "Редактировать клиента" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Редактировать клиента" });
+    expect(within(dialog).getByLabelText("Имя")).toHaveValue("Olena K.");
+
+    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359 87 333 4499" } });
+    fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "olena.updated@example.com" } });
+    fireEvent.change(within(dialog).getByLabelText("Канал связи"), { target: { value: "Email" } });
+    fireEvent.change(within(dialog).getByLabelText("Заметка клиента"), { target: { value: "Обновленная заметка из формы клиента." } });
+    fireEvent.change(within(dialog).getByLabelText("Теги"), { target: { value: "UA, вечер, email" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать клиента" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "Olena K." })).toHaveLength(1);
+    expect(within(card).getByText("+359 87 333 4499")).toBeInTheDocument();
+    expect(within(card).getByText("olena.updated@example.com")).toBeInTheDocument();
+    expect(within(card).getAllByText("Email").length).toBeGreaterThan(0);
+    expect(within(card).getByText(/Обновленная заметка/)).toBeInTheDocument();
+    expect(within(card).getByText("email")).toBeInTheDocument();
   });
 
   it("updates the calendar detail panel when an appointment is selected", async () => {

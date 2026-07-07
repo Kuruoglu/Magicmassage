@@ -32,7 +32,7 @@ test("admin search and action panel are interactive", async ({ page }) => {
 
   await page.getByRole("button", { name: "Добавить клиента" }).click();
 
-  await expect(page.getByRole("dialog", { name: "Быстрое действие" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Новый клиент" })).toBeVisible();
 });
 
 test("accountant CSV export provides visible feedback", async ({ page }) => {
@@ -216,6 +216,45 @@ test("client profile saves a note and exposes contact actions", async ({ page })
 
   await expect(card.getByRole("status")).toHaveText("Заметка сохранена.");
   await expect(card.getByText("Клиентка просит напоминать за 2 часа.")).toBeVisible();
+});
+
+test("client form creates and edits a client profile", async ({ page }) => {
+  await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Добавить клиента" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новый клиент" });
+  await createDialog.getByRole("textbox", { name: "Имя" }).fill("Ирина Тестова");
+  await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359 88 777 1122");
+  await createDialog.getByRole("textbox", { name: "Email" }).fill("irina@example.com");
+  await createDialog.getByLabel("Язык").selectOption("bg");
+  await createDialog.getByLabel("Канал связи").selectOption("Telegram");
+  await createDialog.getByLabel("Статус").selectOption("Новый клиент");
+  await createDialog.getByRole("textbox", { name: "Telegram" }).fill("https://t.me/irina_demo");
+  await createDialog.getByRole("textbox", { name: "Следующий визит" }).fill("Не назначен");
+  await createDialog.getByRole("textbox", { name: "Заметка клиента" }).fill("Новая клиентка, предпочитает дневные слоты.");
+  await createDialog.getByRole("textbox", { name: "Теги" }).fill("BG, new");
+  await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
+
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("button", { name: "Ирина Тестова" })).toBeVisible();
+
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
+  await expect(card.getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
+  await expect(card.getByText("BG · Новый клиент")).toBeVisible();
+  await expect(card.getByText("irina@example.com")).toBeVisible();
+
+  await card.getByRole("button", { name: "Редактировать клиента" }).click();
+
+  const editDialog = page.getByRole("dialog", { name: "Редактировать клиента" });
+  await editDialog.getByLabel("Канал связи").selectOption("Email");
+  await editDialog.getByRole("textbox", { name: "Заметка клиента" }).fill("Обновлено после звонка, лучше писать на email.");
+  await editDialog.getByRole("textbox", { name: "Теги" }).fill("BG, email");
+  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  await expect(editDialog).toHaveCount(0);
+  await expect(card.getByText("Обновлено после звонка, лучше писать на email.")).toBeVisible();
+  await expect(card.getByText("email", { exact: true })).toBeVisible();
 });
 
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {

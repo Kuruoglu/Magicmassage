@@ -3754,6 +3754,10 @@ button.admin-calendar-item[aria-pressed="true"] {
   gap: 12px;
 }
 
+.admin-client-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .admin-action-body label {
   color: var(--admin-muted);
   display: grid;
@@ -3781,6 +3785,11 @@ button.admin-calendar-item[aria-pressed="true"] {
   font-size: 0.82rem;
   font-weight: 800;
   margin: -4px 0 0;
+}
+
+.admin-form-alert-wide,
+.admin-form-wide {
+  grid-column: 1 / -1;
 }
 
 .admin-confirm-copy {
@@ -4031,6 +4040,10 @@ button.admin-calendar-item[aria-pressed="true"] {
 
   .admin-calendar-month-grid {
     gap: 4px;
+  }
+
+  .admin-client-form-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-calendar-weekday {
