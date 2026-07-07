@@ -422,8 +422,6 @@ const calendarModes: Array<{ id: CalendarMode; label: string }> = [
 const calendarMonthLabel = "Июль 2026";
 const calendarWeekdayLabels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const calendarWeekLabel = "Неделя 6-12 июля";
-const calendarDayCapacity = 4;
-const appointmentBufferMinutes = 30;
 const calendarMonthDays = Array.from({ length: 31 }, (_, index) => {
   const day = index + 1;
 
@@ -1274,8 +1272,8 @@ function appointmentCountLabel(count: number) {
   return `${count} записей`;
 }
 
-function freeSlotCount(appointmentCount: number) {
-  return Math.max(0, calendarDayCapacity - appointmentCount);
+function freeSlotCount(appointmentCount: number, dailySlotCapacity: number) {
+  return Math.max(0, dailySlotCapacity - appointmentCount);
 }
 
 function freeSlotLabel(count: number) {
@@ -1288,6 +1286,18 @@ function freeSlotLabel(count: number) {
   }
 
   return `${count} свободных слотов`;
+}
+
+function slotCountLabel(count: number) {
+  if (count === 1) {
+    return "1 слот";
+  }
+
+  if (count > 1 && count < 5) {
+    return `${count} слота`;
+  }
+
+  return `${count} слотов`;
 }
 
 function paymentCountLabel(count: number) {
@@ -4416,7 +4426,9 @@ function PriceWorkspace({
 
 function CalendarWorkspace({
   appointments,
+  bookingBufferMinutes,
   clients,
+  dailySlotCapacity,
   onCancelAppointment,
   onCalendarDateChange,
   onEditAppointment,
@@ -4426,7 +4438,9 @@ function CalendarWorkspace({
   selectedCalendarDate,
 }: {
   appointments: Appointment[];
+  bookingBufferMinutes: number;
   clients: ClientRecord[];
+  dailySlotCapacity: number;
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarDateChange: (date: string) => void;
   onEditAppointment: (appointment: Appointment) => void;
@@ -4523,7 +4537,7 @@ function CalendarWorkspace({
             {calendarMonthDays.map((day) => {
               const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
               const countLabel = appointmentCountLabel(dayAppointments.length);
-              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length));
+              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length, dailySlotCapacity));
 
               return (
                 <span className="admin-calendar-month-cell" key={day.date} role="gridcell">
@@ -4550,7 +4564,7 @@ function CalendarWorkspace({
             {weekDays.map((day) => {
               const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
               const countLabel = appointmentCountLabel(dayAppointments.length);
-              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length));
+              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length, dailySlotCapacity));
 
               return (
                 <section className="admin-calendar-week-day" key={day.date} role="gridcell">
@@ -4626,11 +4640,11 @@ function CalendarWorkspace({
             <dl className="admin-detail-list">
               <div>
                 <dt>Расчет слотов</dt>
-                <dd>{calendarDayCapacity} слота в день</dd>
+                <dd>{slotCountLabel(dailySlotCapacity)} в день</dd>
               </div>
               <div>
                 <dt>Буфер между сеансами</dt>
-                <dd>{appointmentBufferMinutes} минут, позже в Настройки → Запись</dd>
+                <dd>{bookingBufferMinutes} минут, Настройки → Запись</dd>
               </div>
             </dl>
           </>
@@ -6268,7 +6282,9 @@ function Workspace({
     return (
       <CalendarWorkspace
         appointments={appointments}
+        bookingBufferMinutes={settings.bookingBufferMinutes}
         clients={clients}
+        dailySlotCapacity={settings.dailySlotCapacity}
         key={`${selectedCalendarDate ?? "default-calendar"}:${calendarAppointmentFocus?.appointmentKey ?? "default-focus"}`}
         onCancelAppointment={onCancelAppointment}
         onCalendarDateChange={onCalendarDateChange}

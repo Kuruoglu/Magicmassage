@@ -1042,6 +1042,28 @@ describe("AdminShell", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Настройки сохранены.");
   });
 
+  it("uses saved booking settings for calendar slot availability", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<AdminShell activeSection="settings" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
+    fireEvent.change(within(dialog).getByLabelText("Слотов в день"), { target: { value: "5" } });
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
+
+    rerender(<AdminShell activeSection="calendar" role="owner" />);
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+
+    const monthGrid = screen.getByRole("grid", { name: "Месяц Июль 2026" });
+    expect(within(monthGrid).getByRole("button", { name: /6 июля.*2 записи.*3 свободных слота/ })).toBeInTheDocument();
+
+    const details = screen.getByLabelText("Детали выбранной записи");
+    expect(within(details).getByText("5 слотов в день")).toBeInTheDocument();
+    expect(within(details).getByText(/45 минут/)).toBeInTheDocument();
+  });
+
   it("keeps settings details synchronized with search results", async () => {
     const user = userEvent.setup();
 

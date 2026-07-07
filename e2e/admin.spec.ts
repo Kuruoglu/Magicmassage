@@ -578,6 +578,32 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
   await expect(page.getByRole("status")).toHaveText("Действие записано в audit log.");
 });
 
+test("calendar availability uses saved booking settings", async ({ page }) => {
+  await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
+
+  const settingsDetails = page.getByLabel("Детали настроек");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Настройки админки" });
+  await dialog.getByLabel("Перерыв между сеансами").fill("45");
+  await dialog.getByLabel("Слотов в день").fill("5");
+  await dialog.getByRole("button", { name: "Сохранить настройки" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(settingsDetails.getByText("45 минут")).toBeVisible();
+  await expect(settingsDetails.getByText("5 слотов")).toBeVisible();
+
+  await page.getByRole("link", { name: "Календарь" }).click();
+  await page.getByRole("button", { name: "Месяц" }).click();
+
+  const monthGrid = page.getByRole("grid", { name: "Месяц Июль 2026" });
+  await expect(monthGrid.getByRole("button", { name: /6 июля.*2 записи.*3 свободных слота/ })).toBeVisible();
+
+  const appointmentDetails = page.getByLabel("Детали выбранной записи");
+  await expect(appointmentDetails.getByText("5 слотов в день")).toBeVisible();
+  await expect(appointmentDetails.getByText("45 минут")).toBeVisible();
+});
+
 test("users workspace invites, filters and edits accountant access", async ({ page }) => {
   await page.goto("/admin?section=users", { waitUntil: "networkidle" });
 
