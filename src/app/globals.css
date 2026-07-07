@@ -3138,6 +3138,18 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.admin-list-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-list-link:hover,
+.admin-list-link:focus-visible {
+  border-color: rgba(124, 77, 161, 0.42);
+  box-shadow: 0 16px 34px rgba(29, 20, 36, 0.1);
+  outline: 0;
+}
+
 .admin-list-item div,
 .admin-calendar-item > span {
   display: grid;
@@ -3165,6 +3177,11 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   min-height: 44px;
   padding: 0;
   text-align: left;
+}
+
+.admin-row-link {
+  display: inline-flex;
+  text-decoration: none;
 }
 
 .admin-row-action:hover,

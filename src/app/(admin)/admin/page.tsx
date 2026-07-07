@@ -14,6 +14,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const role = resolveAdminRole(firstQueryValue(query.role));
   const activeSection = resolveAdminSection(firstQueryValue(query.section), role);
   const calendarAction = firstQueryValue(query.action) === "create" ? "create" : undefined;
+  const selectedCertificateCode = firstQueryValue(query.certificate);
   const selectedClientName = firstQueryValue(query.client);
 
   return (
@@ -21,6 +22,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       activeSection={activeSection}
       calendarAction={calendarAction}
       role={role}
+      selectedCertificateCode={selectedCertificateCode}
       selectedClientName={selectedClientName}
     />
   );

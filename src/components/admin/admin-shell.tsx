@@ -6,6 +6,7 @@ import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useStat
 
 import {
   calculateFinanceSummary,
+  canAccessAdminSection,
   getAdminModule,
   getAdminNavigationForRole,
   roleLabels,
@@ -28,6 +29,7 @@ type AdminShellProps = {
   calendarAction?: AdminCalendarAction;
   role: AdminRoleId;
   selectedClientName?: string;
+  selectedCertificateCode?: string;
 };
 
 type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
@@ -1167,6 +1169,14 @@ function isActiveClient(client: ClientRecord) {
 
 function clientProfileHref(clientName: string, role: AdminRoleId) {
   return `/admin?section=clients&role=${role}&client=${encodeURIComponent(clientName)}`;
+}
+
+function adminSectionHref(section: AdminSectionId, role: AdminRoleId) {
+  return `/admin?section=${section}&role=${role}`;
+}
+
+function certificateDetailHref(certificateCode: string, role: AdminRoleId) {
+  return `/admin?section=certificates&role=${role}&certificate=${encodeURIComponent(certificateCode)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -3145,6 +3155,62 @@ function DashboardWorkspace({ certificates, query, role }: { certificates: Certi
   const filteredCertificates = certificates.filter((certificate) =>
     matchesSearch([certificate.code, certificate.buyer, certificate.clientName, certificate.recipient, certificate.status], query),
   );
+  const operationItems = [
+    ...(canAccessAdminSection("calendar", role)
+      ? [
+          {
+            href: `/admin?section=calendar&role=${role}&action=create`,
+            label: "Создать запись",
+            note: "Быстро открыть чистую форму записи.",
+          },
+        ]
+      : []),
+    ...(canAccessAdminSection("clients", role)
+      ? [
+          {
+            href: adminSectionHref("clients", role),
+            label: "Открыть клиентов",
+            note: "Найти карточку клиента, контакты и историю.",
+          },
+        ]
+      : []),
+    ...(canAccessAdminSection("certificates", role)
+      ? [
+          {
+            href: adminSectionHref("certificates", role),
+            label: "Сертификаты к отправке",
+            note: "Проверить PDF, статусы и погашения.",
+          },
+        ]
+      : []),
+    ...(canAccessAdminSection("finances", role)
+      ? [
+          {
+            href: adminSectionHref("finances", role),
+            label: "Выгрузить Stripe",
+            note: "Продажи, комиссии, возвраты и net за период.",
+          },
+        ]
+      : []),
+    ...(canAccessAdminSection("users", role)
+      ? [
+          {
+            href: adminSectionHref("users", role),
+            label: "Пользователи и роли",
+            note: "Проверить доступы сотрудников и бухгалтера.",
+          },
+        ]
+      : []),
+    ...(canAccessAdminSection("settings", role)
+      ? [
+          {
+            href: adminSectionHref("settings", role),
+            label: "Настройки календаря",
+            note: "Буфер между сеансами, рабочее время и правила записи.",
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="admin-dashboard-grid">
@@ -3172,16 +3238,26 @@ function DashboardWorkspace({ certificates, query, role }: { certificates: Certi
                 <th>Клиент</th>
                 <th>Услуга</th>
                 <th>Статус</th>
+                <th>Раздел</th>
               </tr>
             </thead>
             <tbody>
               {filteredAppointments.map((appointment) => (
                 <tr key={appointmentKey(appointment)}>
                   <td className="admin-tabular">{appointment.time}</td>
-                  <td>{appointment.client}</td>
+                  <td>
+                    <Link className="admin-row-action admin-row-link" href={clientProfileHref(appointment.client, role)}>
+                      {appointment.client}
+                    </Link>
+                  </td>
                   <td>{appointment.service}</td>
                   <td>
                     <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                  </td>
+                  <td>
+                    <Link className="admin-row-action admin-row-link" href={adminSectionHref("calendar", role)}>
+                      Календарь
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -3202,7 +3278,11 @@ function DashboardWorkspace({ certificates, query, role }: { certificates: Certi
           {filteredCertificates.map((certificate) => (
             <article className="admin-list-item" key={certificate.code}>
               <div>
-                <strong>{certificate.code}</strong>
+                <strong>
+                  <Link className="admin-row-action admin-row-link" href={certificateDetailHref(certificate.code, role)}>
+                    {certificate.code}
+                  </Link>
+                </strong>
                 <span>
                   {certificate.buyer} → {certificate.recipient}
                 </span>
@@ -3212,6 +3292,23 @@ function DashboardWorkspace({ certificates, query, role }: { certificates: Certi
           ))}
         </div>
         {filteredCertificates.length === 0 ? <EmptyState label="Сертификаты не найдены." /> : null}
+      </section>
+
+      <section className="admin-panel" aria-labelledby="dashboard-queue-heading">
+        <div className="admin-panel-head">
+          <h2 id="dashboard-queue-heading">Операционная очередь</h2>
+        </div>
+        <div className="admin-list">
+          {operationItems.map((item) => (
+            <Link className="admin-list-item admin-list-link" href={item.href} key={item.label}>
+              <div>
+                <strong>{item.label}</strong>
+                <span>{item.note}</span>
+              </div>
+              <span aria-hidden="true">→</span>
+            </Link>
+          ))}
+        </div>
       </section>
     </div>
   );
@@ -3582,6 +3679,7 @@ function CertificatesWorkspace({
   onUpdateCertificateStatus,
   query,
   role,
+  selectedCertificateCode,
 }: {
   certificates: CertificateRecord[];
   clients: ClientRecord[];
@@ -3591,8 +3689,15 @@ function CertificatesWorkspace({
   onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
   query: string;
   role: AdminRoleId;
+  selectedCertificateCode?: string;
 }) {
-  const [selectedCode, setSelectedCode] = useState(certificates[0]?.code ?? "");
+  const [selectedCode, setSelectedCode] = useState(() => {
+    if (selectedCertificateCode && certificates.some((certificate) => certificate.code === selectedCertificateCode)) {
+      return selectedCertificateCode;
+    }
+
+    return certificates[0]?.code ?? "";
+  });
   const [editingCertificate, setEditingCertificate] = useState<CertificateRecord | undefined>();
   const [actionNotice, setActionNotice] = useState("");
   const filteredCertificates = certificates.filter((certificate) =>
@@ -5887,6 +5992,7 @@ function Workspace({
   query,
   role,
   section,
+  selectedCertificateCode,
   selectedClientName,
   services,
   settings,
@@ -5937,6 +6043,7 @@ function Workspace({
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
+  selectedCertificateCode?: string;
   selectedClientName?: string;
   services: ServiceRecord[];
   settings: SettingsRecord;
@@ -5969,11 +6076,13 @@ function Workspace({
         certificates={certificates}
         clients={clients}
         isCertificateCreateOpen={isCertificateCreateOpen}
+        key={selectedCertificateCode ?? "default-certificate"}
         onCloseCertificateCreate={onCloseCertificateCreate}
         onSaveCertificate={onSaveCertificate}
         onUpdateCertificateStatus={onUpdateCertificateStatus}
         query={query}
         role={role}
+        selectedCertificateCode={selectedCertificateCode}
       />
     );
   }
@@ -6087,7 +6196,13 @@ function Workspace({
   return <GenericWorkspace query={query} section={section} />;
 }
 
-export function AdminShell({ activeSection, calendarAction, role, selectedClientName }: AdminShellProps) {
+export function AdminShell({
+  activeSection,
+  calendarAction,
+  role,
+  selectedCertificateCode,
+  selectedClientName,
+}: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
   const [query, setQuery] = useState("");
@@ -6709,6 +6824,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           query={query}
           role={role}
           section={activeSection}
+          selectedCertificateCode={selectedCertificateCode}
           selectedClientName={selectedClientName}
           services={services}
           settings={settings}

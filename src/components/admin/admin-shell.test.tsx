@@ -28,6 +28,51 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("link", { name: "Финансы" })).not.toBeInTheDocument();
   });
 
+  it("links dashboard operational rows to the connected workspaces", () => {
+    render(<AdminShell activeSection="dashboard" role="owner" />);
+
+    expect(screen.getByRole("heading", { name: "Операционная очередь" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Создать запись/ })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&action=create",
+    );
+    expect(screen.getByRole("link", { name: /Открыть клиентов/ })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner",
+    );
+    expect(screen.getByRole("link", { name: /Выгрузить Stripe/ })).toHaveAttribute(
+      "href",
+      "/admin?section=finances&role=owner",
+    );
+    expect(screen.getByRole("link", { name: /Пользователи и роли/ })).toHaveAttribute(
+      "href",
+      "/admin?section=users&role=owner",
+    );
+    expect(screen.getByRole("link", { name: "Анна Петрова" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=%D0%90%D0%BD%D0%BD%D0%B0%20%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2%D0%B0",
+    );
+    expect(screen.getByRole("link", { name: "MMN-2407-1023" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+    );
+  });
+
+  it("hides restricted dashboard operation links for a specialist", () => {
+    render(<AdminShell activeSection="dashboard" role="specialist" />);
+
+    expect(screen.getByRole("link", { name: /Создать запись/ })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=specialist&action=create",
+    );
+    expect(screen.getByRole("link", { name: /Открыть клиентов/ })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=specialist",
+    );
+    expect(screen.queryByRole("link", { name: /Выгрузить Stripe/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Пользователи и роли/ })).not.toBeInTheDocument();
+  });
+
   it("shows the strict finance workspace for the accountant role only", () => {
     render(<AdminShell activeSection="finances" role="accountant" />);
 
@@ -112,6 +157,15 @@ describe("AdminShell", () => {
     expect(within(card).getByText("Oksana → Self")).toBeInTheDocument();
     expect(within(card).getByText("250 €")).toBeInTheDocument();
     expect(within(card).getByText("Ожидает PDF")).toBeInTheDocument();
+  });
+
+  it("opens certificate details from the certificate query", () => {
+    render(<AdminShell activeSection="certificates" role="owner" selectedCertificateCode="MMN-2407-1023" />);
+
+    const details = screen.getByLabelText("Детали сертификата");
+    expect(within(details).getByRole("heading", { name: "MMN-2407-1023" })).toBeInTheDocument();
+    expect(within(details).getByText("Oksana → Self")).toBeInTheDocument();
+    expect(within(details).getByText("Ожидает PDF")).toBeInTheDocument();
   });
 
   it("creates a manual certificate and opens its details", () => {
@@ -564,8 +618,9 @@ describe("AdminShell", () => {
 
     await user.click(screen.getByRole("button", { name: "Создать запись" }));
 
-    expect(screen.getByRole("dialog", { name: "Быстрое действие" })).toBeInTheDocument();
-    expect(screen.getByText("Создать запись")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Быстрое действие" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByDisplayValue("Создать запись")).toBeInTheDocument();
   });
 
   it("creates a calendar appointment from the primary action", async () => {
