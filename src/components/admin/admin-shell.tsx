@@ -1168,7 +1168,23 @@ function matchesAdminUserFilter(user: AdminUserRecord, filter: AdminUserFilterId
 }
 
 function isActiveClient(client: ClientRecord) {
-  return normalizeSearch(client.status).startsWith("актив") && client.visits >= 5;
+  return clientActivitySummary(client).isActive;
+}
+
+function clientActivitySummary(client: ClientRecord) {
+  const hasActiveStatus = normalizeSearch(client.status).startsWith("актив");
+  const hasEnoughVisits = client.visits >= 5;
+  const isActive = hasActiveStatus && hasEnoughVisits;
+  const visitLabel = visitCountLabel(client.visits);
+
+  return {
+    details: `${hasActiveStatus ? "статус активный" : `статус: ${client.status}`}, ${
+      hasEnoughVisits ? "5+ визитов" : "меньше 5 визитов"
+    }`,
+    isActive,
+    nextVisit: `Следующий визит: ${client.next}`,
+    reason: `${isActive ? "В активных" : "Не в активных"}: ${visitLabel}`,
+  };
 }
 
 function visitCountLabel(visits: number) {
@@ -3394,6 +3410,7 @@ function ClientDetailCard({
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const activity = clientActivitySummary(client);
 
   function startNoteEdit() {
     setDraftNote(client.note);
@@ -3439,6 +3456,15 @@ function ClientDetailCard({
             {client.language.toUpperCase()} · {client.status}
           </p>
         </div>
+      </div>
+
+      <div className="admin-client-activity" aria-label="Активность клиента">
+        <span className={activity.isActive ? "admin-status admin-status-success" : "admin-status admin-status-warning"}>
+          {activity.isActive ? "В активных" : "Не в активных"}
+        </span>
+        <strong>{activity.reason}</strong>
+        <small>{activity.details}</small>
+        <small>{activity.nextVisit}</small>
       </div>
 
       <dl className="admin-client-contact-list">
@@ -3665,7 +3691,10 @@ function ClientsWorkspace({
               </button>
             ))}
           </div>
-          <p className="admin-filter-help">Активные = 5+ визитов и статус &quot;Активный клиент&quot;.</p>
+          <div className="admin-filter-help admin-client-filter-help" aria-label="Смысл фильтра активных клиентов">
+            <strong>Активные — это клиенты со статусом &quot;Активный клиент&quot; и минимум 5 визитами.</strong>
+            <span>Причина активности показывается в таблице, мобильной карточке и карточке клиента.</span>
+          </div>
         </div>
         <div className="admin-table-scroll admin-clients-table-scroll">
           <table className="admin-data-table">
@@ -3676,53 +3705,67 @@ function ClientsWorkspace({
                 <th>Язык</th>
                 <th>Визиты</th>
                 <th>Статус</th>
+                <th>Активность</th>
                 <th>Следующий визит</th>
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map((client) => (
-                <tr aria-selected={client.name === selectedClient.name} key={client.phone}>
-                  <td>
-                    <button className="admin-row-action" onClick={() => openClient(client.name)} type="button">
-                      {client.name}
-                    </button>
-                  </td>
-                  <td className="admin-tabular">{client.phone}</td>
-                  <td>{client.language.toUpperCase()}</td>
-                  <td className="admin-tabular">{client.visits}</td>
-                  <td>
-                    <span className={statusClass(client.status)}>{client.status}</span>
-                  </td>
-                  <td>{client.next}</td>
-                </tr>
-              ))}
+              {filteredClients.map((client) => {
+                const activity = clientActivitySummary(client);
+
+                return (
+                  <tr aria-selected={client.name === selectedClient.name} key={client.phone}>
+                    <td>
+                      <button className="admin-row-action" onClick={() => openClient(client.name)} type="button">
+                        {client.name}
+                      </button>
+                    </td>
+                    <td className="admin-tabular">{client.phone}</td>
+                    <td>{client.language.toUpperCase()}</td>
+                    <td className="admin-tabular">{client.visits}</td>
+                    <td>
+                      <span className={statusClass(client.status)}>{client.status}</span>
+                    </td>
+                    <td>
+                      <span className="admin-client-activity-reason">{activity.reason}</span>
+                      <small>{activity.nextVisit}</small>
+                    </td>
+                    <td>{client.next}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
         <ul aria-label="Мобильный список клиентов" className="admin-mobile-client-list">
-          {filteredClients.map((client) => (
-            <li key={client.phone}>
-              <button
-                aria-pressed={client.name === selectedClient.name}
-                className="admin-mobile-client-card"
-                onClick={() => openClient(client.name)}
-                type="button"
-              >
-                <span className="admin-mobile-client-head">
-                  <strong>{client.name}</strong>
-                  <span>{client.language.toUpperCase()}</span>
-                </span>
-                <span className="admin-mobile-client-meta">
-                  <span className="admin-tabular">{client.phone}</span>
-                  <span>{visitCountLabel(client.visits)}</span>
-                </span>
-                <span className="admin-mobile-client-foot">
-                  <span className={statusClass(client.status)}>{client.status}</span>
-                  <span>{client.next}</span>
-                </span>
-              </button>
-            </li>
-          ))}
+          {filteredClients.map((client) => {
+            const activity = clientActivitySummary(client);
+
+            return (
+              <li key={client.phone}>
+                <button
+                  aria-pressed={client.name === selectedClient.name}
+                  className="admin-mobile-client-card"
+                  onClick={() => openClient(client.name)}
+                  type="button"
+                >
+                  <span className="admin-mobile-client-head">
+                    <strong>{client.name}</strong>
+                    <span>{client.language.toUpperCase()}</span>
+                  </span>
+                  <span className="admin-mobile-client-meta">
+                    <span className="admin-tabular">{client.phone}</span>
+                    <span>{visitCountLabel(client.visits)}</span>
+                  </span>
+                  <span className="admin-mobile-client-activity">{activity.reason}</span>
+                  <span className="admin-mobile-client-foot">
+                    <span className={statusClass(client.status)}>{client.status}</span>
+                    <span>{client.next}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
         {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
       </section>

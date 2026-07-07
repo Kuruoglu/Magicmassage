@@ -128,15 +128,20 @@ describe("AdminShell", () => {
 
     expect(within(filters).getByRole("button", { name: "Активные" })).toHaveAttribute("aria-pressed", "true");
     expect(within(table).getByRole("columnheader", { name: "Статус" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Активность" })).toBeInTheDocument();
     expect(within(table).getByRole("row", { name: /Анна Петрова/ })).toHaveTextContent("Активный клиент");
+    expect(within(table).getByRole("row", { name: /Анна Петрова/ })).toHaveTextContent("В активных: 7 визитов");
     expect(within(table).getByRole("row", { name: /Olena K./ })).toHaveTextContent("Активный клиент");
+    expect(within(table).getByRole("row", { name: /Olena K./ })).toHaveTextContent("В активных: 5 визитов");
     expect(within(table).queryByRole("button", { name: "Maria Georgieva" })).not.toBeInTheDocument();
   });
 
   it("explains how the active client filter is calculated", () => {
     render(<AdminShell activeSection="clients" role="owner" />);
 
-    expect(screen.getByText("Активные = 5+ визитов и статус \"Активный клиент\".")).toBeInTheDocument();
+    const help = screen.getByLabelText("Смысл фильтра активных клиентов");
+    expect(help).toHaveTextContent("Активные — это клиенты со статусом \"Активный клиент\" и минимум 5 визитами.");
+    expect(help).toHaveTextContent("Причина активности показывается в таблице, мобильной карточке и карточке клиента.");
   });
 
   it("renders mobile client summaries with natural visit labels", () => {
@@ -152,10 +157,13 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
     const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    expect(card).toHaveClass("admin-drawer-panel");
     expect(within(card).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
     expect(within(card).getByText("+359 87 333 4411")).toBeInTheDocument();
     expect(within(card).getByText("olena.k@example.com")).toBeInTheDocument();
     expect(within(card).getByText("UA")).toBeInTheDocument();
+    expect(within(card).getByLabelText("Активность клиента")).toHaveTextContent("В активных: 5 визитов");
+    expect(within(card).getByLabelText("Активность клиента")).toHaveTextContent("Следующий визит: 15 Jul 11:30");
     expect(within(card).getByRole("heading", { name: "История визитов" })).toBeInTheDocument();
     expect(within(card).getAllByText("Deep tissue massage").length).toBeGreaterThan(0);
     expect(within(card).getByText("8 июля, 15:00")).toBeInTheDocument();

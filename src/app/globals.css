@@ -3027,6 +3027,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   width: 100%;
 }
 
+.admin-clients-table-scroll .admin-data-table {
+  min-width: 940px;
+}
+
 .admin-data-table th,
 .admin-data-table td {
   border-bottom: 1px solid rgba(124, 77, 161, 0.13);
@@ -3101,6 +3105,14 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 
 .admin-mobile-client-meta {
   justify-content: flex-start;
+}
+
+.admin-mobile-client-activity {
+  color: var(--admin-primary-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .admin-mobile-client-meta span,
@@ -3366,6 +3378,59 @@ button.admin-calendar-item[aria-pressed="true"] {
   font-weight: 700;
   line-height: 1.45;
   margin: 0;
+}
+
+.admin-client-filter-help {
+  background: rgba(124, 77, 161, 0.07);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.admin-client-filter-help strong {
+  color: var(--admin-text);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.admin-client-filter-help span {
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.admin-client-activity {
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.admin-client-activity strong,
+.admin-client-activity-reason {
+  color: var(--admin-text);
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-activity small,
+.admin-client-activity-reason + small {
+  color: var(--admin-muted);
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.4;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
 }
 
 .admin-client-contact-list dt,
@@ -4396,6 +4461,25 @@ button.admin-calendar-item[aria-pressed="true"] {
   }
 
   .admin-page-head button {
+    width: 100%;
+  }
+
+  .admin-clients-workspace .admin-panel-head {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-clients-workspace .admin-filter-row {
+    width: 100%;
+  }
+
+  .admin-clients-workspace .admin-filter-row button {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+  }
+
+  .admin-client-filter-help {
     width: 100%;
   }
 

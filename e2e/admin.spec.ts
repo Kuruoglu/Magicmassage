@@ -811,9 +811,19 @@ test("client filters update the table and profile certificate block", async ({ p
 
   await card.getByRole("button", { name: "Закрыть" }).click();
   await page.getByRole("button", { name: "Активные" }).click();
+  await expect(page.getByLabel("Смысл фильтра активных клиентов")).toContainText(
+    "Активные — это клиенты со статусом \"Активный клиент\" и минимум 5 визитами.",
+  );
   await expect(table.getByRole("row", { name: /Olena K.*Активный клиент/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Olena K.*В активных: 5 визитов/ })).toBeVisible();
   await expect(table.getByRole("row", { name: /Анна Петрова.*Активный клиент/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Анна Петрова.*В активных: 7 визитов/ })).toBeVisible();
   await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Olena K." }).click();
+  await expect(card).toHaveClass(/admin-drawer-panel/);
+  await expect(card.getByLabel("Активность клиента")).toContainText("В активных: 5 визитов");
+  await expect(card.getByLabel("Активность клиента")).toContainText("Следующий визит: 15 Jul 11:30");
 });
 
 test("mobile client active filter shows status cards without horizontal scrolling", async ({ page }) => {
@@ -828,7 +838,8 @@ test("mobile client active filter shows status cards without horizontal scrollin
 
   const annaCard = mobileList.getByRole("listitem").filter({ hasText: "Анна Петрова" });
   await expect(annaCard.getByText("Активный клиент")).toBeVisible();
-  await expect(annaCard.getByText("7 визитов")).toBeVisible();
+  await expect(annaCard.locator(".admin-mobile-client-meta").getByText("7 визитов", { exact: true })).toBeVisible();
+  await expect(annaCard.getByText("В активных: 7 визитов")).toBeVisible();
   await expect(mobileList.getByText("Maria Georgieva")).toHaveCount(0);
 
   const statusBox = await annaCard.getByText("Активный клиент").boundingBox();
