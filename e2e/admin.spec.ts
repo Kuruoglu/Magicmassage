@@ -192,6 +192,34 @@ test("calendar week and list modes are distinct", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Olena K./ })).toBeVisible();
 });
 
+test("calendar day timeline and appointment list use different layouts", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await expect(page.locator(".admin-day-timeline")).toBeVisible();
+  await expect(page.locator(".admin-appointment-feed")).toHaveCount(0);
+  await expect(page.getByText("Буфер после сеанса: 30 минут")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Список" }).click();
+
+  await expect(page.locator(".admin-appointment-feed")).toBeVisible();
+  await expect(page.locator(".admin-day-timeline")).toHaveCount(0);
+  await expect(page.getByText("Всего записей")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Olena K./ })).toBeVisible();
+
+  const layoutMetrics = await page.evaluate(() => ({
+    feedItems: document.querySelectorAll(".admin-appointment-feed-item").length,
+    hasOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    summaryCards: document.querySelectorAll(".admin-appointment-summary-card").length,
+  }));
+
+  expect(layoutMetrics).toEqual({
+    feedItems: expect.any(Number),
+    hasOverflow: false,
+    summaryCards: 3,
+  });
+  expect(layoutMetrics.feedItems).toBeGreaterThan(2);
+});
+
 test("calendar week view uses dense desktop columns", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });

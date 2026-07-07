@@ -627,12 +627,17 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="calendar" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "6 июля" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Таймлайн дня")).toHaveClass("admin-day-timeline");
+    expect(screen.getAllByText("Буфер после сеанса: 30 минут")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: /Olena K./ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Список" }));
 
     expect(screen.getByRole("heading", { name: "Список записей" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Лента всех записей")).toHaveClass("admin-appointment-feed");
+    expect(screen.getByText("Всего записей")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Olena K./ })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Таймлайн дня")).not.toBeInTheDocument();
   });
 
   it("opens the calendar on the selected date from the date query", () => {

@@ -3779,6 +3779,143 @@ button.admin-calendar-item[aria-pressed="true"] {
   outline: 0;
 }
 
+.admin-day-summary,
+.admin-appointment-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.admin-day-summary-card,
+.admin-appointment-summary-card {
+  background: rgba(124, 77, 161, 0.06);
+  border: 1px solid rgba(124, 77, 161, 0.13);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.admin-day-summary-card span,
+.admin-appointment-summary-card span {
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-day-summary-card strong,
+.admin-appointment-summary-card strong {
+  color: var(--admin-text);
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.admin-day-timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-day-timeline-row {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 104px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.admin-day-time-rail {
+  border-left: 2px solid rgba(124, 77, 161, 0.22);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 10px;
+}
+
+.admin-day-time-rail time {
+  color: var(--admin-text);
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.admin-day-time-rail span {
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.admin-day-appointment-card {
+  background: var(--admin-surface);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 8px;
+  min-width: 0;
+  padding: 13px;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-day-appointment-card:hover,
+.admin-day-appointment-card:focus-visible,
+.admin-day-appointment-card[aria-pressed="true"] {
+  border-color: rgba(124, 77, 161, 0.42);
+  box-shadow: 0 16px 34px rgba(29, 20, 36, 0.1);
+  outline: 0;
+}
+
+.admin-day-appointment-card[aria-pressed="true"] {
+  background: rgba(124, 77, 161, 0.08);
+}
+
+.admin-day-appointment-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.admin-day-appointment-head strong,
+.admin-day-appointment-service {
+  color: var(--admin-text);
+  min-width: 0;
+}
+
+.admin-day-appointment-service {
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.admin-day-appointment-note {
+  color: var(--admin-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.admin-appointment-feed {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-appointment-feed-item {
+  grid-template-columns: 86px minmax(0, 1fr) auto;
+}
+
+.admin-appointment-feed-main small + small {
+  margin-top: 2px;
+}
+
 .admin-selected-day-list {
   display: grid;
   gap: 10px;
@@ -4286,6 +4423,13 @@ button.admin-calendar-item[aria-pressed="true"] {
   .admin-calendar-item,
   .admin-list-item {
     align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-day-summary,
+  .admin-appointment-summary,
+  .admin-day-timeline-row,
+  .admin-appointment-feed-item {
     grid-template-columns: 1fr;
   }
 

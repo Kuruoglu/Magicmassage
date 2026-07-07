@@ -4555,9 +4555,10 @@ function CalendarWorkspace({
   const [selectedKey, setSelectedKey] = useState(
     () => selectedAppointmentFocus?.appointmentKey ?? appointmentKey(initialSelectedAppointment ?? fallbackAppointment),
   );
-  const selectedDayAppointments = filteredAppointments.filter((appointment) => appointment.date === selectedDate);
-  const visibleAppointments = mode === "day" ? selectedDayAppointments : filteredAppointments;
-  const appointmentDetailPool = mode === "day" ? selectedDayAppointments : filteredAppointments;
+  const selectedDayAppointments = sortAppointments(filteredAppointments.filter((appointment) => appointment.date === selectedDate));
+  const listAppointments = sortAppointments(filteredAppointments);
+  const visibleAppointments = mode === "day" ? selectedDayAppointments : listAppointments;
+  const appointmentDetailPool = mode === "day" ? selectedDayAppointments : listAppointments;
   const hasVisibleAppointments = visibleAppointments.length > 0;
   const selectedAppointment =
     hasVisibleAppointments
@@ -4570,6 +4571,9 @@ function CalendarWorkspace({
   const selectedAppointmentClient = findClientByName(clients, selectedAppointment.client);
   const shouldShowAppointmentDrawer = isAppointmentDrawerOpen && mode !== "month" && hasVisibleAppointments;
   const weekDays = calendarMonthDays.slice(5, 12);
+  const selectedDayFreeCount = freeSlotCount(selectedDayAppointments.length, dailySlotCapacity);
+  const confirmedListCount = listAppointments.filter((appointment) => appointment.status === "Подтверждена").length;
+  const attentionListCount = listAppointments.filter((appointment) => appointment.status !== "Подтверждена" && appointment.status !== "Отменена").length;
 
   function switchMode(nextMode: CalendarMode) {
     setMode(nextMode);
@@ -4727,31 +4731,92 @@ function CalendarWorkspace({
               );
             })}
           </div>
-        ) : (
-          <div className="admin-calendar-list" aria-label={mode === "day" ? `Записи на ${formatCalendarDay(selectedDate)}` : "Все записи"}>
-            {visibleAppointments.map((appointment) => {
-              const key = appointmentKey(appointment);
+        ) : mode === "day" ? (
+          <>
+            <div className="admin-day-summary" aria-label={`Сводка дня ${formatCalendarDay(selectedDate)}`}>
+              <div className="admin-day-summary-card">
+                <span>Записи</span>
+                <strong>{appointmentCountLabel(selectedDayAppointments.length)}</strong>
+              </div>
+              <div className="admin-day-summary-card">
+                <span>Свободно</span>
+                <strong>{freeSlotLabel(selectedDayFreeCount)}</strong>
+              </div>
+              <div className="admin-day-summary-card">
+                <span>Буфер</span>
+                <strong>{bookingBufferMinutes} минут</strong>
+              </div>
+            </div>
+            <div className="admin-day-timeline" aria-label="Таймлайн дня" role="list">
+              {selectedDayAppointments.map((appointment) => {
+                const key = appointmentKey(appointment);
 
-              return (
-                <button
-                  aria-pressed={key === selectedAppointmentKey}
-                  className="admin-calendar-item"
-                  key={key}
-                  onClick={() => selectAppointment(appointment)}
-                  type="button"
-                >
-                  <time className="admin-tabular">{appointment.time}</time>
-                  <span>
-                    <strong>{appointment.client}</strong>
-                    <small>
-                      {formatCalendarDay(appointment.date)} · {appointment.service}
-                    </small>
-                  </span>
-                  <span className={statusClass(appointment.status)}>{appointment.status}</span>
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <div className="admin-day-timeline-row" key={key} role="listitem">
+                    <div className="admin-day-time-rail">
+                      <time className="admin-tabular">{appointment.time}</time>
+                      <span>Буфер после сеанса: {bookingBufferMinutes} минут</span>
+                    </div>
+                    <button
+                      aria-pressed={key === selectedAppointmentKey}
+                      className="admin-day-appointment-card"
+                      onClick={() => selectAppointment(appointment)}
+                      type="button"
+                    >
+                      <span className="admin-day-appointment-head">
+                        <strong>{appointment.client}</strong>
+                        <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                      </span>
+                      <span className="admin-day-appointment-service">{appointment.service}</span>
+                      {appointment.note ? <span className="admin-day-appointment-note">{appointment.note}</span> : null}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="admin-appointment-summary" aria-label="Сводка списка записей">
+              <div className="admin-appointment-summary-card">
+                <span>Всего записей</span>
+                <strong>{listAppointments.length}</strong>
+              </div>
+              <div className="admin-appointment-summary-card">
+                <span>Подтверждены</span>
+                <strong>{confirmedListCount}</strong>
+              </div>
+              <div className="admin-appointment-summary-card">
+                <span>Требуют внимания</span>
+                <strong>{attentionListCount}</strong>
+              </div>
+            </div>
+            <div className="admin-appointment-feed" aria-label="Лента всех записей">
+              {listAppointments.map((appointment) => {
+                const key = appointmentKey(appointment);
+
+                return (
+                  <button
+                    aria-pressed={key === selectedAppointmentKey}
+                    className="admin-calendar-item admin-appointment-feed-item"
+                    key={key}
+                    onClick={() => selectAppointment(appointment)}
+                    type="button"
+                  >
+                    <time className="admin-tabular">{appointment.time}</time>
+                    <span className="admin-appointment-feed-main">
+                      <strong>{appointment.client}</strong>
+                      <small>
+                        {formatCalendarDay(appointment.date)} · {appointment.service}
+                      </small>
+                      {appointment.note ? <small>{appointment.note}</small> : null}
+                    </span>
+                    <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
         {mode !== "month" && mode !== "week" && visibleAppointments.length === 0 ? <EmptyState label="Записи не найдены." /> : null}
       </section>
