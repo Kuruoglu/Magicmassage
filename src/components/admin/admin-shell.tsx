@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { type FormEvent, useMemo, useState } from "react";
 
@@ -130,6 +131,33 @@ type PriceFormState = {
   status: PriceStatus;
   updatedAt: string;
 };
+type MediaType = "Фото" | "Документ";
+type MediaStatus = "Готово" | "Требует alt" | "Черновик";
+type MediaRecord = {
+  altText: string;
+  dimensions: string;
+  folder: string;
+  id: string;
+  name: string;
+  size: string;
+  status: MediaStatus;
+  type: MediaType;
+  uploadedAt: string;
+  url: string;
+  usage: string[];
+};
+type MediaFormState = {
+  altText: string;
+  dimensions: string;
+  folder: string;
+  name: string;
+  size: string;
+  status: MediaStatus;
+  type: MediaType;
+  uploadedAt: string;
+  url: string;
+  usage: string;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
@@ -167,6 +195,8 @@ const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка"
 const certificateStatusOptions: CertificateStatus[] = ["Оплачено", "Отправлен", "Ожидает PDF", "Погашен"];
 const serviceStatusOptions: ServiceStatus[] = ["Опубликована", "Черновик", "Скрыта"];
 const priceStatusOptions: PriceStatus[] = ["Активна", "Скрыта"];
+const mediaTypeOptions: MediaType[] = ["Фото", "Документ"];
+const mediaStatusOptions: MediaStatus[] = ["Готово", "Требует alt", "Черновик"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -257,6 +287,47 @@ const initialPriceRows: PriceRecord[] = [
     updatedAt: "2026-07-07",
   },
 ];
+const initialMediaRows: MediaRecord[] = [
+  {
+    altText: "Классический массаж в кабинете Magic Massage Natali",
+    dimensions: "1600x1100",
+    folder: "services",
+    id: "media-classic-cover",
+    name: "Классический массаж",
+    size: "368 KB",
+    status: "Готово",
+    type: "Фото",
+    uploadedAt: "2026-07-07",
+    url: "/media/services/classic-massage.jpg",
+    usage: ["Услуга: Классический массаж", "Каталог услуг"],
+  },
+  {
+    altText: "",
+    dimensions: "1800x1200",
+    folder: "gallery",
+    id: "media-studio-room",
+    name: "Фото кабинета",
+    size: "512 KB",
+    status: "Требует alt",
+    type: "Фото",
+    uploadedAt: "2026-07-07",
+    url: "/media/gallery/studio-treatment-room.jpg",
+    usage: ["Галерея", "Главная"],
+  },
+  {
+    altText: "Сертификат массажиста Natali",
+    dimensions: "1200x1600",
+    folder: "certificates",
+    id: "media-certificate-natali",
+    name: "Сертификат Natali",
+    size: "246 KB",
+    status: "Готово",
+    type: "Документ",
+    uploadedAt: "2026-07-07",
+    url: "/media/about/certificates/04-massage-therapist.webp",
+    usage: ["О специалисте"],
+  },
+];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -281,6 +352,10 @@ function statusClass(status: string) {
   }
 
   if (normalizedStatus.includes("черновик")) {
+    return "admin-status admin-status-warning";
+  }
+
+  if (normalizedStatus.includes("требует")) {
     return "admin-status admin-status-warning";
   }
 
@@ -348,6 +423,13 @@ function buildInitialPriceRows(): PriceRecord[] {
   return initialPriceRows.map((price) => ({ ...price }));
 }
 
+function buildInitialMediaRows(): MediaRecord[] {
+  return initialMediaRows.map((item) => ({
+    ...item,
+    usage: [...item.usage],
+  }));
+}
+
 function buildClientFormState(client?: ClientRecord): ClientFormState {
   return {
     email: client?.email ?? "",
@@ -407,6 +489,21 @@ function buildPriceFormState(services: ServiceRecord[], price?: PriceRecord): Pr
   };
 }
 
+function buildMediaFormState(media?: MediaRecord): MediaFormState {
+  return {
+    altText: media?.altText ?? "",
+    dimensions: media?.dimensions ?? "",
+    folder: media?.folder ?? "services",
+    name: media?.name ?? "",
+    size: media?.size ?? "",
+    status: media?.status ?? "Черновик",
+    type: media?.type ?? "Фото",
+    uploadedAt: media?.uploadedAt ?? "2026-07-07",
+    url: media?.url ?? "",
+    usage: media?.usage.join(", ") ?? "",
+  };
+}
+
 function parseClientTags(value: string) {
   return value
     .split(",")
@@ -419,6 +516,14 @@ function parseCommaList(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function createMediaId(name: string, url: string) {
+  const base = normalizeSearch(name || url)
+    .replace(/[^a-z0-9а-яё]+/giu, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `media-${base || "asset"}`;
 }
 
 function findClientByName(clients: ClientRecord[], name: string | undefined) {
@@ -1259,6 +1364,151 @@ function PriceFormDialog({
 
           <div className="admin-action-footer">
             <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить цену"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function MediaFormDialog({
+  initialMedia,
+  onClose,
+  onSave,
+}: {
+  initialMedia?: MediaRecord;
+  onClose: () => void;
+  onSave: (media: MediaRecord, originalId?: string) => void;
+}) {
+  const [form, setForm] = useState<MediaFormState>(() => buildMediaFormState(initialMedia));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialMedia);
+
+  function updateForm<Field extends keyof MediaFormState>(field: Field, value: MediaFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = form.name.trim();
+    const url = form.url.trim();
+
+    if (!name || !url) {
+      setError("Укажите название и URL медиа.");
+      return;
+    }
+
+    onSave(
+      {
+        altText: form.altText.trim(),
+        dimensions: form.dimensions.trim(),
+        folder: form.folder.trim() || "media",
+        id: initialMedia?.id ?? createMediaId(name, url),
+        name,
+        size: form.size.trim(),
+        status: form.status,
+        type: form.type,
+        uploadedAt: form.uploadedAt,
+        url,
+        usage: parseCommaList(form.usage),
+      },
+      initialMedia?.id,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="media-action-title" aria-modal="true" className="admin-action-dialog admin-media-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Медиа</span>
+            <h2 id="media-action-title">{isEditing ? "Редактировать медиа" : "Новое медиа"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-content-form-grid">
+            <label>
+              Название
+              <input
+                aria-invalid={error && !form.name.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("name", event.target.value)}
+                required
+                type="text"
+                value={form.name}
+              />
+            </label>
+            <label>
+              Папка
+              <input onChange={(event) => updateForm("folder", event.target.value)} type="text" value={form.folder} />
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label className="admin-form-wide">
+              URL
+              <input
+                aria-invalid={error && !form.url.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("url", event.target.value)}
+                required
+                type="text"
+                value={form.url}
+              />
+            </label>
+            <label>
+              Тип
+              <select onChange={(event) => updateForm("type", event.target.value as MediaType)} value={form.type}>
+                {mediaTypeOptions.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value as MediaStatus)} value={form.status}>
+                {mediaStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Размер файла
+              <input onChange={(event) => updateForm("size", event.target.value)} type="text" value={form.size} />
+            </label>
+            <label>
+              Разрешение
+              <input onChange={(event) => updateForm("dimensions", event.target.value)} type="text" value={form.dimensions} />
+            </label>
+            <label>
+              Загружено
+              <input onChange={(event) => updateForm("uploadedAt", event.target.value)} type="date" value={form.uploadedAt} />
+            </label>
+            <label className="admin-form-wide">
+              Alt-текст
+              <textarea onChange={(event) => updateForm("altText", event.target.value)} rows={3} value={form.altText} />
+            </label>
+            <label className="admin-form-wide">
+              Использование
+              <textarea onChange={(event) => updateForm("usage", event.target.value)} rows={3} value={form.usage} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить медиа"}</button>
             <button className="admin-secondary-button" onClick={onClose} type="button">
               Отмена
             </button>
@@ -3000,6 +3250,235 @@ function FinanceWorkspace({ query }: { query: string }) {
   );
 }
 
+function MediaWorkspace({
+  isMediaCreateOpen,
+  media,
+  onCloseMediaCreate,
+  onSaveMedia,
+  query,
+}: {
+  isMediaCreateOpen: boolean;
+  media: MediaRecord[];
+  onCloseMediaCreate: () => void;
+  onSaveMedia: (media: MediaRecord, originalId?: string) => void;
+  query: string;
+}) {
+  const [selectedId, setSelectedId] = useState(media[0]?.id ?? "");
+  const [editingMedia, setEditingMedia] = useState<MediaRecord | undefined>();
+  const [filter, setFilter] = useState<"all" | "photo" | "documents" | "needsAlt">("all");
+  const filteredMedia = media
+    .filter((item) => {
+      if (filter === "photo") {
+        return item.type === "Фото";
+      }
+
+      if (filter === "documents") {
+        return item.type === "Документ";
+      }
+
+      if (filter === "needsAlt") {
+        return item.status === "Требует alt";
+      }
+
+      return true;
+    })
+    .filter((item) =>
+      matchesSearch(
+        [item.name, item.url, item.folder, item.type, item.status, item.altText, item.size, item.dimensions, item.usage.join(" ")],
+        query,
+      ),
+    )
+    .sort((first, second) => first.name.localeCompare(second.name, "ru-RU"));
+  const selectedMedia =
+    filteredMedia.find((item) => item.id === selectedId) ??
+    filteredMedia[0] ??
+    media.find((item) => item.id === selectedId) ??
+    media[0];
+  const isMediaFormOpen = isMediaCreateOpen || Boolean(editingMedia);
+
+  function openMedia(item: MediaRecord) {
+    setSelectedId(item.id);
+  }
+
+  function openMediaEdit(item: MediaRecord) {
+    onCloseMediaCreate();
+    setEditingMedia(item);
+  }
+
+  function closeMediaForm() {
+    setEditingMedia(undefined);
+    onCloseMediaCreate();
+  }
+
+  function saveMediaForm(item: MediaRecord, originalId?: string) {
+    onSaveMedia(item, originalId);
+    setSelectedId(item.id);
+    closeMediaForm();
+  }
+
+  if (!selectedMedia) {
+    return (
+      <section className="admin-panel admin-panel-large" aria-labelledby="media-heading">
+        <div className="admin-panel-head">
+          <h2 id="media-heading">Медиа</h2>
+        </div>
+        <EmptyState label="Медиа пока не добавлены." />
+        {isMediaFormOpen ? (
+          <MediaFormDialog
+            initialMedia={editingMedia}
+            key={editingMedia?.id ?? "new-media"}
+            onClose={closeMediaForm}
+            onSave={saveMediaForm}
+          />
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <div className="admin-split-view admin-content-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="media-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="media-heading">Библиотека медиа</h2>
+            <p>Файлы сайта, папки, alt-тексты, статус готовности и места использования.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры медиа">
+            <button aria-pressed={filter === "all"} onClick={() => setFilter("all")} type="button">
+              Все
+            </button>
+            <button aria-pressed={filter === "photo"} onClick={() => setFilter("photo")} type="button">
+              Фото
+            </button>
+            <button aria-pressed={filter === "documents"} onClick={() => setFilter("documents")} type="button">
+              Документы
+            </button>
+            <button aria-pressed={filter === "needsAlt"} onClick={() => setFilter("needsAlt")} type="button">
+              Требует alt
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-table-scroll">
+          <table className="admin-data-table">
+            <thead>
+              <tr>
+                <th>Файл</th>
+                <th>Папка</th>
+                <th>Тип</th>
+                <th>Статус</th>
+                <th>Использование</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredMedia.map((item) => (
+                <tr aria-selected={item.id === selectedMedia.id} key={item.id}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openMedia(item)} type="button">
+                      {item.name}
+                    </button>
+                  </td>
+                  <td>{item.folder}</td>
+                  <td>{item.type}</td>
+                  <td>
+                    <span className={statusClass(item.status)}>{item.status}</span>
+                  </td>
+                  <td>{item.usage[0] ?? "Не используется"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredMedia.length === 0 ? <EmptyState label="Медиа не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали медиа">
+        <span className="admin-kicker">Медиа</span>
+        <div className="admin-detail-heading">
+          <h2>{selectedMedia.name}</h2>
+          <div className="admin-detail-actions">
+            <button className="admin-text-action" onClick={() => openMediaEdit(selectedMedia)} type="button">
+              Редактировать
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-media-preview">
+          {selectedMedia.type === "Фото" ? (
+            <Image
+              alt={selectedMedia.altText || selectedMedia.name}
+              fill
+              key={selectedMedia.url}
+              priority
+              sizes="340px"
+              src={selectedMedia.url}
+              unoptimized
+            />
+          ) : null}
+          <span>{selectedMedia.type}</span>
+        </div>
+
+        <dl className="admin-detail-list">
+          <div>
+            <dt>URL</dt>
+            <dd>{selectedMedia.url}</dd>
+          </div>
+          <div>
+            <dt>Alt-текст</dt>
+            <dd>{selectedMedia.altText || "Alt-текст нужно заполнить перед публикацией."}</dd>
+          </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>
+              <span className={statusClass(selectedMedia.status)}>{selectedMedia.status}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Папка</dt>
+            <dd>{selectedMedia.folder}</dd>
+          </div>
+          <div>
+            <dt>Размер</dt>
+            <dd>{selectedMedia.size || "Не указан"}</dd>
+          </div>
+          <div>
+            <dt>Разрешение</dt>
+            <dd>{selectedMedia.dimensions || "Не указано"}</dd>
+          </div>
+          <div>
+            <dt>Загружено</dt>
+            <dd>{selectedMedia.uploadedAt}</dd>
+          </div>
+        </dl>
+
+        <section className="admin-client-section">
+          <h3>Использование</h3>
+          {selectedMedia.usage.length > 0 ? (
+            <ul className="admin-client-history">
+              {selectedMedia.usage.map((usage) => (
+                <li key={usage}>
+                  <span>{usage}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>Файл пока не привязан к страницам.</p>
+          )}
+        </section>
+      </aside>
+
+      {isMediaFormOpen ? (
+        <MediaFormDialog
+          initialMedia={editingMedia}
+          key={editingMedia?.id ?? "new-media"}
+          onClose={closeMediaForm}
+          onSave={saveMediaForm}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function GenericWorkspace({ query, section }: { query: string; section: AdminSectionId }) {
   const sectionModule = getAdminModule(section);
   const filteredItems = sectionSamples[section].filter((item) => matchesSearch([item, sectionModule.title], query));
@@ -3057,18 +3536,22 @@ function Workspace({
   clients,
   isCertificateCreateOpen,
   isClientCreateOpen,
+  isMediaCreateOpen,
   isPriceCreateOpen,
   isServiceCreateOpen,
+  media,
   onCancelAppointment,
   onCalendarCreateIntent,
   onCloseCertificateCreate,
   onCloseClientCreate,
+  onCloseMediaCreate,
   onClosePriceCreate,
   onCloseServiceCreate,
   onEditAppointment,
   onSaveCertificate,
   onSaveClient,
   onSaveClientNote,
+  onSaveMedia,
   onSavePrice,
   onSaveService,
   onUpdateCertificateStatus,
@@ -3084,18 +3567,22 @@ function Workspace({
   clients: ClientRecord[];
   isCertificateCreateOpen: boolean;
   isClientCreateOpen: boolean;
+  isMediaCreateOpen: boolean;
   isPriceCreateOpen: boolean;
   isServiceCreateOpen: boolean;
+  media: MediaRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
   onCloseCertificateCreate: () => void;
   onCloseClientCreate: () => void;
+  onCloseMediaCreate: () => void;
   onClosePriceCreate: () => void;
   onCloseServiceCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
+  onSaveMedia: (media: MediaRecord, originalId?: string) => void;
   onSavePrice: (price: PriceRecord, originalId?: string) => void;
   onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
   onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
@@ -3169,6 +3656,18 @@ function Workspace({
     );
   }
 
+  if (section === "media") {
+    return (
+      <MediaWorkspace
+        isMediaCreateOpen={isMediaCreateOpen}
+        media={media}
+        onCloseMediaCreate={onCloseMediaCreate}
+        onSaveMedia={onSaveMedia}
+        query={query}
+      />
+    );
+  }
+
   if (section === "calendar") {
     return (
       <CalendarWorkspace
@@ -3202,10 +3701,12 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows());
   const [services, setServices] = useState<ServiceRecord[]>(() => buildInitialServiceRows());
   const [prices, setPrices] = useState<PriceRecord[]>(() => buildInitialPriceRows());
+  const [media, setMedia] = useState<MediaRecord[]>(() => buildInitialMediaRows());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
   const [isPriceCreateOpen, setIsPriceCreateOpen] = useState(false);
+  const [isMediaCreateOpen, setIsMediaCreateOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -3246,6 +3747,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setCancellingAppointment(undefined);
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
+      setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsClientCreateOpen(true);
@@ -3256,6 +3758,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setCancellingAppointment(undefined);
       setIsActionOpen(false);
       setIsClientCreateOpen(false);
+      setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsCertificateCreateOpen(true);
@@ -3267,6 +3770,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
       setIsClientCreateOpen(false);
+      setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(true);
       return;
@@ -3277,13 +3781,26 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
       setIsClientCreateOpen(false);
+      setIsMediaCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsPriceCreateOpen(true);
       return;
     }
 
+    if (activeSection === "media") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
+      setIsClientCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(false);
+      setIsMediaCreateOpen(true);
+      return;
+    }
+
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setIsActionOpen(true);
@@ -3293,6 +3810,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setCancellingAppointment(undefined);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setEditingAppointment(appointment);
@@ -3304,6 +3822,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsActionOpen(false);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setCancellingAppointment(appointment);
@@ -3315,6 +3834,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setEditingAppointment(undefined);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setIsActionOpen(false);
@@ -3325,6 +3845,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsActionOpen(false);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setEditingAppointment(undefined);
@@ -3458,6 +3979,26 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     });
   }
 
+  function saveMediaRecord(mediaRecord: MediaRecord, originalId?: string) {
+    setMedia((current) => {
+      const originalKey = originalId ? normalizeSearch(originalId) : "";
+      const nextKey = normalizeSearch(mediaRecord.id);
+      const existingIndex = current.findIndex((currentMedia) => {
+        if (originalKey) {
+          return normalizeSearch(currentMedia.id) === originalKey;
+        }
+
+        return normalizeSearch(currentMedia.id) === nextKey || normalizeSearch(currentMedia.url) === normalizeSearch(mediaRecord.url);
+      });
+
+      if (existingIndex === -1) {
+        return [...current, mediaRecord];
+      }
+
+      return current.map((currentMedia, index) => (index === existingIndex ? mediaRecord : currentMedia));
+    });
+  }
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -3527,18 +4068,22 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           clients={clients}
           isCertificateCreateOpen={isCertificateCreateOpen}
           isClientCreateOpen={isClientCreateOpen}
+          isMediaCreateOpen={isMediaCreateOpen}
           isPriceCreateOpen={isPriceCreateOpen}
           isServiceCreateOpen={isServiceCreateOpen}
+          media={media}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
           onCloseCertificateCreate={() => setIsCertificateCreateOpen(false)}
           onCloseClientCreate={() => setIsClientCreateOpen(false)}
+          onCloseMediaCreate={() => setIsMediaCreateOpen(false)}
           onClosePriceCreate={() => setIsPriceCreateOpen(false)}
           onCloseServiceCreate={() => setIsServiceCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
           onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}
           onSaveClientNote={saveClientNote}
+          onSaveMedia={saveMediaRecord}
           onSavePrice={savePriceRecord}
           onSaveService={saveServiceRecord}
           onUpdateCertificateStatus={updateCertificateStatus}

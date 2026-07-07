@@ -299,6 +299,64 @@ describe("AdminShell", () => {
     expect(within(screen.getByLabelText("Детали цены")).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
   });
 
+  it("uploads and edits a media asset from the media workspace", () => {
+    render(<AdminShell activeSection="media" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Загрузить медиа" }));
+
+    const createDialog = screen.getByRole("dialog", { name: "Новое медиа" });
+    fireEvent.change(within(createDialog).getByLabelText("Название"), { target: { value: "Арома обложка" } });
+    fireEvent.change(within(createDialog).getByLabelText("URL"), { target: { value: "/media/services/relaxing-massage.jpg" } });
+    fireEvent.change(within(createDialog).getByLabelText("Папка"), { target: { value: "services" } });
+    fireEvent.change(within(createDialog).getByLabelText("Тип"), { target: { value: "Фото" } });
+    fireEvent.change(within(createDialog).getByLabelText("Статус"), { target: { value: "Готово" } });
+    fireEvent.change(within(createDialog).getByLabelText("Alt-текст"), { target: { value: "Арома массаж в кабинете Magic Massage Natali" } });
+    fireEvent.change(within(createDialog).getByLabelText("Использование"), { target: { value: "Услуга: Арома массаж, Hero сайта" } });
+    fireEvent.change(within(createDialog).getByLabelText("Размер файла"), { target: { value: "410 KB" } });
+    fireEvent.change(within(createDialog).getByLabelText("Разрешение"), { target: { value: "1600x1100" } });
+    fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить медиа" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новое медиа" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "Арома обложка" })).toBeInTheDocument();
+
+    const details = screen.getByLabelText("Детали медиа");
+    expect(within(details).getByRole("heading", { name: "Арома обложка" })).toBeInTheDocument();
+    expect(within(details).getByText("/media/services/relaxing-massage.jpg")).toBeInTheDocument();
+    expect(within(details).getByText("Услуга: Арома массаж")).toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать медиа" });
+    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Требует alt" } });
+    fireEvent.change(within(editDialog).getByLabelText("Alt-текст"), { target: { value: "Нужно уточнить alt перед публикацией" } });
+    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать медиа" })).not.toBeInTheDocument();
+    expect(within(details).getByText("Требует alt")).toBeInTheDocument();
+    expect(within(details).getByText("Нужно уточнить alt перед публикацией")).toBeInTheDocument();
+  });
+
+  it("filters media rows by type and missing alt state", () => {
+    render(<AdminShell activeSection="media" role="owner" />);
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("button", { name: "Классический массаж" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Документы" }));
+
+    expect(screen.getByRole("button", { name: "Документы" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Сертификат Natali" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Классический массаж" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали медиа")).getByRole("heading", { name: "Сертификат Natali" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Требует alt" }));
+
+    expect(within(table).getByRole("button", { name: "Фото кабинета" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Сертификат Natali" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали медиа")).getByRole("heading", { name: "Фото кабинета" })).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали медиа")).getByRole("img", { name: "Фото кабинета" })).toBeInTheDocument();
+  });
+
   it("shows quick contact actions in the selected client card", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 

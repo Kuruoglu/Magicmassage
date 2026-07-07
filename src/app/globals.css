@@ -3709,6 +3709,39 @@ button.admin-calendar-item[aria-pressed="true"] {
   font-weight: 700;
 }
 
+.admin-media-preview {
+  align-items: end;
+  aspect-ratio: 16 / 10;
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  margin-top: 14px;
+  overflow: hidden;
+  position: relative;
+}
+
+.admin-media-preview img {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+}
+
+.admin-media-preview span {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(124, 77, 161, 0.18);
+  border-radius: 999px;
+  color: var(--admin-primary-strong);
+  font-size: 0.72rem;
+  font-weight: 900;
+  justify-self: start;
+  margin: 10px;
+  padding: 5px 9px;
+  position: relative;
+}
+
 .admin-module-grid {
   display: grid;
   gap: 12px;

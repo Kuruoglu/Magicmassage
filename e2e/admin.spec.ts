@@ -377,6 +377,46 @@ test("price workspace can create and edit a euro price variant", async ({ page }
   await expect(details.getByText("Скрыта")).toBeVisible();
 });
 
+test("media workspace can upload, filter and edit an asset", async ({ page }) => {
+  await page.goto("/admin?section=media", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Загрузить медиа" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новое медиа" });
+  await createDialog.getByLabel("Название").fill("Арома обложка");
+  await createDialog.getByLabel("URL").fill("/media/services/relaxing-massage.jpg");
+  await createDialog.getByLabel("Папка").fill("services");
+  await createDialog.getByLabel("Тип").selectOption("Фото");
+  await createDialog.getByLabel("Статус").selectOption("Готово");
+  await createDialog.getByLabel("Alt-текст").fill("Арома массаж в кабинете Magic Massage Natali");
+  await createDialog.getByLabel("Использование").fill("Услуга: Арома массаж, Hero сайта");
+  await createDialog.getByLabel("Размер файла").fill("410 KB");
+  await createDialog.getByLabel("Разрешение").fill("1600x1100");
+  await createDialog.getByRole("button", { name: "Сохранить медиа" }).click();
+
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("button", { name: "Арома обложка" })).toBeVisible();
+
+  const details = page.getByLabel("Детали медиа");
+  await expect(details.getByRole("heading", { name: "Арома обложка" })).toBeVisible();
+  await expect(details.getByText("/media/services/relaxing-massage.jpg")).toBeVisible();
+  await expect(details.getByText("Услуга: Арома массаж")).toBeVisible();
+
+  await details.getByRole("button", { name: "Редактировать" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Редактировать медиа" });
+  await editDialog.getByLabel("Статус").selectOption("Требует alt");
+  await editDialog.getByLabel("Alt-текст").fill("Нужно уточнить alt перед публикацией");
+  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  await expect(editDialog).toHaveCount(0);
+  await expect(details.getByText("Требует alt")).toBeVisible();
+  await expect(details.getByText("Нужно уточнить alt перед публикацией")).toBeVisible();
+
+  await page.getByRole("button", { name: "Требует alt" }).click();
+  await expect(page.getByRole("button", { name: "Требует alt" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("table").getByRole("button", { name: "Арома обложка" })).toBeVisible();
+});
+
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 
