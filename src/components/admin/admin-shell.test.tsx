@@ -532,17 +532,25 @@ describe("AdminShell", () => {
     expect(within(card).getByText("email")).toBeInTheDocument();
   });
 
-  it("updates the calendar detail panel when an appointment is selected", async () => {
+  it("opens selected appointment details in a right drawer", async () => {
     const user = userEvent.setup();
+    const { container } = render(<AdminShell activeSection="calendar" role="owner" />);
 
-    render(<AdminShell activeSection="calendar" role="owner" />);
+    expect(container.querySelector(".admin-calendar-workspace")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Детали выбранной записи" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Список" }));
     await user.click(screen.getByRole("button", { name: /Olena K./ }));
 
-    expect(screen.getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("Deep tissue massage")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали выбранной записи")).getByText(/Уточнить шею и плечи/)).toBeInTheDocument();
+    const details = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(within(details).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(details).getByText("Deep tissue massage")).toBeInTheDocument();
+    expect(within(details).getByText(/Уточнить шею и плечи/)).toBeInTheDocument();
+
+    await user.click(within(details).getByRole("button", { name: "Закрыть" }));
+
+    expect(screen.queryByRole("dialog", { name: "Детали выбранной записи" })).not.toBeInTheDocument();
   });
 
   it("links from a calendar appointment to the matching client card", async () => {
@@ -605,12 +613,10 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Месяц" }));
     await user.click(screen.getByRole("button", { name: /^7 июля.*0 записей/ }));
 
-    const details = screen.getByLabelText("Детали выбранной записи");
     expect(screen.getByRole("heading", { name: "7 июля" })).toBeInTheDocument();
     expect(screen.getByText("Записи не найдены.")).toBeInTheDocument();
-    expect(within(details).getByRole("heading", { name: "Записей нет" })).toBeInTheDocument();
-    expect(within(details).getByText("На выбранный день записей нет.")).toBeInTheDocument();
-    expect(within(details).queryByText("Анна Петрова")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Детали выбранной записи" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Анна Петрова")).not.toBeInTheDocument();
   });
 
   it("keeps day mode focused on one day and list mode on all appointments", async () => {
@@ -690,6 +696,9 @@ describe("AdminShell", () => {
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
 
     expect(screen.queryByRole("dialog", { name: "Новая запись" })).not.toBeInTheDocument();
+    const createdDetails = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+    expect(within(createdDetails).getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
+    await user.click(within(createdDetails).getByRole("button", { name: "Закрыть" }));
 
     await user.click(screen.getByRole("button", { name: "Список" }));
     await user.click(screen.getByRole("button", { name: /Ирина Тестова/ }));
@@ -1061,9 +1070,9 @@ describe("AdminShell", () => {
     const monthGrid = screen.getByRole("grid", { name: "Месяц Июль 2026" });
     expect(within(monthGrid).getByRole("button", { name: /6 июля.*2 записи.*3 свободных слота/ })).toBeInTheDocument();
 
-    const details = screen.getByLabelText("Детали выбранной записи");
-    expect(within(details).getByText("5 слотов в день")).toBeInTheDocument();
-    expect(within(details).getByText(/45 минут/)).toBeInTheDocument();
+    const monthPlan = screen.getByLabelText("План месяца");
+    expect(within(monthPlan).getByText("5 слотов в день")).toBeInTheDocument();
+    expect(within(monthPlan).getByText(/45 минут/)).toBeInTheDocument();
   });
 
   it("keeps settings details synchronized with search results", async () => {

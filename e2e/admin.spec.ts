@@ -145,6 +145,34 @@ test("calendar month view uses compact labels on mobile", async ({ page }) => {
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test("calendar appointment details open as a right drawer and leave the calendar wide", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("dialog", { name: "Детали выбранной записи" })).toHaveCount(0);
+  const panelBox = await page.locator(".admin-calendar-panel").boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(panelBox!.width).toBeGreaterThan(900);
+
+  await page.getByRole("button", { name: "Неделя" }).click();
+  await page.getByRole("button", { name: /Анна Петрова/ }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Детали выбранной записи" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole("heading", { name: "Анна Петрова" })).toBeVisible();
+  await expect(drawer.getByText("Классический массаж")).toBeVisible();
+
+  const drawerBox = await drawer.boundingBox();
+  expect(drawerBox).not.toBeNull();
+  expect(Math.round(drawerBox!.x + drawerBox!.width)).toBe(1440);
+
+  await drawer.getByRole("button", { name: "Закрыть" }).click();
+  await expect(drawer).toHaveCount(0);
+
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 test("calendar week and list modes are distinct", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 
@@ -179,8 +207,10 @@ test("calendar can create a new appointment", async ({ page }) => {
 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "12 июля" })).toBeVisible();
-  await expect(page.getByLabel("Детали выбранной записи").getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
-  await expect(page.getByLabel("Детали выбранной записи").getByText("11:15")).toBeVisible();
+  const createdDetails = page.getByRole("dialog", { name: "Детали выбранной записи" });
+  await expect(createdDetails.getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
+  await expect(createdDetails.getByText("11:15")).toBeVisible();
+  await createdDetails.getByRole("button", { name: "Закрыть" }).click();
   await page.getByRole("button", { name: "Список" }).click();
   await page.getByRole("button", { name: /Ирина Тестова/ }).click();
   await expect(page.getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
@@ -635,9 +665,9 @@ test("calendar availability uses saved booking settings", async ({ page }) => {
   const monthGrid = page.getByRole("grid", { name: "Месяц Июль 2026" });
   await expect(monthGrid.getByRole("button", { name: /6 июля.*2 записи.*3 свободных слота/ })).toBeVisible();
 
-  const appointmentDetails = page.getByLabel("Детали выбранной записи");
-  await expect(appointmentDetails.getByText("5 слотов в день")).toBeVisible();
-  await expect(appointmentDetails.getByText("45 минут")).toBeVisible();
+  const monthPlan = page.getByLabel("План месяца");
+  await expect(monthPlan.getByText("5 слотов в день")).toBeVisible();
+  await expect(monthPlan.getByText("45 минут")).toBeVisible();
 });
 
 test("users workspace invites, filters and edits accountant access", async ({ page }) => {

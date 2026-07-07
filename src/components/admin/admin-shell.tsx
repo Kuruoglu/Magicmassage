@@ -3753,6 +3753,80 @@ function ClientsWorkspace({
   );
 }
 
+function AppointmentDetailDrawer({
+  appointment,
+  appointmentClient,
+  onCancelAppointment,
+  onClose,
+  onEditAppointment,
+  role,
+}: {
+  appointment: Appointment;
+  appointmentClient?: ClientRecord;
+  onCancelAppointment: (appointment: Appointment) => void;
+  onClose: () => void;
+  onEditAppointment: (appointment: Appointment) => void;
+  role: AdminRoleId;
+}) {
+  return (
+    <aside
+      aria-label="Детали выбранной записи"
+      aria-modal="true"
+      className="admin-panel admin-detail-panel admin-drawer-panel admin-appointment-drawer"
+      role="dialog"
+    >
+      <div className="admin-panel-head">
+        <span className="admin-kicker">Детали записи</span>
+        <button className="admin-icon-button" onClick={onClose} type="button">
+          Закрыть
+        </button>
+      </div>
+      <div className="admin-detail-heading">
+        <h2>{appointment.client}</h2>
+        <div className="admin-detail-actions">
+          {appointmentClient ? (
+            <Link className="admin-outline-action" href={clientProfileHref(appointment.client, role)}>
+              Открыть клиента
+            </Link>
+          ) : null}
+          <button className="admin-text-action" onClick={() => onEditAppointment(appointment)} type="button">
+            Редактировать
+          </button>
+          {appointment.status === "Отменена" ? null : (
+            <button className="admin-danger-button" onClick={() => onCancelAppointment(appointment)} type="button">
+              Отменить
+            </button>
+          )}
+        </div>
+      </div>
+      <dl className="admin-detail-list">
+        <div>
+          <dt>Дата</dt>
+          <dd>{formatCalendarDay(appointment.date)}</dd>
+        </div>
+        <div>
+          <dt>Услуга</dt>
+          <dd>{appointment.service}</dd>
+        </div>
+        <div>
+          <dt>Статус</dt>
+          <dd>
+            <span className={statusClass(appointment.status)}>{appointment.status}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Время</dt>
+          <dd>{appointment.time}</dd>
+        </div>
+        <div>
+          <dt>Комментарий</dt>
+          <dd>{appointment.note || "Комментарий к записи пока пуст."}</dd>
+        </div>
+      </dl>
+    </aside>
+  );
+}
+
 function CertificatesWorkspace({
   certificates,
   clients,
@@ -4477,6 +4551,7 @@ function CalendarWorkspace({
       : appointments[1];
   const [mode, setMode] = useState<CalendarMode>("day");
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(Boolean(selectedAppointmentFocus));
   const [selectedKey, setSelectedKey] = useState(
     () => selectedAppointmentFocus?.appointmentKey ?? appointmentKey(initialSelectedAppointment ?? fallbackAppointment),
   );
@@ -4493,18 +4568,26 @@ function CalendarWorkspace({
   const selectedAppointmentKey = hasVisibleAppointments ? appointmentKey(selectedAppointment) : "";
   const calendarHeading = calendarHeadingLabel(mode, selectedDate);
   const selectedAppointmentClient = findClientByName(clients, selectedAppointment.client);
+  const shouldShowAppointmentDrawer = isAppointmentDrawerOpen && mode !== "month" && hasVisibleAppointments;
   const weekDays = calendarMonthDays.slice(5, 12);
+
+  function switchMode(nextMode: CalendarMode) {
+    setMode(nextMode);
+    setIsAppointmentDrawerOpen(false);
+  }
 
   function selectAppointment(appointment: Appointment) {
     onCalendarDateChange(appointment.date);
     setSelectedDate(appointment.date);
     setSelectedKey(appointmentKey(appointment));
+    setIsAppointmentDrawerOpen(true);
   }
 
   function selectDate(date: string, appointments: Appointment[], nextMode: CalendarMode = mode) {
     onCalendarDateChange(date);
     setSelectedDate(date);
     setMode(nextMode);
+    setIsAppointmentDrawerOpen(false);
 
     if (appointments[0]) {
       setSelectedKey(appointmentKey(appointments[0]));
@@ -4514,7 +4597,7 @@ function CalendarWorkspace({
   }
 
   return (
-    <div className="admin-split-view">
+    <div className="admin-split-view admin-calendar-workspace">
       <section className="admin-panel admin-calendar-panel" aria-labelledby="calendar-heading">
         <div className="admin-panel-head">
           <h2 id="calendar-heading">{calendarHeading}</h2>
@@ -4523,7 +4606,7 @@ function CalendarWorkspace({
               <button
                 aria-pressed={mode === calendarMode.id}
                 key={calendarMode.id}
-                onClick={() => setMode(calendarMode.id)}
+                onClick={() => switchMode(calendarMode.id)}
                 type="button"
               >
                 {calendarMode.label}
@@ -4533,44 +4616,64 @@ function CalendarWorkspace({
         </div>
 
         {mode === "month" ? (
-          <div className="admin-calendar-month-grid" role="grid" aria-label={`Месяц ${calendarMonthLabel}`}>
-            {calendarWeekdayLabels.map((weekday) => (
-              <span className="admin-calendar-weekday" key={weekday} role="columnheader">
-                {weekday}
-              </span>
-            ))}
-            {Array.from({ length: calendarLeadingBlankDays }, (_, index) => (
-              <span aria-hidden="true" className="admin-calendar-month-cell admin-calendar-month-cell-empty" key={`blank-${index}`} role="gridcell" />
-            ))}
-            {calendarMonthDays.map((day) => {
-              const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
-              const countLabel = appointmentCountLabel(dayAppointments.length);
-              const freeCount = freeSlotCount(dayAppointments.length, dailySlotCapacity);
-              const freeLabel = freeSlotLabel(freeCount);
-              const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
-              const compactFreeLabel = compactFreeSlotLabel(freeCount);
-
-              return (
-                <span className="admin-calendar-month-cell" key={day.date} role="gridcell">
-                  <button
-                    aria-label={`${day.day} июля, ${countLabel}, ${freeLabel}`}
-                    aria-pressed={selectedDate === day.date}
-                    className="admin-calendar-day-button"
-                    onClick={() => selectDate(day.date, dayAppointments, "day")}
-                    type="button"
-                  >
-                    <strong>{day.day}</strong>
-                    <small>
-                      <span className="admin-month-count-full">{countLabel}</span>
-                      <span className="admin-month-count-compact">{compactCountLabel}</span>
-                      <span className="admin-month-free-full">{freeLabel}</span>
-                      <span className="admin-month-free-compact">{compactFreeLabel}</span>
-                    </small>
-                  </button>
+          <>
+            <div className="admin-calendar-month-grid" role="grid" aria-label={`Месяц ${calendarMonthLabel}`}>
+              {calendarWeekdayLabels.map((weekday) => (
+                <span className="admin-calendar-weekday" key={weekday} role="columnheader">
+                  {weekday}
                 </span>
-              );
-            })}
-          </div>
+              ))}
+              {Array.from({ length: calendarLeadingBlankDays }, (_, index) => (
+                <span aria-hidden="true" className="admin-calendar-month-cell admin-calendar-month-cell-empty" key={`blank-${index}`} role="gridcell" />
+              ))}
+              {calendarMonthDays.map((day) => {
+                const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
+                const countLabel = appointmentCountLabel(dayAppointments.length);
+                const freeCount = freeSlotCount(dayAppointments.length, dailySlotCapacity);
+                const freeLabel = freeSlotLabel(freeCount);
+                const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
+                const compactFreeLabel = compactFreeSlotLabel(freeCount);
+
+                return (
+                  <span className="admin-calendar-month-cell" key={day.date} role="gridcell">
+                    <button
+                      aria-label={`${day.day} июля, ${countLabel}, ${freeLabel}`}
+                      aria-pressed={selectedDate === day.date}
+                      className="admin-calendar-day-button"
+                      onClick={() => selectDate(day.date, dayAppointments, "day")}
+                      type="button"
+                    >
+                      <strong>{day.day}</strong>
+                      <small>
+                        <span className="admin-month-count-full">{countLabel}</span>
+                        <span className="admin-month-count-compact">{compactCountLabel}</span>
+                        <span className="admin-month-free-full">{freeLabel}</span>
+                        <span className="admin-month-free-compact">{compactFreeLabel}</span>
+                      </small>
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+            <div className="admin-calendar-context-note" aria-label="План месяца">
+              <div>
+                <span className="admin-kicker">План месяца</span>
+                <p>
+                  В ячейках месяца показаны только количество записей и свободные слоты. Нажатие на день открывает дневной режим.
+                </p>
+              </div>
+              <dl className="admin-detail-list">
+                <div>
+                  <dt>Расчет слотов</dt>
+                  <dd>{slotCountLabel(dailySlotCapacity)} в день</dd>
+                </div>
+                <div>
+                  <dt>Буфер между сеансами</dt>
+                  <dd>{bookingBufferMinutes} минут, Настройки → Запись</dd>
+                </div>
+              </dl>
+            </div>
+          </>
         ) : mode === "week" ? (
           <div className="admin-calendar-week-grid" role="grid" aria-label={calendarWeekLabel}>
             {weekDays.map((day) => {
@@ -4641,81 +4744,18 @@ function CalendarWorkspace({
         {mode !== "month" && mode !== "week" && visibleAppointments.length === 0 ? <EmptyState label="Записи не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали выбранной записи">
-        <span className="admin-kicker">Правая панель</span>
-        {mode === "month" ? (
-          <>
-            <h2>План месяца</h2>
-            <p>
-              В ячейках месяца показаны только количество записей и свободные слоты. Нажатие на день открывает дневной режим.
-            </p>
-            <dl className="admin-detail-list">
-              <div>
-                <dt>Расчет слотов</dt>
-                <dd>{slotCountLabel(dailySlotCapacity)} в день</dd>
-              </div>
-              <div>
-                <dt>Буфер между сеансами</dt>
-                <dd>{bookingBufferMinutes} минут, Настройки → Запись</dd>
-              </div>
-            </dl>
-          </>
-        ) : !hasVisibleAppointments ? (
-          <>
-            <h2>Записей нет</h2>
-            <p>{mode === "day" ? "На выбранный день записей нет." : "По текущему фильтру записей нет."}</p>
-          </>
-        ) : (
-          <>
-            <div className="admin-detail-heading">
-              <h2>{selectedAppointment.client}</h2>
-              <div className="admin-detail-actions">
-                {selectedAppointmentClient ? (
-                  <Link className="admin-outline-action" href={clientProfileHref(selectedAppointment.client, role)}>
-                    Открыть клиента
-                  </Link>
-                ) : null}
-                <button className="admin-text-action" onClick={() => onEditAppointment(selectedAppointment)} type="button">
-                  Редактировать
-                </button>
-                {selectedAppointment.status === "Отменена" ? null : (
-                  <button
-                    className="admin-danger-button"
-                    onClick={() => onCancelAppointment(selectedAppointment)}
-                    type="button"
-                  >
-                    Отменить
-                  </button>
-                )}
-              </div>
-            </div>
-            <dl className="admin-detail-list">
-              <div>
-                <dt>Дата</dt>
-                <dd>{formatCalendarDay(selectedAppointment.date)}</dd>
-              </div>
-              <div>
-                <dt>Услуга</dt>
-                <dd>{selectedAppointment.service}</dd>
-              </div>
-              <div>
-                <dt>Статус</dt>
-                <dd>
-                  <span className={statusClass(selectedAppointment.status)}>{selectedAppointment.status}</span>
-                </dd>
-              </div>
-              <div>
-                <dt>Время</dt>
-                <dd>{selectedAppointment.time}</dd>
-              </div>
-              <div>
-                <dt>Комментарий</dt>
-                <dd>{selectedAppointment.note || "Комментарий к записи пока пуст."}</dd>
-              </div>
-            </dl>
-          </>
-        )}
-      </aside>
+      {shouldShowAppointmentDrawer ? (
+        <div className="admin-drawer-backdrop">
+          <AppointmentDetailDrawer
+            appointment={selectedAppointment}
+            appointmentClient={selectedAppointmentClient}
+            onCancelAppointment={onCancelAppointment}
+            onClose={() => setIsAppointmentDrawerOpen(false)}
+            onEditAppointment={onEditAppointment}
+            role={role}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
