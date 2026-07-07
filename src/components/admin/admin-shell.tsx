@@ -28,6 +28,7 @@ type AdminShellProps = {
   activeSection: AdminSectionId;
   calendarAction?: AdminCalendarAction;
   role: AdminRoleId;
+  selectedCalendarDate?: string;
   selectedClientName?: string;
   selectedCertificateCode?: string;
 };
@@ -1175,6 +1176,10 @@ function adminSectionHref(section: AdminSectionId, role: AdminRoleId) {
   return `/admin?section=${section}&role=${role}`;
 }
 
+function calendarDateHref(date: string, role: AdminRoleId) {
+  return `/admin?section=calendar&role=${role}&date=${encodeURIComponent(date)}`;
+}
+
 function certificateDetailHref(certificateCode: string, role: AdminRoleId) {
   return `/admin?section=certificates&role=${role}&certificate=${encodeURIComponent(certificateCode)}`;
 }
@@ -1226,6 +1231,10 @@ function formatCalendarDay(date: string) {
 
 function formatCalendarShortDay(date: string) {
   return `${Number(date.slice(-2))} июл`;
+}
+
+function isCalendarMonthDate(date: string | undefined): date is string {
+  return Boolean(date && calendarMonthDays.some((day) => day.date === date));
 }
 
 function appointmentCountLabel(count: number) {
@@ -3255,7 +3264,7 @@ function DashboardWorkspace({ certificates, query, role }: { certificates: Certi
                     <span className={statusClass(appointment.status)}>{appointment.status}</span>
                   </td>
                   <td>
-                    <Link className="admin-row-action admin-row-link" href={adminSectionHref("calendar", role)}>
+                    <Link className="admin-row-action admin-row-link" href={calendarDateHref(appointment.date, role)}>
                       Календарь
                     </Link>
                   </td>
@@ -4356,6 +4365,7 @@ function CalendarWorkspace({
   onEditAppointment,
   query,
   role,
+  selectedCalendarDate,
 }: {
   appointments: Appointment[];
   clients: ClientRecord[];
@@ -4363,6 +4373,7 @@ function CalendarWorkspace({
   onEditAppointment: (appointment: Appointment) => void;
   query: string;
   role: AdminRoleId;
+  selectedCalendarDate?: string;
 }) {
   const fallbackAppointment = appointments[0] ?? {
     client: "Нет записи",
@@ -4375,9 +4386,13 @@ function CalendarWorkspace({
   const filteredAppointments = appointments.filter((appointment) =>
     matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status, appointment.note], query),
   );
+  const initialSelectedDate = isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : "2026-07-06";
+  const initialSelectedAppointment = isCalendarMonthDate(selectedCalendarDate)
+    ? appointments.find((appointment) => appointment.date === initialSelectedDate)
+    : appointments[1];
   const [mode, setMode] = useState<CalendarMode>("day");
-  const [selectedDate, setSelectedDate] = useState("2026-07-06");
-  const [selectedKey, setSelectedKey] = useState(() => appointmentKey(appointments[1] ?? fallbackAppointment));
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  const [selectedKey, setSelectedKey] = useState(() => appointmentKey(initialSelectedAppointment ?? fallbackAppointment));
   const selectedDayAppointments = filteredAppointments.filter((appointment) => appointment.date === selectedDate);
   const visibleAppointments = mode === "day" ? selectedDayAppointments : filteredAppointments;
   const appointmentDetailPool = mode === "day" ? selectedDayAppointments : filteredAppointments;
@@ -5992,6 +6007,7 @@ function Workspace({
   query,
   role,
   section,
+  selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
   services,
@@ -6043,6 +6059,7 @@ function Workspace({
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
+  selectedCalendarDate?: string;
   selectedCertificateCode?: string;
   selectedClientName?: string;
   services: ServiceRecord[];
@@ -6181,10 +6198,12 @@ function Workspace({
       <CalendarWorkspace
         appointments={appointments}
         clients={clients}
+        key={selectedCalendarDate ?? "default-calendar"}
         onCancelAppointment={onCancelAppointment}
         onEditAppointment={onEditAppointment}
         query={query}
         role={role}
+        selectedCalendarDate={selectedCalendarDate}
       />
     );
   }
@@ -6200,6 +6219,7 @@ export function AdminShell({
   activeSection,
   calendarAction,
   role,
+  selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
 }: AdminShellProps) {
@@ -6824,6 +6844,7 @@ export function AdminShell({
           query={query}
           role={role}
           section={activeSection}
+          selectedCalendarDate={selectedCalendarDate}
           selectedCertificateCode={selectedCertificateCode}
           selectedClientName={selectedClientName}
           services={services}

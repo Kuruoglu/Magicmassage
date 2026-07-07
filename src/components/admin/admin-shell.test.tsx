@@ -52,6 +52,10 @@ describe("AdminShell", () => {
       "href",
       "/admin?section=clients&role=owner&client=%D0%90%D0%BD%D0%BD%D0%B0%20%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2%D0%B0",
     );
+    expect(within(screen.getByRole("row", { name: /10:00 Анна Петрова/ })).getByRole("link", { name: "Календарь" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&date=2026-07-06",
+    );
     expect(screen.getByRole("link", { name: "MMN-2407-1023" })).toHaveAttribute(
       "href",
       "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
@@ -609,6 +613,15 @@ describe("AdminShell", () => {
 
     expect(screen.getByRole("heading", { name: "Список записей" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Olena K./ })).toBeInTheDocument();
+  });
+
+  it("opens the calendar on the selected date from the date query", () => {
+    render(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-10" />);
+
+    expect(screen.getByRole("heading", { name: "10 июля" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "День" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Светлана/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Анна Петрова/ })).not.toBeInTheDocument();
   });
 
   it("opens a quick action panel from the primary action", async () => {

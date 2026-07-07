@@ -29,6 +29,19 @@ test("dashboard links to connected admin workspaces", async ({ page }) => {
   await expect(page.getByLabel("Детали сертификата").getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
 });
 
+test("dashboard calendar row link opens the matching day", async ({ page }) => {
+  await page.goto("/admin", { waitUntil: "networkidle" });
+
+  await page.getByRole("row", { name: /17:30 Светлана/ }).getByRole("link", { name: "Календарь" }).click();
+
+  await expect(page).toHaveURL(/section=calendar/);
+  await expect(page).toHaveURL(/date=2026-07-10/);
+  await expect(page.getByRole("heading", { name: "10 июля" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "День" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: /Светлана/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
+});
+
 test("accountant view exposes only finance navigation", async ({ page }) => {
   await page.goto("/admin?role=accountant");
 
