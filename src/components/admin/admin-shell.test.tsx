@@ -759,4 +759,56 @@ describe("AdminShell", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("CSV отчет за 2026-07-02 - 2026-07-02 готов к скачиванию.");
   });
+
+  it("edits public contact settings from the contacts workspace", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="contacts" role="owner" />);
+
+    expect(screen.getByRole("heading", { name: "Контактные настройки сайта" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Детали контакта")).toHaveTextContent("Телефон салона");
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Контактные настройки" });
+    await user.clear(within(dialog).getByLabelText("Телефон"));
+    await user.type(within(dialog).getByLabelText("Телефон"), "+359 87 555 0000");
+    await user.clear(within(dialog).getByLabelText("Адрес"));
+    await user.type(within(dialog).getByLabelText("Адрес"), "ул. Места 49, Бургас");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить контакты" }));
+
+    expect(screen.queryByRole("dialog", { name: "Контактные настройки" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Контактные настройки")).getByText("+359 87 555 0000")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Контактные настройки")).getByText("ул. Места 49, Бургас")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали контакта")).getByText("+359 87 555 0000")).toBeInTheDocument();
+  });
+
+  it("filters contact channels and edits the selected channel", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="contacts" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Мессенджеры" }));
+
+    const table = screen.getByRole("table");
+    expect(screen.getByRole("button", { name: "Мессенджеры" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Telegram" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Google Maps" })).not.toBeInTheDocument();
+
+    await user.click(within(table).getByRole("button", { name: "Telegram" }));
+    const details = screen.getByLabelText("Детали контакта");
+    expect(within(details).getByRole("heading", { name: "Telegram" })).toBeInTheDocument();
+
+    await user.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Редактировать контакт" });
+    await user.clear(within(dialog).getByLabelText("Значение"));
+    await user.type(within(dialog).getByLabelText("Значение"), "https://t.me/magicmassage_burgas");
+    await user.selectOptions(within(dialog).getByLabelText("Статус"), "Активен");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать контакт" })).not.toBeInTheDocument();
+    expect(within(details).getByText("https://t.me/magicmassage_burgas")).toBeInTheDocument();
+    expect(within(details).getByText("Активен")).toBeInTheDocument();
+  });
 });

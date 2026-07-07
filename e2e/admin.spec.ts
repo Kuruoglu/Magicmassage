@@ -417,6 +417,43 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
   await expect(page.getByRole("table").getByRole("button", { name: "Арома обложка" })).toBeVisible();
 });
 
+test("contacts workspace edits site settings and contact channels", async ({ page }) => {
+  await page.goto("/admin?section=contacts", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("heading", { name: "Контактные настройки сайта" })).toBeVisible();
+  await expect(page.getByLabel("Детали контакта").getByRole("heading", { name: "Телефон салона" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Сохранить" }).click();
+
+  const settingsDialog = page.getByRole("dialog", { name: "Контактные настройки" });
+  await settingsDialog.getByLabel("Телефон").fill("+359 87 555 0000");
+  await settingsDialog.getByLabel("Адрес").fill("ул. Места 49, Бургас");
+  await settingsDialog.getByRole("button", { name: "Сохранить контакты" }).click();
+
+  await expect(settingsDialog).toHaveCount(0);
+  await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("+359 87 555 0000")).toBeVisible();
+  await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("ул. Места 49, Бургас")).toBeVisible();
+  await expect(page.getByLabel("Детали контакта").getByText("+359 87 555 0000")).toBeVisible();
+
+  await page.getByRole("button", { name: "Мессенджеры" }).click();
+  await expect(page.getByRole("button", { name: "Мессенджеры" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("table").getByRole("button", { name: "Telegram" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("button", { name: "Google Maps" })).toHaveCount(0);
+
+  const details = page.getByLabel("Детали контакта");
+  await page.getByRole("table").getByRole("button", { name: "Telegram" }).click();
+  await details.getByRole("button", { name: "Редактировать" }).click();
+
+  const channelDialog = page.getByRole("dialog", { name: "Редактировать контакт" });
+  await channelDialog.getByLabel("Значение").fill("https://t.me/magicmassage_burgas");
+  await channelDialog.getByLabel("Статус").selectOption("Активен");
+  await channelDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  await expect(channelDialog).toHaveCount(0);
+  await expect(details.getByText("https://t.me/magicmassage_burgas")).toBeVisible();
+  await expect(details.getByText("Активен")).toBeVisible();
+});
+
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

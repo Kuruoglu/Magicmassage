@@ -158,6 +158,35 @@ type MediaFormState = {
   url: string;
   usage: string;
 };
+type ContactChannelType = "Телефон" | "Email" | "Мессенджер" | "Соцсеть" | "Карта" | "Бронирование";
+type ContactStatus = "Активен" | "Черновик" | "Скрыт";
+type ContactChannelRecord = {
+  id: string;
+  name: string;
+  note: string;
+  status: ContactStatus;
+  type: ContactChannelType;
+  usage: string[];
+  value: string;
+};
+type ContactChannelFormState = {
+  name: string;
+  note: string;
+  status: ContactStatus;
+  type: ContactChannelType;
+  usage: string;
+  value: string;
+};
+type ContactSettingsRecord = {
+  address: string;
+  bookingUrl: string;
+  businessName: string;
+  email: string;
+  mapUrl: string;
+  phone: string;
+  seoArea: string;
+  workingHours: string;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
@@ -197,6 +226,8 @@ const serviceStatusOptions: ServiceStatus[] = ["Опубликована", "Че
 const priceStatusOptions: PriceStatus[] = ["Активна", "Скрыта"];
 const mediaTypeOptions: MediaType[] = ["Фото", "Документ"];
 const mediaStatusOptions: MediaStatus[] = ["Готово", "Требует alt", "Черновик"];
+const contactChannelTypeOptions: ContactChannelType[] = ["Телефон", "Email", "Мессенджер", "Соцсеть", "Карта", "Бронирование"];
+const contactStatusOptions: ContactStatus[] = ["Активен", "Черновик", "Скрыт"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -328,6 +359,72 @@ const initialMediaRows: MediaRecord[] = [
     usage: ["О специалисте"],
   },
 ];
+const initialContactSettings: ContactSettingsRecord = {
+  address: "ул. Места 49, Бургас, Болгария",
+  bookingUrl: "https://studio24.bg/magic-massage-natali",
+  businessName: "Magic Massage Natali",
+  email: "info@magicmassage.bg",
+  mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+  phone: "+359 87 333 4411",
+  seoArea: "Burgas, Bulgaria",
+  workingHours: "Пн-Сб 10:00-19:00",
+};
+const initialContactChannels: ContactChannelRecord[] = [
+  {
+    id: "contact-phone",
+    name: "Телефон салона",
+    note: "Основной номер для шапки, контактов, LocalBusiness schema и быстрых CTA.",
+    status: "Активен",
+    type: "Телефон",
+    usage: ["Шапка сайта", "Контакты", "LocalBusiness SEO"],
+    value: "+359 87 333 4411",
+  },
+  {
+    id: "contact-email",
+    name: "Email",
+    note: "Публичный email для сертификатов, вопросов и административной связи.",
+    status: "Активен",
+    type: "Email",
+    usage: ["Контакты", "Письма по сертификатам"],
+    value: "info@magicmassage.bg",
+  },
+  {
+    id: "contact-telegram",
+    name: "Telegram",
+    note: "Можно показывать после подтверждения финальной ссылки клиента.",
+    status: "Черновик",
+    type: "Мессенджер",
+    usage: ["Контакты", "Быстрая связь"],
+    value: "https://t.me/magicmassage_demo",
+  },
+  {
+    id: "contact-map",
+    name: "Google Maps",
+    note: "Карта должна грузиться только после cookie consent на публичном сайте.",
+    status: "Активен",
+    type: "Карта",
+    usage: ["Контакты", "LocalBusiness SEO"],
+    value: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+  },
+  {
+    id: "contact-instagram",
+    name: "Instagram",
+    note: "Оставить скрытым до подтверждения официального профиля.",
+    status: "Скрыт",
+    type: "Соцсеть",
+    usage: ["Футер", "Контакты"],
+    value: "https://instagram.com/magicmassage_demo",
+  },
+  {
+    id: "contact-studio24",
+    name: "Studio24 booking",
+    note: "Публичные CTA записи ведут сюда, пока внутреннее бронирование не запущено.",
+    status: "Активен",
+    type: "Бронирование",
+    usage: ["Hero CTA", "Услуги", "Контакты"],
+    value: "https://studio24.bg/magic-massage-natali",
+  },
+];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -363,7 +460,7 @@ function statusClass(status: string) {
     return "admin-status admin-status-danger";
   }
 
-  if (normalizedStatus.includes("скрыта")) {
+  if (normalizedStatus.includes("скрыт")) {
     return "admin-status admin-status-danger";
   }
 
@@ -428,6 +525,17 @@ function buildInitialMediaRows(): MediaRecord[] {
     ...item,
     usage: [...item.usage],
   }));
+}
+
+function buildInitialContactChannels(): ContactChannelRecord[] {
+  return initialContactChannels.map((channel) => ({
+    ...channel,
+    usage: [...channel.usage],
+  }));
+}
+
+function buildInitialContactSettings(): ContactSettingsRecord {
+  return { ...initialContactSettings };
 }
 
 function buildClientFormState(client?: ClientRecord): ClientFormState {
@@ -504,6 +612,21 @@ function buildMediaFormState(media?: MediaRecord): MediaFormState {
   };
 }
 
+function buildContactChannelFormState(channel?: ContactChannelRecord): ContactChannelFormState {
+  return {
+    name: channel?.name ?? "",
+    note: channel?.note ?? "",
+    status: channel?.status ?? "Черновик",
+    type: channel?.type ?? "Телефон",
+    usage: channel?.usage.join(", ") ?? "",
+    value: channel?.value ?? "",
+  };
+}
+
+function buildContactSettingsFormState(settings: ContactSettingsRecord): ContactSettingsRecord {
+  return { ...settings };
+}
+
 function parseClientTags(value: string) {
   return value
     .split(",")
@@ -524,6 +647,14 @@ function createMediaId(name: string, url: string) {
     .replace(/^-+|-+$/g, "");
 
   return `media-${base || "asset"}`;
+}
+
+function createContactChannelId(name: string, value: string) {
+  const base = normalizeSearch(name || value)
+    .replace(/[^a-z0-9а-яё]+/giu, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `contact-${base || "channel"}`;
 }
 
 function findClientByName(clients: ClientRecord[], name: string | undefined) {
@@ -1509,6 +1640,254 @@ function MediaFormDialog({
 
           <div className="admin-action-footer">
             <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить медиа"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ContactSettingsDialog({
+  settings,
+  onClose,
+  onSave,
+}: {
+  settings: ContactSettingsRecord;
+  onClose: () => void;
+  onSave: (settings: ContactSettingsRecord) => void;
+}) {
+  const [form, setForm] = useState<ContactSettingsRecord>(() => buildContactSettingsFormState(settings));
+  const [error, setError] = useState("");
+
+  function updateForm<Field extends keyof ContactSettingsRecord>(field: Field, value: ContactSettingsRecord[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!form.businessName.trim() || !form.phone.trim() || !form.address.trim()) {
+      setError("Укажите название, телефон и адрес салона.");
+      return;
+    }
+
+    onSave({
+      address: form.address.trim(),
+      bookingUrl: form.bookingUrl.trim(),
+      businessName: form.businessName.trim(),
+      email: form.email.trim(),
+      mapUrl: form.mapUrl.trim(),
+      phone: form.phone.trim(),
+      seoArea: form.seoArea.trim(),
+      workingHours: form.workingHours.trim(),
+    });
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="contact-settings-title" aria-modal="true" className="admin-action-dialog admin-contact-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Контакты</span>
+            <h2 id="contact-settings-title">Контактные настройки</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-content-form-grid">
+            <label>
+              Название
+              <input
+                aria-invalid={error && !form.businessName.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("businessName", event.target.value)}
+                required
+                type="text"
+                value={form.businessName}
+              />
+            </label>
+            <label>
+              Телефон
+              <input
+                aria-invalid={error && !form.phone.trim() ? "true" : undefined}
+                autoComplete="tel"
+                onChange={(event) => updateForm("phone", event.target.value)}
+                required
+                type="tel"
+                value={form.phone}
+              />
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label className="admin-form-wide">
+              Адрес
+              <input
+                aria-invalid={error && !form.address.trim() ? "true" : undefined}
+                autoComplete="street-address"
+                onChange={(event) => updateForm("address", event.target.value)}
+                required
+                type="text"
+                value={form.address}
+              />
+            </label>
+            <label>
+              Email
+              <input autoComplete="email" onChange={(event) => updateForm("email", event.target.value)} type="email" value={form.email} />
+            </label>
+            <label>
+              Часы работы
+              <input onChange={(event) => updateForm("workingHours", event.target.value)} type="text" value={form.workingHours} />
+            </label>
+            <label className="admin-form-wide">
+              Studio24 URL
+              <input onChange={(event) => updateForm("bookingUrl", event.target.value)} type="url" value={form.bookingUrl} />
+            </label>
+            <label className="admin-form-wide">
+              Map URL
+              <input onChange={(event) => updateForm("mapUrl", event.target.value)} type="url" value={form.mapUrl} />
+            </label>
+            <label className="admin-form-wide">
+              LocalBusiness area
+              <input onChange={(event) => updateForm("seoArea", event.target.value)} type="text" value={form.seoArea} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">Сохранить контакты</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ContactChannelDialog({
+  initialChannel,
+  onClose,
+  onSave,
+}: {
+  initialChannel?: ContactChannelRecord;
+  onClose: () => void;
+  onSave: (channel: ContactChannelRecord, originalId?: string) => void;
+}) {
+  const [form, setForm] = useState<ContactChannelFormState>(() => buildContactChannelFormState(initialChannel));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialChannel);
+
+  function updateForm<Field extends keyof ContactChannelFormState>(field: Field, value: ContactChannelFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = form.name.trim();
+    const value = form.value.trim();
+
+    if (!name || !value) {
+      setError("Укажите название и значение контакта.");
+      return;
+    }
+
+    onSave(
+      {
+        id: initialChannel?.id ?? createContactChannelId(name, value),
+        name,
+        note: form.note.trim(),
+        status: form.status,
+        type: form.type,
+        usage: parseCommaList(form.usage),
+        value,
+      },
+      initialChannel?.id,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="contact-channel-title" aria-modal="true" className="admin-action-dialog admin-contact-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Контакты</span>
+            <h2 id="contact-channel-title">{isEditing ? "Редактировать контакт" : "Новый контакт"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-content-form-grid">
+            <label>
+              Название
+              <input
+                aria-invalid={error && !form.name.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("name", event.target.value)}
+                required
+                type="text"
+                value={form.name}
+              />
+            </label>
+            <label>
+              Тип
+              <select onChange={(event) => updateForm("type", event.target.value as ContactChannelType)} value={form.type}>
+                {contactChannelTypeOptions.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value as ContactStatus)} value={form.status}>
+                {contactStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="admin-form-wide">
+              Значение
+              <input
+                aria-invalid={error && !form.value.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("value", event.target.value)}
+                required
+                type="text"
+                value={form.value}
+              />
+            </label>
+            <label className="admin-form-wide">
+              Места использования
+              <textarea onChange={(event) => updateForm("usage", event.target.value)} rows={3} value={form.usage} />
+            </label>
+            <label className="admin-form-wide">
+              Заметка
+              <textarea onChange={(event) => updateForm("note", event.target.value)} rows={3} value={form.note} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить контакт"}</button>
             <button className="admin-secondary-button" onClick={onClose} type="button">
               Отмена
             </button>
@@ -3479,6 +3858,222 @@ function MediaWorkspace({
   );
 }
 
+function ContactsWorkspace({
+  contactChannels,
+  contactSettings,
+  isContactSettingsOpen,
+  onCloseContactSettings,
+  onSaveContactChannel,
+  onSaveContactSettings,
+  query,
+}: {
+  contactChannels: ContactChannelRecord[];
+  contactSettings: ContactSettingsRecord;
+  isContactSettingsOpen: boolean;
+  onCloseContactSettings: () => void;
+  onSaveContactChannel: (channel: ContactChannelRecord, originalId?: string) => void;
+  onSaveContactSettings: (settings: ContactSettingsRecord) => void;
+  query: string;
+}) {
+  const [selectedId, setSelectedId] = useState(contactChannels[0]?.id ?? "");
+  const [editingChannel, setEditingChannel] = useState<ContactChannelRecord | undefined>();
+  const [filter, setFilter] = useState<"all" | "active" | "messengers" | "seo">("all");
+  const filteredChannels = contactChannels
+    .filter((channel) => {
+      if (filter === "active") {
+        return channel.status === "Активен";
+      }
+
+      if (filter === "messengers") {
+        return channel.type === "Мессенджер";
+      }
+
+      if (filter === "seo") {
+        return channel.type === "Карта" || channel.usage.some((usage) => normalizeSearch(usage).includes("seo"));
+      }
+
+      return true;
+    })
+    .filter((channel) =>
+      matchesSearch([channel.name, channel.type, channel.status, channel.value, channel.note, channel.usage.join(" ")], query),
+    )
+    .sort((first, second) => first.name.localeCompare(second.name, "ru-RU"));
+  const selectedChannel =
+    filteredChannels.find((channel) => channel.id === selectedId) ??
+    filteredChannels[0] ??
+    contactChannels.find((channel) => channel.id === selectedId) ??
+    contactChannels[0];
+
+  function openChannel(channel: ContactChannelRecord) {
+    setSelectedId(channel.id);
+  }
+
+  function openChannelEdit(channel: ContactChannelRecord) {
+    onCloseContactSettings();
+    setEditingChannel(channel);
+  }
+
+  function closeChannelForm() {
+    setEditingChannel(undefined);
+  }
+
+  function saveChannelForm(channel: ContactChannelRecord, originalId?: string) {
+    onSaveContactChannel(channel, originalId);
+    setSelectedId(channel.id);
+    closeChannelForm();
+  }
+
+  return (
+    <div className="admin-split-view admin-content-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="contacts-workspace-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="contacts-workspace-heading">Контактные настройки сайта</h2>
+            <p>Публичные данные салона, каналы связи, карта, Studio24 и LocalBusiness SEO для сайта.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры контактов">
+            <button aria-pressed={filter === "all"} onClick={() => setFilter("all")} type="button">
+              Все
+            </button>
+            <button aria-pressed={filter === "active"} onClick={() => setFilter("active")} type="button">
+              Активные
+            </button>
+            <button aria-pressed={filter === "messengers"} onClick={() => setFilter("messengers")} type="button">
+              Мессенджеры
+            </button>
+            <button aria-pressed={filter === "seo"} onClick={() => setFilter("seo")} type="button">
+              SEO/карта
+            </button>
+          </div>
+        </div>
+
+        <dl className="admin-detail-list" aria-label="Контактные настройки">
+          <div>
+            <dt>Название</dt>
+            <dd>{contactSettings.businessName}</dd>
+          </div>
+          <div>
+            <dt>Телефон</dt>
+            <dd>{contactSettings.phone}</dd>
+          </div>
+          <div>
+            <dt>Адрес</dt>
+            <dd>{contactSettings.address}</dd>
+          </div>
+          <div>
+            <dt>Часы работы</dt>
+            <dd>{contactSettings.workingHours}</dd>
+          </div>
+        </dl>
+
+        <div className="admin-table-scroll">
+          <table className="admin-data-table">
+            <thead>
+              <tr>
+                <th>Канал</th>
+                <th>Тип</th>
+                <th>Статус</th>
+                <th>Значение</th>
+                <th>Использование</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredChannels.map((channel) => (
+                <tr aria-selected={channel.id === selectedChannel?.id} key={channel.id}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openChannel(channel)} type="button">
+                      {channel.name}
+                    </button>
+                  </td>
+                  <td>{channel.type}</td>
+                  <td>
+                    <span className={statusClass(channel.status)}>{channel.status}</span>
+                  </td>
+                  <td>{channel.value}</td>
+                  <td>{channel.usage[0] ?? "Не используется"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredChannels.length === 0 ? <EmptyState label="Контакты не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали контакта">
+        {selectedChannel ? (
+          <>
+            <span className="admin-kicker">Контакт</span>
+            <div className="admin-detail-heading">
+              <h2>{selectedChannel.name}</h2>
+              <div className="admin-detail-actions">
+                <button className="admin-text-action" onClick={() => openChannelEdit(selectedChannel)} type="button">
+                  Редактировать
+                </button>
+              </div>
+            </div>
+
+            <dl className="admin-detail-list">
+              <div>
+                <dt>Тип</dt>
+                <dd>{selectedChannel.type}</dd>
+              </div>
+              <div>
+                <dt>Статус</dt>
+                <dd>
+                  <span className={statusClass(selectedChannel.status)}>{selectedChannel.status}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Значение</dt>
+                <dd>{selectedChannel.value}</dd>
+              </div>
+              <div>
+                <dt>Заметка</dt>
+                <dd>{selectedChannel.note || "Заметка не добавлена."}</dd>
+              </div>
+            </dl>
+
+            <section className="admin-client-section">
+              <h3>Использование</h3>
+              {selectedChannel.usage.length > 0 ? (
+                <ul className="admin-client-history">
+                  {selectedChannel.usage.map((usage) => (
+                    <li key={usage}>
+                      <span>{usage}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Канал пока не привязан к публичным блокам сайта.</p>
+              )}
+            </section>
+          </>
+        ) : (
+          <EmptyState label="Выберите контактный канал." />
+        )}
+      </aside>
+
+      {isContactSettingsOpen ? (
+        <ContactSettingsDialog
+          key={`${contactSettings.phone}-${contactSettings.address}`}
+          onClose={onCloseContactSettings}
+          onSave={onSaveContactSettings}
+          settings={contactSettings}
+        />
+      ) : null}
+
+      {editingChannel ? (
+        <ContactChannelDialog
+          initialChannel={editingChannel}
+          key={editingChannel.id}
+          onClose={closeChannelForm}
+          onSave={saveChannelForm}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function GenericWorkspace({ query, section }: { query: string; section: AdminSectionId }) {
   const sectionModule = getAdminModule(section);
   const filteredItems = sectionSamples[section].filter((item) => matchesSearch([item, sectionModule.title], query));
@@ -3534,8 +4129,11 @@ function Workspace({
   appointments,
   certificates,
   clients,
+  contactChannels,
+  contactSettings,
   isCertificateCreateOpen,
   isClientCreateOpen,
+  isContactSettingsOpen,
   isMediaCreateOpen,
   isPriceCreateOpen,
   isServiceCreateOpen,
@@ -3544,6 +4142,7 @@ function Workspace({
   onCalendarCreateIntent,
   onCloseCertificateCreate,
   onCloseClientCreate,
+  onCloseContactSettings,
   onCloseMediaCreate,
   onClosePriceCreate,
   onCloseServiceCreate,
@@ -3551,6 +4150,8 @@ function Workspace({
   onSaveCertificate,
   onSaveClient,
   onSaveClientNote,
+  onSaveContactChannel,
+  onSaveContactSettings,
   onSaveMedia,
   onSavePrice,
   onSaveService,
@@ -3565,8 +4166,11 @@ function Workspace({
   appointments: Appointment[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
+  contactChannels: ContactChannelRecord[];
+  contactSettings: ContactSettingsRecord;
   isCertificateCreateOpen: boolean;
   isClientCreateOpen: boolean;
+  isContactSettingsOpen: boolean;
   isMediaCreateOpen: boolean;
   isPriceCreateOpen: boolean;
   isServiceCreateOpen: boolean;
@@ -3575,6 +4179,7 @@ function Workspace({
   onCalendarCreateIntent: () => void;
   onCloseCertificateCreate: () => void;
   onCloseClientCreate: () => void;
+  onCloseContactSettings: () => void;
   onCloseMediaCreate: () => void;
   onClosePriceCreate: () => void;
   onCloseServiceCreate: () => void;
@@ -3582,6 +4187,8 @@ function Workspace({
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
+  onSaveContactChannel: (channel: ContactChannelRecord, originalId?: string) => void;
+  onSaveContactSettings: (settings: ContactSettingsRecord) => void;
   onSaveMedia: (media: MediaRecord, originalId?: string) => void;
   onSavePrice: (price: PriceRecord, originalId?: string) => void;
   onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
@@ -3668,6 +4275,20 @@ function Workspace({
     );
   }
 
+  if (section === "contacts") {
+    return (
+      <ContactsWorkspace
+        contactChannels={contactChannels}
+        contactSettings={contactSettings}
+        isContactSettingsOpen={isContactSettingsOpen}
+        onCloseContactSettings={onCloseContactSettings}
+        onSaveContactChannel={onSaveContactChannel}
+        onSaveContactSettings={onSaveContactSettings}
+        query={query}
+      />
+    );
+  }
+
   if (section === "calendar") {
     return (
       <CalendarWorkspace
@@ -3702,11 +4323,14 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [services, setServices] = useState<ServiceRecord[]>(() => buildInitialServiceRows());
   const [prices, setPrices] = useState<PriceRecord[]>(() => buildInitialPriceRows());
   const [media, setMedia] = useState<MediaRecord[]>(() => buildInitialMediaRows());
+  const [contactChannels, setContactChannels] = useState<ContactChannelRecord[]>(() => buildInitialContactChannels());
+  const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
   const [isPriceCreateOpen, setIsPriceCreateOpen] = useState(false);
   const [isMediaCreateOpen, setIsMediaCreateOpen] = useState(false);
+  const [isContactSettingsOpen, setIsContactSettingsOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -3747,6 +4371,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setCancellingAppointment(undefined);
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
+      setIsContactSettingsOpen(false);
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
@@ -3758,6 +4383,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setCancellingAppointment(undefined);
       setIsActionOpen(false);
       setIsClientCreateOpen(false);
+      setIsContactSettingsOpen(false);
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
@@ -3770,6 +4396,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
       setIsClientCreateOpen(false);
+      setIsContactSettingsOpen(false);
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(true);
@@ -3781,6 +4408,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
       setIsClientCreateOpen(false);
+      setIsContactSettingsOpen(false);
       setIsMediaCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsPriceCreateOpen(true);
@@ -3792,14 +4420,28 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
       setIsClientCreateOpen(false);
+      setIsContactSettingsOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsMediaCreateOpen(true);
       return;
     }
 
+    if (activeSection === "contacts") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
+      setIsClientCreateOpen(false);
+      setIsMediaCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(false);
+      setIsContactSettingsOpen(true);
+      return;
+    }
+
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsContactSettingsOpen(false);
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
@@ -3810,6 +4452,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setCancellingAppointment(undefined);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsContactSettingsOpen(false);
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
@@ -3822,6 +4465,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsActionOpen(false);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsContactSettingsOpen(false);
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
@@ -3834,6 +4478,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setEditingAppointment(undefined);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsContactSettingsOpen(false);
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
@@ -3845,6 +4490,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsActionOpen(false);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsContactSettingsOpen(false);
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
@@ -3999,6 +4645,52 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     });
   }
 
+  function saveContactSettingsRecord(settings: ContactSettingsRecord) {
+    setContactSettings(settings);
+    setContactChannels((current) =>
+      current.map((channel) => {
+        if (channel.id === "contact-phone") {
+          return { ...channel, value: settings.phone };
+        }
+
+        if (channel.id === "contact-email") {
+          return { ...channel, value: settings.email };
+        }
+
+        if (channel.id === "contact-map") {
+          return { ...channel, value: settings.mapUrl };
+        }
+
+        if (channel.id === "contact-studio24") {
+          return { ...channel, value: settings.bookingUrl };
+        }
+
+        return channel;
+      }),
+    );
+    setIsContactSettingsOpen(false);
+  }
+
+  function saveContactChannelRecord(channel: ContactChannelRecord, originalId?: string) {
+    setContactChannels((current) => {
+      const originalKey = originalId ? normalizeSearch(originalId) : "";
+      const nextKey = normalizeSearch(channel.id);
+      const existingIndex = current.findIndex((currentChannel) => {
+        if (originalKey) {
+          return normalizeSearch(currentChannel.id) === originalKey;
+        }
+
+        return normalizeSearch(currentChannel.id) === nextKey || normalizeSearch(currentChannel.value) === normalizeSearch(channel.value);
+      });
+
+      if (existingIndex === -1) {
+        return [...current, channel];
+      }
+
+      return current.map((currentChannel, index) => (index === existingIndex ? channel : currentChannel));
+    });
+  }
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -4066,8 +4758,11 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           appointments={calendarAppointments}
           certificates={certificates}
           clients={clients}
+          contactChannels={contactChannels}
+          contactSettings={contactSettings}
           isCertificateCreateOpen={isCertificateCreateOpen}
           isClientCreateOpen={isClientCreateOpen}
+          isContactSettingsOpen={isContactSettingsOpen}
           isMediaCreateOpen={isMediaCreateOpen}
           isPriceCreateOpen={isPriceCreateOpen}
           isServiceCreateOpen={isServiceCreateOpen}
@@ -4076,6 +4771,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
           onCloseCertificateCreate={() => setIsCertificateCreateOpen(false)}
           onCloseClientCreate={() => setIsClientCreateOpen(false)}
+          onCloseContactSettings={() => setIsContactSettingsOpen(false)}
           onCloseMediaCreate={() => setIsMediaCreateOpen(false)}
           onClosePriceCreate={() => setIsPriceCreateOpen(false)}
           onCloseServiceCreate={() => setIsServiceCreateOpen(false)}
@@ -4083,6 +4779,8 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}
           onSaveClientNote={saveClientNote}
+          onSaveContactChannel={saveContactChannelRecord}
+          onSaveContactSettings={saveContactSettingsRecord}
           onSaveMedia={saveMediaRecord}
           onSavePrice={savePriceRecord}
           onSaveService={saveServiceRecord}
