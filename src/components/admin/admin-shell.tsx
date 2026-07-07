@@ -2943,16 +2943,18 @@ function CalendarAppointmentDialog({
   onClose,
   onSave,
   prefillClientName,
+  prefillDate,
 }: {
   clients: ClientRecord[];
   initialAppointment?: Appointment;
   onClose: () => void;
   onSave: (appointment: Appointment) => void;
   prefillClientName?: string;
+  prefillDate?: string;
 }) {
   const [form, setForm] = useState<Appointment>({
     client: initialAppointment?.client ?? prefillClientName ?? "",
-    date: initialAppointment?.date ?? "2026-07-06",
+    date: initialAppointment?.date ?? prefillDate ?? "2026-07-06",
     id: initialAppointment?.id,
     note: initialAppointment?.note ?? "",
     service: initialAppointment?.service ?? appointmentServiceOptions[0],
@@ -4362,6 +4364,7 @@ function CalendarWorkspace({
   appointments,
   clients,
   onCancelAppointment,
+  onCalendarDateChange,
   onEditAppointment,
   query,
   role,
@@ -4370,6 +4373,7 @@ function CalendarWorkspace({
   appointments: Appointment[];
   clients: ClientRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
+  onCalendarDateChange: (date: string) => void;
   onEditAppointment: (appointment: Appointment) => void;
   query: string;
   role: AdminRoleId;
@@ -4409,11 +4413,13 @@ function CalendarWorkspace({
   const weekDays = calendarMonthDays.slice(5, 12);
 
   function selectAppointment(appointment: Appointment) {
+    onCalendarDateChange(appointment.date);
     setSelectedDate(appointment.date);
     setSelectedKey(appointmentKey(appointment));
   }
 
   function selectDate(date: string, appointments: Appointment[], nextMode: CalendarMode = mode) {
+    onCalendarDateChange(date);
     setSelectedDate(date);
     setMode(nextMode);
 
@@ -5980,6 +5986,7 @@ function Workspace({
   media,
   onCancelAppointment,
   onCalendarCreateIntent,
+  onCalendarDateChange,
   onCloseBlogCreate,
   onCloseCertificateCreate,
   onCloseClientCreate,
@@ -6032,6 +6039,7 @@ function Workspace({
   media: MediaRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
+  onCalendarDateChange: (date: string) => void;
   onCloseBlogCreate: () => void;
   onCloseCertificateCreate: () => void;
   onCloseClientCreate: () => void;
@@ -6200,6 +6208,7 @@ function Workspace({
         clients={clients}
         key={selectedCalendarDate ?? "default-calendar"}
         onCancelAppointment={onCancelAppointment}
+        onCalendarDateChange={onCalendarDateChange}
         onEditAppointment={onEditAppointment}
         query={query}
         role={role}
@@ -6241,6 +6250,15 @@ export function AdminShell({
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows());
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord());
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers());
+  const selectedCalendarRouteDate = isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : undefined;
+  const [calendarSelection, setCalendarSelection] = useState(() => ({
+    date: selectedCalendarRouteDate ?? "2026-07-06",
+    routeDate: selectedCalendarRouteDate,
+  }));
+  const activeCalendarDate =
+    calendarSelection.routeDate === selectedCalendarRouteDate
+      ? calendarSelection.date
+      : (selectedCalendarRouteDate ?? "2026-07-06");
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
@@ -6281,6 +6299,13 @@ export function AdminShell({
         ),
       ),
     );
+  }
+
+  function updateActiveCalendarDate(date: string) {
+    setCalendarSelection({
+      date,
+      routeDate: selectedCalendarRouteDate,
+    });
   }
 
   function openPrimaryAction() {
@@ -6817,6 +6842,7 @@ export function AdminShell({
           media={media}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
+          onCalendarDateChange={updateActiveCalendarDate}
           onCloseBlogCreate={() => setIsBlogCreateOpen(false)}
           onCloseCertificateCreate={() => setIsCertificateCreateOpen(false)}
           onCloseClientCreate={() => setIsClientCreateOpen(false)}
@@ -6859,6 +6885,7 @@ export function AdminShell({
             onClose={closeActionDialog}
             onSave={saveCalendarAppointment}
             prefillClientName={shouldPrefillCalendarClient ? selectedClientName : undefined}
+            prefillDate={editingAppointment ? undefined : activeCalendarDate}
           />
         ) : isActionOpen ? (
           <QuickActionDialog

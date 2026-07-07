@@ -624,6 +624,30 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("button", { name: /Анна Петрова/ })).not.toBeInTheDocument();
   });
 
+  it("prefills appointment creation with the calendar date query", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-10" />);
+
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    expect(within(dialog).getByLabelText("Дата")).toHaveValue("2026-07-10");
+  });
+
+  it("prefills appointment creation with the day selected in month view", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    await user.click(screen.getByRole("button", { name: /^7 июля.*0 записей/ }));
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    expect(within(dialog).getByLabelText("Дата")).toHaveValue("2026-07-07");
+  });
+
   it("opens a quick action panel from the primary action", async () => {
     const user = userEvent.setup();
 

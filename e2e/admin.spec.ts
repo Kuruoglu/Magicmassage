@@ -148,6 +148,15 @@ test("calendar can create a new appointment", async ({ page }) => {
   await expect(page.getByLabel("Детали выбранной записи").getByText("SPA процедура")).toBeVisible();
 });
 
+test("calendar create action uses the currently selected day", async ({ page }) => {
+  await page.goto("/admin?section=calendar&role=owner&date=2026-07-10", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Создать запись" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Новая запись" });
+  await expect(dialog.getByLabel("Дата")).toHaveValue("2026-07-10");
+});
+
 test("calendar creation resets client field and suggests existing clients", async ({ page }) => {
   await page.goto("/admin?section=calendar&client=Olena%20K.&action=create", { waitUntil: "networkidle" });
 
