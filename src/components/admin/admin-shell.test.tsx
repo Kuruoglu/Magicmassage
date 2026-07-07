@@ -114,6 +114,65 @@ describe("AdminShell", () => {
     expect(within(card).getByText("Ожидает PDF")).toBeInTheDocument();
   });
 
+  it("creates a manual certificate and opens its details", () => {
+    render(<AdminShell activeSection="certificates" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Выдать вручную" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новый сертификат" });
+    fireEvent.change(within(dialog).getByLabelText("Код"), { target: { value: "MMN-2407-1999" } });
+    fireEvent.change(within(dialog).getByLabelText("Покупатель"), { target: { value: "Ирина Тестова" } });
+    fireEvent.change(within(dialog).getByLabelText("Клиент"), { target: { value: "Ирина Тестова" } });
+    fireEvent.change(within(dialog).getByLabelText("Получатель"), { target: { value: "Self" } });
+    fireEvent.change(within(dialog).getByLabelText("Сумма"), { target: { value: "90 €" } });
+    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Оплачено" } });
+    fireEvent.change(within(dialog).getByLabelText("Stripe ID"), { target: { value: "manual" } });
+    fireEvent.change(within(dialog).getByLabelText("Дата оплаты"), { target: { value: "2026-07-07" } });
+    fireEvent.change(within(dialog).getByLabelText("Действителен до"), { target: { value: "2027-01-07" } });
+    fireEvent.change(within(dialog).getByLabelText("Заметка"), { target: { value: "Ручная выдача после оплаты в салоне." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить сертификат" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новый сертификат" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "MMN-2407-1999" })).toBeInTheDocument();
+
+    const details = screen.getByLabelText("Детали сертификата");
+    expect(within(details).getByRole("heading", { name: "MMN-2407-1999" })).toBeInTheDocument();
+    expect(within(details).getByText("Ирина Тестова → Self")).toBeInTheDocument();
+    expect(within(details).getByText("90 €")).toBeInTheDocument();
+    expect(within(details).getByText("manual")).toBeInTheDocument();
+    expect(within(details).getByText("Ручная выдача после оплаты в салоне.")).toBeInTheDocument();
+  });
+
+  it("updates certificate delivery, redemption, and editable details", () => {
+    render(<AdminShell activeSection="certificates" role="owner" />);
+
+    fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "MMN-2407-1023" }));
+
+    const details = screen.getByLabelText("Детали сертификата");
+    expect(within(details).getByRole("heading", { name: "MMN-2407-1023" })).toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Отправить PDF" }));
+    expect(within(details).getByText("Отправлен")).toBeInTheDocument();
+    expect(within(details).getByRole("status")).toHaveTextContent("PDF отмечен как отправленный.");
+
+    fireEvent.click(within(details).getByRole("button", { name: "Погасить" }));
+    expect(within(details).getByText("Погашен")).toBeInTheDocument();
+    expect(within(details).getByRole("status")).toHaveTextContent("Сертификат погашен.");
+
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+    const dialog = screen.getByRole("dialog", { name: "Редактировать сертификат" });
+    fireEvent.change(within(dialog).getByLabelText("Получатель"), { target: { value: "Olena K." } });
+    fireEvent.change(within(dialog).getByLabelText("Сумма"), { target: { value: "260 €" } });
+    fireEvent.change(within(dialog).getByLabelText("Заметка"), { target: { value: "Погашен после записи клиента." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать сертификат" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "MMN-2407-1023" })).toHaveLength(1);
+    expect(within(details).getByText("Oksana → Olena K.")).toBeInTheDocument();
+    expect(within(details).getByText("260 €")).toBeInTheDocument();
+    expect(within(details).getByText("Погашен после записи клиента.")).toBeInTheDocument();
+  });
+
   it("shows quick contact actions in the selected client card", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 

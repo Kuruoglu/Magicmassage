@@ -59,8 +59,33 @@ type ClientRecord = {
   totalSpend: string;
   visits: number;
 };
+type CertificateStatus = "Оплачено" | "Отправлен" | "Ожидает PDF" | "Погашен";
+type CertificateRecord = {
+  amount: string;
+  buyer: string;
+  clientName: string;
+  code: string;
+  expiresAt: string;
+  history: string[];
+  note: string;
+  paymentDate: string;
+  recipient: string;
+  status: CertificateStatus;
+  stripeId: string;
+};
+type CertificateFormState = {
+  amount: string;
+  buyer: string;
+  clientName: string;
+  code: string;
+  expiresAt: string;
+  note: string;
+  paymentDate: string;
+  recipient: string;
+  status: CertificateStatus;
+  stripeId: string;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
-type ClientCertificate = (typeof certificateRows)[number];
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
 const clientFilterOptions = [
@@ -94,6 +119,7 @@ type ClientFormState = {
 };
 const appointmentServiceOptions = ["Классический массаж", "Лимфодренажный массаж", "Deep tissue massage", "SPA процедура"] as const;
 const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена", "Отменена"];
+const certificateStatusOptions: CertificateStatus[] = ["Оплачено", "Отправлен", "Ожидает PDF", "Погашен"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -121,6 +147,13 @@ function formatCurrency(value: number) {
     maximumFractionDigits: 2,
     style: "currency",
   }).format(value);
+}
+
+function addMonthsToIsoDate(date: string, months: number) {
+  const nextDate = new Date(`${date}T00:00:00.000Z`);
+  nextDate.setUTCMonth(nextDate.getUTCMonth() + months);
+
+  return nextDate.toISOString().slice(0, 10);
 }
 
 function statusClass(status: string) {
@@ -159,6 +192,26 @@ function buildInitialClientRows(): ClientRecord[] {
   }));
 }
 
+function buildInitialCertificateRows(): CertificateRecord[] {
+  return certificateRows.map((certificate, index) => {
+    const financeRow = financeRows.find((row) => row.certificateCode === certificate.code);
+    const paymentDate = financeRow?.date ?? "2026-07-01";
+
+    return {
+      ...certificate,
+      expiresAt: addMonthsToIsoDate(paymentDate, 6),
+      history: [
+        `${paymentDate}: Stripe оплата связана с ${financeRow?.id ?? "manual"}.`,
+        certificate.status === "Ожидает PDF" ? "PDF ожидает генерации." : "PDF готов к отправке.",
+      ],
+      note: index === 2 ? "Проверить PDF перед повторной отправкой клиенту." : "Автоматически создан из оплаты Stripe.",
+      paymentDate,
+      status: certificate.status as CertificateStatus,
+      stripeId: financeRow?.id ?? "manual",
+    };
+  });
+}
+
 function buildClientFormState(client?: ClientRecord): ClientFormState {
   return {
     email: client?.email ?? "",
@@ -173,6 +226,21 @@ function buildClientFormState(client?: ClientRecord): ClientFormState {
     telegram: client?.telegram ?? "",
     totalSpend: client?.totalSpend ?? "0 €",
     visits: String(client?.visits ?? 0),
+  };
+}
+
+function buildCertificateFormState(certificate?: CertificateRecord): CertificateFormState {
+  return {
+    amount: certificate?.amount ?? "0 €",
+    buyer: certificate?.buyer ?? "",
+    clientName: certificate?.clientName ?? "",
+    code: certificate?.code ?? "",
+    expiresAt: certificate?.expiresAt ?? "2027-01-07",
+    note: certificate?.note ?? "",
+    paymentDate: certificate?.paymentDate ?? "2026-07-07",
+    recipient: certificate?.recipient ?? "",
+    status: certificate?.status ?? "Оплачено",
+    stripeId: certificate?.stripeId ?? "manual",
   };
 }
 
@@ -193,10 +261,10 @@ function findClientByName(clients: ClientRecord[], name: string | undefined) {
   return clients.find((client) => normalizeSearch(client.name) === normalizedName);
 }
 
-function findClientCertificates(clientName: string): ClientCertificate[] {
+function findClientCertificates(certificates: CertificateRecord[], clientName: string): CertificateRecord[] {
   const normalizedName = normalizeSearch(clientName);
 
-  return certificateRows.filter((certificate) => normalizeSearch(certificate.clientName) === normalizedName);
+  return certificates.filter((certificate) => normalizeSearch(certificate.clientName) === normalizedName);
 }
 
 function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
@@ -613,6 +681,152 @@ function ClientFormDialog({
   );
 }
 
+function CertificateFormDialog({
+  initialCertificate,
+  onClose,
+  onSave,
+}: {
+  initialCertificate?: CertificateRecord;
+  onClose: () => void;
+  onSave: (certificate: CertificateRecord, originalCode?: string) => void;
+}) {
+  const [form, setForm] = useState<CertificateFormState>(() => buildCertificateFormState(initialCertificate));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialCertificate);
+
+  function updateForm<Field extends keyof CertificateFormState>(field: Field, value: CertificateFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const code = form.code.trim();
+    const buyer = form.buyer.trim();
+    const recipient = form.recipient.trim();
+
+    if (!code || !buyer || !recipient) {
+      setError("Укажите код, покупателя и получателя сертификата.");
+      return;
+    }
+
+    onSave(
+      {
+        amount: form.amount.trim() || "0 €",
+        buyer,
+        clientName: form.clientName.trim() || recipient,
+        code,
+        expiresAt: form.expiresAt,
+        history: initialCertificate?.history.map((entry) => entry) ?? [`${form.paymentDate}: сертификат создан вручную.`],
+        note: form.note.trim(),
+        paymentDate: form.paymentDate,
+        recipient,
+        status: form.status,
+        stripeId: form.stripeId.trim() || "manual",
+      },
+      initialCertificate?.code,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="certificate-action-title" aria-modal="true" className="admin-action-dialog admin-certificate-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Сертификаты</span>
+            <h2 id="certificate-action-title">{isEditing ? "Редактировать сертификат" : "Новый сертификат"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-certificate-form-grid">
+            <label>
+              Код
+              <input
+                aria-invalid={error && !form.code.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("code", event.target.value)}
+                required
+                type="text"
+                value={form.code}
+              />
+            </label>
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value as CertificateStatus)} value={form.status}>
+                {certificateStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Покупатель
+              <input
+                aria-invalid={error && !form.buyer.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("buyer", event.target.value)}
+                required
+                type="text"
+                value={form.buyer}
+              />
+            </label>
+            <label>
+              Клиент
+              <input onChange={(event) => updateForm("clientName", event.target.value)} type="text" value={form.clientName} />
+            </label>
+            <label>
+              Получатель
+              <input
+                aria-invalid={error && !form.recipient.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("recipient", event.target.value)}
+                required
+                type="text"
+                value={form.recipient}
+              />
+            </label>
+            <label>
+              Сумма
+              <input onChange={(event) => updateForm("amount", event.target.value)} type="text" value={form.amount} />
+            </label>
+            <label>
+              Stripe ID
+              <input onChange={(event) => updateForm("stripeId", event.target.value)} type="text" value={form.stripeId} />
+            </label>
+            <label>
+              Дата оплаты
+              <input onChange={(event) => updateForm("paymentDate", event.target.value)} type="date" value={form.paymentDate} />
+            </label>
+            <label>
+              Действителен до
+              <input onChange={(event) => updateForm("expiresAt", event.target.value)} type="date" value={form.expiresAt} />
+            </label>
+            <label className="admin-form-wide">
+              Заметка
+              <textarea onChange={(event) => updateForm("note", event.target.value)} rows={4} value={form.note} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить сертификат"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 function CalendarAppointmentDialog({
   clients,
   initialAppointment,
@@ -833,11 +1047,11 @@ function CalendarAppointmentCancelDialog({
   );
 }
 
-function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId }) {
+function DashboardWorkspace({ certificates, query, role }: { certificates: CertificateRecord[]; query: string; role: AdminRoleId }) {
   const filteredAppointments = upcomingAppointments.filter((appointment) =>
     matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
   );
-  const filteredCertificates = certificateRows.filter((certificate) =>
+  const filteredCertificates = certificates.filter((certificate) =>
     matchesSearch([certificate.code, certificate.buyer, certificate.clientName, certificate.recipient, certificate.status], query),
   );
 
@@ -899,7 +1113,7 @@ function DashboardWorkspace({ query, role }: { query: string; role: AdminRoleId 
               <div>
                 <strong>{certificate.code}</strong>
                 <span>
-                  {certificate.buyer} {"->"} {certificate.recipient}
+                  {certificate.buyer} → {certificate.recipient}
                 </span>
               </div>
               <span className={statusClass(certificate.status)}>{certificate.status}</span>
@@ -921,7 +1135,7 @@ function ClientDetailCard({
   onSaveNote,
   role,
 }: {
-  certificates: ClientCertificate[];
+  certificates: CertificateRecord[];
   client: ClientRecord;
   onCalendarCreateIntent: () => void;
   onClose: () => void;
@@ -1118,6 +1332,7 @@ function ClientDetailCard({
 }
 
 function ClientsWorkspace({
+  certificates,
   clients,
   isClientCreateOpen,
   onCalendarCreateIntent,
@@ -1128,6 +1343,7 @@ function ClientsWorkspace({
   role,
   selectedClientName,
 }: {
+  certificates: CertificateRecord[];
   clients: ClientRecord[];
   isClientCreateOpen: boolean;
   onCalendarCreateIntent: () => void;
@@ -1243,7 +1459,7 @@ function ClientsWorkspace({
       {isClientDrawerOpen ? (
         <div className="admin-drawer-backdrop">
           <ClientDetailCard
-            certificates={findClientCertificates(selectedClient.name)}
+            certificates={findClientCertificates(certificates, selectedClient.name)}
             key={selectedClient.name}
             client={selectedClient}
             onCalendarCreateIntent={onCalendarCreateIntent}
@@ -1260,6 +1476,274 @@ function ClientsWorkspace({
           key={editingClient?.name ?? "new-client"}
           onClose={closeClientForm}
           onSave={saveClientForm}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CertificatesWorkspace({
+  certificates,
+  clients,
+  isCertificateCreateOpen,
+  onCloseCertificateCreate,
+  onSaveCertificate,
+  onUpdateCertificateStatus,
+  query,
+  role,
+}: {
+  certificates: CertificateRecord[];
+  clients: ClientRecord[];
+  isCertificateCreateOpen: boolean;
+  onCloseCertificateCreate: () => void;
+  onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
+  onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
+  query: string;
+  role: AdminRoleId;
+}) {
+  const [selectedCode, setSelectedCode] = useState(certificates[0]?.code ?? "");
+  const [editingCertificate, setEditingCertificate] = useState<CertificateRecord | undefined>();
+  const [actionNotice, setActionNotice] = useState("");
+  const filteredCertificates = certificates.filter((certificate) =>
+    matchesSearch(
+      [
+        certificate.code,
+        certificate.buyer,
+        certificate.clientName,
+        certificate.recipient,
+        certificate.amount,
+        certificate.status,
+        certificate.stripeId,
+        certificate.note,
+      ],
+      query,
+    ),
+  );
+  const selectedCertificate =
+    filteredCertificates.find((certificate) => certificate.code === selectedCode) ??
+    certificates.find((certificate) => certificate.code === selectedCode) ??
+    filteredCertificates[0] ??
+    certificates[0];
+  const linkedClient = selectedCertificate ? findClientByName(clients, selectedCertificate.clientName) : undefined;
+  const isCertificateFormOpen = isCertificateCreateOpen || Boolean(editingCertificate);
+  const paidCount = certificates.filter((certificate) => certificate.status === "Оплачено").length;
+  const pendingPdfCount = certificates.filter((certificate) => certificate.status === "Ожидает PDF").length;
+  const redeemedCount = certificates.filter((certificate) => certificate.status === "Погашен").length;
+
+  function openCertificate(code: string) {
+    setSelectedCode(code);
+    setActionNotice("");
+  }
+
+  function openCertificateEdit(certificate: CertificateRecord) {
+    onCloseCertificateCreate();
+    setActionNotice("");
+    setEditingCertificate(certificate);
+  }
+
+  function closeCertificateForm() {
+    setEditingCertificate(undefined);
+    onCloseCertificateCreate();
+  }
+
+  function saveCertificateForm(certificate: CertificateRecord, originalCode?: string) {
+    onSaveCertificate(certificate, originalCode);
+    setSelectedCode(certificate.code);
+    setActionNotice(originalCode ? "Сертификат обновлен." : "Сертификат создан.");
+    closeCertificateForm();
+  }
+
+  function setCertificateStatus(status: CertificateStatus, notice: string) {
+    if (!selectedCertificate) {
+      return;
+    }
+
+    onUpdateCertificateStatus(selectedCertificate.code, status, `2026-07-07: ${notice}`);
+    setSelectedCode(selectedCertificate.code);
+    setActionNotice(notice);
+  }
+
+  if (!selectedCertificate) {
+    return (
+      <section className="admin-panel admin-panel-large" aria-labelledby="certificates-heading">
+        <div className="admin-panel-head">
+          <h2 id="certificates-heading">Сертификаты</h2>
+        </div>
+        <EmptyState label="Сертификаты пока не заведены." />
+        {isCertificateFormOpen ? (
+          <CertificateFormDialog
+            initialCertificate={editingCertificate}
+            key={editingCertificate?.code ?? "new-certificate"}
+            onClose={closeCertificateForm}
+            onSave={saveCertificateForm}
+          />
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <div className="admin-split-view admin-certificates-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="certificates-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="certificates-heading">Сертификаты</h2>
+            <p>Ручная выдача, PDF-статус, погашение и связь с клиентской карточкой.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры сертификатов">
+            <button aria-pressed="true" type="button">
+              Все
+            </button>
+            <button type="button">К отправке</button>
+            <button type="button">Погашены</button>
+          </div>
+        </div>
+
+        <div className="admin-metric-row admin-certificate-summary" aria-label="Сводка сертификатов">
+          <article className="admin-metric admin-metric-success">
+            <span>Оплачено</span>
+            <strong>{paidCount}</strong>
+          </article>
+          <article className="admin-metric admin-metric-warning">
+            <span>PDF ждут</span>
+            <strong>{pendingPdfCount}</strong>
+          </article>
+          <article className="admin-metric admin-metric-neutral">
+            <span>Погашено</span>
+            <strong>{redeemedCount}</strong>
+          </article>
+        </div>
+
+        <div className="admin-table-scroll">
+          <table className="admin-data-table">
+            <thead>
+              <tr>
+                <th>Код</th>
+                <th>Покупатель</th>
+                <th>Клиент</th>
+                <th>Сумма</th>
+                <th>Статус</th>
+                <th>Оплата</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCertificates.map((certificate) => (
+                <tr aria-selected={certificate.code === selectedCertificate.code} key={certificate.code}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openCertificate(certificate.code)} type="button">
+                      {certificate.code}
+                    </button>
+                  </td>
+                  <td>{certificate.buyer}</td>
+                  <td>{certificate.clientName}</td>
+                  <td className="admin-tabular">{certificate.amount}</td>
+                  <td>
+                    <span className={statusClass(certificate.status)}>{certificate.status}</span>
+                  </td>
+                  <td className="admin-tabular">{certificate.paymentDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredCertificates.length === 0 ? <EmptyState label="Сертификаты не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали сертификата">
+        <span className="admin-kicker">Сертификат</span>
+        <div className="admin-detail-heading">
+          <h2>{selectedCertificate.code}</h2>
+          <div className="admin-detail-actions">
+            {linkedClient ? (
+              <Link className="admin-outline-action" href={clientProfileHref(linkedClient.name, role)}>
+                Открыть клиента
+              </Link>
+            ) : null}
+            <button className="admin-text-action" onClick={() => openCertificateEdit(selectedCertificate)} type="button">
+              Редактировать
+            </button>
+            <button
+              className="admin-text-action"
+              disabled={selectedCertificate.status === "Отправлен" || selectedCertificate.status === "Погашен"}
+              onClick={() => setCertificateStatus("Отправлен", "PDF отмечен как отправленный.")}
+              type="button"
+            >
+              Отправить PDF
+            </button>
+            <button
+              className="admin-danger-button"
+              disabled={selectedCertificate.status === "Погашен"}
+              onClick={() => setCertificateStatus("Погашен", "Сертификат погашен.")}
+              type="button"
+            >
+              Погасить
+            </button>
+          </div>
+        </div>
+
+        {actionNotice ? (
+          <p className="admin-export-notice" role="status">
+            {actionNotice}
+          </p>
+        ) : null}
+
+        <dl className="admin-detail-list">
+          <div>
+            <dt>Покупатель → получатель</dt>
+            <dd>
+              {selectedCertificate.buyer} → {selectedCertificate.recipient}
+            </dd>
+          </div>
+          <div>
+            <dt>Клиент</dt>
+            <dd>{selectedCertificate.clientName}</dd>
+          </div>
+          <div>
+            <dt>Сумма</dt>
+            <dd>{selectedCertificate.amount}</dd>
+          </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>
+              <span className={statusClass(selectedCertificate.status)}>{selectedCertificate.status}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Stripe ID</dt>
+            <dd>{selectedCertificate.stripeId}</dd>
+          </div>
+          <div>
+            <dt>Дата оплаты</dt>
+            <dd>{selectedCertificate.paymentDate}</dd>
+          </div>
+          <div>
+            <dt>Действителен до</dt>
+            <dd>{selectedCertificate.expiresAt}</dd>
+          </div>
+          <div>
+            <dt>Заметка</dt>
+            <dd>{selectedCertificate.note || "Заметка по сертификату пока пустая."}</dd>
+          </div>
+        </dl>
+
+        <section className="admin-client-section">
+          <h3>История</h3>
+          <ul className="admin-client-history">
+            {selectedCertificate.history.map((entry) => (
+              <li key={entry}>
+                <span>{entry}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </aside>
+
+      {isCertificateFormOpen ? (
+        <CertificateFormDialog
+          initialCertificate={editingCertificate}
+          key={editingCertificate?.code ?? "new-certificate"}
+          onClose={closeCertificateForm}
+          onSave={saveCertificateForm}
         />
       ) : null}
     </div>
@@ -1724,40 +2208,51 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 
 function Workspace({
   appointments,
+  certificates,
   clients,
+  isCertificateCreateOpen,
   isClientCreateOpen,
   onCancelAppointment,
   onCalendarCreateIntent,
+  onCloseCertificateCreate,
   onCloseClientCreate,
   onEditAppointment,
+  onSaveCertificate,
   onSaveClient,
   onSaveClientNote,
+  onUpdateCertificateStatus,
   query,
   role,
   section,
   selectedClientName,
 }: {
   appointments: Appointment[];
+  certificates: CertificateRecord[];
   clients: ClientRecord[];
+  isCertificateCreateOpen: boolean;
   isClientCreateOpen: boolean;
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
+  onCloseCertificateCreate: () => void;
   onCloseClientCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
+  onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
   selectedClientName?: string;
 }) {
   if (section === "dashboard") {
-    return <DashboardWorkspace query={query} role={role} />;
+    return <DashboardWorkspace certificates={certificates} query={query} role={role} />;
   }
 
   if (section === "clients") {
     return (
       <ClientsWorkspace
+        certificates={certificates}
         clients={clients}
         isClientCreateOpen={isClientCreateOpen}
         key={selectedClientName ?? "default-client"}
@@ -1768,6 +2263,21 @@ function Workspace({
         query={query}
         role={role}
         selectedClientName={selectedClientName}
+      />
+    );
+  }
+
+  if (section === "certificates") {
+    return (
+      <CertificatesWorkspace
+        certificates={certificates}
+        clients={clients}
+        isCertificateCreateOpen={isCertificateCreateOpen}
+        onCloseCertificateCreate={onCloseCertificateCreate}
+        onSaveCertificate={onSaveCertificate}
+        onUpdateCertificateStatus={onUpdateCertificateStatus}
+        query={query}
+        role={role}
       />
     );
   }
@@ -1802,7 +2312,9 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
   const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows());
+  const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
+  const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -1842,15 +2354,28 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     if (activeSection === "clients") {
       setCancellingAppointment(undefined);
       setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
       setIsClientCreateOpen(true);
       return;
     }
 
+    if (activeSection === "certificates") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsClientCreateOpen(false);
+      setIsCertificateCreateOpen(true);
+      return;
+    }
+
+    setIsCertificateCreateOpen(false);
+    setIsClientCreateOpen(false);
     setIsActionOpen(true);
   }
 
   function openAppointmentEdit(appointment: Appointment) {
     setCancellingAppointment(undefined);
+    setIsCertificateCreateOpen(false);
+    setIsClientCreateOpen(false);
     setEditingAppointment(appointment);
     setIsActionOpen(true);
   }
@@ -1858,6 +2383,8 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   function openAppointmentCancel(appointment: Appointment) {
     setEditingAppointment(undefined);
     setIsActionOpen(false);
+    setIsCertificateCreateOpen(false);
+    setIsClientCreateOpen(false);
     setCancellingAppointment(appointment);
   }
 
@@ -1865,12 +2392,15 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setDismissedCalendarActionKey("");
     setCancellingAppointment(undefined);
     setEditingAppointment(undefined);
+    setIsCertificateCreateOpen(false);
+    setIsClientCreateOpen(false);
     setIsActionOpen(false);
   }
 
   function closeActionDialog() {
     setDismissedCalendarActionKey(calendarActionKey);
     setIsActionOpen(false);
+    setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
     setEditingAppointment(undefined);
   }
@@ -1919,6 +2449,40 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
 
       return current.map((currentClient, index) => (index === existingIndex ? client : currentClient));
     });
+  }
+
+  function saveCertificateRecord(certificate: CertificateRecord, originalCode?: string) {
+    setCertificates((current) => {
+      const originalKey = originalCode ? normalizeSearch(originalCode) : "";
+      const nextKey = normalizeSearch(certificate.code);
+      const existingIndex = current.findIndex((currentCertificate) => {
+        if (originalKey) {
+          return normalizeSearch(currentCertificate.code) === originalKey;
+        }
+
+        return normalizeSearch(currentCertificate.code) === nextKey;
+      });
+
+      if (existingIndex === -1) {
+        return [...current, certificate];
+      }
+
+      return current.map((currentCertificate, index) => (index === existingIndex ? certificate : currentCertificate));
+    });
+  }
+
+  function updateCertificateStatus(certificateCode: string, status: CertificateStatus, historyEntry: string) {
+    setCertificates((current) =>
+      current.map((certificate) =>
+        normalizeSearch(certificate.code) === normalizeSearch(certificateCode)
+          ? {
+              ...certificate,
+              history: [historyEntry, ...certificate.history],
+              status,
+            }
+          : certificate,
+      ),
+    );
   }
 
   return (
@@ -1986,14 +2550,19 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
 
         <Workspace
           appointments={calendarAppointments}
+          certificates={certificates}
           clients={clients}
+          isCertificateCreateOpen={isCertificateCreateOpen}
           isClientCreateOpen={isClientCreateOpen}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
+          onCloseCertificateCreate={() => setIsCertificateCreateOpen(false)}
           onCloseClientCreate={() => setIsClientCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
+          onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}
           onSaveClientNote={saveClientNote}
+          onUpdateCertificateStatus={updateCertificateStatus}
           query={query}
           role={role}
           section={activeSection}

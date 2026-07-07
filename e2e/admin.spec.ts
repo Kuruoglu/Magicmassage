@@ -257,6 +257,56 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await expect(card.getByText("email", { exact: true })).toBeVisible();
 });
 
+test("certificate workspace can issue, send, redeem and edit a certificate", async ({ page }) => {
+  await page.goto("/admin?section=certificates", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Выдать вручную" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новый сертификат" });
+  await createDialog.getByLabel("Код").fill("MMN-2407-1999");
+  await createDialog.getByLabel("Покупатель").fill("Ирина Тестова");
+  await createDialog.getByLabel("Клиент").fill("Ирина Тестова");
+  await createDialog.getByLabel("Получатель").fill("Self");
+  await createDialog.getByLabel("Сумма").fill("90 €");
+  await createDialog.getByLabel("Статус").selectOption("Оплачено");
+  await createDialog.getByLabel("Stripe ID").fill("manual");
+  await createDialog.getByLabel("Дата оплаты").fill("2026-07-07");
+  await createDialog.getByLabel("Действителен до").fill("2027-01-07");
+  await createDialog.getByLabel("Заметка").fill("Ручная выдача после оплаты в салоне.");
+  await createDialog.getByRole("button", { name: "Сохранить сертификат" }).click();
+
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("button", { name: "MMN-2407-1999" })).toBeVisible();
+
+  const details = page.getByLabel("Детали сертификата");
+  await expect(details.getByRole("heading", { name: "MMN-2407-1999" })).toBeVisible();
+  await expect(details.getByText("Ирина Тестова → Self")).toBeVisible();
+  await expect(details.getByText("90 €")).toBeVisible();
+  await expect(details.getByText("manual")).toBeVisible();
+
+  await page.getByRole("table").getByRole("button", { name: "MMN-2407-1023" }).click();
+  await expect(details.getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
+
+  await details.getByRole("button", { name: "Отправить PDF" }).click();
+  await expect(details.getByRole("status")).toHaveText("PDF отмечен как отправленный.");
+
+  await details.getByRole("button", { name: "Погасить" }).click();
+  await expect(details.getByRole("status")).toHaveText("Сертификат погашен.");
+  await expect(details.getByText("Погашен", { exact: true })).toBeVisible();
+
+  await details.getByRole("button", { name: "Редактировать" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Редактировать сертификат" });
+  await editDialog.getByLabel("Получатель").fill("Olena K.");
+  await editDialog.getByLabel("Сумма").fill("260 €");
+  await editDialog.getByLabel("Заметка").fill("Погашен после записи клиента.");
+  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  await expect(editDialog).toHaveCount(0);
+  await expect(details.getByText("Oksana → Olena K.")).toBeVisible();
+  await expect(details.getByText("260 €")).toBeVisible();
+  await expect(details.getByText("Погашен после записи клиента.")).toBeVisible();
+});
+
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

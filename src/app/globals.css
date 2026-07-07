@@ -2837,10 +2837,16 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   color: #FFFFFF;
 }
 
-.admin-page-head button:hover,
+.admin-page-head button:hover:not(:disabled),
 .admin-panel-head a:hover,
-.admin-text-action:hover {
+.admin-text-action:hover:not(:disabled) {
   background: var(--admin-primary-strong);
+}
+
+.admin-page-head button:disabled,
+.admin-text-action:disabled {
+  cursor: default;
+  opacity: 0.62;
 }
 
 .admin-outline-action {
@@ -2873,6 +2879,11 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   gap: 12px;
   grid-column: 1 / -1;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-certificate-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
 }
 
 .admin-metric,
@@ -3754,6 +3765,7 @@ button.admin-calendar-item[aria-pressed="true"] {
   gap: 12px;
 }
 
+.admin-certificate-form-grid,
 .admin-client-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -4042,6 +4054,7 @@ button.admin-calendar-item[aria-pressed="true"] {
     gap: 4px;
   }
 
+  .admin-certificate-form-grid,
   .admin-client-form-grid {
     grid-template-columns: 1fr;
   }
