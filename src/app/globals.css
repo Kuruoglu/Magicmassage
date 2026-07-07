@@ -3052,6 +3052,62 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   background: rgba(124, 77, 161, 0.08);
 }
 
+.admin-mobile-client-list {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-mobile-client-card {
+  background: #fff;
+  border: 1px solid rgba(124, 77, 161, 0.13);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.admin-mobile-client-card[aria-pressed="true"] {
+  background: rgba(124, 77, 161, 0.08);
+}
+
+.admin-mobile-client-head,
+.admin-mobile-client-meta,
+.admin-mobile-client-foot {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.admin-mobile-client-head strong {
+  font-size: 0.94rem;
+}
+
+.admin-mobile-client-head span,
+.admin-mobile-client-meta,
+.admin-mobile-client-foot > span:last-child {
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.admin-mobile-client-meta {
+  justify-content: flex-start;
+}
+
+.admin-mobile-client-meta span,
+.admin-mobile-client-foot span {
+  overflow-wrap: anywhere;
+}
+
 .admin-users-table {
   min-width: 0;
   table-layout: fixed;
@@ -4208,6 +4264,15 @@ button.admin-calendar-item[aria-pressed="true"] {
 
   .admin-data-table {
     min-width: 680px;
+  }
+
+  .admin-clients-table-scroll {
+    display: none;
+  }
+
+  .admin-mobile-client-list {
+    display: grid;
+    gap: 10px;
   }
 
   .admin-settings-table-scroll {

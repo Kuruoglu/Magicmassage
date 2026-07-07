@@ -127,8 +127,9 @@ describe("AdminShell", () => {
     await user.click(within(filters).getByRole("button", { name: "Активные" }));
 
     expect(within(filters).getByRole("button", { name: "Активные" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(table).getByRole("button", { name: "Анна Петрова" })).toBeInTheDocument();
-    expect(within(table).getByRole("button", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Статус" })).toBeInTheDocument();
+    expect(within(table).getByRole("row", { name: /Анна Петрова/ })).toHaveTextContent("Активный клиент");
+    expect(within(table).getByRole("row", { name: /Olena K./ })).toHaveTextContent("Активный клиент");
     expect(within(table).queryByRole("button", { name: "Maria Georgieva" })).not.toBeInTheDocument();
   });
 
@@ -136,6 +137,15 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="clients" role="owner" />);
 
     expect(screen.getByText("Активные = 5+ визитов и статус \"Активный клиент\".")).toBeInTheDocument();
+  });
+
+  it("renders mobile client summaries with natural visit labels", () => {
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    const mobileList = screen.getByRole("list", { name: "Мобильный список клиентов" });
+    expect(within(mobileList).getByText("3 визита")).toBeInTheDocument();
+    expect(within(mobileList).getByText("5 визитов")).toBeInTheDocument();
+    expect(within(mobileList).getByText("7 визитов")).toBeInTheDocument();
   });
 
   it("shows the selected client detail card from the client query", () => {

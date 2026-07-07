@@ -653,6 +653,39 @@ test("client filters update the table and profile certificate block", async ({ p
   await expect(card.getByRole("heading", { name: "Сертификаты" })).toBeVisible();
   await expect(card.getByText("MMN-2407-1023")).toBeVisible();
   await expect(card.getByText("250 €")).toBeVisible();
+
+  await card.getByRole("button", { name: "Закрыть" }).click();
+  await page.getByRole("button", { name: "Активные" }).click();
+  await expect(table.getByRole("row", { name: /Olena K.*Активный клиент/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Анна Петрова.*Активный клиент/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toHaveCount(0);
+});
+
+test("mobile client active filter shows status cards without horizontal scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Активные" }).click();
+
+  const mobileList = page.getByRole("list", { name: "Мобильный список клиентов" });
+  await expect(mobileList).toBeVisible();
+  await expect(page.getByRole("table")).toHaveCount(0);
+
+  const annaCard = mobileList.getByRole("listitem").filter({ hasText: "Анна Петрова" });
+  await expect(annaCard.getByText("Активный клиент")).toBeVisible();
+  await expect(annaCard.getByText("7 визитов")).toBeVisible();
+  await expect(mobileList.getByText("Maria Georgieva")).toHaveCount(0);
+
+  const statusBox = await annaCard.getByText("Активный клиент").boundingBox();
+  const viewport = page.viewportSize();
+  expect(statusBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(statusBox!.x + statusBox!.width).toBeLessThanOrEqual(viewport!.width);
+
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
 });
 
 test("admin mobile layout avoids horizontal overflow", async ({ page }) => {

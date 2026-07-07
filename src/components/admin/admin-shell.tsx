@@ -1173,6 +1173,26 @@ function isActiveClient(client: ClientRecord) {
   return normalizeSearch(client.status).startsWith("актив") && client.visits >= 5;
 }
 
+function visitCountLabel(visits: number) {
+  const absoluteVisits = Math.abs(visits);
+  const lastTwoDigits = absoluteVisits % 100;
+  const lastDigit = absoluteVisits % 10;
+
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return `${visits} визитов`;
+  }
+
+  if (lastDigit === 1) {
+    return `${visits} визит`;
+  }
+
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return `${visits} визита`;
+  }
+
+  return `${visits} визитов`;
+}
+
 function clientProfileHref(clientName: string, role: AdminRoleId) {
   return `/admin?section=clients&role=${role}&client=${encodeURIComponent(clientName)}`;
 }
@@ -3629,7 +3649,7 @@ function ClientsWorkspace({
           </div>
           <p className="admin-filter-help">Активные = 5+ визитов и статус &quot;Активный клиент&quot;.</p>
         </div>
-        <div className="admin-table-scroll">
+        <div className="admin-table-scroll admin-clients-table-scroll">
           <table className="admin-data-table">
             <thead>
               <tr>
@@ -3637,6 +3657,7 @@ function ClientsWorkspace({
                 <th>Телефон</th>
                 <th>Язык</th>
                 <th>Визиты</th>
+                <th>Статус</th>
                 <th>Следующий визит</th>
               </tr>
             </thead>
@@ -3651,12 +3672,40 @@ function ClientsWorkspace({
                   <td className="admin-tabular">{client.phone}</td>
                   <td>{client.language.toUpperCase()}</td>
                   <td className="admin-tabular">{client.visits}</td>
+                  <td>
+                    <span className={statusClass(client.status)}>{client.status}</span>
+                  </td>
                   <td>{client.next}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <ul aria-label="Мобильный список клиентов" className="admin-mobile-client-list">
+          {filteredClients.map((client) => (
+            <li key={client.phone}>
+              <button
+                aria-pressed={client.name === selectedClient.name}
+                className="admin-mobile-client-card"
+                onClick={() => openClient(client.name)}
+                type="button"
+              >
+                <span className="admin-mobile-client-head">
+                  <strong>{client.name}</strong>
+                  <span>{client.language.toUpperCase()}</span>
+                </span>
+                <span className="admin-mobile-client-meta">
+                  <span className="admin-tabular">{client.phone}</span>
+                  <span>{visitCountLabel(client.visits)}</span>
+                </span>
+                <span className="admin-mobile-client-foot">
+                  <span className={statusClass(client.status)}>{client.status}</span>
+                  <span>{client.next}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
         {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
       </section>
 
