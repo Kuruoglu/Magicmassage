@@ -3629,6 +3629,10 @@ button.admin-calendar-item[aria-pressed="true"] {
   display: none;
 }
 
+.admin-month-free-compact {
+  display: none;
+}
+
 .admin-calendar-week-grid {
   display: grid;
   gap: 10px;
@@ -4213,7 +4217,7 @@ button.admin-calendar-item[aria-pressed="true"] {
   }
 
   .admin-calendar-month-grid {
-    gap: 4px;
+    gap: 3px;
   }
 
   .admin-certificate-form-grid,
@@ -4235,7 +4239,7 @@ button.admin-calendar-item[aria-pressed="true"] {
   .admin-calendar-day-button {
     gap: 4px;
     min-height: 54px;
-    padding: 6px 4px;
+    padding: 6px 3px;
   }
 
   .admin-calendar-day-button > strong {
@@ -4243,7 +4247,9 @@ button.admin-calendar-item[aria-pressed="true"] {
   }
 
   .admin-calendar-day-button > small {
-    font-size: 0.7rem;
+    font-size: 0.62rem;
+    gap: 1px;
+    line-height: 1.05;
   }
 
   .admin-month-count-full {
@@ -4252,6 +4258,16 @@ button.admin-calendar-item[aria-pressed="true"] {
 
   .admin-month-count-compact {
     display: inline;
+    white-space: nowrap;
+  }
+
+  .admin-month-free-full {
+    display: none;
+  }
+
+  .admin-month-free-compact {
+    display: inline;
+    white-space: nowrap;
   }
 
   .admin-month-event {

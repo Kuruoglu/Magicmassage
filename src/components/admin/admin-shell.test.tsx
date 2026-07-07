@@ -571,6 +571,8 @@ describe("AdminShell", () => {
     expect(within(monthGrid).queryByText("Классический массаж")).not.toBeInTheDocument();
     expect(within(monthGrid).getByText("2 записи")).toBeInTheDocument();
     expect(within(monthGrid).getAllByText("2 свободных слота").length).toBeGreaterThan(0);
+    expect(within(monthGrid).getAllByText("2 зап.").length).toBeGreaterThan(0);
+    expect(within(monthGrid).getAllByText("2 св.").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /6 июля.*2 записи/ }));
 

@@ -109,6 +109,42 @@ test("calendar month view is selectable", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Мария Иванова/ })).toBeVisible();
 });
 
+test("calendar month view uses compact labels on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Месяц" }).click();
+
+  const monthGrid = page.getByRole("grid", { name: "Месяц Июль 2026" });
+  const selectedDay = monthGrid.getByRole("button", { name: /6 июля.*2 записи.*2 свободных слота/ });
+  await expect(selectedDay).toBeVisible();
+  await expect(selectedDay.getByText("2 зап.")).toBeVisible();
+  await expect(selectedDay.getByText("2 св.")).toBeVisible();
+  await expect(selectedDay.getByText("2 свободных слота")).toBeHidden();
+
+  const compactLineBoxes = await selectedDay.evaluate((button) => {
+    const measureLineBoxes = (selector: string) => {
+      const element = button.querySelector(selector);
+      if (!element) {
+        return 0;
+      }
+
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getClientRects().length;
+    };
+
+    return {
+      count: measureLineBoxes(".admin-month-count-compact"),
+      free: measureLineBoxes(".admin-month-free-compact"),
+    };
+  });
+  expect(compactLineBoxes).toEqual({ count: 1, free: 1 });
+
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 test("calendar week and list modes are distinct", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 

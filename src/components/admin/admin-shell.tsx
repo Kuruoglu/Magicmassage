@@ -1272,6 +1272,10 @@ function appointmentCountLabel(count: number) {
   return `${count} записей`;
 }
 
+function compactAppointmentCountLabel(count: number) {
+  return `${count} зап.`;
+}
+
 function freeSlotCount(appointmentCount: number, dailySlotCapacity: number) {
   return Math.max(0, dailySlotCapacity - appointmentCount);
 }
@@ -1286,6 +1290,10 @@ function freeSlotLabel(count: number) {
   }
 
   return `${count} свободных слотов`;
+}
+
+function compactFreeSlotLabel(count: number) {
+  return `${count} св.`;
 }
 
 function slotCountLabel(count: number) {
@@ -4537,7 +4545,10 @@ function CalendarWorkspace({
             {calendarMonthDays.map((day) => {
               const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
               const countLabel = appointmentCountLabel(dayAppointments.length);
-              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length, dailySlotCapacity));
+              const freeCount = freeSlotCount(dayAppointments.length, dailySlotCapacity);
+              const freeLabel = freeSlotLabel(freeCount);
+              const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
+              const compactFreeLabel = compactFreeSlotLabel(freeCount);
 
               return (
                 <span className="admin-calendar-month-cell" key={day.date} role="gridcell">
@@ -4551,8 +4562,9 @@ function CalendarWorkspace({
                     <strong>{day.day}</strong>
                     <small>
                       <span className="admin-month-count-full">{countLabel}</span>
-                      <span className="admin-month-count-compact">{dayAppointments.length}</span>
-                      <span>{freeLabel}</span>
+                      <span className="admin-month-count-compact">{compactCountLabel}</span>
+                      <span className="admin-month-free-full">{freeLabel}</span>
+                      <span className="admin-month-free-compact">{compactFreeLabel}</span>
                     </small>
                   </button>
                 </span>
