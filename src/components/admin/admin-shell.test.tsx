@@ -686,6 +686,31 @@ describe("AdminShell", () => {
     expect(within(screen.getByLabelText("Детали выбранной записи")).getByText("SPA процедура")).toBeInTheDocument();
   });
 
+  it("selects a newly created appointment immediately after saving", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+    await user.type(within(dialog).getByLabelText("Клиент"), "Ирина Тестова");
+    await user.selectOptions(within(dialog).getByLabelText("Услуга"), "SPA процедура");
+    await user.clear(within(dialog).getByLabelText("Дата"));
+    await user.type(within(dialog).getByLabelText("Дата"), "2026-07-12");
+    await user.clear(within(dialog).getByLabelText("Время"));
+    await user.type(within(dialog).getByLabelText("Время"), "11:15");
+    await user.selectOptions(within(dialog).getByLabelText("Статус"), "Подтверждена");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+
+    const details = screen.getByLabelText("Детали выбранной записи");
+    expect(screen.queryByRole("dialog", { name: "Новая запись" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "12 июля" })).toBeInTheDocument();
+    expect(within(details).getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
+    expect(within(details).getByText("SPA процедура")).toBeInTheDocument();
+    expect(within(details).getByText("11:15")).toBeInTheDocument();
+  });
+
   it("opens primary appointment creation with an empty client after a prefilled dialog was closed", async () => {
     const user = userEvent.setup();
 

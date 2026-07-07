@@ -43,6 +43,11 @@ type Appointment = {
   service: string;
   status: AppointmentStatus;
 };
+type CalendarAppointmentFocus = {
+  appointmentKey: string;
+  date: string;
+  routeDate?: string;
+};
 type ClientVisit = {
   date: string;
   service: string;
@@ -4368,6 +4373,7 @@ function CalendarWorkspace({
   onEditAppointment,
   query,
   role,
+  selectedAppointmentFocus,
   selectedCalendarDate,
 }: {
   appointments: Appointment[];
@@ -4377,6 +4383,7 @@ function CalendarWorkspace({
   onEditAppointment: (appointment: Appointment) => void;
   query: string;
   role: AdminRoleId;
+  selectedAppointmentFocus?: CalendarAppointmentFocus;
   selectedCalendarDate?: string;
 }) {
   const fallbackAppointment = appointments[0] ?? {
@@ -4390,13 +4397,18 @@ function CalendarWorkspace({
   const filteredAppointments = appointments.filter((appointment) =>
     matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status, appointment.note], query),
   );
-  const initialSelectedDate = isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : "2026-07-06";
-  const initialSelectedAppointment = isCalendarMonthDate(selectedCalendarDate)
-    ? appointments.find((appointment) => appointment.date === initialSelectedDate)
-    : appointments[1];
+  const initialSelectedDate =
+    selectedAppointmentFocus?.date ?? (isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : "2026-07-06");
+  const initialSelectedAppointment = selectedAppointmentFocus
+    ? appointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentFocus.appointmentKey)
+    : isCalendarMonthDate(selectedCalendarDate)
+      ? appointments.find((appointment) => appointment.date === initialSelectedDate)
+      : appointments[1];
   const [mode, setMode] = useState<CalendarMode>("day");
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
-  const [selectedKey, setSelectedKey] = useState(() => appointmentKey(initialSelectedAppointment ?? fallbackAppointment));
+  const [selectedKey, setSelectedKey] = useState(
+    () => selectedAppointmentFocus?.appointmentKey ?? appointmentKey(initialSelectedAppointment ?? fallbackAppointment),
+  );
   const selectedDayAppointments = filteredAppointments.filter((appointment) => appointment.date === selectedDate);
   const visibleAppointments = mode === "day" ? selectedDayAppointments : filteredAppointments;
   const appointmentDetailPool = mode === "day" ? selectedDayAppointments : filteredAppointments;
@@ -5970,6 +5982,7 @@ function Workspace({
   adminUsers,
   appointments,
   blogPosts,
+  calendarAppointmentFocus,
   certificates,
   clients,
   contactChannels,
@@ -6023,6 +6036,7 @@ function Workspace({
   adminUsers: AdminUserRecord[];
   appointments: Appointment[];
   blogPosts: BlogPostRecord[];
+  calendarAppointmentFocus?: CalendarAppointmentFocus;
   certificates: CertificateRecord[];
   clients: ClientRecord[];
   contactChannels: ContactChannelRecord[];
@@ -6206,12 +6220,13 @@ function Workspace({
       <CalendarWorkspace
         appointments={appointments}
         clients={clients}
-        key={selectedCalendarDate ?? "default-calendar"}
+        key={`${selectedCalendarDate ?? "default-calendar"}:${calendarAppointmentFocus?.appointmentKey ?? "default-focus"}`}
         onCancelAppointment={onCancelAppointment}
         onCalendarDateChange={onCalendarDateChange}
         onEditAppointment={onEditAppointment}
         query={query}
         role={role}
+        selectedAppointmentFocus={calendarAppointmentFocus}
         selectedCalendarDate={selectedCalendarDate}
       />
     );
@@ -6255,6 +6270,9 @@ export function AdminShell({
     date: selectedCalendarRouteDate ?? "2026-07-06",
     routeDate: selectedCalendarRouteDate,
   }));
+  const [calendarAppointmentFocus, setCalendarAppointmentFocus] = useState<CalendarAppointmentFocus | undefined>();
+  const activeCalendarAppointmentFocus =
+    calendarAppointmentFocus?.routeDate === selectedCalendarRouteDate ? calendarAppointmentFocus : undefined;
   const activeCalendarDate =
     calendarSelection.routeDate === selectedCalendarRouteDate
       ? calendarSelection.date
@@ -6280,15 +6298,14 @@ export function AdminShell({
       : "new-empty-appointment";
 
   function handleAppointmentCreate(appointment: Appointment) {
-    setCalendarAppointments((current) =>
-      sortAppointments([
-        ...current,
-        {
-          ...appointment,
-          id: `custom-${current.length + 1}`,
-        },
-      ]),
-    );
+    const createdAppointment = {
+      ...appointment,
+      id: `custom-${calendarAppointments.length + 1}`,
+    };
+
+    setCalendarAppointments((current) => sortAppointments([...current, createdAppointment]));
+
+    return createdAppointment;
   }
 
   function handleAppointmentUpdate(appointment: Appointment) {
@@ -6527,7 +6544,13 @@ export function AdminShell({
     if (editingAppointment) {
       handleAppointmentUpdate(appointment);
     } else {
-      handleAppointmentCreate(appointment);
+      const createdAppointment = handleAppointmentCreate(appointment);
+      updateActiveCalendarDate(createdAppointment.date);
+      setCalendarAppointmentFocus({
+        appointmentKey: appointmentKey(createdAppointment),
+        date: createdAppointment.date,
+        routeDate: selectedCalendarRouteDate,
+      });
     }
 
     closeActionDialog();
@@ -6826,6 +6849,7 @@ export function AdminShell({
           adminUsers={adminUsers}
           appointments={calendarAppointments}
           blogPosts={blogPosts}
+          calendarAppointmentFocus={activeCalendarAppointmentFocus}
           certificates={certificates}
           clients={clients}
           contactChannels={contactChannels}

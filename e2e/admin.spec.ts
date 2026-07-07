@@ -142,6 +142,9 @@ test("calendar can create a new appointment", async ({ page }) => {
   await dialog.getByRole("button", { name: "Сохранить запись" }).click();
 
   await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "12 июля" })).toBeVisible();
+  await expect(page.getByLabel("Детали выбранной записи").getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
+  await expect(page.getByLabel("Детали выбранной записи").getByText("11:15")).toBeVisible();
   await page.getByRole("button", { name: "Список" }).click();
   await page.getByRole("button", { name: /Ирина Тестова/ }).click();
   await expect(page.getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
