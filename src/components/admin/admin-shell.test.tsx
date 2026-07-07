@@ -982,4 +982,81 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("dialog", { name: "Подтвердить действие" })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Действие записано в audit log.");
   });
+
+  it("invites and edits an admin user with the accountant role", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="users" role="owner" />);
+
+    expect(screen.getByRole("heading", { name: "Пользователи админки" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Детали пользователя")).toHaveTextContent("Stripe-отчеты недоступны");
+
+    await user.click(screen.getByRole("button", { name: "Пригласить" }));
+
+    const createDialog = screen.getByRole("dialog", { name: "Пригласить пользователя" });
+    await user.type(within(createDialog).getByLabelText("Имя"), "Елена Бухгалтер");
+    await user.type(within(createDialog).getByLabelText("Email"), "accountant@example.com");
+    await user.selectOptions(within(createDialog).getByLabelText("Роль"), "accountant");
+    await user.type(within(createDialog).getByLabelText("Комментарий доступа"), "Доступ только для налоговой выгрузки Stripe.");
+    await user.click(within(createDialog).getByRole("button", { name: "Отправить приглашение" }));
+
+    expect(screen.queryByRole("dialog", { name: "Пригласить пользователя" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "Елена Бухгалтер" })).toBeInTheDocument();
+
+    const details = screen.getByLabelText("Детали пользователя");
+    expect(within(details).getByRole("heading", { name: "Елена Бухгалтер" })).toBeInTheDocument();
+    expect(within(details).getByText("Бухгалтер")).toBeInTheDocument();
+    expect(within(details).getByText("Stripe-продажи за период")).toBeInTheDocument();
+    expect(within(details).getByText("Экспорт CSV/XLSX/PDF")).toBeInTheDocument();
+
+    await user.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать пользователя" });
+    await user.selectOptions(within(editDialog).getByLabelText("Статус"), "Активен");
+    await user.clear(within(editDialog).getByLabelText("Комментарий доступа"));
+    await user.type(within(editDialog).getByLabelText("Комментарий доступа"), "Доступ подтвержден владельцем для налоговой отчетности.");
+    await user.click(within(editDialog).getByRole("button", { name: "Сохранить пользователя" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать пользователя" })).not.toBeInTheDocument();
+    expect(within(details).getByText("Активен")).toBeInTheDocument();
+    expect(within(details).getByText("Доступ подтвержден владельцем для налоговой отчетности.")).toBeInTheDocument();
+  });
+
+  it("rejects an invalid admin user email", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="users" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Пригласить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Пригласить пользователя" });
+    await user.type(within(dialog).getByLabelText("Имя"), "Bad Email");
+    await user.type(within(dialog).getByLabelText("Email"), "not-an-email");
+    await user.click(within(dialog).getByRole("button", { name: "Отправить приглашение" }));
+
+    expect(screen.getByRole("dialog", { name: "Пригласить пользователя" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите имя и корректный email пользователя.");
+    expect(within(dialog).getByLabelText("Email")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("filters admin users by accountant access and global search", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="users" role="owner" />);
+
+    const filters = screen.getByLabelText("Фильтры пользователей");
+    const table = screen.getByRole("table");
+
+    await user.click(within(filters).getByRole("button", { name: "Бухгалтеры" }));
+
+    expect(within(filters).getByRole("button", { name: "Бухгалтеры" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Ирина Finance" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Natali Ivanova" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Детали пользователя")).toHaveTextContent("Stripe-продажи за период");
+
+    await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "stripe");
+
+    expect(within(table).getByRole("button", { name: "Ирина Finance" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Мария Контент" })).not.toBeInTheDocument();
+  });
 });

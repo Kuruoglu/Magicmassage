@@ -260,6 +260,27 @@ type SettingsFormState = {
   workingDays: string;
   workingHours: string;
 };
+type AdminUserStatus = "Активен" | "Приглашен" | "Пауза" | "Заблокирован";
+type AdminUserRecord = {
+  accessNote: string;
+  email: string;
+  history: string[];
+  id: string;
+  lastLogin: string;
+  name: string;
+  role: AdminRoleId;
+  status: AdminUserStatus;
+  twoFactor: boolean;
+};
+type AdminUserFormState = {
+  accessNote: string;
+  email: string;
+  lastLogin: string;
+  name: string;
+  role: AdminRoleId;
+  status: AdminUserStatus;
+  twoFactor: boolean;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
@@ -278,6 +299,48 @@ const clientLanguageOptions = [
 ] as const;
 const clientContactOptions = ["Телефон", "Telegram", "Viber", "Email"] as const;
 const clientStatusOptions = ["Новый клиент", "Активный клиент", "Пауза"] as const;
+const adminUserStatusOptions: AdminUserStatus[] = ["Активен", "Приглашен", "Пауза", "Заблокирован"];
+const adminUserFilterOptions = [
+  { id: "all", label: "Все" },
+  { id: "active", label: "Активные" },
+  { id: "invited", label: "Приглашения" },
+  { id: "accountant", label: "Бухгалтеры" },
+] as const;
+type AdminUserFilterId = (typeof adminUserFilterOptions)[number]["id"];
+const adminRoleOptions: Array<{ id: AdminRoleId; label: string }> = [
+  { id: "owner", label: roleLabels.owner },
+  { id: "administrator", label: roleLabels.administrator },
+  { id: "specialist", label: roleLabels.specialist },
+  { id: "editor", label: roleLabels.editor },
+  { id: "accountant", label: roleLabels.accountant },
+  { id: "viewer", label: roleLabels.viewer },
+];
+const adminRolePermissionSummary: Record<AdminRoleId, { items: string[]; scope: string }> = {
+  owner: {
+    items: ["Полный доступ ко всем модулям", "Управление ролями", "Критические настройки", "Финансовые отчеты"],
+    scope: "Полный контроль админки и системных настроек.",
+  },
+  administrator: {
+    items: ["Клиенты", "Календарь", "Сертификаты", "Контент", "Финансы без системных ролей"],
+    scope: "Операционное управление без опасных системных действий.",
+  },
+  specialist: {
+    items: ["Календарь", "Клиенты", "Карточки записей", "Комментарии к сеансам"],
+    scope: "Работа с расписанием и клиентскими карточками.",
+  },
+  editor: {
+    items: ["Виды массажа", "Прайс", "Медиа", "Контакты", "Блог"],
+    scope: "Контент публичного сайта без доступа к клиентским и финансовым данным.",
+  },
+  accountant: {
+    items: ["Stripe-продажи за период", "Комиссии Stripe", "Возвраты и net-суммы", "Экспорт CSV/XLSX/PDF", "Audit log скачиваний"],
+    scope: "Только налоговая выгрузка Stripe без доступа к клиентам, календарю и контенту.",
+  },
+  viewer: {
+    items: ["Просмотр доступных разделов", "Без сохранения изменений", "Без экспорта финансов"],
+    scope: "Read-only доступ для проверки контента и операций.",
+  },
+};
 type ClientFormState = {
   email: string;
   language: string;
@@ -609,6 +672,74 @@ const initialSettingsRecord: SettingsRecord = {
   workingDays: "Пн-Сб",
   workingHours: "10:00-19:00",
 };
+const initialAdminUserRows: AdminUserRecord[] = [
+  {
+    accessNote: "Публикует материалы сайта и готовит переводы, без доступа к Stripe и клиентским данным.",
+    email: "content@magicmassage.bg",
+    history: ["2026-07-07: приглашение создано владельцем.", "2026-07-07: назначена роль редактора."],
+    id: "admin-user-content",
+    lastLogin: "Еще не входила",
+    name: "Мария Контент",
+    role: "editor",
+    status: "Приглашен",
+    twoFactor: false,
+  },
+  {
+    accessNote: "Владелец салона, подтверждает роли, настройки, финансы и опасные действия.",
+    email: "natali@magicmassage.bg",
+    history: ["2026-07-07: владелец подтвержден.", "2026-07-07: 2FA включена."],
+    id: "admin-user-owner",
+    lastLogin: "2026-07-07 10:12",
+    name: "Natali Ivanova",
+    role: "owner",
+    status: "Активен",
+    twoFactor: true,
+  },
+  {
+    accessNote: "Операционный доступ к календарю, клиентам, сертификатам и контенту без управления ролями.",
+    email: "admin@magicmassage.bg",
+    history: ["2026-07-06: вход в админку.", "2026-07-05: обновлены сертификаты."],
+    id: "admin-user-operations",
+    lastLogin: "2026-07-06 18:40",
+    name: "Анна Операции",
+    role: "administrator",
+    status: "Активен",
+    twoFactor: true,
+  },
+  {
+    accessNote: "Работает только с расписанием, комментариями к записям и клиентскими карточками.",
+    email: "specialist@magicmassage.bg",
+    history: ["2026-07-07: просмотр календаря.", "2026-07-06: обновлен комментарий к записи."],
+    id: "admin-user-specialist",
+    lastLogin: "2026-07-07 09:30",
+    name: "Ольга Специалист",
+    role: "specialist",
+    status: "Активен",
+    twoFactor: false,
+  },
+  {
+    accessNote: "Stripe-отчеты для налогов: продажи за период, комиссии, возвраты, net-суммы и audit log скачиваний.",
+    email: "finance@magicmassage.bg",
+    history: ["2026-07-07: скачан CSV отчет за июль.", "2026-07-06: роль Бухгалтер подтверждена владельцем."],
+    id: "admin-user-accountant",
+    lastLogin: "2026-07-07 11:05",
+    name: "Ирина Finance",
+    role: "accountant",
+    status: "Активен",
+    twoFactor: true,
+  },
+  {
+    accessNote: "Read-only доступ для проверки материалов перед публикацией.",
+    email: "reviewer@magicmassage.bg",
+    history: ["2026-07-05: просмотр публичного контента."],
+    id: "admin-user-viewer",
+    lastLogin: "2026-07-05 15:20",
+    name: "Reviewer Demo",
+    role: "viewer",
+    status: "Пауза",
+    twoFactor: false,
+  },
+];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -663,6 +794,10 @@ function matchesSearch(values: Array<string | number | undefined>, query: string
   }
 
   return values.some((value) => String(value ?? "").toLocaleLowerCase("ru-RU").includes(normalizedQuery));
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function buildInitialClientRows(): ClientRecord[] {
@@ -734,6 +869,13 @@ function buildInitialSettingsRecord(): SettingsRecord {
   return { ...initialSettingsRecord };
 }
 
+function buildInitialAdminUsers(): AdminUserRecord[] {
+  return initialAdminUserRows.map((user) => ({
+    ...user,
+    history: [...user.history],
+  }));
+}
+
 function buildClientFormState(client?: ClientRecord): ClientFormState {
   return {
     email: client?.email ?? "",
@@ -748,6 +890,18 @@ function buildClientFormState(client?: ClientRecord): ClientFormState {
     telegram: client?.telegram ?? "",
     totalSpend: client?.totalSpend ?? "0 €",
     visits: String(client?.visits ?? 0),
+  };
+}
+
+function buildAdminUserFormState(user?: AdminUserRecord): AdminUserFormState {
+  return {
+    accessNote: user?.accessNote ?? "",
+    email: user?.email ?? "",
+    lastLogin: user?.lastLogin ?? "Еще не входил",
+    name: user?.name ?? "",
+    role: user?.role ?? "viewer",
+    status: user?.status ?? "Приглашен",
+    twoFactor: user?.twoFactor ?? false,
   };
 }
 
@@ -940,6 +1094,15 @@ function createBlogPostId(title: string, slug: string) {
   return `blog-${base || "post"}`;
 }
 
+function createAdminUserId(name: string, email: string) {
+  const base = normalizeSearch(email || name)
+    .replace(/@/g, "-")
+    .replace(/[^a-z0-9а-яё]+/giu, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `admin-user-${base || "invite"}`;
+}
+
 function findClientByName(clients: ClientRecord[], name: string | undefined) {
   const normalizedName = name ? normalizeSearch(name) : "";
 
@@ -977,6 +1140,22 @@ function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
 
   if (filter === "ru" || filter === "bg") {
     return normalizeSearch(client.language) === filter;
+  }
+
+  return true;
+}
+
+function matchesAdminUserFilter(user: AdminUserRecord, filter: AdminUserFilterId) {
+  if (filter === "active") {
+    return user.status === "Активен";
+  }
+
+  if (filter === "invited") {
+    return user.status === "Приглашен";
+  }
+
+  if (filter === "accountant") {
+    return user.role === "accountant";
   }
 
   return true;
@@ -1374,6 +1553,150 @@ function ClientFormDialog({
 
           <div className="admin-action-footer">
             <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить клиента"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function AdminUserDialog({
+  initialUser,
+  onClose,
+  onSave,
+}: {
+  initialUser?: AdminUserRecord;
+  onClose: () => void;
+  onSave: (user: AdminUserRecord, originalId?: string) => void;
+}) {
+  const [form, setForm] = useState<AdminUserFormState>(() => buildAdminUserFormState(initialUser));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialUser);
+
+  function updateForm<Field extends keyof AdminUserFormState>(field: Field, value: AdminUserFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = form.name.trim();
+    const email = form.email.trim();
+
+    if (!name || !isValidEmail(email)) {
+      setError("Укажите имя и корректный email пользователя.");
+      return;
+    }
+
+    const roleLabel = roleLabels[form.role];
+    const nextStatus = form.status;
+    const actionLabel = isEditing ? "обновлен" : "приглашен";
+
+    onSave(
+      {
+        accessNote: form.accessNote.trim() || adminRolePermissionSummary[form.role].scope,
+        email,
+        history: [
+          `2026-07-07: пользователь ${actionLabel}; роль ${roleLabel}, статус ${nextStatus}.`,
+          ...(initialUser?.history ?? []),
+        ],
+        id: initialUser?.id ?? createAdminUserId(name, email),
+        lastLogin: form.lastLogin.trim() || "Еще не входил",
+        name,
+        role: form.role,
+        status: nextStatus,
+        twoFactor: form.twoFactor,
+      },
+      initialUser?.id,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="admin-user-action-title" aria-modal="true" className="admin-action-dialog admin-client-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Пользователи</span>
+            <h2 id="admin-user-action-title">{isEditing ? "Редактировать пользователя" : "Пригласить пользователя"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-user-form-grid">
+            <label>
+              Имя
+              <input
+                aria-invalid={error && !form.name.trim() ? "true" : undefined}
+                autoComplete="name"
+                onChange={(event) => updateForm("name", event.target.value)}
+                required
+                type="text"
+                value={form.name}
+              />
+            </label>
+            <label>
+              Email
+              <input
+                aria-invalid={error && !isValidEmail(form.email) ? "true" : undefined}
+                autoComplete="email"
+                onChange={(event) => updateForm("email", event.target.value)}
+                required
+                type="email"
+                value={form.email}
+              />
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Роль
+              <select onChange={(event) => updateForm("role", event.target.value as AdminRoleId)} value={form.role}>
+                {adminRoleOptions.map((roleOption) => (
+                  <option key={roleOption.id} value={roleOption.id}>
+                    {roleOption.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value as AdminUserStatus)} value={form.status}>
+                {adminUserStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Последний вход
+              <input onChange={(event) => updateForm("lastLogin", event.target.value)} type="text" value={form.lastLogin} />
+            </label>
+            <label className="admin-checkbox-label">
+              <input
+                checked={form.twoFactor}
+                onChange={(event) => updateForm("twoFactor", event.target.checked)}
+                type="checkbox"
+              />
+              2FA включена
+            </label>
+            <label className="admin-form-wide">
+              Комментарий доступа
+              <textarea onChange={(event) => updateForm("accessNote", event.target.value)} rows={4} value={form.accessNote} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить пользователя" : "Отправить приглашение"}</button>
             <button className="admin-secondary-button" onClick={onClose} type="button">
               Отмена
             </button>
@@ -5242,6 +5565,230 @@ function SettingsWorkspace({
   );
 }
 
+function UsersWorkspace({
+  adminUsers,
+  isUserCreateOpen,
+  onCloseUserCreate,
+  onSaveAdminUser,
+  query,
+}: {
+  adminUsers: AdminUserRecord[];
+  isUserCreateOpen: boolean;
+  onCloseUserCreate: () => void;
+  onSaveAdminUser: (user: AdminUserRecord, originalId?: string) => void;
+  query: string;
+}) {
+  const [selectedUserId, setSelectedUserId] = useState(adminUsers[0]?.id ?? "");
+  const [editingUser, setEditingUser] = useState<AdminUserRecord | undefined>();
+  const [userFilter, setUserFilter] = useState<AdminUserFilterId>("all");
+  const filteredUsers = adminUsers.filter((adminUser) => {
+    const permissions = adminRolePermissionSummary[adminUser.role];
+
+    return (
+      matchesAdminUserFilter(adminUser, userFilter) &&
+      matchesSearch(
+        [
+          adminUser.name,
+          adminUser.email,
+          adminUser.status,
+          roleLabels[adminUser.role],
+          permissions.scope,
+          ...permissions.items,
+          adminUser.accessNote,
+          adminUser.lastLogin,
+        ],
+        query,
+      )
+    );
+  });
+  const selectedUser =
+    filteredUsers.find((adminUser) => adminUser.id === selectedUserId) ??
+    filteredUsers[0] ??
+    adminUsers.find((adminUser) => adminUser.id === selectedUserId);
+  const isUserFormOpen = isUserCreateOpen || Boolean(editingUser);
+
+  function openUser(user: AdminUserRecord) {
+    setSelectedUserId(user.id);
+  }
+
+  function openUserEdit(user: AdminUserRecord) {
+    onCloseUserCreate();
+    setEditingUser(user);
+  }
+
+  function closeUserForm() {
+    setEditingUser(undefined);
+    onCloseUserCreate();
+  }
+
+  function saveUserForm(user: AdminUserRecord, originalId?: string) {
+    onSaveAdminUser(user, originalId);
+    setSelectedUserId(user.id);
+    closeUserForm();
+  }
+
+  if (!selectedUser) {
+    return (
+      <section className="admin-panel admin-panel-large" aria-labelledby="users-heading">
+        <div className="admin-panel-head">
+          <h2 id="users-heading">Пользователи админки</h2>
+        </div>
+        <EmptyState label="Пользователи пока не заведены." />
+        {isUserFormOpen ? (
+          <AdminUserDialog
+            initialUser={editingUser}
+            key={editingUser?.id ?? "new-admin-user"}
+            onClose={closeUserForm}
+            onSave={saveUserForm}
+          />
+        ) : null}
+      </section>
+    );
+  }
+
+  const selectedPermissions = adminRolePermissionSummary[selectedUser.role];
+  const accountantScopeLabel =
+    selectedUser.role === "accountant"
+      ? "Stripe-отчеты доступны только для налогов."
+      : "Stripe-отчеты недоступны в ограниченном бухгалтерском режиме.";
+
+  return (
+    <div className="admin-split-view admin-content-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="users-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="users-heading">Пользователи админки</h2>
+            <p>Приглашения, роли, статусы доступа, 2FA и журнал входов сотрудников.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры пользователей">
+            {adminUserFilterOptions.map((filter) => (
+              <button
+                aria-pressed={userFilter === filter.id}
+                key={filter.id}
+                onClick={() => setUserFilter(filter.id)}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="admin-table-scroll admin-users-table-scroll">
+          <table className="admin-data-table admin-users-table">
+            <thead>
+              <tr>
+                <th>Пользователь</th>
+                <th>Email</th>
+                <th>Роль</th>
+                <th>Статус</th>
+                <th>2FA</th>
+                <th>Последний вход</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((adminUser) => (
+                <tr aria-selected={adminUser.id === selectedUser.id} key={adminUser.id}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openUser(adminUser)} type="button">
+                      {adminUser.name}
+                    </button>
+                  </td>
+                  <td>{adminUser.email}</td>
+                  <td>{roleLabels[adminUser.role]}</td>
+                  <td>
+                    <span className={statusClass(adminUser.status)}>{adminUser.status}</span>
+                  </td>
+                  <td>{adminUser.twoFactor ? "Включена" : "Нет"}</td>
+                  <td className="admin-tabular">{adminUser.lastLogin}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredUsers.length === 0 ? <EmptyState label="Пользователи не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали пользователя">
+        <span className="admin-kicker">Доступ</span>
+        <div className="admin-detail-heading">
+          <h2>{selectedUser.name}</h2>
+          <div className="admin-detail-actions">
+            <button className="admin-text-action" onClick={() => openUserEdit(selectedUser)} type="button">
+              Редактировать
+            </button>
+          </div>
+        </div>
+
+        <dl className="admin-detail-list">
+          <div>
+            <dt>Email</dt>
+            <dd>{selectedUser.email}</dd>
+          </div>
+          <div>
+            <dt>Роль</dt>
+            <dd>{roleLabels[selectedUser.role]}</dd>
+          </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>
+              <span className={statusClass(selectedUser.status)}>{selectedUser.status}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>2FA</dt>
+            <dd>{selectedUser.twoFactor ? "Включена" : "Не включена"}</dd>
+          </div>
+          <div>
+            <dt>Последний вход</dt>
+            <dd>{selectedUser.lastLogin}</dd>
+          </div>
+          <div>
+            <dt>Режим бухгалтера</dt>
+            <dd>{accountantScopeLabel}</dd>
+          </div>
+          <div>
+            <dt>Комментарий</dt>
+            <dd>{selectedUser.accessNote}</dd>
+          </div>
+        </dl>
+
+        <section className="admin-client-section">
+          <h3>Права роли</h3>
+          <p>{selectedPermissions.scope}</p>
+          <ul className="admin-client-history">
+            {selectedPermissions.items.map((permission) => (
+              <li key={permission}>
+                <span>{permission}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="admin-client-section">
+          <h3>Audit log доступа</h3>
+          <ul className="admin-client-history">
+            {selectedUser.history.map((entry) => (
+              <li key={entry}>
+                <span>{entry}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </aside>
+
+      {isUserFormOpen ? (
+        <AdminUserDialog
+          initialUser={editingUser}
+          key={editingUser?.id ?? "new-admin-user"}
+          onClose={closeUserForm}
+          onSave={saveUserForm}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function GenericWorkspace({ query, section }: { query: string; section: AdminSectionId }) {
   const sectionModule = getAdminModule(section);
   const filteredItems = sectionSamples[section].filter((item) => matchesSearch([item, sectionModule.title], query));
@@ -5294,6 +5841,7 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 }
 
 function Workspace({
+  adminUsers,
   appointments,
   blogPosts,
   certificates,
@@ -5308,6 +5856,7 @@ function Workspace({
   isPriceCreateOpen,
   isServiceCreateOpen,
   isSettingsEditOpen,
+  isUserCreateOpen,
   media,
   onCancelAppointment,
   onCalendarCreateIntent,
@@ -5319,9 +5868,11 @@ function Workspace({
   onClosePriceCreate,
   onCloseServiceCreate,
   onCloseSettingsEdit,
+  onCloseUserCreate,
   onEditAppointment,
   onOpenSettingsEdit,
   onSaveBlogPost,
+  onSaveAdminUser,
   onSaveCertificate,
   onSaveClient,
   onSaveClientNote,
@@ -5340,6 +5891,7 @@ function Workspace({
   services,
   settings,
 }: {
+  adminUsers: AdminUserRecord[];
   appointments: Appointment[];
   blogPosts: BlogPostRecord[];
   certificates: CertificateRecord[];
@@ -5354,6 +5906,7 @@ function Workspace({
   isPriceCreateOpen: boolean;
   isServiceCreateOpen: boolean;
   isSettingsEditOpen: boolean;
+  isUserCreateOpen: boolean;
   media: MediaRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
@@ -5365,8 +5918,10 @@ function Workspace({
   onClosePriceCreate: () => void;
   onCloseServiceCreate: () => void;
   onCloseSettingsEdit: () => void;
+  onCloseUserCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
   onOpenSettingsEdit: () => void;
+  onSaveAdminUser: (user: AdminUserRecord, originalId?: string) => void;
   onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => void;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
@@ -5487,6 +6042,18 @@ function Workspace({
     );
   }
 
+  if (section === "users") {
+    return (
+      <UsersWorkspace
+        adminUsers={adminUsers}
+        isUserCreateOpen={isUserCreateOpen}
+        onCloseUserCreate={onCloseUserCreate}
+        onSaveAdminUser={onSaveAdminUser}
+        query={query}
+      />
+    );
+  }
+
   if (section === "settings") {
     return (
       <SettingsWorkspace
@@ -5538,6 +6105,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings());
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows());
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord());
+  const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
@@ -5546,6 +6114,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [isContactSettingsOpen, setIsContactSettingsOpen] = useState(false);
   const [isBlogCreateOpen, setIsBlogCreateOpen] = useState(false);
   const [isSettingsEditOpen, setIsSettingsEditOpen] = useState(false);
+  const [isUserCreateOpen, setIsUserCreateOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -5592,7 +6161,23 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
       setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(false);
       setIsClientCreateOpen(true);
+      return;
+    }
+
+    if (activeSection === "users") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
+      setIsClientCreateOpen(false);
+      setIsContactSettingsOpen(false);
+      setIsMediaCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(true);
       return;
     }
 
@@ -5606,6 +6191,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
       setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(false);
       setIsCertificateCreateOpen(true);
       return;
     }
@@ -5620,6 +6206,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsPriceCreateOpen(false);
       setIsBlogCreateOpen(false);
       setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(false);
       setIsServiceCreateOpen(true);
       return;
     }
@@ -5634,6 +6221,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
       setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(false);
       setIsPriceCreateOpen(true);
       return;
     }
@@ -5648,6 +6236,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
       setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(false);
       setIsMediaCreateOpen(true);
       return;
     }
@@ -5662,6 +6251,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
       setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(false);
       setIsContactSettingsOpen(true);
       return;
     }
@@ -5677,6 +6267,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(true);
       setIsSettingsEditOpen(false);
+      setIsUserCreateOpen(false);
       return;
     }
 
@@ -5690,6 +6281,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
+      setIsUserCreateOpen(false);
       setIsSettingsEditOpen(true);
       return;
     }
@@ -5702,6 +6294,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
     setIsSettingsEditOpen(false);
+    setIsUserCreateOpen(false);
     setIsActionOpen(true);
   }
 
@@ -5715,6 +6308,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
     setIsSettingsEditOpen(false);
+    setIsUserCreateOpen(false);
     setEditingAppointment(appointment);
     setIsActionOpen(true);
   }
@@ -5730,6 +6324,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
     setIsSettingsEditOpen(false);
+    setIsUserCreateOpen(false);
     setCancellingAppointment(appointment);
   }
 
@@ -5745,6 +6340,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
     setIsSettingsEditOpen(false);
+    setIsUserCreateOpen(false);
     setIsActionOpen(false);
   }
 
@@ -5759,6 +6355,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
     setIsSettingsEditOpen(false);
+    setIsUserCreateOpen(false);
     setEditingAppointment(undefined);
   }
 
@@ -5976,6 +6573,27 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     });
   }
 
+  function saveAdminUserRecord(user: AdminUserRecord, originalId?: string) {
+    setAdminUsers((current) => {
+      const originalKey = originalId ? normalizeSearch(originalId) : "";
+      const nextKey = normalizeSearch(user.id);
+      const nextEmail = normalizeSearch(user.email);
+      const existingIndex = current.findIndex((currentUser) => {
+        if (originalKey) {
+          return normalizeSearch(currentUser.id) === originalKey;
+        }
+
+        return normalizeSearch(currentUser.id) === nextKey || normalizeSearch(currentUser.email) === nextEmail;
+      });
+
+      if (existingIndex === -1) {
+        return [...current, user];
+      }
+
+      return current.map((currentUser, index) => (index === existingIndex ? user : currentUser));
+    });
+  }
+
   function saveSettingsRecord(nextSettings: SettingsRecord) {
     setSettings(nextSettings);
     setIsSettingsEditOpen(false);
@@ -6045,6 +6663,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
         </section>
 
         <Workspace
+          adminUsers={adminUsers}
           appointments={calendarAppointments}
           blogPosts={blogPosts}
           certificates={certificates}
@@ -6059,6 +6678,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           isPriceCreateOpen={isPriceCreateOpen}
           isServiceCreateOpen={isServiceCreateOpen}
           isSettingsEditOpen={isSettingsEditOpen}
+          isUserCreateOpen={isUserCreateOpen}
           media={media}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
@@ -6070,8 +6690,10 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           onClosePriceCreate={() => setIsPriceCreateOpen(false)}
           onCloseServiceCreate={() => setIsServiceCreateOpen(false)}
           onCloseSettingsEdit={() => setIsSettingsEditOpen(false)}
+          onCloseUserCreate={() => setIsUserCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
           onOpenSettingsEdit={() => setIsSettingsEditOpen(true)}
+          onSaveAdminUser={saveAdminUserRecord}
           onSaveBlogPost={saveBlogPostRecord}
           onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}

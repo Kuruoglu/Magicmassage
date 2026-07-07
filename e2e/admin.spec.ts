@@ -534,6 +534,45 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
   await expect(page.getByRole("status")).toHaveText("Действие записано в audit log.");
 });
 
+test("users workspace invites, filters and edits accountant access", async ({ page }) => {
+  await page.goto("/admin?section=users", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("heading", { name: "Пользователи админки" })).toBeVisible();
+  await expect(page.getByLabel("Детали пользователя").getByText("Stripe-отчеты недоступны")).toBeVisible();
+
+  await page.getByRole("button", { name: "Пригласить" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Пригласить пользователя" });
+  await createDialog.getByLabel("Имя").fill("Елена Бухгалтер");
+  await createDialog.getByLabel("Email").fill("accountant@example.com");
+  await createDialog.getByLabel("Роль").selectOption("accountant");
+  await createDialog.getByLabel("Комментарий доступа").fill("Доступ только для налоговой выгрузки Stripe.");
+  await createDialog.getByRole("button", { name: "Отправить приглашение" }).click();
+
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("button", { name: "Елена Бухгалтер" })).toBeVisible();
+
+  const details = page.getByLabel("Детали пользователя");
+  await expect(details.getByRole("heading", { name: "Елена Бухгалтер" })).toBeVisible();
+  await expect(details.getByText("Stripe-продажи за период")).toBeVisible();
+  await expect(details.getByText("Экспорт CSV/XLSX/PDF")).toBeVisible();
+
+  await page.getByRole("button", { name: "Бухгалтеры" }).click();
+  await expect(page.getByRole("button", { name: "Бухгалтеры" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("table").getByRole("button", { name: "Елена Бухгалтер" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("button", { name: "Natali Ivanova" })).toHaveCount(0);
+
+  await details.getByRole("button", { name: "Редактировать" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Редактировать пользователя" });
+  await editDialog.getByLabel("Статус").selectOption("Активен");
+  await editDialog.getByLabel("Комментарий доступа").fill("Доступ подтвержден владельцем для налоговой отчетности.");
+  await editDialog.getByRole("button", { name: "Сохранить пользователя" }).click();
+
+  await expect(editDialog).toHaveCount(0);
+  await expect(details.getByText("Активен", { exact: true })).toBeVisible();
+  await expect(details.getByText("Доступ подтвержден владельцем для налоговой отчетности.")).toBeVisible();
+});
+
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 
