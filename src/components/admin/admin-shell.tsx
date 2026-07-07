@@ -187,6 +187,37 @@ type ContactSettingsRecord = {
   seoArea: string;
   workingHours: string;
 };
+type BlogStatus = "Опубликована" | "Черновик" | "Запланирована" | "На проверке";
+type BlogPostRecord = {
+  author: string;
+  body: string;
+  category: string;
+  coverImage: string;
+  excerpt: string;
+  id: string;
+  locales: string[];
+  publishedAt: string;
+  seoTitle: string;
+  slug: string;
+  status: BlogStatus;
+  tags: string[];
+  title: string;
+  updatedAt: string;
+};
+type BlogPostFormState = {
+  author: string;
+  body: string;
+  category: string;
+  coverImage: string;
+  excerpt: string;
+  locales: string;
+  publishedAt: string;
+  seoTitle: string;
+  slug: string;
+  status: BlogStatus;
+  tags: string;
+  title: string;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
@@ -228,6 +259,7 @@ const mediaTypeOptions: MediaType[] = ["Фото", "Документ"];
 const mediaStatusOptions: MediaStatus[] = ["Готово", "Требует alt", "Черновик"];
 const contactChannelTypeOptions: ContactChannelType[] = ["Телефон", "Email", "Мессенджер", "Соцсеть", "Карта", "Бронирование"];
 const contactStatusOptions: ContactStatus[] = ["Активен", "Черновик", "Скрыт"];
+const blogStatusOptions: BlogStatus[] = ["Опубликована", "Черновик", "Запланирована", "На проверке"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -425,6 +457,56 @@ const initialContactChannels: ContactChannelRecord[] = [
     value: "https://studio24.bg/magic-massage-natali",
   },
 ];
+const initialBlogPostRows: BlogPostRecord[] = [
+  {
+    author: "Natali",
+    body: "Короткая памятка помогает клиенту подготовиться к первому визиту, прийти вовремя и заранее выбрать комфортную одежду.",
+    category: "Советы",
+    coverImage: "/media/blog/first-massage-preparation.jpg",
+    excerpt: "Что стоит знать перед первым сеансом массажа в Magic Massage Natali.",
+    id: "blog-first-massage-preparation",
+    locales: ["ru", "bg", "ua", "en"],
+    publishedAt: "2026-07-05",
+    seoTitle: "Подготовка к первому массажу в Бургасе",
+    slug: "first-massage-preparation",
+    status: "Опубликована",
+    tags: ["подготовка", "первый визит"],
+    title: "Подготовка к первому массажу",
+    updatedAt: "2026-07-07",
+  },
+  {
+    author: "Natali",
+    body: "Черновик статьи объясняет, когда лимфодренажный массаж может быть уместен, какие ожидания стоит проговорить и как избежать медицинских обещаний.",
+    category: "Услуги",
+    coverImage: "/media/services/lymphatic-drainage-massage.jpg",
+    excerpt: "Спокойное объяснение услуги без неподтвержденных медицинских обещаний.",
+    id: "blog-lymphatic-draft",
+    locales: ["ru", "bg"],
+    publishedAt: "2026-07-12",
+    seoTitle: "Лимфодренажный массаж в Бургасе",
+    slug: "lymphatic-when-useful",
+    status: "Черновик",
+    tags: ["лимфодренаж", "услуги"],
+    title: "Лимфодренаж: когда он уместен",
+    updatedAt: "2026-07-07",
+  },
+  {
+    author: "Natali",
+    body: "Запланированная статья рассказывает, как выбрать сумму сертификата, кому он подойдет и как получатель сможет записаться на услугу.",
+    category: "Сертификаты",
+    coverImage: "/media/gift-certificates/certificate-preview.jpg",
+    excerpt: "Как выбрать подарочный сертификат и не усложнять покупку.",
+    id: "blog-gift-certificate",
+    locales: ["ru", "en"],
+    publishedAt: "2026-07-18",
+    seoTitle: "Подарочный сертификат на массаж в Бургасе",
+    slug: "gift-certificate-without-stress",
+    status: "Запланирована",
+    tags: ["сертификат", "подарок"],
+    title: "Подарочный сертификат без стресса",
+    updatedAt: "2026-07-07",
+  },
+];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -538,6 +620,14 @@ function buildInitialContactSettings(): ContactSettingsRecord {
   return { ...initialContactSettings };
 }
 
+function buildInitialBlogPostRows(): BlogPostRecord[] {
+  return initialBlogPostRows.map((post) => ({
+    ...post,
+    locales: [...post.locales],
+    tags: [...post.tags],
+  }));
+}
+
 function buildClientFormState(client?: ClientRecord): ClientFormState {
   return {
     email: client?.email ?? "",
@@ -627,6 +717,23 @@ function buildContactSettingsFormState(settings: ContactSettingsRecord): Contact
   return { ...settings };
 }
 
+function buildBlogPostFormState(post?: BlogPostRecord): BlogPostFormState {
+  return {
+    author: post?.author ?? "Natali",
+    body: post?.body ?? "",
+    category: post?.category ?? "",
+    coverImage: post?.coverImage ?? "",
+    excerpt: post?.excerpt ?? "",
+    locales: post?.locales.join(", ") ?? "ru, bg, ua, en",
+    publishedAt: post?.publishedAt ?? "2026-07-07",
+    seoTitle: post?.seoTitle ?? "",
+    slug: post?.slug ?? "",
+    status: post?.status ?? "Черновик",
+    tags: post?.tags.join(", ") ?? "",
+    title: post?.title ?? "",
+  };
+}
+
 function parseClientTags(value: string) {
   return value
     .split(",")
@@ -655,6 +762,14 @@ function createContactChannelId(name: string, value: string) {
     .replace(/^-+|-+$/g, "");
 
   return `contact-${base || "channel"}`;
+}
+
+function createBlogPostId(title: string, slug: string) {
+  const base = normalizeSearch(slug || title)
+    .replace(/[^a-z0-9а-яё]+/giu, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `blog-${base || "post"}`;
 }
 
 function findClientByName(clients: ClientRecord[], name: string | undefined) {
@@ -1888,6 +2003,156 @@ function ContactChannelDialog({
 
           <div className="admin-action-footer">
             <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить контакт"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function BlogPostDialog({
+  initialPost,
+  onClose,
+  onSave,
+}: {
+  initialPost?: BlogPostRecord;
+  onClose: () => void;
+  onSave: (post: BlogPostRecord, originalId?: string) => void;
+}) {
+  const [form, setForm] = useState<BlogPostFormState>(() => buildBlogPostFormState(initialPost));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialPost);
+
+  function updateForm<Field extends keyof BlogPostFormState>(field: Field, value: BlogPostFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const title = form.title.trim();
+    const slug = form.slug.trim();
+
+    if (!title || !slug) {
+      setError("Укажите заголовок и slug статьи.");
+      return;
+    }
+
+    onSave(
+      {
+        author: form.author.trim() || "Natali",
+        body: form.body.trim(),
+        category: form.category.trim() || "Общее",
+        coverImage: form.coverImage.trim(),
+        excerpt: form.excerpt.trim(),
+        id: initialPost?.id ?? createBlogPostId(title, slug),
+        locales: parseCommaList(form.locales),
+        publishedAt: form.publishedAt,
+        seoTitle: form.seoTitle.trim() || title,
+        slug,
+        status: form.status,
+        tags: parseCommaList(form.tags),
+        title,
+        updatedAt: "2026-07-07",
+      },
+      initialPost?.id,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="blog-action-title" aria-modal="true" className="admin-action-dialog admin-service-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Блог</span>
+            <h2 id="blog-action-title">{isEditing ? "Редактировать статью" : "Новая статья"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-content-form-grid">
+            <label>
+              Заголовок
+              <input
+                aria-invalid={error && !form.title.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("title", event.target.value)}
+                required
+                type="text"
+                value={form.title}
+              />
+            </label>
+            <label>
+              Slug
+              <input
+                aria-invalid={error && !form.slug.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("slug", event.target.value)}
+                required
+                type="text"
+                value={form.slug}
+              />
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Категория
+              <input onChange={(event) => updateForm("category", event.target.value)} type="text" value={form.category} />
+            </label>
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value as BlogStatus)} value={form.status}>
+                {blogStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Автор
+              <input onChange={(event) => updateForm("author", event.target.value)} type="text" value={form.author} />
+            </label>
+            <label>
+              Дата публикации
+              <input onChange={(event) => updateForm("publishedAt", event.target.value)} type="date" value={form.publishedAt} />
+            </label>
+            <label>
+              Локали
+              <input onChange={(event) => updateForm("locales", event.target.value)} type="text" value={form.locales} />
+            </label>
+            <label>
+              SEO title
+              <input onChange={(event) => updateForm("seoTitle", event.target.value)} type="text" value={form.seoTitle} />
+            </label>
+            <label className="admin-form-wide">
+              Обложка
+              <input onChange={(event) => updateForm("coverImage", event.target.value)} type="text" value={form.coverImage} />
+            </label>
+            <label className="admin-form-wide">
+              Краткое описание
+              <textarea onChange={(event) => updateForm("excerpt", event.target.value)} rows={3} value={form.excerpt} />
+            </label>
+            <label className="admin-form-wide">
+              Текст статьи
+              <textarea onChange={(event) => updateForm("body", event.target.value)} rows={5} value={form.body} />
+            </label>
+            <label className="admin-form-wide">
+              Теги
+              <input onChange={(event) => updateForm("tags", event.target.value)} type="text" value={form.tags} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить статью"}</button>
             <button className="admin-secondary-button" onClick={onClose} type="button">
               Отмена
             </button>
@@ -4074,6 +4339,234 @@ function ContactsWorkspace({
   );
 }
 
+function BlogWorkspace({
+  blogPosts,
+  isBlogCreateOpen,
+  onCloseBlogCreate,
+  onSaveBlogPost,
+  query,
+}: {
+  blogPosts: BlogPostRecord[];
+  isBlogCreateOpen: boolean;
+  onCloseBlogCreate: () => void;
+  onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => void;
+  query: string;
+}) {
+  const [selectedId, setSelectedId] = useState(blogPosts[0]?.id ?? "");
+  const [editingPost, setEditingPost] = useState<BlogPostRecord | undefined>();
+  const [statusFilter, setStatusFilter] = useState<"all" | BlogStatus>("all");
+  const filteredPosts = blogPosts
+    .filter((post) => statusFilter === "all" || post.status === statusFilter)
+    .filter((post) =>
+      matchesSearch(
+        [
+          post.title,
+          post.slug,
+          post.category,
+          post.status,
+          post.author,
+          post.seoTitle,
+          post.excerpt,
+          post.body,
+          post.tags.join(" "),
+          post.locales.join(" "),
+        ],
+        query,
+      ),
+    )
+    .sort((first, second) => first.publishedAt.localeCompare(second.publishedAt));
+  const selectedPost =
+    filteredPosts.find((post) => post.id === selectedId) ??
+    filteredPosts[0] ??
+    blogPosts.find((post) => post.id === selectedId) ??
+    blogPosts[0];
+  const isBlogFormOpen = isBlogCreateOpen || Boolean(editingPost);
+
+  function openPost(post: BlogPostRecord) {
+    setSelectedId(post.id);
+  }
+
+  function openPostEdit(post: BlogPostRecord) {
+    onCloseBlogCreate();
+    setEditingPost(post);
+  }
+
+  function closeBlogForm() {
+    setEditingPost(undefined);
+    onCloseBlogCreate();
+  }
+
+  function savePostForm(post: BlogPostRecord, originalId?: string) {
+    onSaveBlogPost(post, originalId);
+    setSelectedId(post.id);
+    closeBlogForm();
+  }
+
+  if (!selectedPost) {
+    return (
+      <section className="admin-panel admin-panel-large" aria-labelledby="blog-heading">
+        <div className="admin-panel-head">
+          <h2 id="blog-heading">Контент-план блога</h2>
+        </div>
+        <EmptyState label="Статьи пока не заведены." />
+        {isBlogFormOpen ? (
+          <BlogPostDialog
+            initialPost={editingPost}
+            key={editingPost?.id ?? "new-blog-post"}
+            onClose={closeBlogForm}
+            onSave={savePostForm}
+          />
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <div className="admin-split-view admin-content-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="blog-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="blog-heading">Контент-план блога</h2>
+            <p>Статьи сайта, категории, теги, SEO, локали, обложки и статус публикации.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры блога">
+            <button aria-pressed={statusFilter === "all"} onClick={() => setStatusFilter("all")} type="button">
+              Все
+            </button>
+            <button aria-pressed={statusFilter === "Опубликована"} onClick={() => setStatusFilter("Опубликована")} type="button">
+              Опубликованные
+            </button>
+            <button aria-pressed={statusFilter === "Черновик"} onClick={() => setStatusFilter("Черновик")} type="button">
+              Черновики
+            </button>
+            <button aria-pressed={statusFilter === "Запланирована"} onClick={() => setStatusFilter("Запланирована")} type="button">
+              Запланированные
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-table-scroll">
+          <table className="admin-data-table">
+            <thead>
+              <tr>
+                <th>Статья</th>
+                <th>Категория</th>
+                <th>Статус</th>
+                <th>Дата</th>
+                <th>Локали</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPosts.map((post) => (
+                <tr aria-selected={post.id === selectedPost.id} key={post.id}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openPost(post)} type="button">
+                      {post.title}
+                    </button>
+                  </td>
+                  <td>{post.category}</td>
+                  <td>
+                    <span className={statusClass(post.status)}>{post.status}</span>
+                  </td>
+                  <td className="admin-tabular">{post.publishedAt}</td>
+                  <td>{post.locales.join(", ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredPosts.length === 0 ? <EmptyState label="Статьи не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали статьи">
+        <span className="admin-kicker">Статья</span>
+        <div className="admin-detail-heading">
+          <h2>{selectedPost.title}</h2>
+          <div className="admin-detail-actions">
+            <button className="admin-text-action" onClick={() => openPostEdit(selectedPost)} type="button">
+              Редактировать
+            </button>
+          </div>
+        </div>
+
+        <dl className="admin-detail-list">
+          <div>
+            <dt>Slug</dt>
+            <dd>{selectedPost.slug}</dd>
+          </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>
+              <span className={statusClass(selectedPost.status)}>{selectedPost.status}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Категория</dt>
+            <dd>{selectedPost.category}</dd>
+          </div>
+          <div>
+            <dt>Автор</dt>
+            <dd>{selectedPost.author}</dd>
+          </div>
+          <div>
+            <dt>Дата публикации</dt>
+            <dd>{selectedPost.publishedAt}</dd>
+          </div>
+          <div>
+            <dt>Обновлено</dt>
+            <dd>{selectedPost.updatedAt}</dd>
+          </div>
+          <div>
+            <dt>Локали</dt>
+            <dd>{selectedPost.locales.join(", ")}</dd>
+          </div>
+          <div>
+            <dt>SEO title</dt>
+            <dd>{selectedPost.seoTitle}</dd>
+          </div>
+          <div>
+            <dt>Обложка</dt>
+            <dd>{selectedPost.coverImage || "Обложка не выбрана."}</dd>
+          </div>
+          <div>
+            <dt>Краткое описание</dt>
+            <dd>{selectedPost.excerpt || "Описание пока пустое."}</dd>
+          </div>
+        </dl>
+
+        <section className="admin-client-section">
+          <h3>Теги</h3>
+          {selectedPost.tags.length > 0 ? (
+            <ul className="admin-client-history">
+              {selectedPost.tags.map((tag) => (
+                <li key={tag}>
+                  <span>{tag}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>Теги пока не добавлены.</p>
+          )}
+        </section>
+
+        <section className="admin-client-section">
+          <h3>Текст статьи</h3>
+          <p>{selectedPost.body || "Текст статьи пока пустой."}</p>
+        </section>
+      </aside>
+
+      {isBlogFormOpen ? (
+        <BlogPostDialog
+          initialPost={editingPost}
+          key={editingPost?.id ?? "new-blog-post"}
+          onClose={closeBlogForm}
+          onSave={savePostForm}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function GenericWorkspace({ query, section }: { query: string; section: AdminSectionId }) {
   const sectionModule = getAdminModule(section);
   const filteredItems = sectionSamples[section].filter((item) => matchesSearch([item, sectionModule.title], query));
@@ -4127,10 +4620,12 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 
 function Workspace({
   appointments,
+  blogPosts,
   certificates,
   clients,
   contactChannels,
   contactSettings,
+  isBlogCreateOpen,
   isCertificateCreateOpen,
   isClientCreateOpen,
   isContactSettingsOpen,
@@ -4140,6 +4635,7 @@ function Workspace({
   media,
   onCancelAppointment,
   onCalendarCreateIntent,
+  onCloseBlogCreate,
   onCloseCertificateCreate,
   onCloseClientCreate,
   onCloseContactSettings,
@@ -4147,6 +4643,7 @@ function Workspace({
   onClosePriceCreate,
   onCloseServiceCreate,
   onEditAppointment,
+  onSaveBlogPost,
   onSaveCertificate,
   onSaveClient,
   onSaveClientNote,
@@ -4164,10 +4661,12 @@ function Workspace({
   services,
 }: {
   appointments: Appointment[];
+  blogPosts: BlogPostRecord[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
   contactChannels: ContactChannelRecord[];
   contactSettings: ContactSettingsRecord;
+  isBlogCreateOpen: boolean;
   isCertificateCreateOpen: boolean;
   isClientCreateOpen: boolean;
   isContactSettingsOpen: boolean;
@@ -4177,6 +4676,7 @@ function Workspace({
   media: MediaRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
+  onCloseBlogCreate: () => void;
   onCloseCertificateCreate: () => void;
   onCloseClientCreate: () => void;
   onCloseContactSettings: () => void;
@@ -4184,6 +4684,7 @@ function Workspace({
   onClosePriceCreate: () => void;
   onCloseServiceCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => void;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
@@ -4289,6 +4790,18 @@ function Workspace({
     );
   }
 
+  if (section === "blog") {
+    return (
+      <BlogWorkspace
+        blogPosts={blogPosts}
+        isBlogCreateOpen={isBlogCreateOpen}
+        onCloseBlogCreate={onCloseBlogCreate}
+        onSaveBlogPost={onSaveBlogPost}
+        query={query}
+      />
+    );
+  }
+
   if (section === "calendar") {
     return (
       <CalendarWorkspace
@@ -4325,12 +4838,14 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [media, setMedia] = useState<MediaRecord[]>(() => buildInitialMediaRows());
   const [contactChannels, setContactChannels] = useState<ContactChannelRecord[]>(() => buildInitialContactChannels());
   const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings());
+  const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
   const [isPriceCreateOpen, setIsPriceCreateOpen] = useState(false);
   const [isMediaCreateOpen, setIsMediaCreateOpen] = useState(false);
   const [isContactSettingsOpen, setIsContactSettingsOpen] = useState(false);
+  const [isBlogCreateOpen, setIsBlogCreateOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -4375,6 +4890,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(false);
       setIsClientCreateOpen(true);
       return;
     }
@@ -4387,6 +4903,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(false);
       setIsCertificateCreateOpen(true);
       return;
     }
@@ -4399,6 +4916,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsContactSettingsOpen(false);
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
+      setIsBlogCreateOpen(false);
       setIsServiceCreateOpen(true);
       return;
     }
@@ -4411,6 +4929,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsContactSettingsOpen(false);
       setIsMediaCreateOpen(false);
       setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(false);
       setIsPriceCreateOpen(true);
       return;
     }
@@ -4423,6 +4942,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsContactSettingsOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(false);
       setIsMediaCreateOpen(true);
       return;
     }
@@ -4435,7 +4955,21 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(false);
       setIsContactSettingsOpen(true);
+      return;
+    }
+
+    if (activeSection === "blog") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
+      setIsClientCreateOpen(false);
+      setIsContactSettingsOpen(false);
+      setIsMediaCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(true);
       return;
     }
 
@@ -4445,6 +4979,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
+    setIsBlogCreateOpen(false);
     setIsActionOpen(true);
   }
 
@@ -4456,6 +4991,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
+    setIsBlogCreateOpen(false);
     setEditingAppointment(appointment);
     setIsActionOpen(true);
   }
@@ -4469,6 +5005,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
+    setIsBlogCreateOpen(false);
     setCancellingAppointment(appointment);
   }
 
@@ -4482,6 +5019,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
+    setIsBlogCreateOpen(false);
     setIsActionOpen(false);
   }
 
@@ -4494,6 +5032,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsMediaCreateOpen(false);
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
+    setIsBlogCreateOpen(false);
     setEditingAppointment(undefined);
   }
 
@@ -4691,6 +5230,26 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     });
   }
 
+  function saveBlogPostRecord(post: BlogPostRecord, originalId?: string) {
+    setBlogPosts((current) => {
+      const originalKey = originalId ? normalizeSearch(originalId) : "";
+      const nextKey = normalizeSearch(post.id);
+      const existingIndex = current.findIndex((currentPost) => {
+        if (originalKey) {
+          return normalizeSearch(currentPost.id) === originalKey;
+        }
+
+        return normalizeSearch(currentPost.id) === nextKey || normalizeSearch(currentPost.slug) === normalizeSearch(post.slug);
+      });
+
+      if (existingIndex === -1) {
+        return [...current, post];
+      }
+
+      return current.map((currentPost, index) => (index === existingIndex ? post : currentPost));
+    });
+  }
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -4756,10 +5315,12 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
 
         <Workspace
           appointments={calendarAppointments}
+          blogPosts={blogPosts}
           certificates={certificates}
           clients={clients}
           contactChannels={contactChannels}
           contactSettings={contactSettings}
+          isBlogCreateOpen={isBlogCreateOpen}
           isCertificateCreateOpen={isCertificateCreateOpen}
           isClientCreateOpen={isClientCreateOpen}
           isContactSettingsOpen={isContactSettingsOpen}
@@ -4769,6 +5330,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           media={media}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
+          onCloseBlogCreate={() => setIsBlogCreateOpen(false)}
           onCloseCertificateCreate={() => setIsCertificateCreateOpen(false)}
           onCloseClientCreate={() => setIsClientCreateOpen(false)}
           onCloseContactSettings={() => setIsContactSettingsOpen(false)}
@@ -4776,6 +5338,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           onClosePriceCreate={() => setIsPriceCreateOpen(false)}
           onCloseServiceCreate={() => setIsServiceCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
+          onSaveBlogPost={saveBlogPostRecord}
           onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}
           onSaveClientNote={saveClientNote}

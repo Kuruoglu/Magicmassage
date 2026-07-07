@@ -454,6 +454,52 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
   await expect(details.getByText("Активен")).toBeVisible();
 });
 
+test("blog workspace can create, filter and edit an article", async ({ page }) => {
+  await page.goto("/admin?section=blog", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("heading", { name: "Контент-план блога" })).toBeVisible();
+  await expect(page.getByLabel("Детали статьи").getByRole("heading", { name: "Подготовка к первому массажу" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Новая статья" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новая статья" });
+  await createDialog.getByLabel("Заголовок").fill("Как подготовиться к массажу");
+  await createDialog.getByLabel("Slug").fill("prepare-for-massage");
+  await createDialog.getByLabel("Категория").fill("Советы");
+  await createDialog.getByLabel("Статус").selectOption("Черновик");
+  await createDialog.getByLabel("Автор").fill("Natali");
+  await createDialog.getByLabel("Дата публикации").fill("2026-07-20");
+  await createDialog.getByLabel("Локали").fill("ru, bg");
+  await createDialog.getByLabel("SEO title").fill("Как подготовиться к массажу в Бургасе");
+  await createDialog.getByLabel("Обложка").fill("/media/blog/prepare-for-massage.jpg");
+  await createDialog.getByLabel("Краткое описание").fill("Короткая памятка перед первым визитом.");
+  await createDialog.getByLabel("Текст статьи").fill("Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.");
+  await createDialog.getByLabel("Теги").fill("подготовка, массаж");
+  await createDialog.getByRole("button", { name: "Сохранить статью" }).click();
+
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("button", { name: "Как подготовиться к массажу" })).toBeVisible();
+
+  const details = page.getByLabel("Детали статьи");
+  await expect(details.getByRole("heading", { name: "Как подготовиться к массажу" })).toBeVisible();
+  await expect(details.getByText("prepare-for-massage", { exact: true })).toBeVisible();
+  await expect(details.getByText("Короткая памятка перед первым визитом.")).toBeVisible();
+
+  await details.getByRole("button", { name: "Редактировать" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Редактировать статью" });
+  await editDialog.getByLabel("Статус").selectOption("Опубликована");
+  await editDialog.getByLabel("Краткое описание").fill("Обновленная памятка перед визитом.");
+  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  await expect(editDialog).toHaveCount(0);
+  await expect(details.getByText("Опубликована")).toBeVisible();
+  await expect(details.getByText("Обновленная памятка перед визитом.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Черновики" }).click();
+  await expect(page.getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("table").getByRole("button", { name: "Лимфодренаж: когда он уместен" })).toBeVisible();
+});
+
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

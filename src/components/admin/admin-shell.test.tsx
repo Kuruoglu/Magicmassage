@@ -811,4 +811,79 @@ describe("AdminShell", () => {
     expect(within(details).getByText("https://t.me/magicmassage_burgas")).toBeInTheDocument();
     expect(within(details).getByText("Активен")).toBeInTheDocument();
   });
+
+  it("creates and edits a blog article from the blog workspace", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="blog" role="owner" />);
+
+    expect(screen.getByRole("heading", { name: "Контент-план блога" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Детали статьи")).toHaveTextContent("Подготовка к первому массажу");
+
+    await user.click(screen.getByRole("button", { name: "Новая статья" }));
+
+    const createDialog = screen.getByRole("dialog", { name: "Новая статья" });
+    fireEvent.change(within(createDialog).getByLabelText("Заголовок"), { target: { value: "Как подготовиться к массажу" } });
+    fireEvent.change(within(createDialog).getByLabelText("Slug"), { target: { value: "prepare-for-massage" } });
+    fireEvent.change(within(createDialog).getByLabelText("Категория"), { target: { value: "Советы" } });
+    fireEvent.change(within(createDialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
+    fireEvent.change(within(createDialog).getByLabelText("Автор"), { target: { value: "Natali" } });
+    fireEvent.change(within(createDialog).getByLabelText("Дата публикации"), { target: { value: "2026-07-20" } });
+    fireEvent.change(within(createDialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
+    fireEvent.change(within(createDialog).getByLabelText("SEO title"), {
+      target: { value: "Как подготовиться к массажу в Бургасе" },
+    });
+    fireEvent.change(within(createDialog).getByLabelText("Обложка"), { target: { value: "/media/blog/prepare-for-massage.jpg" } });
+    fireEvent.change(within(createDialog).getByLabelText("Краткое описание"), {
+      target: { value: "Короткая памятка перед первым визитом." },
+    });
+    fireEvent.change(within(createDialog).getByLabelText("Текст статьи"), {
+      target: { value: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду." },
+    });
+    fireEvent.change(within(createDialog).getByLabelText("Теги"), { target: { value: "подготовка, массаж" } });
+    await user.click(within(createDialog).getByRole("button", { name: "Сохранить статью" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новая статья" })).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toHaveTextContent("Как подготовиться к массажу");
+
+    const details = screen.getByLabelText("Детали статьи");
+    expect(within(details).getByRole("heading", { name: "Как подготовиться к массажу" })).toBeInTheDocument();
+    expect(within(details).getByText("prepare-for-massage")).toBeInTheDocument();
+    expect(within(details).getByText("Короткая памятка перед первым визитом.")).toBeInTheDocument();
+
+    await user.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать статью" });
+    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Опубликована" } });
+    fireEvent.change(within(editDialog).getByLabelText("Краткое описание"), {
+      target: { value: "Обновленная памятка перед визитом." },
+    });
+    await user.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать статью" })).not.toBeInTheDocument();
+    expect(within(details).getByText("Опубликована")).toBeInTheDocument();
+    expect(within(details).getByText("Обновленная памятка перед визитом.")).toBeInTheDocument();
+  });
+
+  it("filters blog posts by status and global search", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="blog" role="owner" />);
+
+    const filters = screen.getByLabelText("Фильтры блога");
+    const table = screen.getByRole("table");
+
+    await user.click(within(filters).getByRole("button", { name: "Черновики" }));
+
+    expect(within(filters).getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Лимфодренаж: когда он уместен" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Подготовка к первому массажу" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск" }), { target: { value: "сертификат" } });
+
+    expect(within(table).queryByRole("button", { name: "Лимфодренаж: когда он уместен" })).not.toBeInTheDocument();
+
+    await user.click(within(filters).getByRole("button", { name: "Запланированные" }));
+    expect(within(table).getByRole("button", { name: "Подарочный сертификат без стресса" })).toBeInTheDocument();
+  });
 });
