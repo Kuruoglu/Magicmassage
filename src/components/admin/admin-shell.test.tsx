@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -885,5 +885,101 @@ describe("AdminShell", () => {
 
     await user.click(within(filters).getByRole("button", { name: "Запланированные" }));
     expect(within(table).getByRole("button", { name: "Подарочный сертификат без стресса" })).toBeInTheDocument();
+  });
+
+  it("edits booking and Google Calendar settings from the settings workspace", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="settings" role="owner" />);
+
+    expect(screen.getByRole("heading", { name: "Настройки админки" })).toBeInTheDocument();
+    const details = screen.getByLabelText("Детали настроек");
+    expect(within(details).getByRole("heading", { name: "Запись и календарь" })).toBeInTheDocument();
+    expect(within(details).getByText("30 минут")).toBeInTheDocument();
+    expect(within(details).getByText("Внутренний календарь главный")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
+    fireEvent.change(within(dialog).getByLabelText("Слотов в день"), { target: { value: "5" } });
+    fireEvent.change(within(dialog).getByLabelText("Google Calendar"), { target: { value: "Односторонняя" } });
+    fireEvent.change(within(dialog).getByLabelText("Google Calendar ID"), { target: { value: "natali@example.com" } });
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
+
+    expect(screen.queryByRole("dialog", { name: "Настройки админки" })).not.toBeInTheDocument();
+    expect(within(details).getByText("45 минут")).toBeInTheDocument();
+    expect(within(details).getByText("5 слотов")).toBeInTheDocument();
+    expect(within(details).getByText("Односторонняя")).toBeInTheDocument();
+    expect(within(details).getByText("natali@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Настройки сохранены.");
+  });
+
+  it("keeps settings details synchronized with search results", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="settings" role="owner" />);
+
+    await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "Stripe");
+
+    const details = screen.getByLabelText("Детали настроек");
+    expect(within(details).getByRole("heading", { name: "Платежи" })).toBeInTheDocument();
+    expect(within(details).getByText("EUR")).toBeInTheDocument();
+    expect(within(details).getByText("Тестовый")).toBeInTheDocument();
+
+    await user.clear(screen.getByRole("searchbox", { name: "Поиск" }));
+    await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "нет такого раздела");
+
+    expect(screen.getByText("Настройки не найдены.")).toBeInTheDocument();
+    expect(within(details).getByRole("heading", { name: "Ничего не найдено" })).toBeInTheDocument();
+  });
+
+  it("moves keyboard focus into the settings dialog", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="settings" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    await waitFor(() => expect(within(dialog).getByRole("heading", { name: "Настройки админки" })).toHaveFocus());
+  });
+
+  it("rejects invalid numeric settings", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="settings" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "-5" } });
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
+
+    expect(screen.getByRole("dialog", { name: "Настройки админки" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите название, буфер записи, слоты и срок хранения audit log.");
+    expect(within(dialog).getByLabelText("Перерыв между сеансами")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Детали настроек")).toHaveTextContent("30 минут");
+  });
+
+  it("switches settings groups and confirms dangerous settings actions", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="settings" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Роли и аудит" }));
+
+    const details = screen.getByLabelText("Детали настроек");
+    expect(within(details).getByRole("heading", { name: "Роли и аудит" })).toBeInTheDocument();
+    expect(within(details).getByText("Бухгалтер: только Stripe-отчеты")).toBeInTheDocument();
+
+    await user.click(within(details).getByRole("button", { name: "Сбросить демо-данные" }));
+
+    const confirmDialog = screen.getByRole("dialog", { name: "Подтвердить действие" });
+    expect(within(confirmDialog).getByText("Опасное действие не выполняется без подтверждения владельца.")).toBeInTheDocument();
+    await user.click(within(confirmDialog).getByRole("button", { name: "Подтвердить" }));
+
+    expect(screen.queryByRole("dialog", { name: "Подтвердить действие" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Действие записано в audit log.");
   });
 });

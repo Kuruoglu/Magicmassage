@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   calculateFinanceSummary,
@@ -218,6 +218,48 @@ type BlogPostFormState = {
   tags: string;
   title: string;
 };
+type SettingsGroupId = "business" | "booking" | "payments" | "email" | "privacySeo" | "rolesAudit";
+type CalendarSyncMode = "Отключена" | "Внутренний календарь главный" | "Односторонняя" | "Двусторонняя позже";
+type StripeMode = "Тестовый" | "Live после подтверждения";
+type SettingsRecord = {
+  auditLogRetentionDays: number;
+  bookingBufferMinutes: number;
+  businessName: string;
+  cookiePrivacyMode: string;
+  currency: "EUR";
+  dailySlotCapacity: number;
+  defaultLocale: string;
+  defaultSeoTitle: string;
+  emailSender: string;
+  googleCalendarId: string;
+  googleCalendarMode: CalendarSyncMode;
+  reminderTemplate: string;
+  rolesPolicy: string;
+  stripeMode: StripeMode;
+  timezone: string;
+  updatedAt: string;
+  workingDays: string;
+  workingHours: string;
+};
+type SettingsFormState = {
+  auditLogRetentionDays: string;
+  bookingBufferMinutes: string;
+  businessName: string;
+  cookiePrivacyMode: string;
+  currency: "EUR";
+  dailySlotCapacity: string;
+  defaultLocale: string;
+  defaultSeoTitle: string;
+  emailSender: string;
+  googleCalendarId: string;
+  googleCalendarMode: CalendarSyncMode;
+  reminderTemplate: string;
+  rolesPolicy: string;
+  stripeMode: StripeMode;
+  timezone: string;
+  workingDays: string;
+  workingHours: string;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
@@ -260,6 +302,46 @@ const mediaStatusOptions: MediaStatus[] = ["Готово", "Требует alt",
 const contactChannelTypeOptions: ContactChannelType[] = ["Телефон", "Email", "Мессенджер", "Соцсеть", "Карта", "Бронирование"];
 const contactStatusOptions: ContactStatus[] = ["Активен", "Черновик", "Скрыт"];
 const blogStatusOptions: BlogStatus[] = ["Опубликована", "Черновик", "Запланирована", "На проверке"];
+const calendarSyncModeOptions: CalendarSyncMode[] = ["Отключена", "Внутренний календарь главный", "Односторонняя", "Двусторонняя позже"];
+const stripeModeOptions: StripeMode[] = ["Тестовый", "Live после подтверждения"];
+const settingsGroups: Array<{ id: SettingsGroupId; status: string; summary: string; title: string }> = [
+  {
+    id: "business",
+    status: "Готово",
+    summary: "Название, язык, часовой пояс и базовые данные салона.",
+    title: "Бизнес",
+  },
+  {
+    id: "booking",
+    status: "Готово",
+    summary: "Рабочие часы, слоты, буфер между сеансами и Google Calendar.",
+    title: "Запись и календарь",
+  },
+  {
+    id: "payments",
+    status: "Ожидает Stripe live",
+    summary: "Валюта EUR, Stripe режим и правила сертификатов.",
+    title: "Платежи",
+  },
+  {
+    id: "email",
+    status: "Черновик",
+    summary: "Email отправителя и шаблоны будущих уведомлений.",
+    title: "Email",
+  },
+  {
+    id: "privacySeo",
+    status: "Готово",
+    summary: "Cookie/privacy текст, SEO по умолчанию и локальные метаданные.",
+    title: "Privacy и SEO",
+  },
+  {
+    id: "rolesAudit",
+    status: "Защищено",
+    summary: "Роли, доступ бухгалтера, audit log и опасные действия.",
+    title: "Роли и аудит",
+  },
+];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -507,6 +589,26 @@ const initialBlogPostRows: BlogPostRecord[] = [
     updatedAt: "2026-07-07",
   },
 ];
+const initialSettingsRecord: SettingsRecord = {
+  auditLogRetentionDays: 180,
+  bookingBufferMinutes: 30,
+  businessName: "Magic Massage Natali",
+  cookiePrivacyMode: "Google Maps только после consent; Stripe только в оплате сертификата.",
+  currency: "EUR",
+  dailySlotCapacity: 4,
+  defaultLocale: "bg",
+  defaultSeoTitle: "Magic Massage Natali - массаж в Бургасе",
+  emailSender: "info@magicmassage.bg",
+  googleCalendarId: "",
+  googleCalendarMode: "Внутренний календарь главный",
+  reminderTemplate: "Напоминание за 24 часа до записи после запуска email-провайдера.",
+  rolesPolicy: "Владелец управляет настройками; администратор работает без критических системных действий.",
+  stripeMode: "Тестовый",
+  timezone: "Europe/Sofia",
+  updatedAt: "2026-07-07",
+  workingDays: "Пн-Сб",
+  workingHours: "10:00-19:00",
+};
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -628,6 +730,10 @@ function buildInitialBlogPostRows(): BlogPostRecord[] {
   }));
 }
 
+function buildInitialSettingsRecord(): SettingsRecord {
+  return { ...initialSettingsRecord };
+}
+
 function buildClientFormState(client?: ClientRecord): ClientFormState {
   return {
     email: client?.email ?? "",
@@ -732,6 +838,68 @@ function buildBlogPostFormState(post?: BlogPostRecord): BlogPostFormState {
     tags: post?.tags.join(", ") ?? "",
     title: post?.title ?? "",
   };
+}
+
+function buildSettingsFormState(settings: SettingsRecord): SettingsFormState {
+  return {
+    auditLogRetentionDays: String(settings.auditLogRetentionDays),
+    bookingBufferMinutes: String(settings.bookingBufferMinutes),
+    businessName: settings.businessName,
+    cookiePrivacyMode: settings.cookiePrivacyMode,
+    currency: settings.currency,
+    dailySlotCapacity: String(settings.dailySlotCapacity),
+    defaultLocale: settings.defaultLocale,
+    defaultSeoTitle: settings.defaultSeoTitle,
+    emailSender: settings.emailSender,
+    googleCalendarId: settings.googleCalendarId,
+    googleCalendarMode: settings.googleCalendarMode,
+    reminderTemplate: settings.reminderTemplate,
+    rolesPolicy: settings.rolesPolicy,
+    stripeMode: settings.stripeMode,
+    timezone: settings.timezone,
+    workingDays: settings.workingDays,
+    workingHours: settings.workingHours,
+  };
+}
+
+function isPositiveInteger(value: number) {
+  return Number.isInteger(value) && value > 0;
+}
+
+function getDialogFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  );
+}
+
+function trapDialogFocus(event: KeyboardEvent<HTMLElement>) {
+  if (event.key !== "Tab") {
+    return;
+  }
+
+  const focusableElements = getDialogFocusableElements(event.currentTarget);
+
+  if (focusableElements.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+  const activeElement = document.activeElement;
+
+  if (event.shiftKey && (activeElement === firstElement || activeElement === event.currentTarget)) {
+    event.preventDefault();
+    lastElement.focus();
+    return;
+  }
+
+  if (!event.shiftKey && activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
 }
 
 function parseClientTags(value: string) {
@@ -2158,6 +2326,270 @@ function BlogPostDialog({
             </button>
           </div>
         </form>
+      </section>
+    </div>
+  );
+}
+
+function SettingsDialog({
+  onClose,
+  onSave,
+  settings,
+}: {
+  onClose: () => void;
+  onSave: (settings: SettingsRecord) => void;
+  settings: SettingsRecord;
+}) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [form, setForm] = useState<SettingsFormState>(() => buildSettingsFormState(settings));
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
+  function updateForm<Field extends keyof SettingsFormState>(field: Field, value: SettingsFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const bookingBufferMinutes = Number(form.bookingBufferMinutes);
+    const dailySlotCapacity = Number(form.dailySlotCapacity);
+    const auditLogRetentionDays = Number(form.auditLogRetentionDays);
+
+    if (
+      !form.businessName.trim() ||
+      !isPositiveInteger(bookingBufferMinutes) ||
+      !isPositiveInteger(dailySlotCapacity) ||
+      !isPositiveInteger(auditLogRetentionDays)
+    ) {
+      setError("Укажите название, буфер записи, слоты и срок хранения audit log.");
+      return;
+    }
+
+    onSave({
+      auditLogRetentionDays,
+      bookingBufferMinutes,
+      businessName: form.businessName.trim(),
+      cookiePrivacyMode: form.cookiePrivacyMode.trim(),
+      currency: form.currency,
+      dailySlotCapacity,
+      defaultLocale: form.defaultLocale,
+      defaultSeoTitle: form.defaultSeoTitle.trim(),
+      emailSender: form.emailSender.trim(),
+      googleCalendarId: form.googleCalendarId.trim(),
+      googleCalendarMode: form.googleCalendarMode,
+      reminderTemplate: form.reminderTemplate.trim(),
+      rolesPolicy: form.rolesPolicy.trim(),
+      stripeMode: form.stripeMode,
+      timezone: form.timezone.trim(),
+      updatedAt: "2026-07-07",
+      workingDays: form.workingDays.trim(),
+      workingHours: form.workingHours.trim(),
+    });
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section
+        aria-labelledby="settings-action-title"
+        aria-modal="true"
+        className="admin-action-dialog admin-service-form-dialog"
+        onKeyDown={trapDialogFocus}
+        role="dialog"
+      >
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Настройки</span>
+            <h2 id="settings-action-title" ref={titleRef} tabIndex={-1}>
+              Настройки админки
+            </h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-content-form-grid">
+            <label>
+              Название бизнеса
+              <input
+                aria-invalid={error && !form.businessName.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("businessName", event.target.value)}
+                required
+                type="text"
+                value={form.businessName}
+              />
+            </label>
+            <label>
+              Язык по умолчанию
+              <select onChange={(event) => updateForm("defaultLocale", event.target.value)} value={form.defaultLocale}>
+                {clientLanguageOptions.map((locale) => (
+                  <option key={locale.value} value={locale.value}>
+                    {locale.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Часовой пояс
+              <input onChange={(event) => updateForm("timezone", event.target.value)} type="text" value={form.timezone} />
+            </label>
+            <label>
+              Рабочие дни
+              <input onChange={(event) => updateForm("workingDays", event.target.value)} type="text" value={form.workingDays} />
+            </label>
+            <label>
+              Рабочие часы
+              <input onChange={(event) => updateForm("workingHours", event.target.value)} type="text" value={form.workingHours} />
+            </label>
+            <label>
+              Перерыв между сеансами
+              <input
+                aria-invalid={error && !isPositiveInteger(Number(form.bookingBufferMinutes)) ? "true" : undefined}
+                min={1}
+                onChange={(event) => updateForm("bookingBufferMinutes", event.target.value)}
+                required
+                step={1}
+                type="number"
+                value={form.bookingBufferMinutes}
+              />
+            </label>
+            <label>
+              Слотов в день
+              <input
+                aria-invalid={error && !isPositiveInteger(Number(form.dailySlotCapacity)) ? "true" : undefined}
+                min={1}
+                onChange={(event) => updateForm("dailySlotCapacity", event.target.value)}
+                required
+                step={1}
+                type="number"
+                value={form.dailySlotCapacity}
+              />
+            </label>
+            <label>
+              Google Calendar
+              <select onChange={(event) => updateForm("googleCalendarMode", event.target.value as CalendarSyncMode)} value={form.googleCalendarMode}>
+                {calendarSyncModeOptions.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Google Calendar ID
+              <input onChange={(event) => updateForm("googleCalendarId", event.target.value)} type="text" value={form.googleCalendarId} />
+            </label>
+            <label>
+              Валюта
+              <select onChange={(event) => updateForm("currency", event.target.value as "EUR")} value={form.currency}>
+                <option value="EUR">EUR</option>
+              </select>
+            </label>
+            <label>
+              Stripe режим
+              <select onChange={(event) => updateForm("stripeMode", event.target.value as StripeMode)} value={form.stripeMode}>
+                {stripeModeOptions.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Email отправителя
+              <input onChange={(event) => updateForm("emailSender", event.target.value)} type="email" value={form.emailSender} />
+            </label>
+            <label>
+              Хранение audit log
+              <input
+                aria-invalid={error && !isPositiveInteger(Number(form.auditLogRetentionDays)) ? "true" : undefined}
+                min={1}
+                onChange={(event) => updateForm("auditLogRetentionDays", event.target.value)}
+                step={1}
+                type="number"
+                value={form.auditLogRetentionDays}
+              />
+            </label>
+            <label className="admin-form-wide">
+              SEO title
+              <input onChange={(event) => updateForm("defaultSeoTitle", event.target.value)} type="text" value={form.defaultSeoTitle} />
+            </label>
+            <label className="admin-form-wide">
+              Cookie/privacy
+              <textarea onChange={(event) => updateForm("cookiePrivacyMode", event.target.value)} rows={3} value={form.cookiePrivacyMode} />
+            </label>
+            <label className="admin-form-wide">
+              Шаблон напоминания
+              <textarea onChange={(event) => updateForm("reminderTemplate", event.target.value)} rows={3} value={form.reminderTemplate} />
+            </label>
+            <label className="admin-form-wide">
+              Политика ролей
+              <textarea onChange={(event) => updateForm("rolesPolicy", event.target.value)} rows={3} value={form.rolesPolicy} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">Сохранить настройки</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function DangerousSettingsDialog({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="admin-action-backdrop">
+      <section
+        aria-labelledby="danger-settings-title"
+        aria-modal="true"
+        className="admin-action-dialog"
+        onKeyDown={trapDialogFocus}
+        role="dialog"
+      >
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Опасная зона</span>
+            <h2 id="danger-settings-title" ref={titleRef} tabIndex={-1}>
+              Подтвердить действие
+            </h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+        <div className="admin-action-body">
+          <p>Опасное действие не выполняется без подтверждения владельца.</p>
+          <p>Для v1 это действие только фиксируется в audit log и не удаляет реальные данные.</p>
+        </div>
+        <div className="admin-action-footer">
+          <button className="admin-danger-button" onClick={onConfirm} type="button">
+            Подтвердить
+          </button>
+          <button className="admin-secondary-button" onClick={onClose} type="button">
+            Отмена
+          </button>
+        </div>
       </section>
     </div>
   );
@@ -4567,6 +4999,249 @@ function BlogWorkspace({
   );
 }
 
+function SettingsWorkspace({
+  isSettingsEditOpen,
+  onCloseSettingsEdit,
+  onOpenSettingsEdit,
+  onSaveSettings,
+  query,
+  settings,
+}: {
+  isSettingsEditOpen: boolean;
+  onCloseSettingsEdit: () => void;
+  onOpenSettingsEdit: () => void;
+  onSaveSettings: (settings: SettingsRecord) => void;
+  query: string;
+  settings: SettingsRecord;
+}) {
+  const [selectedGroupId, setSelectedGroupId] = useState<SettingsGroupId>("booking");
+  const [actionNotice, setActionNotice] = useState("");
+  const [isDangerDialogOpen, setIsDangerDialogOpen] = useState(false);
+  const filteredGroups = settingsGroups.filter((group) => matchesSearch([group.title, group.summary, group.status], query));
+  const selectedGroup = filteredGroups.find((group) => group.id === selectedGroupId) ?? filteredGroups[0];
+
+  function openGroup(groupId: SettingsGroupId) {
+    setSelectedGroupId(groupId);
+    setActionNotice("");
+  }
+
+  function saveSettingsForm(nextSettings: SettingsRecord) {
+    onSaveSettings(nextSettings);
+    setActionNotice("Настройки сохранены.");
+    onCloseSettingsEdit();
+  }
+
+  function confirmDangerousAction() {
+    setIsDangerDialogOpen(false);
+    setActionNotice("Действие записано в audit log.");
+  }
+
+  return (
+    <div className="admin-split-view admin-content-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="settings-workspace-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="settings-workspace-heading">Настройки админки</h2>
+            <p>Группы системных правил: запись, платежи, email, privacy/SEO, роли и audit log.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры настроек">
+            <button aria-pressed="true" type="button">
+              Все группы
+            </button>
+          </div>
+        </div>
+
+        {actionNotice ? (
+          <p className="admin-export-notice" role="status">
+            {actionNotice}
+          </p>
+        ) : null}
+
+        <div className="admin-table-scroll admin-settings-table-scroll">
+          <table className="admin-data-table admin-settings-table">
+            <thead>
+              <tr>
+                <th>Группа</th>
+                <th>Ключевые настройки</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredGroups.map((group) => (
+                <tr aria-selected={group.id === selectedGroup?.id} key={group.id}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openGroup(group.id)} type="button">
+                      {group.title}
+                    </button>
+                  </td>
+                  <td>{group.summary}</td>
+                  <td>
+                    <span className={statusClass(group.status)}>{group.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredGroups.length === 0 ? <EmptyState label="Настройки не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали настроек">
+        <span className="admin-kicker">Настройки</span>
+        {!selectedGroup ? (
+          <>
+            <div className="admin-detail-heading">
+              <h2>Ничего не найдено</h2>
+            </div>
+            <p>Измените поиск, чтобы выбрать группу настроек.</p>
+          </>
+        ) : (
+          <>
+        <div className="admin-detail-heading">
+          <h2>{selectedGroup.title}</h2>
+          <div className="admin-detail-actions">
+            <button className="admin-text-action" onClick={onOpenSettingsEdit} type="button">
+              Редактировать
+            </button>
+          </div>
+        </div>
+        <p>{selectedGroup.summary}</p>
+
+        {selectedGroup.id === "business" ? (
+          <dl className="admin-detail-list">
+            <div>
+              <dt>Название</dt>
+              <dd>{settings.businessName}</dd>
+            </div>
+            <div>
+              <dt>Язык по умолчанию</dt>
+              <dd>{settings.defaultLocale}</dd>
+            </div>
+            <div>
+              <dt>Часовой пояс</dt>
+              <dd>{settings.timezone}</dd>
+            </div>
+            <div>
+              <dt>Обновлено</dt>
+              <dd>{settings.updatedAt}</dd>
+            </div>
+          </dl>
+        ) : null}
+
+        {selectedGroup.id === "booking" ? (
+          <dl className="admin-detail-list">
+            <div>
+              <dt>Рабочие дни</dt>
+              <dd>{settings.workingDays}</dd>
+            </div>
+            <div>
+              <dt>Рабочие часы</dt>
+              <dd>{settings.workingHours}</dd>
+            </div>
+            <div>
+              <dt>Перерыв между сеансами</dt>
+              <dd>{settings.bookingBufferMinutes} минут</dd>
+            </div>
+            <div>
+              <dt>Слотов в день</dt>
+              <dd>{settings.dailySlotCapacity} слотов</dd>
+            </div>
+            <div>
+              <dt>Google Calendar</dt>
+              <dd>{settings.googleCalendarMode}</dd>
+            </div>
+            <div>
+              <dt>Google Calendar ID</dt>
+              <dd>{settings.googleCalendarId || "Не подключен"}</dd>
+            </div>
+            <div>
+              <dt>Источник записей</dt>
+              <dd>Админка остается главным календарем.</dd>
+            </div>
+          </dl>
+        ) : null}
+
+        {selectedGroup.id === "payments" ? (
+          <dl className="admin-detail-list">
+            <div>
+              <dt>Валюта</dt>
+              <dd>{settings.currency}</dd>
+            </div>
+            <div>
+              <dt>Stripe режим</dt>
+              <dd>{settings.stripeMode}</dd>
+            </div>
+            <div>
+              <dt>Сертификаты</dt>
+              <dd>Оплата сертификатов через Stripe; услуги массажа без online payment в v1.</dd>
+            </div>
+          </dl>
+        ) : null}
+
+        {selectedGroup.id === "email" ? (
+          <dl className="admin-detail-list">
+            <div>
+              <dt>Email отправителя</dt>
+              <dd>{settings.emailSender}</dd>
+            </div>
+            <div>
+              <dt>Шаблон напоминания</dt>
+              <dd>{settings.reminderTemplate}</dd>
+            </div>
+          </dl>
+        ) : null}
+
+        {selectedGroup.id === "privacySeo" ? (
+          <dl className="admin-detail-list">
+            <div>
+              <dt>Cookie/privacy</dt>
+              <dd>{settings.cookiePrivacyMode}</dd>
+            </div>
+            <div>
+              <dt>SEO title</dt>
+              <dd>{settings.defaultSeoTitle}</dd>
+            </div>
+          </dl>
+        ) : null}
+
+        {selectedGroup.id === "rolesAudit" ? (
+          <>
+            <dl className="admin-detail-list">
+              <div>
+                <dt>Политика ролей</dt>
+                <dd>{settings.rolesPolicy}</dd>
+              </div>
+              <div>
+                <dt>Бухгалтер</dt>
+                <dd>Бухгалтер: только Stripe-отчеты</dd>
+              </div>
+              <div>
+                <dt>Audit log</dt>
+                <dd>{settings.auditLogRetentionDays} дней хранения</dd>
+              </div>
+            </dl>
+            <section className="admin-client-section">
+              <h3>Опасная зона</h3>
+              <p>Действия с данными должны быть отделены от обычного сохранения и подтверждаться владельцем.</p>
+              <button className="admin-danger-button" onClick={() => setIsDangerDialogOpen(true)} type="button">
+                Сбросить демо-данные
+              </button>
+            </section>
+          </>
+        ) : null}
+          </>
+        )}
+      </aside>
+
+      {isSettingsEditOpen ? (
+        <SettingsDialog key={settings.updatedAt} onClose={onCloseSettingsEdit} onSave={saveSettingsForm} settings={settings} />
+      ) : null}
+
+      {isDangerDialogOpen ? <DangerousSettingsDialog onClose={() => setIsDangerDialogOpen(false)} onConfirm={confirmDangerousAction} /> : null}
+    </div>
+  );
+}
+
 function GenericWorkspace({ query, section }: { query: string; section: AdminSectionId }) {
   const sectionModule = getAdminModule(section);
   const filteredItems = sectionSamples[section].filter((item) => matchesSearch([item, sectionModule.title], query));
@@ -4632,6 +5307,7 @@ function Workspace({
   isMediaCreateOpen,
   isPriceCreateOpen,
   isServiceCreateOpen,
+  isSettingsEditOpen,
   media,
   onCancelAppointment,
   onCalendarCreateIntent,
@@ -4642,7 +5318,9 @@ function Workspace({
   onCloseMediaCreate,
   onClosePriceCreate,
   onCloseServiceCreate,
+  onCloseSettingsEdit,
   onEditAppointment,
+  onOpenSettingsEdit,
   onSaveBlogPost,
   onSaveCertificate,
   onSaveClient,
@@ -4652,6 +5330,7 @@ function Workspace({
   onSaveMedia,
   onSavePrice,
   onSaveService,
+  onSaveSettings,
   onUpdateCertificateStatus,
   prices,
   query,
@@ -4659,6 +5338,7 @@ function Workspace({
   section,
   selectedClientName,
   services,
+  settings,
 }: {
   appointments: Appointment[];
   blogPosts: BlogPostRecord[];
@@ -4673,6 +5353,7 @@ function Workspace({
   isMediaCreateOpen: boolean;
   isPriceCreateOpen: boolean;
   isServiceCreateOpen: boolean;
+  isSettingsEditOpen: boolean;
   media: MediaRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
@@ -4683,7 +5364,9 @@ function Workspace({
   onCloseMediaCreate: () => void;
   onClosePriceCreate: () => void;
   onCloseServiceCreate: () => void;
+  onCloseSettingsEdit: () => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onOpenSettingsEdit: () => void;
   onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => void;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
@@ -4693,6 +5376,7 @@ function Workspace({
   onSaveMedia: (media: MediaRecord, originalId?: string) => void;
   onSavePrice: (price: PriceRecord, originalId?: string) => void;
   onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
+  onSaveSettings: (settings: SettingsRecord) => void;
   onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
   prices: PriceRecord[];
   query: string;
@@ -4700,6 +5384,7 @@ function Workspace({
   section: AdminSectionId;
   selectedClientName?: string;
   services: ServiceRecord[];
+  settings: SettingsRecord;
 }) {
   if (section === "dashboard") {
     return <DashboardWorkspace certificates={certificates} query={query} role={role} />;
@@ -4802,6 +5487,19 @@ function Workspace({
     );
   }
 
+  if (section === "settings") {
+    return (
+      <SettingsWorkspace
+        isSettingsEditOpen={isSettingsEditOpen}
+        onCloseSettingsEdit={onCloseSettingsEdit}
+        onOpenSettingsEdit={onOpenSettingsEdit}
+        onSaveSettings={onSaveSettings}
+        query={query}
+        settings={settings}
+      />
+    );
+  }
+
   if (section === "calendar") {
     return (
       <CalendarWorkspace
@@ -4839,6 +5537,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [contactChannels, setContactChannels] = useState<ContactChannelRecord[]>(() => buildInitialContactChannels());
   const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings());
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows());
+  const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
@@ -4846,6 +5545,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [isMediaCreateOpen, setIsMediaCreateOpen] = useState(false);
   const [isContactSettingsOpen, setIsContactSettingsOpen] = useState(false);
   const [isBlogCreateOpen, setIsBlogCreateOpen] = useState(false);
+  const [isSettingsEditOpen, setIsSettingsEditOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -4891,6 +5591,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(false);
       setIsClientCreateOpen(true);
       return;
     }
@@ -4904,6 +5605,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(false);
       setIsCertificateCreateOpen(true);
       return;
     }
@@ -4917,6 +5619,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsMediaCreateOpen(false);
       setIsPriceCreateOpen(false);
       setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(false);
       setIsServiceCreateOpen(true);
       return;
     }
@@ -4930,6 +5633,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsMediaCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(false);
       setIsPriceCreateOpen(true);
       return;
     }
@@ -4943,6 +5647,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(false);
       setIsMediaCreateOpen(true);
       return;
     }
@@ -4956,6 +5661,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(false);
       setIsContactSettingsOpen(true);
       return;
     }
@@ -4970,6 +5676,21 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setIsPriceCreateOpen(false);
       setIsServiceCreateOpen(false);
       setIsBlogCreateOpen(true);
+      setIsSettingsEditOpen(false);
+      return;
+    }
+
+    if (activeSection === "settings") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
+      setIsClientCreateOpen(false);
+      setIsContactSettingsOpen(false);
+      setIsMediaCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(false);
+      setIsBlogCreateOpen(false);
+      setIsSettingsEditOpen(true);
       return;
     }
 
@@ -4980,6 +5701,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
+    setIsSettingsEditOpen(false);
     setIsActionOpen(true);
   }
 
@@ -4992,6 +5714,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
+    setIsSettingsEditOpen(false);
     setEditingAppointment(appointment);
     setIsActionOpen(true);
   }
@@ -5006,6 +5729,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
+    setIsSettingsEditOpen(false);
     setCancellingAppointment(appointment);
   }
 
@@ -5020,6 +5744,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
+    setIsSettingsEditOpen(false);
     setIsActionOpen(false);
   }
 
@@ -5033,6 +5758,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsPriceCreateOpen(false);
     setIsServiceCreateOpen(false);
     setIsBlogCreateOpen(false);
+    setIsSettingsEditOpen(false);
     setEditingAppointment(undefined);
   }
 
@@ -5250,6 +5976,11 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     });
   }
 
+  function saveSettingsRecord(nextSettings: SettingsRecord) {
+    setSettings(nextSettings);
+    setIsSettingsEditOpen(false);
+  }
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -5327,6 +6058,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           isMediaCreateOpen={isMediaCreateOpen}
           isPriceCreateOpen={isPriceCreateOpen}
           isServiceCreateOpen={isServiceCreateOpen}
+          isSettingsEditOpen={isSettingsEditOpen}
           media={media}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
@@ -5337,7 +6069,9 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           onCloseMediaCreate={() => setIsMediaCreateOpen(false)}
           onClosePriceCreate={() => setIsPriceCreateOpen(false)}
           onCloseServiceCreate={() => setIsServiceCreateOpen(false)}
+          onCloseSettingsEdit={() => setIsSettingsEditOpen(false)}
           onEditAppointment={openAppointmentEdit}
+          onOpenSettingsEdit={() => setIsSettingsEditOpen(true)}
           onSaveBlogPost={saveBlogPostRecord}
           onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}
@@ -5347,6 +6081,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           onSaveMedia={saveMediaRecord}
           onSavePrice={savePriceRecord}
           onSaveService={saveServiceRecord}
+          onSaveSettings={saveSettingsRecord}
           onUpdateCertificateStatus={updateCertificateStatus}
           prices={prices}
           query={query}
@@ -5354,6 +6089,7 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           section={activeSection}
           selectedClientName={selectedClientName}
           services={services}
+          settings={settings}
         />
 
         {isCalendarActionDialogOpen ? (

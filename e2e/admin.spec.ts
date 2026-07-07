@@ -500,6 +500,40 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await expect(page.getByRole("table").getByRole("button", { name: "Лимфодренаж: когда он уместен" })).toBeVisible();
 });
 
+test("settings workspace edits booking rules and confirms dangerous actions", async ({ page }) => {
+  await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("heading", { name: "Настройки админки" })).toBeVisible();
+  const details = page.getByLabel("Детали настроек");
+  await expect(details.getByRole("heading", { name: "Запись и календарь" })).toBeVisible();
+  await expect(details.getByText("30 минут")).toBeVisible();
+
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  const dialog = page.getByRole("dialog", { name: "Настройки админки" });
+  await dialog.getByLabel("Перерыв между сеансами").fill("45");
+  await dialog.getByLabel("Слотов в день").fill("5");
+  await dialog.getByRole("combobox", { name: /Google Calendar/ }).selectOption("Односторонняя");
+  await dialog.getByLabel("Google Calendar ID").fill("natali@example.com");
+  await dialog.getByRole("button", { name: "Сохранить настройки" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(details.getByText("45 минут")).toBeVisible();
+  await expect(details.getByText("5 слотов")).toBeVisible();
+  await expect(details.getByText("Односторонняя")).toBeVisible();
+  await expect(details.getByText("natali@example.com")).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("Настройки сохранены.");
+
+  await page.getByRole("button", { name: "Роли и аудит" }).click();
+  await expect(details.getByRole("heading", { name: "Роли и аудит" })).toBeVisible();
+  await details.getByRole("button", { name: "Сбросить демо-данные" }).click();
+
+  const confirmDialog = page.getByRole("dialog", { name: "Подтвердить действие" });
+  await expect(confirmDialog.getByText("Опасное действие не выполняется без подтверждения владельца.")).toBeVisible();
+  await confirmDialog.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(confirmDialog).toHaveCount(0);
+  await expect(page.getByRole("status")).toHaveText("Действие записано в audit log.");
+});
+
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

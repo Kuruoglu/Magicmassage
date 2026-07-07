@@ -3691,6 +3691,12 @@ button.admin-calendar-item[aria-pressed="true"] {
   opacity: 0.72;
 }
 
+.admin-client-section .admin-danger-button {
+  min-height: 44px;
+  padding: 0 12px;
+  width: 100%;
+}
+
 .admin-detail-list {
   display: grid;
   gap: 12px;
@@ -4135,6 +4141,70 @@ button.admin-calendar-item[aria-pressed="true"] {
 
   .admin-data-table {
     min-width: 680px;
+  }
+
+  .admin-settings-table-scroll {
+    overflow: visible;
+  }
+
+  .admin-settings-table {
+    min-width: 0;
+  }
+
+  .admin-settings-table thead {
+    display: none;
+  }
+
+  .admin-settings-table tbody,
+  .admin-settings-table tr,
+  .admin-settings-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-settings-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .admin-settings-table tr {
+    background: #fff;
+    border: 1px solid rgba(124, 77, 161, 0.13);
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .admin-settings-table tr[aria-selected="true"] {
+    background: rgba(124, 77, 161, 0.08);
+  }
+
+  .admin-settings-table tr[aria-selected="true"] td {
+    background: transparent;
+  }
+
+  .admin-settings-table td {
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .admin-settings-table td + td {
+    margin-top: 8px;
+  }
+
+  .admin-settings-table td:nth-child(2) {
+    color: var(--admin-muted);
+    line-height: 1.45;
+  }
+
+  .admin-settings-table td:nth-child(3) {
+    margin-top: 10px;
+  }
+
+  .admin-settings-table .admin-row-action {
+    min-height: auto;
+    padding: 0;
+    text-align: left;
+    white-space: normal;
   }
 }
 
