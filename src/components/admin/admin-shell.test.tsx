@@ -173,6 +173,132 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Погашен после записи клиента.")).toBeInTheDocument();
   });
 
+  it("creates and edits a massage service from the services workspace", () => {
+    render(<AdminShell activeSection="services" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить услугу" }));
+
+    const createDialog = screen.getByRole("dialog", { name: "Новая услуга" });
+    fireEvent.change(within(createDialog).getByLabelText("Название"), { target: { value: "Арома массаж" } });
+    fireEvent.change(within(createDialog).getByLabelText("Slug"), { target: { value: "aroma-massage" } });
+    fireEvent.change(within(createDialog).getByLabelText("Категория"), { target: { value: "SPA" } });
+    fireEvent.change(within(createDialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
+    fireEvent.change(within(createDialog).getByLabelText("Длительность"), { target: { value: "75 мин" } });
+    fireEvent.change(within(createDialog).getByLabelText("Порядок"), { target: { value: "9" } });
+    fireEvent.change(within(createDialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
+    fireEvent.change(within(createDialog).getByLabelText("SEO title"), { target: { value: "Арома массаж в Бургасе" } });
+    fireEvent.change(within(createDialog).getByLabelText("Обложка"), { target: { value: "/media/services/aroma-massage.jpg" } });
+    fireEvent.change(within(createDialog).getByLabelText("Описание"), { target: { value: "Расслабляющая SPA-услуга с ароматическими маслами." } });
+    fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить услугу" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новая услуга" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "Арома массаж" })).toBeInTheDocument();
+
+    const details = screen.getByLabelText("Детали услуги");
+    expect(within(details).getByRole("heading", { name: "Арома массаж" })).toBeInTheDocument();
+    expect(within(details).getByText("aroma-massage")).toBeInTheDocument();
+    expect(within(details).getByText("Расслабляющая SPA-услуга с ароматическими маслами.")).toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать услугу" });
+    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Опубликована" } });
+    fireEvent.change(within(editDialog).getByLabelText("Описание"), { target: { value: "Опубликованное описание услуги для сайта." } });
+    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать услугу" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "Арома массаж" })).toHaveLength(1);
+    expect(within(details).getByText("Опубликована")).toBeInTheDocument();
+    expect(within(details).getByText("Опубликованное описание услуги для сайта.")).toBeInTheDocument();
+  });
+
+  it("keeps price variants attached when a service slug changes", () => {
+    render(<AdminShell activeSection="services" role="owner" />);
+
+    fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "Классический массаж" }));
+
+    const details = screen.getByLabelText("Детали услуги");
+    expect(within(details).getByText("70 €")).toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать услугу" });
+    fireEvent.change(within(editDialog).getByLabelText("Slug"), { target: { value: "classic-massage-updated" } });
+    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(within(details).getByText("classic-massage-updated")).toBeInTheDocument();
+    expect(within(details).getByText("70 €")).toBeInTheDocument();
+  });
+
+  it("filters service rows by publication status", () => {
+    render(<AdminShell activeSection="services" role="owner" />);
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("button", { name: "Классический массаж" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Черновики" }));
+
+    expect(screen.getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Deep tissue massage" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Классический массаж" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали услуги")).getByRole("heading", { name: "Deep tissue massage" })).toBeInTheDocument();
+  });
+
+  it("creates and edits a price variant from the price workspace", () => {
+    render(<AdminShell activeSection="price" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить цену" }));
+
+    const createDialog = screen.getByRole("dialog", { name: "Новая цена" });
+    fireEvent.change(within(createDialog).getByLabelText("Услуга"), { target: { value: "classic-massage" } });
+    fireEvent.change(within(createDialog).getByLabelText("Длительность"), { target: { value: "90" } });
+    fireEvent.change(within(createDialog).getByLabelText("Цена"), { target: { value: "110" } });
+    fireEvent.change(within(createDialog).getByLabelText("Статус"), { target: { value: "Активна" } });
+    fireEvent.change(within(createDialog).getByLabelText("Порядок"), { target: { value: "4" } });
+    fireEvent.change(within(createDialog).getByLabelText("Заметка"), { target: { value: "Новый длинный вариант для постоянных клиентов." } });
+    fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить цену" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новая цена" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "Классический массаж · 90 мин" })).toBeInTheDocument();
+
+    const details = screen.getByLabelText("Детали цены");
+    expect(within(details).getByRole("heading", { name: "Классический массаж · 90 мин" })).toBeInTheDocument();
+    expect(within(details).getByText("110 €")).toBeInTheDocument();
+    expect(within(details).getByText("Новый длинный вариант для постоянных клиентов.")).toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать цену" });
+    fireEvent.change(within(editDialog).getByLabelText("Цена"), { target: { value: "115" } });
+    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Скрыта" } });
+    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(screen.queryByRole("dialog", { name: "Редактировать цену" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "Классический массаж · 90 мин" })).toHaveLength(1);
+    expect(within(details).getByText("115 €")).toBeInTheDocument();
+    expect(within(details).getByText("Скрыта")).toBeInTheDocument();
+  });
+
+  it("filters price rows by active and hidden status", () => {
+    render(<AdminShell activeSection="price" role="owner" />);
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("button", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Скрытые" }));
+
+    expect(screen.getByRole("button", { name: "Скрытые" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "Deep tissue massage · 60 мин" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Классический массаж · 60 мин" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали цены")).getByRole("heading", { name: "Deep tissue massage · 60 мин" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Активные" }));
+
+    expect(within(table).getByRole("button", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Deep tissue massage · 60 мин" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Детали цены")).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
+  });
+
   it("shows quick contact actions in the selected client card", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 

@@ -307,6 +307,76 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
   await expect(details.getByText("Погашен после записи клиента.")).toBeVisible();
 });
 
+test("services workspace can create and edit a massage service", async ({ page }) => {
+  await page.goto("/admin?section=services", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Добавить услугу" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новая услуга" });
+  await createDialog.getByLabel("Название").fill("Арома массаж");
+  await createDialog.getByLabel("Slug").fill("aroma-massage");
+  await createDialog.getByLabel("Категория").fill("SPA");
+  await createDialog.getByLabel("Статус").selectOption("Черновик");
+  await createDialog.getByLabel("Длительность").fill("75 мин");
+  await createDialog.getByLabel("Порядок").fill("9");
+  await createDialog.getByLabel("Локали").fill("ru, bg");
+  await createDialog.getByLabel("SEO title").fill("Арома массаж в Бургасе");
+  await createDialog.getByLabel("Обложка").fill("/media/services/aroma-massage.jpg");
+  await createDialog.getByLabel("Описание").fill("Расслабляющая SPA-услуга с ароматическими маслами.");
+  await createDialog.getByRole("button", { name: "Сохранить услугу" }).click();
+
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("button", { name: "Арома массаж" })).toBeVisible();
+
+  const details = page.getByLabel("Детали услуги");
+  await expect(details.getByRole("heading", { name: "Арома массаж" })).toBeVisible();
+  await expect(details.getByText("aroma-massage", { exact: true })).toBeVisible();
+  await expect(details.getByText("Расслабляющая SPA-услуга с ароматическими маслами.")).toBeVisible();
+
+  await details.getByRole("button", { name: "Редактировать" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Редактировать услугу" });
+  await editDialog.getByLabel("Статус").selectOption("Опубликована");
+  await editDialog.getByLabel("Описание").fill("Опубликованное описание услуги для сайта.");
+  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  await expect(editDialog).toHaveCount(0);
+  await expect(details.getByText("Опубликована")).toBeVisible();
+  await expect(details.getByText("Опубликованное описание услуги для сайта.")).toBeVisible();
+});
+
+test("price workspace can create and edit a euro price variant", async ({ page }) => {
+  await page.goto("/admin?section=price", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Добавить цену" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новая цена" });
+  await createDialog.getByLabel("Услуга").selectOption("classic-massage");
+  await createDialog.getByLabel("Длительность").fill("90");
+  await createDialog.getByLabel("Цена").fill("110");
+  await createDialog.getByLabel("Статус").selectOption("Активна");
+  await createDialog.getByLabel("Порядок").fill("4");
+  await createDialog.getByLabel("Заметка").fill("Новый длинный вариант для постоянных клиентов.");
+  await createDialog.getByRole("button", { name: "Сохранить цену" }).click();
+
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("button", { name: "Классический массаж · 90 мин" })).toBeVisible();
+
+  const details = page.getByLabel("Детали цены");
+  await expect(details.getByRole("heading", { name: "Классический массаж · 90 мин" })).toBeVisible();
+  await expect(details.getByText("110 €")).toBeVisible();
+  await expect(details.getByText("EUR")).toBeVisible();
+
+  await details.getByRole("button", { name: "Редактировать" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Редактировать цену" });
+  await editDialog.getByLabel("Цена").fill("115");
+  await editDialog.getByLabel("Статус").selectOption("Скрыта");
+  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+
+  await expect(editDialog).toHaveCount(0);
+  await expect(details.getByText("115 €")).toBeVisible();
+  await expect(details.getByText("Скрыта")).toBeVisible();
+});
+
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

@@ -85,6 +85,51 @@ type CertificateFormState = {
   status: CertificateStatus;
   stripeId: string;
 };
+type ServiceStatus = "Опубликована" | "Черновик" | "Скрыта";
+type ServiceRecord = {
+  category: string;
+  coverImage: string;
+  duration: string;
+  locales: string[];
+  name: string;
+  order: number;
+  seoTitle: string;
+  slug: string;
+  status: ServiceStatus;
+  summary: string;
+};
+type ServiceFormState = {
+  category: string;
+  coverImage: string;
+  duration: string;
+  locales: string;
+  name: string;
+  order: string;
+  seoTitle: string;
+  slug: string;
+  status: ServiceStatus;
+  summary: string;
+};
+type PriceStatus = "Активна" | "Скрыта";
+type PriceRecord = {
+  durationMinutes: number;
+  id: string;
+  note: string;
+  order: number;
+  priceEur: number;
+  serviceSlug: string;
+  status: PriceStatus;
+  updatedAt: string;
+};
+type PriceFormState = {
+  durationMinutes: string;
+  note: string;
+  order: string;
+  priceEur: string;
+  serviceSlug: string;
+  status: PriceStatus;
+  updatedAt: string;
+};
 type CalendarMode = "day" | "week" | "month" | "list";
 
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
@@ -120,6 +165,8 @@ type ClientFormState = {
 const appointmentServiceOptions = ["Классический массаж", "Лимфодренажный массаж", "Deep tissue massage", "SPA процедура"] as const;
 const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена", "Отменена"];
 const certificateStatusOptions: CertificateStatus[] = ["Оплачено", "Отправлен", "Ожидает PDF", "Погашен"];
+const serviceStatusOptions: ServiceStatus[] = ["Опубликована", "Черновик", "Скрыта"];
+const priceStatusOptions: PriceStatus[] = ["Активна", "Скрыта"];
 const calendarModes: Array<{ id: CalendarMode; label: string }> = [
   { id: "day", label: "День" },
   { id: "week", label: "Неделя" },
@@ -140,6 +187,76 @@ const calendarMonthDays = Array.from({ length: 31 }, (_, index) => {
   };
 });
 const calendarLeadingBlankDays = 2;
+const initialServiceRows: ServiceRecord[] = [
+  {
+    category: "Массаж",
+    coverImage: "/media/services/classic-massage.jpg",
+    duration: "60-90 мин",
+    locales: ["bg", "ru", "ua", "en"],
+    name: "Классический массаж",
+    order: 1,
+    seoTitle: "Классический массаж в Бургасе",
+    slug: "classic-massage",
+    status: "Опубликована",
+    summary: "Базовая услуга для расслабления, восстановления тонуса и снятия усталости.",
+  },
+  {
+    category: "Массаж",
+    coverImage: "/media/services/lymphatic-drainage-massage.jpg",
+    duration: "60-90 мин",
+    locales: ["bg", "ru", "ua", "en"],
+    name: "Лимфодренажный массаж",
+    order: 2,
+    seoTitle: "Лимфодренажный массаж в Бургасе",
+    slug: "lymphatic-drainage-massage",
+    status: "Опубликована",
+    summary: "Мягкие ритмичные техники для ощущения легкости и бережной работы с тканями.",
+  },
+  {
+    category: "Массаж",
+    coverImage: "/media/services/deep-tissue-massage.jpg",
+    duration: "60-90 мин",
+    locales: ["bg", "ru", "ua", "en"],
+    name: "Deep tissue massage",
+    order: 3,
+    seoTitle: "Deep tissue massage Burgas",
+    slug: "deep-tissue-massage",
+    status: "Черновик",
+    summary: "Более глубокая и медленная работа с зонами устойчивого напряжения.",
+  },
+];
+const initialPriceRows: PriceRecord[] = [
+  {
+    durationMinutes: 60,
+    id: "price-classic-60",
+    note: "Основной вариант для публичного прайса.",
+    order: 1,
+    priceEur: 70,
+    serviceSlug: "classic-massage",
+    status: "Активна",
+    updatedAt: "2026-07-07",
+  },
+  {
+    durationMinutes: 90,
+    id: "price-lymphatic-90",
+    note: "Курс можно уточнять в карточке услуги.",
+    order: 2,
+    priceEur: 95,
+    serviceSlug: "lymphatic-drainage-massage",
+    status: "Активна",
+    updatedAt: "2026-07-07",
+  },
+  {
+    durationMinutes: 60,
+    id: "price-deep-60",
+    note: "Пока скрыто до финального подтверждения текста.",
+    order: 3,
+    priceEur: 85,
+    serviceSlug: "deep-tissue-massage",
+    status: "Скрыта",
+    updatedAt: "2026-07-07",
+  },
+];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -163,7 +280,15 @@ function statusClass(status: string) {
     return "admin-status admin-status-warning";
   }
 
+  if (normalizedStatus.includes("черновик")) {
+    return "admin-status admin-status-warning";
+  }
+
   if (normalizedStatus.includes("отмен") || normalizedStatus.includes("возврат")) {
+    return "admin-status admin-status-danger";
+  }
+
+  if (normalizedStatus.includes("скрыта")) {
     return "admin-status admin-status-danger";
   }
 
@@ -212,6 +337,17 @@ function buildInitialCertificateRows(): CertificateRecord[] {
   });
 }
 
+function buildInitialServiceRows(): ServiceRecord[] {
+  return initialServiceRows.map((service) => ({
+    ...service,
+    locales: [...service.locales],
+  }));
+}
+
+function buildInitialPriceRows(): PriceRecord[] {
+  return initialPriceRows.map((price) => ({ ...price }));
+}
+
 function buildClientFormState(client?: ClientRecord): ClientFormState {
   return {
     email: client?.email ?? "",
@@ -244,10 +380,44 @@ function buildCertificateFormState(certificate?: CertificateRecord): Certificate
   };
 }
 
+function buildServiceFormState(service?: ServiceRecord): ServiceFormState {
+  return {
+    category: service?.category ?? "Массаж",
+    coverImage: service?.coverImage ?? "",
+    duration: service?.duration ?? "60 мин",
+    locales: service?.locales.join(", ") ?? "bg, ru, ua, en",
+    name: service?.name ?? "",
+    order: String(service?.order ?? initialServiceRows.length + 1),
+    seoTitle: service?.seoTitle ?? "",
+    slug: service?.slug ?? "",
+    status: service?.status ?? "Черновик",
+    summary: service?.summary ?? "",
+  };
+}
+
+function buildPriceFormState(services: ServiceRecord[], price?: PriceRecord): PriceFormState {
+  return {
+    durationMinutes: price ? String(price.durationMinutes) : "",
+    note: price?.note ?? "",
+    order: String(price?.order ?? initialPriceRows.length + 1),
+    priceEur: price ? String(price.priceEur) : "",
+    serviceSlug: price?.serviceSlug ?? services[0]?.slug ?? "",
+    status: price?.status ?? "Активна",
+    updatedAt: price?.updatedAt ?? "2026-07-07",
+  };
+}
+
 function parseClientTags(value: string) {
   return value
     .split(",")
     .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function parseCommaList(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
     .filter(Boolean);
 }
 
@@ -265,6 +435,20 @@ function findClientCertificates(certificates: CertificateRecord[], clientName: s
   const normalizedName = normalizeSearch(clientName);
 
   return certificates.filter((certificate) => normalizeSearch(certificate.clientName) === normalizedName);
+}
+
+function findServiceBySlug(services: ServiceRecord[], slug: string) {
+  return services.find((service) => normalizeSearch(service.slug) === normalizeSearch(slug));
+}
+
+function priceLabel(price: PriceRecord, services: ServiceRecord[]) {
+  const service = findServiceBySlug(services, price.serviceSlug);
+
+  return `${service?.name ?? price.serviceSlug} · ${price.durationMinutes} мин`;
+}
+
+function priceValue(price: PriceRecord) {
+  return `${price.priceEur} €`;
 }
 
 function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
@@ -817,6 +1001,264 @@ function CertificateFormDialog({
 
           <div className="admin-action-footer">
             <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить сертификат"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ServiceFormDialog({
+  initialService,
+  onClose,
+  onSave,
+}: {
+  initialService?: ServiceRecord;
+  onClose: () => void;
+  onSave: (service: ServiceRecord, originalSlug?: string) => void;
+}) {
+  const [form, setForm] = useState<ServiceFormState>(() => buildServiceFormState(initialService));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialService);
+
+  function updateForm<Field extends keyof ServiceFormState>(field: Field, value: ServiceFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = form.name.trim();
+    const slug = form.slug.trim();
+
+    if (!name || !slug) {
+      setError("Укажите название и slug услуги.");
+      return;
+    }
+
+    onSave(
+      {
+        category: form.category.trim() || "Массаж",
+        coverImage: form.coverImage.trim(),
+        duration: form.duration.trim() || "60 мин",
+        locales: parseCommaList(form.locales),
+        name,
+        order: Number.parseInt(form.order, 10) || 1,
+        seoTitle: form.seoTitle.trim() || name,
+        slug,
+        status: form.status,
+        summary: form.summary.trim(),
+      },
+      initialService?.slug,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="service-action-title" aria-modal="true" className="admin-action-dialog admin-service-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Виды массажа</span>
+            <h2 id="service-action-title">{isEditing ? "Редактировать услугу" : "Новая услуга"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-content-form-grid">
+            <label>
+              Название
+              <input
+                aria-invalid={error && !form.name.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("name", event.target.value)}
+                required
+                type="text"
+                value={form.name}
+              />
+            </label>
+            <label>
+              Slug
+              <input
+                aria-invalid={error && !form.slug.trim() ? "true" : undefined}
+                onChange={(event) => updateForm("slug", event.target.value)}
+                required
+                type="text"
+                value={form.slug}
+              />
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Категория
+              <input onChange={(event) => updateForm("category", event.target.value)} type="text" value={form.category} />
+            </label>
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value as ServiceStatus)} value={form.status}>
+                {serviceStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Длительность
+              <input onChange={(event) => updateForm("duration", event.target.value)} type="text" value={form.duration} />
+            </label>
+            <label>
+              Порядок
+              <input onChange={(event) => updateForm("order", event.target.value)} type="number" value={form.order} />
+            </label>
+            <label>
+              Локали
+              <input onChange={(event) => updateForm("locales", event.target.value)} type="text" value={form.locales} />
+            </label>
+            <label>
+              SEO title
+              <input onChange={(event) => updateForm("seoTitle", event.target.value)} type="text" value={form.seoTitle} />
+            </label>
+            <label className="admin-form-wide">
+              Обложка
+              <input onChange={(event) => updateForm("coverImage", event.target.value)} type="text" value={form.coverImage} />
+            </label>
+            <label className="admin-form-wide">
+              Описание
+              <textarea onChange={(event) => updateForm("summary", event.target.value)} rows={4} value={form.summary} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить услугу"}</button>
+            <button className="admin-secondary-button" onClick={onClose} type="button">
+              Отмена
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function PriceFormDialog({
+  initialPrice,
+  onClose,
+  onSave,
+  services,
+}: {
+  initialPrice?: PriceRecord;
+  onClose: () => void;
+  onSave: (price: PriceRecord, originalId?: string) => void;
+  services: ServiceRecord[];
+}) {
+  const [form, setForm] = useState<PriceFormState>(() => buildPriceFormState(services, initialPrice));
+  const [error, setError] = useState("");
+  const isEditing = Boolean(initialPrice);
+
+  function updateForm<Field extends keyof PriceFormState>(field: Field, value: PriceFormState[Field]) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const durationMinutes = Number.parseInt(form.durationMinutes, 10);
+    const priceEur = Number.parseFloat(form.priceEur.replace(",", "."));
+
+    if (!form.serviceSlug || !durationMinutes || !Number.isFinite(priceEur) || priceEur <= 0) {
+      setError("Укажите услугу, длительность и цену.");
+      return;
+    }
+
+    onSave(
+      {
+        durationMinutes,
+        id: initialPrice?.id ?? `price-${form.serviceSlug}-${durationMinutes}`,
+        note: form.note.trim(),
+        order: Number.parseInt(form.order, 10) || 1,
+        priceEur,
+        serviceSlug: form.serviceSlug,
+        status: form.status,
+        updatedAt: form.updatedAt,
+      },
+      initialPrice?.id,
+    );
+  }
+
+  return (
+    <div className="admin-action-backdrop">
+      <section aria-labelledby="price-action-title" aria-modal="true" className="admin-action-dialog admin-price-form-dialog" role="dialog">
+        <div className="admin-panel-head">
+          <div>
+            <span className="admin-kicker">Прайс</span>
+            <h2 id="price-action-title">{isEditing ? "Редактировать цену" : "Новая цена"}</h2>
+          </div>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="admin-action-body admin-content-form-grid">
+            <label>
+              Услуга
+              <select onChange={(event) => updateForm("serviceSlug", event.target.value)} value={form.serviceSlug}>
+                {services.map((service) => (
+                  <option key={service.slug} value={service.slug}>
+                    {service.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Статус
+              <select onChange={(event) => updateForm("status", event.target.value as PriceStatus)} value={form.status}>
+                {priceStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {error ? (
+              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <label>
+              Длительность
+              <input onChange={(event) => updateForm("durationMinutes", event.target.value)} type="number" value={form.durationMinutes} />
+            </label>
+            <label>
+              Цена
+              <input onChange={(event) => updateForm("priceEur", event.target.value)} type="number" value={form.priceEur} />
+            </label>
+            <label>
+              Порядок
+              <input onChange={(event) => updateForm("order", event.target.value)} type="number" value={form.order} />
+            </label>
+            <label>
+              Обновлено
+              <input onChange={(event) => updateForm("updatedAt", event.target.value)} type="date" value={form.updatedAt} />
+            </label>
+            <label className="admin-form-wide">
+              Заметка
+              <textarea onChange={(event) => updateForm("note", event.target.value)} rows={4} value={form.note} />
+            </label>
+          </div>
+
+          <div className="admin-action-footer">
+            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить цену"}</button>
             <button className="admin-secondary-button" onClick={onClose} type="button">
               Отмена
             </button>
@@ -1750,6 +2192,409 @@ function CertificatesWorkspace({
   );
 }
 
+function ServicesWorkspace({
+  isServiceCreateOpen,
+  onCloseServiceCreate,
+  onSaveService,
+  prices,
+  query,
+  services,
+}: {
+  isServiceCreateOpen: boolean;
+  onCloseServiceCreate: () => void;
+  onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
+  prices: PriceRecord[];
+  query: string;
+  services: ServiceRecord[];
+}) {
+  const [selectedSlug, setSelectedSlug] = useState(services[0]?.slug ?? "");
+  const [editingService, setEditingService] = useState<ServiceRecord | undefined>();
+  const [statusFilter, setStatusFilter] = useState<"all" | ServiceStatus>("all");
+  const filteredServices = services
+    .filter((service) => statusFilter === "all" || service.status === statusFilter)
+    .filter((service) =>
+      matchesSearch(
+        [service.name, service.slug, service.category, service.duration, service.status, service.seoTitle, service.summary],
+        query,
+      ),
+    )
+    .sort((first, second) => first.order - second.order);
+  const selectedService =
+    filteredServices.find((service) => service.slug === selectedSlug) ??
+    filteredServices[0] ??
+    services.find((service) => service.slug === selectedSlug) ??
+    services[0];
+  const servicePriceRows = selectedService
+    ? prices.filter((price) => normalizeSearch(price.serviceSlug) === normalizeSearch(selectedService.slug))
+    : [];
+  const isServiceFormOpen = isServiceCreateOpen || Boolean(editingService);
+
+  function openService(service: ServiceRecord) {
+    setSelectedSlug(service.slug);
+  }
+
+  function openServiceEdit(service: ServiceRecord) {
+    onCloseServiceCreate();
+    setEditingService(service);
+  }
+
+  function closeServiceForm() {
+    setEditingService(undefined);
+    onCloseServiceCreate();
+  }
+
+  function saveServiceForm(service: ServiceRecord, originalSlug?: string) {
+    onSaveService(service, originalSlug);
+    setSelectedSlug(service.slug);
+    closeServiceForm();
+  }
+
+  if (!selectedService) {
+    return (
+      <section className="admin-panel admin-panel-large" aria-labelledby="services-heading">
+        <div className="admin-panel-head">
+          <h2 id="services-heading">Виды массажа</h2>
+        </div>
+        <EmptyState label="Услуги пока не заведены." />
+        {isServiceFormOpen ? (
+          <ServiceFormDialog
+            initialService={editingService}
+            key={editingService?.slug ?? "new-service"}
+            onClose={closeServiceForm}
+            onSave={saveServiceForm}
+          />
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <div className="admin-split-view admin-content-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="services-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="services-heading">Каталог услуг</h2>
+            <p>Название, slug, SEO, локали, обложка и видимость услуги на сайте.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры услуг">
+            <button aria-pressed={statusFilter === "all"} onClick={() => setStatusFilter("all")} type="button">
+              Все
+            </button>
+            <button aria-pressed={statusFilter === "Опубликована"} onClick={() => setStatusFilter("Опубликована")} type="button">
+              Опубликованы
+            </button>
+            <button aria-pressed={statusFilter === "Черновик"} onClick={() => setStatusFilter("Черновик")} type="button">
+              Черновики
+            </button>
+            <button aria-pressed={statusFilter === "Скрыта"} onClick={() => setStatusFilter("Скрыта")} type="button">
+              Скрытые
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-table-scroll">
+          <table className="admin-data-table">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Slug</th>
+                <th>Категория</th>
+                <th>Длительность</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredServices.map((service) => (
+                <tr aria-selected={service.slug === selectedService.slug} key={service.slug}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openService(service)} type="button">
+                      {service.name}
+                    </button>
+                  </td>
+                  <td className="admin-tabular">{service.slug}</td>
+                  <td>{service.category}</td>
+                  <td>{service.duration}</td>
+                  <td>
+                    <span className={statusClass(service.status)}>{service.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredServices.length === 0 ? <EmptyState label="Услуги не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали услуги">
+        <span className="admin-kicker">Услуга</span>
+        <div className="admin-detail-heading">
+          <h2>{selectedService.name}</h2>
+          <div className="admin-detail-actions">
+            <button className="admin-text-action" onClick={() => openServiceEdit(selectedService)} type="button">
+              Редактировать
+            </button>
+          </div>
+        </div>
+        <dl className="admin-detail-list">
+          <div>
+            <dt>Slug</dt>
+            <dd>{selectedService.slug}</dd>
+          </div>
+          <div>
+            <dt>Описание</dt>
+            <dd>{selectedService.summary || "Описание пока пустое."}</dd>
+          </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>
+              <span className={statusClass(selectedService.status)}>{selectedService.status}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Категория</dt>
+            <dd>{selectedService.category}</dd>
+          </div>
+          <div>
+            <dt>Длительность</dt>
+            <dd>{selectedService.duration}</dd>
+          </div>
+          <div>
+            <dt>SEO title</dt>
+            <dd>{selectedService.seoTitle}</dd>
+          </div>
+          <div>
+            <dt>Обложка</dt>
+            <dd>{selectedService.coverImage || "Не выбрана"}</dd>
+          </div>
+          <div>
+            <dt>Локали</dt>
+            <dd>{selectedService.locales.join(", ")}</dd>
+          </div>
+        </dl>
+
+        <section className="admin-client-section">
+          <h3>Варианты цены</h3>
+          {servicePriceRows.length > 0 ? (
+            <ul className="admin-client-history">
+              {servicePriceRows.map((price) => (
+                <li key={price.id}>
+                  <span>{price.durationMinutes} мин</span>
+                  <strong>{priceValue(price)}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>Для этой услуги пока нет цены.</p>
+          )}
+        </section>
+      </aside>
+
+      {isServiceFormOpen ? (
+        <ServiceFormDialog
+          initialService={editingService}
+          key={editingService?.slug ?? "new-service"}
+          onClose={closeServiceForm}
+          onSave={saveServiceForm}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function PriceWorkspace({
+  isPriceCreateOpen,
+  onClosePriceCreate,
+  onSavePrice,
+  prices,
+  query,
+  services,
+}: {
+  isPriceCreateOpen: boolean;
+  onClosePriceCreate: () => void;
+  onSavePrice: (price: PriceRecord, originalId?: string) => void;
+  prices: PriceRecord[];
+  query: string;
+  services: ServiceRecord[];
+}) {
+  const [selectedId, setSelectedId] = useState(prices[0]?.id ?? "");
+  const [editingPrice, setEditingPrice] = useState<PriceRecord | undefined>();
+  const [statusFilter, setStatusFilter] = useState<"all" | PriceStatus>("all");
+  const filteredPrices = prices
+    .filter((price) => statusFilter === "all" || price.status === statusFilter)
+    .filter((price) => {
+      const service = findServiceBySlug(services, price.serviceSlug);
+
+      return matchesSearch(
+        [priceLabel(price, services), service?.category, price.durationMinutes, price.priceEur, price.status, price.updatedAt, price.note],
+        query,
+      );
+    })
+    .sort((first, second) => first.order - second.order);
+  const selectedPrice =
+    filteredPrices.find((price) => price.id === selectedId) ??
+    filteredPrices[0] ??
+    prices.find((price) => price.id === selectedId) ??
+    prices[0];
+  const selectedService = selectedPrice ? findServiceBySlug(services, selectedPrice.serviceSlug) : undefined;
+  const isPriceFormOpen = isPriceCreateOpen || Boolean(editingPrice);
+
+  function openPrice(price: PriceRecord) {
+    setSelectedId(price.id);
+  }
+
+  function openPriceEdit(price: PriceRecord) {
+    onClosePriceCreate();
+    setEditingPrice(price);
+  }
+
+  function closePriceForm() {
+    setEditingPrice(undefined);
+    onClosePriceCreate();
+  }
+
+  function savePriceForm(price: PriceRecord, originalId?: string) {
+    onSavePrice(price, originalId);
+    setSelectedId(price.id);
+    closePriceForm();
+  }
+
+  if (!selectedPrice) {
+    return (
+      <section className="admin-panel admin-panel-large" aria-labelledby="price-heading">
+        <div className="admin-panel-head">
+          <h2 id="price-heading">Прайс</h2>
+        </div>
+        <EmptyState label="Цены пока не заведены." />
+        {isPriceFormOpen ? (
+          <PriceFormDialog
+            initialPrice={editingPrice}
+            key={editingPrice?.id ?? "new-price"}
+            onClose={closePriceForm}
+            onSave={savePriceForm}
+            services={services}
+          />
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <div className="admin-split-view admin-content-workspace">
+      <section className="admin-panel admin-panel-large" aria-labelledby="price-heading">
+        <div className="admin-panel-head">
+          <div>
+            <h2 id="price-heading">Прайс</h2>
+            <p>Варианты услуги, длительность, цена в евро, активность и порядок вывода.</p>
+          </div>
+          <div className="admin-filter-row" aria-label="Фильтры прайса">
+            <button aria-pressed={statusFilter === "all"} onClick={() => setStatusFilter("all")} type="button">
+              Все
+            </button>
+            <button aria-pressed={statusFilter === "Активна"} onClick={() => setStatusFilter("Активна")} type="button">
+              Активные
+            </button>
+            <button aria-pressed={statusFilter === "Скрыта"} onClick={() => setStatusFilter("Скрыта")} type="button">
+              Скрытые
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-table-scroll">
+          <table className="admin-data-table">
+            <thead>
+              <tr>
+                <th>Услуга</th>
+                <th>Длительность</th>
+                <th>Цена</th>
+                <th>Статус</th>
+                <th>Порядок</th>
+                <th>Обновлено</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPrices.map((price) => (
+                <tr aria-selected={price.id === selectedPrice.id} key={price.id}>
+                  <td>
+                    <button className="admin-row-action" onClick={() => openPrice(price)} type="button">
+                      {priceLabel(price, services)}
+                    </button>
+                  </td>
+                  <td className="admin-tabular">{price.durationMinutes} мин</td>
+                  <td className="admin-tabular">{priceValue(price)}</td>
+                  <td>
+                    <span className={statusClass(price.status)}>{price.status}</span>
+                  </td>
+                  <td className="admin-tabular">{price.order}</td>
+                  <td className="admin-tabular">{price.updatedAt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredPrices.length === 0 ? <EmptyState label="Цены не найдены." /> : null}
+      </section>
+
+      <aside className="admin-panel admin-detail-panel" aria-label="Детали цены">
+        <span className="admin-kicker">Цена</span>
+        <div className="admin-detail-heading">
+          <h2>{priceLabel(selectedPrice, services)}</h2>
+          <div className="admin-detail-actions">
+            <button className="admin-text-action" onClick={() => openPriceEdit(selectedPrice)} type="button">
+              Редактировать
+            </button>
+          </div>
+        </div>
+        <dl className="admin-detail-list">
+          <div>
+            <dt>Услуга</dt>
+            <dd>{selectedService?.name ?? selectedPrice.serviceSlug}</dd>
+          </div>
+          <div>
+            <dt>Категория</dt>
+            <dd>{selectedService?.category ?? "Не указана"}</dd>
+          </div>
+          <div>
+            <dt>Цена</dt>
+            <dd>{priceValue(selectedPrice)}</dd>
+          </div>
+          <div>
+            <dt>Длительность</dt>
+            <dd>{selectedPrice.durationMinutes} мин</dd>
+          </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>
+              <span className={statusClass(selectedPrice.status)}>{selectedPrice.status}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Порядок</dt>
+            <dd>{selectedPrice.order}</dd>
+          </div>
+          <div>
+            <dt>Валюта</dt>
+            <dd>EUR</dd>
+          </div>
+          <div>
+            <dt>Заметка</dt>
+            <dd>{selectedPrice.note || "Заметка по цене пока пустая."}</dd>
+          </div>
+        </dl>
+      </aside>
+
+      {isPriceFormOpen ? (
+        <PriceFormDialog
+          initialPrice={editingPrice}
+          key={editingPrice?.id ?? "new-price"}
+          onClose={closePriceForm}
+          onSave={savePriceForm}
+          services={services}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function CalendarWorkspace({
   appointments,
   clients,
@@ -2212,38 +3057,54 @@ function Workspace({
   clients,
   isCertificateCreateOpen,
   isClientCreateOpen,
+  isPriceCreateOpen,
+  isServiceCreateOpen,
   onCancelAppointment,
   onCalendarCreateIntent,
   onCloseCertificateCreate,
   onCloseClientCreate,
+  onClosePriceCreate,
+  onCloseServiceCreate,
   onEditAppointment,
   onSaveCertificate,
   onSaveClient,
   onSaveClientNote,
+  onSavePrice,
+  onSaveService,
   onUpdateCertificateStatus,
+  prices,
   query,
   role,
   section,
   selectedClientName,
+  services,
 }: {
   appointments: Appointment[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
   isCertificateCreateOpen: boolean;
   isClientCreateOpen: boolean;
+  isPriceCreateOpen: boolean;
+  isServiceCreateOpen: boolean;
   onCancelAppointment: (appointment: Appointment) => void;
   onCalendarCreateIntent: () => void;
   onCloseCertificateCreate: () => void;
   onCloseClientCreate: () => void;
+  onClosePriceCreate: () => void;
+  onCloseServiceCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
+  onSavePrice: (price: PriceRecord, originalId?: string) => void;
+  onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
   onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
+  prices: PriceRecord[];
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
   selectedClientName?: string;
+  services: ServiceRecord[];
 }) {
   if (section === "dashboard") {
     return <DashboardWorkspace certificates={certificates} query={query} role={role} />;
@@ -2282,6 +3143,32 @@ function Workspace({
     );
   }
 
+  if (section === "services") {
+    return (
+      <ServicesWorkspace
+        isServiceCreateOpen={isServiceCreateOpen}
+        onCloseServiceCreate={onCloseServiceCreate}
+        onSaveService={onSaveService}
+        prices={prices}
+        query={query}
+        services={services}
+      />
+    );
+  }
+
+  if (section === "price") {
+    return (
+      <PriceWorkspace
+        isPriceCreateOpen={isPriceCreateOpen}
+        onClosePriceCreate={onClosePriceCreate}
+        onSavePrice={onSavePrice}
+        prices={prices}
+        query={query}
+        services={services}
+      />
+    );
+  }
+
   if (section === "calendar") {
     return (
       <CalendarWorkspace
@@ -2313,8 +3200,12 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
   const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows());
   const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows());
+  const [services, setServices] = useState<ServiceRecord[]>(() => buildInitialServiceRows());
+  const [prices, setPrices] = useState<PriceRecord[]>(() => buildInitialPriceRows());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
+  const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
+  const [isPriceCreateOpen, setIsPriceCreateOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
@@ -2355,6 +3246,8 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setCancellingAppointment(undefined);
       setIsActionOpen(false);
       setIsCertificateCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(false);
       setIsClientCreateOpen(true);
       return;
     }
@@ -2363,12 +3256,36 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
       setCancellingAppointment(undefined);
       setIsActionOpen(false);
       setIsClientCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(false);
       setIsCertificateCreateOpen(true);
+      return;
+    }
+
+    if (activeSection === "services") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
+      setIsClientCreateOpen(false);
+      setIsPriceCreateOpen(false);
+      setIsServiceCreateOpen(true);
+      return;
+    }
+
+    if (activeSection === "price") {
+      setCancellingAppointment(undefined);
+      setIsActionOpen(false);
+      setIsCertificateCreateOpen(false);
+      setIsClientCreateOpen(false);
+      setIsServiceCreateOpen(false);
+      setIsPriceCreateOpen(true);
       return;
     }
 
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsPriceCreateOpen(false);
+    setIsServiceCreateOpen(false);
     setIsActionOpen(true);
   }
 
@@ -2376,6 +3293,8 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setCancellingAppointment(undefined);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsPriceCreateOpen(false);
+    setIsServiceCreateOpen(false);
     setEditingAppointment(appointment);
     setIsActionOpen(true);
   }
@@ -2385,6 +3304,8 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsActionOpen(false);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsPriceCreateOpen(false);
+    setIsServiceCreateOpen(false);
     setCancellingAppointment(appointment);
   }
 
@@ -2394,6 +3315,8 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setEditingAppointment(undefined);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsPriceCreateOpen(false);
+    setIsServiceCreateOpen(false);
     setIsActionOpen(false);
   }
 
@@ -2402,6 +3325,8 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     setIsActionOpen(false);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
+    setIsPriceCreateOpen(false);
+    setIsServiceCreateOpen(false);
     setEditingAppointment(undefined);
   }
 
@@ -2485,6 +3410,54 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
     );
   }
 
+  function saveServiceRecord(service: ServiceRecord, originalSlug?: string) {
+    if (originalSlug && normalizeSearch(originalSlug) !== normalizeSearch(service.slug)) {
+      setPrices((current) =>
+        current.map((price) =>
+          normalizeSearch(price.serviceSlug) === normalizeSearch(originalSlug) ? { ...price, serviceSlug: service.slug } : price,
+        ),
+      );
+    }
+
+    setServices((current) => {
+      const originalKey = originalSlug ? normalizeSearch(originalSlug) : "";
+      const nextKey = normalizeSearch(service.slug);
+      const existingIndex = current.findIndex((currentService) => {
+        if (originalKey) {
+          return normalizeSearch(currentService.slug) === originalKey;
+        }
+
+        return normalizeSearch(currentService.slug) === nextKey;
+      });
+
+      if (existingIndex === -1) {
+        return [...current, service];
+      }
+
+      return current.map((currentService, index) => (index === existingIndex ? service : currentService));
+    });
+  }
+
+  function savePriceRecord(price: PriceRecord, originalId?: string) {
+    setPrices((current) => {
+      const originalKey = originalId ? normalizeSearch(originalId) : "";
+      const nextKey = normalizeSearch(price.id);
+      const existingIndex = current.findIndex((currentPrice) => {
+        if (originalKey) {
+          return normalizeSearch(currentPrice.id) === originalKey;
+        }
+
+        return normalizeSearch(currentPrice.id) === nextKey;
+      });
+
+      if (existingIndex === -1) {
+        return [...current, price];
+      }
+
+      return current.map((currentPrice, index) => (index === existingIndex ? price : currentPrice));
+    });
+  }
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -2554,19 +3527,27 @@ export function AdminShell({ activeSection, calendarAction, role, selectedClient
           clients={clients}
           isCertificateCreateOpen={isCertificateCreateOpen}
           isClientCreateOpen={isClientCreateOpen}
+          isPriceCreateOpen={isPriceCreateOpen}
+          isServiceCreateOpen={isServiceCreateOpen}
           onCancelAppointment={openAppointmentCancel}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
           onCloseCertificateCreate={() => setIsCertificateCreateOpen(false)}
           onCloseClientCreate={() => setIsClientCreateOpen(false)}
+          onClosePriceCreate={() => setIsPriceCreateOpen(false)}
+          onCloseServiceCreate={() => setIsServiceCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
           onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}
           onSaveClientNote={saveClientNote}
+          onSavePrice={savePriceRecord}
+          onSaveService={saveServiceRecord}
           onUpdateCertificateStatus={updateCertificateStatus}
+          prices={prices}
           query={query}
           role={role}
           section={activeSection}
           selectedClientName={selectedClientName}
+          services={services}
         />
 
         {isCalendarActionDialogOpen ? (

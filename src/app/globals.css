@@ -3766,6 +3766,7 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-certificate-form-grid,
+.admin-content-form-grid,
 .admin-client-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -4055,6 +4056,7 @@ button.admin-calendar-item[aria-pressed="true"] {
   }
 
   .admin-certificate-form-grid,
+  .admin-content-form-grid,
   .admin-client-form-grid {
     grid-template-columns: 1fr;
   }
