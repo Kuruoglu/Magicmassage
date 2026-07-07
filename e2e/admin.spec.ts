@@ -192,6 +192,41 @@ test("calendar week and list modes are distinct", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Olena K./ })).toBeVisible();
 });
 
+test("calendar week view uses dense desktop columns", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Неделя" }).click();
+
+  const weekGrid = page.getByRole("grid", { name: "Неделя 6-12 июля" });
+  await expect(weekGrid).toBeVisible();
+
+  const weekMetrics = await weekGrid.evaluate((grid) => {
+    const dayCards = Array.from(grid.querySelectorAll(".admin-calendar-week-day"));
+    const dayHeads = Array.from(grid.querySelectorAll(".admin-week-day-head"));
+    const appointments = Array.from(grid.querySelectorAll(".admin-week-appointment"));
+    const firstRowTop = Math.round(dayCards[0]?.getBoundingClientRect().top ?? 0);
+
+    return {
+      columnCount: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
+      allDaysOnOneRow: dayCards.every((card) => Math.round(card.getBoundingClientRect().top) === firstRowTop),
+      maxHeadHeight: Math.max(...dayHeads.map((head) => Math.round(head.getBoundingClientRect().height))),
+      maxAppointmentHeight: Math.max(...appointments.map((appointment) => Math.round(appointment.getBoundingClientRect().height))),
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+
+  expect(weekMetrics).toEqual({
+    allDaysOnOneRow: true,
+    columnCount: 7,
+    maxAppointmentHeight: expect.any(Number),
+    maxHeadHeight: expect.any(Number),
+    overflow: false,
+  });
+  expect(weekMetrics.maxHeadHeight).toBeLessThanOrEqual(64);
+  expect(weekMetrics.maxAppointmentHeight).toBeLessThanOrEqual(74);
+});
+
 test("calendar can create a new appointment", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 

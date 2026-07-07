@@ -603,6 +603,8 @@ describe("AdminShell", () => {
     expect(within(weekGrid).getByText("10 июл")).toBeInTheDocument();
     expect(within(weekGrid).getByText("Анна Петрова")).toBeInTheDocument();
     expect(within(weekGrid).getByText("SPA процедура")).toBeInTheDocument();
+    expect(within(weekGrid).getByText("2 зап.").closest(".admin-week-day-stats")).toBeInTheDocument();
+    expect(within(weekGrid).getByText("Анна Петрова").closest(".admin-week-appointment-main")).toBeInTheDocument();
   });
 
   it("shows an empty state when a month day has no appointments", async () => {

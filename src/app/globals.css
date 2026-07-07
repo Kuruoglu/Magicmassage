@@ -3651,9 +3651,10 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-calendar-week-grid {
+  align-items: start;
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   min-width: 0;
   overflow-x: visible;
   padding-bottom: 4px;
@@ -3664,12 +3665,13 @@ button.admin-calendar-item[aria-pressed="true"] {
   border: 1px solid rgba(124, 77, 161, 0.14);
   border-radius: 8px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  padding: 10px;
+  padding: 8px;
 }
 
 .admin-week-day-head {
+  align-content: start;
   background: var(--admin-surface);
   border: 1px solid rgba(124, 77, 161, 0.14);
   border-radius: 8px;
@@ -3678,19 +3680,29 @@ button.admin-calendar-item[aria-pressed="true"] {
   display: grid;
   font: inherit;
   gap: 4px;
-  min-height: 70px;
-  padding: 8px;
+  min-height: 54px;
+  padding: 7px;
   text-align: left;
 }
 
-.admin-week-day-head strong,
+.admin-week-day-date,
 .admin-week-appointment strong {
   color: var(--admin-text);
 }
 
-.admin-week-day-head span,
-.admin-week-day-head small,
-.admin-week-appointment span,
+.admin-week-day-stats {
+  color: var(--admin-muted);
+  display: flex;
+  flex-wrap: nowrap;
+  font-size: 0.68rem;
+  font-weight: 800;
+  gap: 6px;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.admin-week-day-stats span,
+.admin-week-appointment-service,
 .admin-week-empty {
   color: var(--admin-muted);
   font-size: 0.74rem;
@@ -3698,12 +3710,17 @@ button.admin-calendar-item[aria-pressed="true"] {
   overflow-wrap: anywhere;
 }
 
+.admin-week-day-stats span {
+  white-space: nowrap;
+}
+
 .admin-week-appointment-list {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .admin-week-appointment {
+  align-items: start;
   background: var(--admin-surface);
   border: 1px solid rgba(124, 77, 161, 0.14);
   border-radius: 8px;
@@ -3711,10 +3728,45 @@ button.admin-calendar-item[aria-pressed="true"] {
   cursor: pointer;
   display: grid;
   font: inherit;
-  gap: 4px;
+  gap: 5px;
+  grid-template-columns: 1fr;
+  min-height: 58px;
   min-width: 0;
-  padding: 8px;
+  padding: 7px;
   text-align: left;
+}
+
+.admin-week-appointment time {
+  color: var(--admin-text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.admin-week-appointment-main {
+  align-items: baseline;
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.admin-week-appointment-main strong {
+  flex: 1;
+  font-size: 0.82rem;
+  line-height: 1.18;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-week-appointment-service {
+  display: -webkit-box;
+  font-size: 0.72rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.25;
+  overflow: hidden;
 }
 
 .admin-week-appointment:hover,
@@ -4239,6 +4291,10 @@ button.admin-calendar-item[aria-pressed="true"] {
 
   .admin-calendar-month-grid {
     gap: 3px;
+  }
+
+  .admin-calendar-week-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 
   .admin-calendar-context-note {

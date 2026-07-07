@@ -4679,14 +4679,24 @@ function CalendarWorkspace({
             {weekDays.map((day) => {
               const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
               const countLabel = appointmentCountLabel(dayAppointments.length);
-              const freeLabel = freeSlotLabel(freeSlotCount(dayAppointments.length, dailySlotCapacity));
+              const freeCount = freeSlotCount(dayAppointments.length, dailySlotCapacity);
+              const freeLabel = freeSlotLabel(freeCount);
+              const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
+              const compactFreeLabel = compactFreeSlotLabel(freeCount);
 
               return (
                 <section className="admin-calendar-week-day" key={day.date} role="gridcell">
-                  <button className="admin-week-day-head" onClick={() => selectDate(day.date, dayAppointments, "day")} type="button">
-                    <strong>{formatCalendarShortDay(day.date)}</strong>
-                    <span>{countLabel}</span>
-                    <small>{freeLabel}</small>
+                  <button
+                    aria-label={`${formatCalendarShortDay(day.date)}, ${countLabel}, ${freeLabel}`}
+                    className="admin-week-day-head"
+                    onClick={() => selectDate(day.date, dayAppointments, "day")}
+                    type="button"
+                  >
+                    <strong className="admin-week-day-date">{formatCalendarShortDay(day.date)}</strong>
+                    <span className="admin-week-day-stats">
+                      <span>{compactCountLabel}</span>
+                      <span>{compactFreeLabel}</span>
+                    </span>
                   </button>
                   <div className="admin-week-appointment-list">
                     {dayAppointments.length > 0 ? (
@@ -4701,9 +4711,11 @@ function CalendarWorkspace({
                             onClick={() => selectAppointment(appointment)}
                             type="button"
                           >
-                            <time className="admin-tabular">{appointment.time}</time>
-                            <strong>{appointment.client}</strong>
-                            <span>{appointment.service}</span>
+                            <span className="admin-week-appointment-main">
+                              <time className="admin-tabular">{appointment.time}</time>
+                              <strong>{appointment.client}</strong>
+                            </span>
+                            <span className="admin-week-appointment-service">{appointment.service}</span>
                           </button>
                         );
                       })
