@@ -28,6 +28,7 @@ type AdminShellProps = {
   activeSection: AdminSectionId;
   calendarAction?: AdminCalendarAction;
   role: AdminRoleId;
+  selectedAppointmentKey?: string;
   selectedCalendarDate?: string;
   selectedClientName?: string;
   selectedCertificateCode?: string;
@@ -1273,7 +1274,7 @@ function calendarDateHref(date: string, role: AdminRoleId, clientName?: string) 
 }
 
 function calendarAppointmentHref(appointment: Appointment, role: AdminRoleId, clientName?: string) {
-  return calendarDateHref(appointment.date, role, clientName);
+  return `${calendarDateHref(appointment.date, role, clientName)}&appointment=${encodeURIComponent(appointmentKey(appointment))}`;
 }
 
 function certificateClientHref(clientName: string, role: AdminRoleId) {
@@ -7087,6 +7088,7 @@ export function AdminShell({
   activeSection,
   calendarAction,
   role,
+  selectedAppointmentKey,
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
@@ -7109,14 +7111,26 @@ export function AdminShell({
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows());
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord());
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers());
-  const selectedCalendarRouteDate = isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : undefined;
+  const selectedRouteAppointment = selectedAppointmentKey
+    ? calendarAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentKey)
+    : undefined;
+  const selectedCalendarRouteDate = isCalendarMonthDate(selectedCalendarDate)
+    ? selectedCalendarDate
+    : selectedRouteAppointment?.date;
+  const routeCalendarAppointmentFocus = selectedRouteAppointment
+    ? {
+        appointmentKey: appointmentKey(selectedRouteAppointment),
+        date: selectedRouteAppointment.date,
+        routeDate: selectedCalendarRouteDate,
+      }
+    : undefined;
   const [calendarSelection, setCalendarSelection] = useState(() => ({
     date: selectedCalendarRouteDate ?? "2026-07-06",
     routeDate: selectedCalendarRouteDate,
   }));
   const [calendarAppointmentFocus, setCalendarAppointmentFocus] = useState<CalendarAppointmentFocus | undefined>();
   const activeCalendarAppointmentFocus =
-    calendarAppointmentFocus?.routeDate === selectedCalendarRouteDate ? calendarAppointmentFocus : undefined;
+    calendarAppointmentFocus?.routeDate === selectedCalendarRouteDate ? calendarAppointmentFocus : routeCalendarAppointmentFocus;
   const activeCalendarDate =
     calendarSelection.routeDate === selectedCalendarRouteDate
       ? calendarSelection.date

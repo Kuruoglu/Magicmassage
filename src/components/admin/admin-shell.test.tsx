@@ -174,7 +174,7 @@ describe("AdminShell", () => {
       within(historySection as HTMLElement).getByRole("link", { name: "Открыть запись 8 июля, 15:00" }),
     ).toHaveAttribute(
       "href",
-      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
     );
     expect(within(card).getAllByText(/Предпочитает вечерние слоты/).length).toBeGreaterThan(0);
   });
@@ -568,7 +568,7 @@ describe("AdminShell", () => {
     expect(within(nextAppointment).getByText("Уточнить шею и плечи перед началом сеанса.")).toBeInTheDocument();
     expect(within(nextAppointment).getByRole("link", { name: "Открыть запись" })).toHaveAttribute(
       "href",
-      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
     );
   });
 
@@ -588,7 +588,7 @@ describe("AdminShell", () => {
     expect(within(profile).getByText(/вечерние слоты и сильное давление/)).toBeInTheDocument();
     expect(within(profile).getByRole("link", { name: "Открыть ближайшую запись" })).toHaveAttribute(
       "href",
-      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
     );
     expect(within(profile).getByRole("link", { name: "Открыть активный сертификат" })).toHaveAttribute(
       "href",
@@ -647,7 +647,7 @@ describe("AdminShell", () => {
     expect(within(feed).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
     expect(within(feed).getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
       "href",
-      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
     );
     expect(within(feed).getByRole("link", { name: "Открыть сертификат MMN-2407-1023" })).toHaveAttribute(
       "href",
@@ -851,6 +851,25 @@ describe("AdminShell", () => {
     await user.click(within(details).getByRole("button", { name: "Закрыть" }));
 
     expect(screen.queryByRole("dialog", { name: "Детали выбранной записи" })).not.toBeInTheDocument();
+  });
+
+  it("opens route-focused appointment details from the appointment query", () => {
+    render(
+      <AdminShell
+        activeSection="calendar"
+        role="owner"
+        selectedAppointmentKey="demo-3"
+        selectedCalendarDate="2026-07-08"
+        selectedClientName="Olena K."
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "8 июля" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Фильтр календаря по клиенту")).toHaveTextContent("Показаны записи клиента Olena K.");
+    const details = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+    expect(within(details).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(details).getByText("Deep tissue massage")).toBeInTheDocument();
+    expect(within(details).getByText("15:00")).toBeInTheDocument();
   });
 
   it("links from a calendar appointment to the matching client card", async () => {

@@ -14,6 +14,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const role = resolveAdminRole(firstQueryValue(query.role));
   const activeSection = resolveAdminSection(firstQueryValue(query.section), role);
   const calendarAction = firstQueryValue(query.action) === "create" ? "create" : undefined;
+  const selectedAppointmentKey = firstQueryValue(query.appointment);
   const selectedCalendarDate = firstQueryValue(query.date);
   const selectedCertificateCode = firstQueryValue(query.certificate);
   const selectedClientName = firstQueryValue(query.client);
@@ -23,6 +24,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       activeSection={activeSection}
       calendarAction={calendarAction}
       role={role}
+      selectedAppointmentKey={selectedAppointmentKey}
       selectedCalendarDate={selectedCalendarDate}
       selectedCertificateCode={selectedCertificateCode}
       selectedClientName={selectedClientName}

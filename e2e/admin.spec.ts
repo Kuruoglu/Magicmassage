@@ -475,7 +475,7 @@ test("client profile shows the next calendar appointment", async ({ page }) => {
   await expect(nextAppointment.getByText("Уточнить шею и плечи перед началом сеанса.")).toBeVisible();
   await expect(nextAppointment.getByRole("link", { name: "Открыть запись" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
   );
 });
 
@@ -493,7 +493,7 @@ test("client profile summarizes related work records", async ({ page }) => {
   await expect(profile.getByText(/вечерние слоты и сильное давление/)).toBeVisible();
   await expect(profile.getByRole("link", { name: "Открыть ближайшую запись" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
   );
   await expect(profile.getByRole("link", { name: "Открыть активный сертификат" })).toHaveAttribute(
     "href",
@@ -542,7 +542,7 @@ test("client profile filters the working activity feed", async ({ page }) => {
   await expect(feed.getByText(/Предпочитает вечерние слоты/)).toBeVisible();
   await expect(feed.getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
   );
   await expect(feed.getByRole("link", { name: "Открыть сертификат MMN-2407-1023" })).toHaveAttribute(
     "href",
@@ -589,7 +589,14 @@ test("client profile links visit history and certificates to their workspaces", 
   await expect(page).toHaveURL(/section=calendar/);
   await expect(page).toHaveURL(/date=2026-07-08/);
   await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page).toHaveURL(/appointment=demo-3/);
   await expect(page.getByLabel("Фильтр календаря по клиенту")).toContainText("Показаны записи клиента Olena K.");
+  const focusedAppointment = page.getByLabel("Детали выбранной записи");
+  await expect(focusedAppointment.getByRole("heading", { name: "Olena K." })).toBeVisible();
+  await expect(focusedAppointment.getByText("Deep tissue massage")).toBeVisible();
+  await expect(focusedAppointment.getByText("15:00")).toBeVisible();
+  await focusedAppointment.getByRole("button", { name: "Закрыть" }).click();
+  await expect(focusedAppointment).toHaveCount(0);
   await page.getByRole("button", { name: "Список" }).click();
   await expect(page.getByRole("button", { name: /Olena K.*8 июля.*Deep tissue massage/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
