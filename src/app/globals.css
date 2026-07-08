@@ -3073,10 +3073,11 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   gap: 10px;
   padding: 12px;
   text-align: left;
+  text-decoration: none;
   width: 100%;
 }
 
-.admin-mobile-client-card[aria-pressed="true"] {
+.admin-mobile-client-card[aria-current="page"] {
   background: rgba(124, 77, 161, 0.08);
 }
 

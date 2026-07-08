@@ -106,7 +106,10 @@ describe("AdminShell", () => {
 
     await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "Olena");
 
-    expect(within(screen.getByRole("table")).getByRole("button", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Olena K." })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Olena%20K.",
+    );
     expect(screen.queryByText("Maria Georgieva")).not.toBeInTheDocument();
   });
 
@@ -120,11 +123,16 @@ describe("AdminShell", () => {
     await user.click(within(filters).getByRole("button", { name: "BG" }));
 
     expect(within(filters).getByRole("button", { name: "BG" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(table).getByRole("button", { name: "Maria Georgieva" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Анна Петрова" })).not.toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Olena K." })).not.toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Maria Georgieva" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Maria%20Georgieva",
+    );
+    expect(within(table).queryByRole("link", { name: "Анна Петрова" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Olena K." })).not.toBeInTheDocument();
 
-    await user.click(within(table).getByRole("button", { name: "Maria Georgieva" }));
+    const mariaLink = within(table).getByRole("link", { name: "Maria Georgieva" });
+    mariaLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(mariaLink);
     expect(within(screen.getByRole("dialog", { name: "Карточка клиента" })).getByRole("heading", { name: "Maria Georgieva" })).toBeInTheDocument();
     await user.click(within(screen.getByRole("dialog", { name: "Карточка клиента" })).getByRole("button", { name: "Закрыть" }));
 
@@ -137,7 +145,7 @@ describe("AdminShell", () => {
     expect(within(table).getByRole("row", { name: /Анна Петрова/ })).toHaveTextContent("В активных: 7 визитов");
     expect(within(table).getByRole("row", { name: /Olena K./ })).toHaveTextContent("Активный клиент");
     expect(within(table).getByRole("row", { name: /Olena K./ })).toHaveTextContent("В активных: 5 визитов");
-    expect(within(table).queryByRole("button", { name: "Maria Georgieva" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Maria Georgieva" })).not.toBeInTheDocument();
   });
 
   it("explains how the active client filter is calculated", () => {
@@ -155,6 +163,10 @@ describe("AdminShell", () => {
     expect(within(mobileList).getByText("3 визита")).toBeInTheDocument();
     expect(within(mobileList).getByText("5 визитов")).toBeInTheDocument();
     expect(within(mobileList).getByText("7 визитов")).toBeInTheDocument();
+    expect(within(mobileList).getByRole("link", { name: /Olena K./ })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Olena%20K.",
+    );
   });
 
   it("shows the selected client detail card from the client query", () => {
@@ -777,7 +789,10 @@ describe("AdminShell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
 
     expect(screen.queryByRole("dialog", { name: "Новый клиент" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("button", { name: "Ирина Тестова" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Ирина Тестова" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=%D0%98%D1%80%D0%B8%D0%BD%D0%B0%20%D0%A2%D0%B5%D1%81%D1%82%D0%BE%D0%B2%D0%B0",
+    );
 
     const card = screen.getByRole("dialog", { name: "Карточка клиента" });
     expect(within(card).getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
@@ -828,7 +843,7 @@ describe("AdminShell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
 
     expect(screen.queryByRole("dialog", { name: "Редактировать клиента" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "Olena K." })).toHaveLength(1);
+    expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Olena K." })).toHaveLength(1);
     expect(within(card).getByText("+359 87 333 4499")).toBeInTheDocument();
     expect(within(card).getByText("olena.updated@example.com")).toBeInTheDocument();
     expect(within(card).getAllByText("Email").length).toBeGreaterThan(0);

@@ -679,7 +679,10 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("button", { name: "Ирина Тестова" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Ирина Тестова" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=%D0%98%D1%80%D0%B8%D0%BD%D0%B0%20%D0%A2%D0%B5%D1%81%D1%82%D0%BE%D0%B2%D0%B0",
+  );
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await expect(card.getByRole("heading", { name: "Ирина Тестова" })).toBeVisible();
@@ -1098,14 +1101,20 @@ test("client filters update the table and profile certificate block", async ({ p
   await expect(page.getByRole("button", { name: "BG" })).toHaveAttribute("aria-pressed", "true");
   await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toBeVisible();
   await expect(table.getByRole("row", { name: /Olena K./ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Maria Georgieva" }).click();
+  await expect(table.getByRole("link", { name: "Maria Georgieva" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=Maria%20Georgieva",
+  );
+  await table.getByRole("link", { name: "Maria Georgieva" }).click();
+  await expect(page).toHaveURL(/client=Maria%20Georgieva/);
   await expect(card.getByRole("heading", { name: "Maria Georgieva" })).toBeVisible();
 
   await card.getByRole("button", { name: "Закрыть" }).click();
   await expect(card).toHaveCount(0);
 
   await page.getByRole("button", { name: "Все" }).click();
-  await page.getByRole("button", { name: "Olena K." }).click();
+  await table.getByRole("link", { name: "Olena K." }).click();
+  await expect(page).toHaveURL(/client=Olena%20K\./);
 
   const certificatesSection = card.getByRole("heading", { name: "Сертификаты" }).locator("..");
   await expect(certificatesSection).toBeVisible();
@@ -1123,7 +1132,8 @@ test("client filters update the table and profile certificate block", async ({ p
   await expect(table.getByRole("row", { name: /Анна Петрова.*В активных: 7 визитов/ })).toBeVisible();
   await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Olena K." }).click();
+  await table.getByRole("link", { name: "Olena K." }).click();
+  await expect(page).toHaveURL(/client=Olena%20K\./);
   await expect(card).toHaveClass(/admin-drawer-panel/);
   await expect(card.getByLabel("Активность клиента")).toContainText("В активных: 5 визитов");
   await expect(card.getByLabel("Активность клиента")).toContainText("Следующий визит: 15 Jul 11:30");
@@ -1140,6 +1150,10 @@ test("mobile client active filter shows status cards without horizontal scrollin
   await expect(page.getByRole("table")).toHaveCount(0);
 
   const annaCard = mobileList.getByRole("listitem").filter({ hasText: "Анна Петрова" });
+  await expect(annaCard.getByRole("link", { name: /Анна Петрова/ })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=%D0%90%D0%BD%D0%BD%D0%B0%20%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2%D0%B0",
+  );
   await expect(annaCard.getByText("Активный клиент")).toBeVisible();
   await expect(annaCard.locator(".admin-mobile-client-meta").getByText("7 визитов", { exact: true })).toBeVisible();
   await expect(annaCard.getByText("В активных: 7 визитов")).toBeVisible();

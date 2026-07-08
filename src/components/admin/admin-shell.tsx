@@ -4169,9 +4169,13 @@ function ClientsWorkspace({
                 return (
                   <tr aria-selected={client.name === selectedClient.name} key={client.phone}>
                     <td>
-                      <button className="admin-row-action" onClick={() => openClient(client.name)} type="button">
+                      <Link
+                        className="admin-row-action admin-row-link"
+                        href={clientProfileHref(client.name, role)}
+                        onClick={() => openClient(client.name)}
+                      >
                         {client.name}
-                      </button>
+                      </Link>
                     </td>
                     <td className="admin-tabular">{client.phone}</td>
                     <td>{client.language.toUpperCase()}</td>
@@ -4196,11 +4200,11 @@ function ClientsWorkspace({
 
             return (
               <li key={client.phone}>
-                <button
-                  aria-pressed={client.name === selectedClient.name}
+                <Link
+                  aria-current={client.name === selectedClient.name ? "page" : undefined}
                   className="admin-mobile-client-card"
+                  href={clientProfileHref(client.name, role)}
                   onClick={() => openClient(client.name)}
-                  type="button"
                 >
                   <span className="admin-mobile-client-head">
                     <strong>{client.name}</strong>
@@ -4215,7 +4219,7 @@ function ClientsWorkspace({
                     <span className={statusClass(client.status)}>{client.status}</span>
                     <span>{client.next}</span>
                   </span>
-                </button>
+                </Link>
               </li>
             );
           })}
