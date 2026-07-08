@@ -3426,6 +3426,14 @@ button.admin-calendar-item[aria-pressed="true"] {
   line-height: 1.4;
 }
 
+.admin-route-context-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .admin-client-activity {
   background: var(--admin-surface-muted);
   border: 1px solid rgba(124, 77, 161, 0.14);
@@ -3541,6 +3549,83 @@ button.admin-calendar-item[aria-pressed="true"] {
   padding: 10px;
 }
 
+.admin-client-activity-feed {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-client-feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.admin-client-feed-filters button {
+  background: var(--admin-surface);
+  border: 1px solid rgba(124, 77, 161, 0.18);
+  border-radius: 8px;
+  color: var(--admin-muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 900;
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.admin-client-feed-filters button[aria-pressed="true"] {
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+  color: #fff;
+}
+
+.admin-client-feed-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-client-feed-list li {
+  align-items: center;
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 82px minmax(0, 1fr) auto auto;
+  padding: 10px;
+}
+
+.admin-feed-type {
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-client-feed-list li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-client-feed-list strong {
+  color: var(--admin-text);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-feed-list li > div span {
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .admin-client-history {
   display: grid;
   gap: 10px;
@@ -3619,11 +3704,16 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-client-inline-link,
-.admin-client-certificate-code {
+.admin-client-certificate-code,
+.admin-client-inline-button {
+  background: transparent;
+  border: 0;
   color: var(--admin-primary-strong);
+  cursor: pointer;
   font-size: 0.78rem;
   font-weight: 900;
   line-height: 1.35;
+  padding: 0;
   text-decoration: none;
 }
 
@@ -3635,7 +3725,9 @@ button.admin-calendar-item[aria-pressed="true"] {
 .admin-client-inline-link:hover,
 .admin-client-inline-link:focus-visible,
 .admin-client-certificate-code:hover,
-.admin-client-certificate-code:focus-visible {
+.admin-client-certificate-code:focus-visible,
+.admin-client-inline-button:hover,
+.admin-client-inline-button:focus-visible {
   outline: 0;
   text-decoration: underline;
 }
@@ -4691,6 +4783,10 @@ button.admin-calendar-item[aria-pressed="true"] {
     flex-direction: column;
   }
 
+  .admin-route-context-actions {
+    justify-content: flex-start;
+  }
+
   .admin-topbar {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -4741,8 +4837,13 @@ button.admin-calendar-item[aria-pressed="true"] {
   .admin-content-form-grid,
   .admin-client-form-grid,
   .admin-client-work-grid,
+  .admin-client-feed-list li,
   .admin-user-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-client-feed-filters {
+    justify-content: flex-start;
   }
 
   .admin-calendar-weekday {

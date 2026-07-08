@@ -53,6 +53,7 @@ type ClientVisit = {
   service: string;
   status: string;
 };
+type ClientFeedFilterId = "all" | "visits" | "certificates" | "notes";
 type ClientRecord = {
   email: string;
   history: ClientVisit[];
@@ -299,6 +300,12 @@ const clientFilterOptions = [
   { id: "bg", label: "BG" },
 ] as const;
 type ClientFilterId = (typeof clientFilterOptions)[number]["id"];
+const clientFeedFilterOptions = [
+  { id: "all", label: "Все" },
+  { id: "visits", label: "Визиты" },
+  { id: "certificates", label: "Сертификаты" },
+  { id: "notes", label: "Заметки" },
+] as const satisfies Array<{ id: ClientFeedFilterId; label: string }>;
 const clientLanguageOptions = [
   { label: "RU", value: "ru" },
   { label: "BG", value: "bg" },
@@ -3544,6 +3551,7 @@ function ClientDetailCard({
   role: AdminRoleId;
 }) {
   const [isEditingNote, setIsEditingNote] = useState(false);
+  const [activeFeedFilter, setActiveFeedFilter] = useState<ClientFeedFilterId>("all");
   const [draftNote, setDraftNote] = useState(client.note);
   const [saveNotice, setSaveNotice] = useState("");
   const clientInitials = client.name
@@ -3556,6 +3564,13 @@ function ClientDetailCard({
   const nextAppointment = findClientNextAppointment(client.name, appointments);
   const lastCompletedVisit = findClientLastCompletedVisit(client);
   const activeCertificate = findClientActiveCertificate(certificates);
+  const shouldShowVisits = activeFeedFilter === "all" || activeFeedFilter === "visits";
+  const shouldShowCertificates = activeFeedFilter === "all" || activeFeedFilter === "certificates";
+  const shouldShowNotes = activeFeedFilter === "all" || activeFeedFilter === "notes";
+  const hasVisibleFeedItems =
+    (shouldShowVisits && client.history.length > 0) ||
+    (shouldShowCertificates && certificates.length > 0) ||
+    (shouldShowNotes && Boolean(client.note));
 
   function startNoteEdit() {
     setDraftNote(client.note);
@@ -3710,6 +3725,89 @@ function ClientDetailCard({
             Все сертификаты клиента
           </Link>
         </div>
+      </section>
+
+      <section className="admin-client-section admin-client-activity-feed" aria-label="Рабочая лента клиента">
+        <div className="admin-client-section-head">
+          <h3>Рабочая лента</h3>
+          <div className="admin-client-feed-filters" aria-label="Фильтры рабочей ленты клиента">
+            {clientFeedFilterOptions.map((filter) => (
+              <button
+                aria-pressed={activeFeedFilter === filter.id}
+                key={filter.id}
+                onClick={() => setActiveFeedFilter(filter.id)}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {hasVisibleFeedItems ? (
+          <ol className="admin-client-feed-list">
+            {shouldShowVisits
+              ? client.history.map((visit) => {
+                  const linkedAppointment = findClientVisitAppointment(client.name, visit, appointments);
+
+                  return (
+                    <li key={`feed-visit-${visit.date}-${visit.service}`}>
+                      <span className="admin-feed-type">Визит</span>
+                      <div>
+                        <strong>{visit.service}</strong>
+                        <span>{visit.date}</span>
+                      </div>
+                      <span className={statusClass(visit.status)}>{visit.status}</span>
+                      {linkedAppointment ? (
+                        <Link
+                          aria-label={`Открыть запись ${visit.date}`}
+                          className="admin-client-inline-link"
+                          href={calendarAppointmentHref(linkedAppointment, role, client.name)}
+                        >
+                          Открыть запись
+                        </Link>
+                      ) : null}
+                    </li>
+                  );
+                })
+              : null}
+            {shouldShowCertificates
+              ? certificates.map((certificate) => (
+                  <li key={`feed-certificate-${certificate.code}`}>
+                    <span className="admin-feed-type">Сертификат</span>
+                    <div>
+                      <strong>{certificate.code}</strong>
+                      <span>
+                        {certificate.buyer} → {certificate.recipient} · {certificate.amount}
+                      </span>
+                    </div>
+                    <span className={statusClass(certificate.status)}>{certificate.status}</span>
+                    <Link
+                      aria-label={`Открыть сертификат ${certificate.code}`}
+                      className="admin-client-inline-link"
+                      href={certificateDetailHref(certificate.code, role)}
+                    >
+                      Открыть сертификат
+                    </Link>
+                  </li>
+                ))
+              : null}
+            {shouldShowNotes && client.note ? (
+              <li>
+                <span className="admin-feed-type">Заметка</span>
+                <div>
+                  <strong>Рабочая заметка</strong>
+                  <span>{client.note}</span>
+                </div>
+                <span className={statusClass(client.status)}>{client.status}</span>
+                <button className="admin-client-inline-button" onClick={startNoteEdit} type="button">
+                  Редактировать
+                </button>
+              </li>
+            ) : null}
+          </ol>
+        ) : (
+          <p>В этом фильтре пока нет записей.</p>
+        )}
       </section>
 
       <section className="admin-client-section admin-client-next-appointment" aria-label="Ближайшая запись клиента">
@@ -4309,9 +4407,14 @@ function CertificatesWorkspace({
               <strong>Показаны сертификаты клиента {selectedClientFilterName}</strong>
               <span>Таблица, статусы PDF и погашение ограничены сертификатами этой клиентской карточки.</span>
             </div>
-            <Link className="admin-client-inline-link" href={adminSectionHref("certificates", role)}>
-              Сбросить фильтр
-            </Link>
+            <div className="admin-route-context-actions">
+              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilterName, role)}>
+                Открыть карточку клиента
+              </Link>
+              <Link className="admin-client-inline-link" href={adminSectionHref("certificates", role)}>
+                Сбросить фильтр
+              </Link>
+            </div>
           </div>
         ) : null}
 
@@ -5004,9 +5107,14 @@ function CalendarWorkspace({
               <strong>Показаны записи клиента {selectedClientFilterName}</strong>
               <span>Календарь открыт на ближайшей записи клиента, список и месяц тоже считаются только по нему.</span>
             </div>
-            <Link className="admin-client-inline-link" href={adminSectionHref("calendar", role)}>
-              Сбросить фильтр
-            </Link>
+            <div className="admin-route-context-actions">
+              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilterName, role)}>
+                Открыть карточку клиента
+              </Link>
+              <Link className="admin-client-inline-link" href={adminSectionHref("calendar", role)}>
+                Сбросить фильтр
+              </Link>
+            </div>
           </div>
         ) : null}
 

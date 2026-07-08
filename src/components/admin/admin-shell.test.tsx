@@ -164,10 +164,15 @@ describe("AdminShell", () => {
     expect(within(card).getByText("UA")).toBeInTheDocument();
     expect(within(card).getByLabelText("Активность клиента")).toHaveTextContent("В активных: 5 визитов");
     expect(within(card).getByLabelText("Активность клиента")).toHaveTextContent("Следующий визит: 15 Jul 11:30");
-    expect(within(card).getByRole("heading", { name: "История визитов" })).toBeInTheDocument();
+    const historySection = within(card)
+      .getByRole("heading", { name: "История визитов" })
+      .closest("section");
+    expect(historySection).not.toBeNull();
     expect(within(card).getAllByText("Deep tissue massage").length).toBeGreaterThan(0);
     expect(within(card).getAllByText("8 июля, 15:00").length).toBeGreaterThan(0);
-    expect(within(card).getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
+    expect(
+      within(historySection as HTMLElement).getByRole("link", { name: "Открыть запись 8 июля, 15:00" }),
+    ).toHaveAttribute(
       "href",
       "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
     );
@@ -582,6 +587,46 @@ describe("AdminShell", () => {
     );
   });
 
+  it("filters the selected client working activity feed", async () => {
+    const user = userEvent.setup();
+
+    const { rerender } = render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    const feed = within(card).getByLabelText("Рабочая лента клиента");
+
+    expect(within(feed).getByRole("heading", { name: "Рабочая лента" })).toBeInTheDocument();
+    expect(within(feed).getByText("8 июля, 15:00")).toBeInTheDocument();
+    expect(within(feed).getByText("MMN-2407-1023")).toBeInTheDocument();
+    expect(within(feed).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
+    expect(within(feed).getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+    );
+    expect(within(feed).getByRole("link", { name: "Открыть сертификат MMN-2407-1023" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+    );
+
+    await user.click(within(feed).getByRole("button", { name: "Сертификаты" }));
+
+    expect(within(feed).getByText("MMN-2407-1023")).toBeInTheDocument();
+    expect(within(feed).queryByText("8 июля, 15:00")).not.toBeInTheDocument();
+    expect(within(feed).queryByText(/Предпочитает вечерние слоты/)).not.toBeInTheDocument();
+
+    await user.click(within(feed).getByRole("button", { name: "Заметки" }));
+
+    expect(within(feed).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
+    expect(within(feed).queryByText("MMN-2407-1023")).not.toBeInTheDocument();
+
+    rerender(<AdminShell activeSection="clients" role="owner" selectedClientName="Maria Georgieva" />);
+
+    const updatedFeed = within(screen.getByRole("dialog", { name: "Карточка клиента" })).getByLabelText("Рабочая лента клиента");
+    await waitFor(() => expect(within(updatedFeed).getByRole("button", { name: "Все" })).toHaveAttribute("aria-pressed", "true"));
+    expect(within(updatedFeed).getByText("2 июля, 14:00")).toBeInTheDocument();
+    expect(within(updatedFeed).getByText("MMN-2407-1022")).toBeInTheDocument();
+  });
+
   it("opens the calendar scoped to the selected client", () => {
     render(<AdminShell activeSection="calendar" role="owner" selectedClientName="Olena K." />);
 
@@ -590,6 +635,10 @@ describe("AdminShell", () => {
     expect(within(context).getByRole("link", { name: "Сбросить фильтр" })).toHaveAttribute(
       "href",
       "/admin?section=calendar&role=owner",
+    );
+    expect(within(context).getByRole("link", { name: "Открыть карточку клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Olena%20K.",
     );
     expect(screen.getByRole("heading", { name: "8 июля" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Olena K.*Deep tissue massage/ })).toBeInTheDocument();
@@ -605,6 +654,10 @@ describe("AdminShell", () => {
     expect(within(context).getByRole("link", { name: "Сбросить фильтр" })).toHaveAttribute(
       "href",
       "/admin?section=certificates&role=owner",
+    );
+    expect(within(context).getByRole("link", { name: "Открыть карточку клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Olena%20K.",
     );
     expect(within(table).getByRole("row", { name: /MMN-2407-1023/ })).toBeInTheDocument();
     expect(within(table).queryByRole("row", { name: /MMN-2407-1021/ })).not.toBeInTheDocument();

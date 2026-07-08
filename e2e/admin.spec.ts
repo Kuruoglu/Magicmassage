@@ -464,6 +464,33 @@ test("client profile summarizes related work records", async ({ page }) => {
   );
 });
 
+test("client profile filters the working activity feed", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const feed = page.getByLabel("Рабочая лента клиента");
+  await expect(feed.getByRole("heading", { name: "Рабочая лента" })).toBeVisible();
+  await expect(feed.getByText("8 июля, 15:00")).toBeVisible();
+  await expect(feed.getByText("MMN-2407-1023")).toBeVisible();
+  await expect(feed.getByText(/Предпочитает вечерние слоты/)).toBeVisible();
+  await expect(feed.getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
+  );
+  await expect(feed.getByRole("link", { name: "Открыть сертификат MMN-2407-1023" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+  );
+
+  await feed.getByRole("button", { name: "Сертификаты" }).click();
+  await expect(feed.getByText("MMN-2407-1023")).toBeVisible();
+  await expect(feed.getByText("8 июля, 15:00")).toHaveCount(0);
+  await expect(feed.getByText(/Предпочитает вечерние слоты/)).toHaveCount(0);
+
+  await feed.getByRole("button", { name: "Заметки" }).click();
+  await expect(feed.getByText(/Предпочитает вечерние слоты/)).toBeVisible();
+  await expect(feed.getByText("MMN-2407-1023")).toHaveCount(0);
+});
+
 test("client profile can issue a prefilled certificate", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 
@@ -479,15 +506,17 @@ test("client profile can issue a prefilled certificate", async ({ page }) => {
   await dialog.getByRole("button", { name: "Сохранить сертификат" }).click();
 
   await expect(dialog).toHaveCount(0);
-  await expect(card.getByRole("link", { name: "MMN-2407-1024" })).toBeVisible();
-  await expect(card.getByText("95 €")).toBeVisible();
+  const certificatesSection = card.locator("section").filter({ has: page.getByRole("heading", { name: "Сертификаты" }) });
+  await expect(certificatesSection.getByRole("link", { exact: true, name: "MMN-2407-1024" })).toBeVisible();
+  await expect(certificatesSection.getByText("95 €")).toBeVisible();
 });
 
 test("client profile links visit history and certificates to their workspaces", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
-  await card.getByRole("link", { name: "Открыть запись 8 июля, 15:00" }).click();
+  const visitHistorySection = card.locator("section").filter({ has: page.getByRole("heading", { name: "История визитов" }) });
+  await visitHistorySection.getByRole("link", { name: "Открыть запись 8 июля, 15:00" }).click();
 
   await expect(page).toHaveURL(/section=calendar/);
   await expect(page).toHaveURL(/date=2026-07-08/);
@@ -498,7 +527,9 @@ test("client profile links visit history and certificates to their workspaces", 
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
-  await page.getByRole("dialog", { name: "Карточка клиента" }).getByRole("link", { name: "MMN-2407-1023" }).click();
+  const refreshedCard = page.getByRole("dialog", { name: "Карточка клиента" });
+  const certificatesSection = refreshedCard.locator("section").filter({ has: page.getByRole("heading", { name: "Сертификаты" }) });
+  await certificatesSection.getByRole("link", { exact: true, name: "MMN-2407-1023" }).click();
 
   await expect(page).toHaveURL(/section=certificates/);
   await expect(page).toHaveURL(/certificate=MMN-2407-1023/);
@@ -514,6 +545,10 @@ test("client profile opens filtered record workspaces", async ({ page }) => {
   await expect(page).toHaveURL(/section=calendar/);
   await expect(page).toHaveURL(/client=Olena%20K\./);
   await expect(page.getByLabel("Фильтр календаря по клиенту")).toContainText("Показаны записи клиента Olena K.");
+  await expect(page.getByLabel("Фильтр календаря по клиенту").getByRole("link", { name: "Открыть карточку клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=Olena%20K.",
+  );
   await expect(page.getByRole("heading", { name: "8 июля" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Olena K.*Deep tissue massage/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
@@ -524,6 +559,10 @@ test("client profile opens filtered record workspaces", async ({ page }) => {
   await expect(page).toHaveURL(/section=certificates/);
   await expect(page).toHaveURL(/client=Olena%20K\./);
   await expect(page.getByLabel("Фильтр сертификатов по клиенту")).toContainText("Показаны сертификаты клиента Olena K.");
+  await expect(page.getByLabel("Фильтр сертификатов по клиенту").getByRole("link", { name: "Открыть карточку клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=Olena%20K.",
+  );
   await expect(page.getByRole("row", { name: /MMN-2407-1023/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /MMN-2407-1021/ })).toHaveCount(0);
 });
@@ -567,8 +606,9 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(card.getByText("Обновлено после звонка, лучше писать на email.", { exact: true })).toBeVisible();
-  await expect(card.getByText("email", { exact: true })).toBeVisible();
+  const notesSection = card.locator("section").filter({ has: page.getByRole("heading", { name: "Заметки" }) });
+  await expect(notesSection.getByText("Обновлено после звонка, лучше писать на email.", { exact: true })).toBeVisible();
+  await expect(notesSection.getByText("email", { exact: true })).toBeVisible();
 });
 
 test("certificate workspace can issue, send, redeem and edit a certificate", async ({ page }) => {
