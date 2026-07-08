@@ -420,6 +420,20 @@ test("client profile saves a note and exposes contact actions", async ({ page })
   await expect(card.getByText("Клиентка просит напоминать за 2 часа.")).toBeVisible();
 });
 
+test("client profile shows the next calendar appointment", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const nextAppointment = page.getByLabel("Ближайшая запись клиента");
+  await expect(nextAppointment.getByRole("heading", { name: "Ближайшая запись" })).toBeVisible();
+  await expect(nextAppointment.getByText("8 июля, 15:00")).toBeVisible();
+  await expect(nextAppointment.getByText("Deep tissue massage")).toBeVisible();
+  await expect(nextAppointment.getByText("Уточнить шею и плечи перед началом сеанса.")).toBeVisible();
+  await expect(nextAppointment.getByRole("link", { name: "Открыть запись" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&date=2026-07-08",
+  );
+});
+
 test("client profile links visit history and certificates to their workspaces", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

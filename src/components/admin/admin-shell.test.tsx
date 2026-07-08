@@ -166,7 +166,7 @@ describe("AdminShell", () => {
     expect(within(card).getByLabelText("Активность клиента")).toHaveTextContent("Следующий визит: 15 Jul 11:30");
     expect(within(card).getByRole("heading", { name: "История визитов" })).toBeInTheDocument();
     expect(within(card).getAllByText("Deep tissue massage").length).toBeGreaterThan(0);
-    expect(within(card).getByText("8 июля, 15:00")).toBeInTheDocument();
+    expect(within(card).getAllByText("8 июля, 15:00").length).toBeGreaterThan(0);
     expect(within(card).getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
       "href",
       "/admin?section=calendar&role=owner&date=2026-07-08",
@@ -531,6 +531,22 @@ describe("AdminShell", () => {
     expect(within(card).getByRole("link", { name: "Записать клиента" })).toHaveAttribute(
       "href",
       "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+    );
+  });
+
+  it("shows the next calendar appointment in the selected client card", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    const nextAppointment = within(card).getByLabelText("Ближайшая запись клиента");
+
+    expect(within(nextAppointment).getByRole("heading", { name: "Ближайшая запись" })).toBeInTheDocument();
+    expect(within(nextAppointment).getByText("8 июля, 15:00")).toBeInTheDocument();
+    expect(within(nextAppointment).getByText("Deep tissue massage")).toBeInTheDocument();
+    expect(within(nextAppointment).getByText("Уточнить шею и плечи перед началом сеанса.")).toBeInTheDocument();
+    expect(within(nextAppointment).getByRole("link", { name: "Открыть запись" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&date=2026-07-08",
     );
   });
 

@@ -1256,6 +1256,14 @@ function findClientVisitAppointment(clientName: string, visit: ClientVisit, appo
   );
 }
 
+function findClientNextAppointment(clientName: string, appointments: Appointment[]) {
+  const normalizedClientName = normalizeSearch(clientName);
+
+  return sortAppointments(appointments).find(
+    (appointment) => normalizeSearch(appointment.client) === normalizedClientName && appointment.status !== "Отменена",
+  );
+}
+
 function sortAppointments(appointments: Appointment[]) {
   return [...appointments].sort((first, second) =>
     `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
@@ -3434,6 +3442,7 @@ function ClientDetailCard({
     .slice(0, 2)
     .toUpperCase();
   const activity = clientActivitySummary(client);
+  const nextAppointment = findClientNextAppointment(client.name, appointments);
 
   function startNoteEdit() {
     setDraftNote(client.note);
@@ -3537,6 +3546,29 @@ function ClientDetailCard({
           <strong>{client.totalSpend}</strong>
         </div>
       </div>
+
+      <section className="admin-client-section admin-client-next-appointment" aria-label="Ближайшая запись клиента">
+        <div className="admin-client-section-head">
+          <h3>Ближайшая запись</h3>
+          {nextAppointment ? <span className={statusClass(nextAppointment.status)}>{nextAppointment.status}</span> : null}
+        </div>
+        {nextAppointment ? (
+          <div className="admin-client-next-card">
+            <div>
+              <strong>{nextAppointment.service}</strong>
+              <span>{appointmentVisitLabel(nextAppointment)}</span>
+            </div>
+            <p>{nextAppointment.note || "Комментарий к записи пока пуст."}</p>
+            <div className="admin-client-next-actions">
+              <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role)}>
+                Открыть запись
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <p>В календаре пока нет записи для этого клиента.</p>
+        )}
+      </section>
 
       <section className="admin-client-section">
         <h3>История визитов</h3>
