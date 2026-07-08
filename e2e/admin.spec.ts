@@ -430,7 +430,7 @@ test("client profile shows the next calendar appointment", async ({ page }) => {
   await expect(nextAppointment.getByText("Уточнить шею и плечи перед началом сеанса.")).toBeVisible();
   await expect(nextAppointment.getByRole("link", { name: "Открыть запись" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
   );
 });
 
@@ -448,11 +448,19 @@ test("client profile summarizes related work records", async ({ page }) => {
   await expect(profile.getByText(/вечерние слоты и сильное давление/)).toBeVisible();
   await expect(profile.getByRole("link", { name: "Открыть ближайшую запись" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.",
   );
   await expect(profile.getByRole("link", { name: "Открыть активный сертификат" })).toHaveAttribute(
     "href",
     "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+  );
+  await expect(profile.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&client=Olena%20K.",
+  );
+  await expect(profile.getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&client=Olena%20K.",
   );
 });
 
@@ -483,8 +491,11 @@ test("client profile links visit history and certificates to their workspaces", 
 
   await expect(page).toHaveURL(/section=calendar/);
   await expect(page).toHaveURL(/date=2026-07-08/);
+  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page.getByLabel("Фильтр календаря по клиенту")).toContainText("Показаны записи клиента Olena K.");
   await page.getByRole("button", { name: "Список" }).click();
   await expect(page.getByRole("button", { name: /Olena K.*8 июля.*Deep tissue massage/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
   await page.getByRole("dialog", { name: "Карточка клиента" }).getByRole("link", { name: "MMN-2407-1023" }).click();
@@ -492,6 +503,29 @@ test("client profile links visit history and certificates to their workspaces", 
   await expect(page).toHaveURL(/section=certificates/);
   await expect(page).toHaveURL(/certificate=MMN-2407-1023/);
   await expect(page.getByLabel("Детали сертификата").getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
+});
+
+test("client profile opens filtered record workspaces", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
+  await card.getByRole("link", { name: "Все записи клиента" }).click();
+
+  await expect(page).toHaveURL(/section=calendar/);
+  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page.getByLabel("Фильтр календаря по клиенту")).toContainText("Показаны записи клиента Olena K.");
+  await expect(page.getByRole("heading", { name: "8 июля" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Olena K.*Deep tissue massage/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
+
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.getByRole("dialog", { name: "Карточка клиента" }).getByRole("link", { name: "Все сертификаты клиента" }).click();
+
+  await expect(page).toHaveURL(/section=certificates/);
+  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page.getByLabel("Фильтр сертификатов по клиенту")).toContainText("Показаны сертификаты клиента Olena K.");
+  await expect(page.getByRole("row", { name: /MMN-2407-1023/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /MMN-2407-1021/ })).toHaveCount(0);
 });
 
 test("client form creates and edits a client profile", async ({ page }) => {

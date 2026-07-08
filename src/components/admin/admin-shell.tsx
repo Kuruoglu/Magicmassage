@@ -1151,6 +1151,10 @@ function findClientCertificates(certificates: CertificateRecord[], clientName: s
   return certificates.filter((certificate) => normalizeSearch(certificate.clientName) === normalizedName);
 }
 
+function matchesClientName(value: string, clientName: string | undefined) {
+  return !clientName || normalizeSearch(value) === normalizeSearch(clientName);
+}
+
 function findServiceBySlug(services: ServiceRecord[], slug: string) {
   return services.find((service) => normalizeSearch(service.slug) === normalizeSearch(slug));
 }
@@ -1241,12 +1245,22 @@ function adminSectionHref(section: AdminSectionId, role: AdminRoleId) {
   return `/admin?section=${section}&role=${role}`;
 }
 
-function calendarDateHref(date: string, role: AdminRoleId) {
-  return `/admin?section=calendar&role=${role}&date=${encodeURIComponent(date)}`;
+function calendarClientHref(clientName: string, role: AdminRoleId) {
+  return `/admin?section=calendar&role=${role}&client=${encodeURIComponent(clientName)}`;
 }
 
-function calendarAppointmentHref(appointment: Appointment, role: AdminRoleId) {
-  return calendarDateHref(appointment.date, role);
+function calendarDateHref(date: string, role: AdminRoleId, clientName?: string) {
+  const clientQuery = clientName ? `&client=${encodeURIComponent(clientName)}` : "";
+
+  return `/admin?section=calendar&role=${role}&date=${encodeURIComponent(date)}${clientQuery}`;
+}
+
+function calendarAppointmentHref(appointment: Appointment, role: AdminRoleId, clientName?: string) {
+  return calendarDateHref(appointment.date, role, clientName);
+}
+
+function certificateClientHref(clientName: string, role: AdminRoleId) {
+  return `/admin?section=certificates&role=${role}&client=${encodeURIComponent(clientName)}`;
 }
 
 function certificateDetailHref(certificateCode: string, role: AdminRoleId) {
@@ -3677,7 +3691,7 @@ function ClientDetailCard({
         </p>
         <div className="admin-client-next-actions">
           {nextAppointment ? (
-            <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role)}>
+            <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role, client.name)}>
               Открыть ближайшую запись
             </Link>
           ) : null}
@@ -3688,6 +3702,12 @@ function ClientDetailCard({
           ) : null}
           <Link className="admin-client-inline-link" href={calendarCreateHref(client.name, role)} onClick={onCalendarCreateIntent}>
             Записать снова
+          </Link>
+          <Link className="admin-client-inline-link" href={calendarClientHref(client.name, role)}>
+            Все записи клиента
+          </Link>
+          <Link className="admin-client-inline-link" href={certificateClientHref(client.name, role)}>
+            Все сертификаты клиента
           </Link>
         </div>
       </section>
@@ -3705,7 +3725,7 @@ function ClientDetailCard({
             </div>
             <p>{nextAppointment.note || "Комментарий к записи пока пуст."}</p>
             <div className="admin-client-next-actions">
-              <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role)}>
+              <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role, client.name)}>
                 Открыть запись
               </Link>
             </div>
@@ -3733,7 +3753,7 @@ function ClientDetailCard({
                     <Link
                       aria-label={`Открыть запись ${visit.date}`}
                       className="admin-client-inline-link"
-                      href={calendarAppointmentHref(linkedAppointment, role)}
+                      href={calendarAppointmentHref(linkedAppointment, role, client.name)}
                     >
                       Открыть запись
                     </Link>
@@ -4159,6 +4179,7 @@ function CertificatesWorkspace({
   query,
   role,
   selectedCertificateCode,
+  selectedClientName,
 }: {
   certificates: CertificateRecord[];
   clients: ClientRecord[];
@@ -4169,18 +4190,24 @@ function CertificatesWorkspace({
   query: string;
   role: AdminRoleId;
   selectedCertificateCode?: string;
+  selectedClientName?: string;
 }) {
+  const selectedClientFilter = findClientByName(clients, selectedClientName);
+  const selectedClientFilterName = selectedClientFilter?.name;
+  const clientScopedCertificates = selectedClientFilterName
+    ? certificates.filter((certificate) => matchesClientName(certificate.clientName, selectedClientFilterName))
+    : certificates;
   const [selectedCode, setSelectedCode] = useState(() => {
     if (selectedCertificateCode && certificates.some((certificate) => certificate.code === selectedCertificateCode)) {
       return selectedCertificateCode;
     }
 
-    return certificates[0]?.code ?? "";
+    return clientScopedCertificates[0]?.code ?? certificates[0]?.code ?? "";
   });
   const [isCertificateDrawerOpen, setIsCertificateDrawerOpen] = useState(Boolean(selectedCertificateCode));
   const [editingCertificate, setEditingCertificate] = useState<CertificateRecord | undefined>();
   const [actionNotice, setActionNotice] = useState("");
-  const filteredCertificates = certificates.filter((certificate) =>
+  const filteredCertificates = clientScopedCertificates.filter((certificate) =>
     matchesSearch(
       [
         certificate.code,
@@ -4202,9 +4229,9 @@ function CertificatesWorkspace({
     certificates[0];
   const linkedClient = selectedCertificate ? findClientByName(clients, selectedCertificate.clientName) : undefined;
   const isCertificateFormOpen = isCertificateCreateOpen || Boolean(editingCertificate);
-  const paidCount = certificates.filter((certificate) => certificate.status === "Оплачено").length;
-  const pendingPdfCount = certificates.filter((certificate) => certificate.status === "Ожидает PDF").length;
-  const redeemedCount = certificates.filter((certificate) => certificate.status === "Погашен").length;
+  const paidCount = clientScopedCertificates.filter((certificate) => certificate.status === "Оплачено").length;
+  const pendingPdfCount = clientScopedCertificates.filter((certificate) => certificate.status === "Ожидает PDF").length;
+  const redeemedCount = clientScopedCertificates.filter((certificate) => certificate.status === "Погашен").length;
 
   function openCertificate(code: string) {
     setSelectedCode(code);
@@ -4276,6 +4303,17 @@ function CertificatesWorkspace({
             <button type="button">Погашены</button>
           </div>
         </div>
+        {selectedClientFilterName ? (
+          <div className="admin-route-context" aria-label="Фильтр сертификатов по клиенту">
+            <div>
+              <strong>Показаны сертификаты клиента {selectedClientFilterName}</strong>
+              <span>Таблица, статусы PDF и погашение ограничены сертификатами этой клиентской карточки.</span>
+            </div>
+            <Link className="admin-client-inline-link" href={adminSectionHref("certificates", role)}>
+              Сбросить фильтр
+            </Link>
+          </div>
+        ) : null}
 
         <div className="admin-metric-row admin-certificate-summary" aria-label="Сводка сертификатов">
           <article className="admin-metric admin-metric-success">
@@ -4852,6 +4890,7 @@ function CalendarWorkspace({
   role,
   selectedAppointmentFocus,
   selectedCalendarDate,
+  selectedClientName,
 }: {
   appointments: Appointment[];
   bookingBufferMinutes: number;
@@ -4864,7 +4903,13 @@ function CalendarWorkspace({
   role: AdminRoleId;
   selectedAppointmentFocus?: CalendarAppointmentFocus;
   selectedCalendarDate?: string;
+  selectedClientName?: string;
 }) {
+  const selectedClientFilter = findClientByName(clients, selectedClientName);
+  const selectedClientFilterName = selectedClientFilter?.name;
+  const clientScopedAppointments = selectedClientFilterName
+    ? appointments.filter((appointment) => matchesClientName(appointment.client, selectedClientFilterName))
+    : appointments;
   const fallbackAppointment = appointments[0] ?? {
     client: "Нет записи",
     date: "2026-07-06",
@@ -4873,16 +4918,17 @@ function CalendarWorkspace({
     status: "Новая заявка" as const,
     time: "00:00",
   };
-  const filteredAppointments = appointments.filter((appointment) =>
+  const filteredAppointments = clientScopedAppointments.filter((appointment) =>
     matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status, appointment.note], query),
   );
   const initialSelectedDate =
-    selectedAppointmentFocus?.date ?? (isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : "2026-07-06");
+    selectedAppointmentFocus?.date ??
+    (isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : (sortAppointments(filteredAppointments)[0]?.date ?? "2026-07-06"));
   const initialSelectedAppointment = selectedAppointmentFocus
-    ? appointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentFocus.appointmentKey)
+    ? filteredAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentFocus.appointmentKey)
     : isCalendarMonthDate(selectedCalendarDate)
-      ? appointments.find((appointment) => appointment.date === initialSelectedDate)
-      : appointments[1];
+      ? filteredAppointments.find((appointment) => appointment.date === initialSelectedDate)
+      : filteredAppointments[0];
   const [mode, setMode] = useState<CalendarMode>("day");
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
   const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(Boolean(selectedAppointmentFocus));
@@ -4952,6 +4998,17 @@ function CalendarWorkspace({
             ))}
           </div>
         </div>
+        {selectedClientFilterName ? (
+          <div className="admin-route-context" aria-label="Фильтр календаря по клиенту">
+            <div>
+              <strong>Показаны записи клиента {selectedClientFilterName}</strong>
+              <span>Календарь открыт на ближайшей записи клиента, список и месяц тоже считаются только по нему.</span>
+            </div>
+            <Link className="admin-client-inline-link" href={adminSectionHref("calendar", role)}>
+              Сбросить фильтр
+            </Link>
+          </div>
+        ) : null}
 
         {mode === "month" ? (
           <>
@@ -6662,13 +6719,14 @@ function Workspace({
         certificates={certificates}
         clients={clients}
         isCertificateCreateOpen={isCertificateCreateOpen}
-        key={selectedCertificateCode ?? "default-certificate"}
+        key={`${selectedCertificateCode ?? "default-certificate"}:${selectedClientName ?? "all-clients"}`}
         onCloseCertificateCreate={onCloseCertificateCreate}
         onSaveCertificate={onSaveCertificate}
         onUpdateCertificateStatus={onUpdateCertificateStatus}
         query={query}
         role={role}
         selectedCertificateCode={selectedCertificateCode}
+        selectedClientName={selectedClientName}
       />
     );
   }
@@ -6769,7 +6827,7 @@ function Workspace({
         bookingBufferMinutes={settings.bookingBufferMinutes}
         clients={clients}
         dailySlotCapacity={settings.dailySlotCapacity}
-        key={`${selectedCalendarDate ?? "default-calendar"}:${calendarAppointmentFocus?.appointmentKey ?? "default-focus"}`}
+        key={`${selectedCalendarDate ?? "default-calendar"}:${selectedClientName ?? "all-clients"}:${calendarAppointmentFocus?.appointmentKey ?? "default-focus"}`}
         onCancelAppointment={onCancelAppointment}
         onCalendarDateChange={onCalendarDateChange}
         onEditAppointment={onEditAppointment}
@@ -6777,6 +6835,7 @@ function Workspace({
         role={role}
         selectedAppointmentFocus={calendarAppointmentFocus}
         selectedCalendarDate={selectedCalendarDate}
+        selectedClientName={selectedClientName}
       />
     );
   }
