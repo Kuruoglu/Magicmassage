@@ -40,6 +40,10 @@ describe("AdminShell", () => {
       "href",
       "/admin?section=clients&role=owner",
     );
+    expect(screen.getByRole("link", { name: /Сертификаты к отправке/ })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+    );
     expect(screen.getByRole("link", { name: /Выгрузить Stripe/ })).toHaveAttribute(
       "href",
       "/admin?section=finances&role=owner",

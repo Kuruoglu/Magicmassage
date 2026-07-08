@@ -19,12 +19,18 @@ test("dashboard links to connected admin workspaces", async ({ page }) => {
     "/admin?section=calendar&role=owner&action=create",
   );
 
+  await page.getByRole("link", { name: /Сертификаты к отправке/ }).click();
+  await expect(page).toHaveURL(/section=certificates/);
+  await expect(page).toHaveURL(/certificate=MMN-2407-1023/);
+  await expect(page.getByLabel("Детали сертификата").getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
+
+  await page.goto("/admin", { waitUntil: "networkidle" });
   await page.getByRole("link", { name: "Анна Петрова" }).click();
   await expect(page).toHaveURL(/section=clients/);
   await expect(page.getByRole("dialog", { name: "Карточка клиента" }).getByRole("heading", { name: "Анна Петрова" })).toBeVisible();
 
   await page.goto("/admin", { waitUntil: "networkidle" });
-  await page.getByRole("link", { name: "MMN-2407-1023" }).click();
+  await page.getByRole("link", { exact: true, name: "MMN-2407-1023" }).click();
   await expect(page).toHaveURL(/section=certificates/);
   await expect(page.getByLabel("Детали сертификата").getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
 });

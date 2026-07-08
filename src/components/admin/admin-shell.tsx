@@ -3445,6 +3445,7 @@ function DashboardWorkspace({
   const filteredCertificates = certificates.filter((certificate) =>
     matchesSearch([certificate.code, certificate.buyer, certificate.clientName, certificate.recipient, certificate.status], query),
   );
+  const nextCertificateToSend = certificates.find((certificate) => certificate.status === "Ожидает PDF");
   const operationItems = [
     ...(canAccessAdminSection("calendar", role)
       ? [
@@ -3467,9 +3468,13 @@ function DashboardWorkspace({
     ...(canAccessAdminSection("certificates", role)
       ? [
           {
-            href: adminSectionHref("certificates", role),
+            href: nextCertificateToSend
+              ? certificateDetailHref(nextCertificateToSend.code, role)
+              : adminSectionHref("certificates", role),
             label: "Сертификаты к отправке",
-            note: "Проверить PDF, статусы и погашения.",
+            note: nextCertificateToSend
+              ? `${nextCertificateToSend.code}: проверить PDF, статус и отправку.`
+              : "Проверить PDF, статусы и погашения.",
           },
         ]
       : []),
