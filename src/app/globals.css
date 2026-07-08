@@ -3549,6 +3549,36 @@ button.admin-calendar-item[aria-pressed="true"] {
   padding: 10px;
 }
 
+.admin-client-next-action {
+  align-items: center;
+  background: rgba(124, 77, 161, 0.06);
+  border: 1px solid rgba(124, 77, 161, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 12px;
+}
+
+.admin-client-next-action-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-client-next-action h3 {
+  color: var(--admin-text);
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.admin-client-next-action p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .admin-client-activity-feed {
   display: grid;
   gap: 12px;
@@ -4837,6 +4867,7 @@ button.admin-calendar-item[aria-pressed="true"] {
   .admin-content-form-grid,
   .admin-client-form-grid,
   .admin-client-work-grid,
+  .admin-client-next-action,
   .admin-client-feed-list li,
   .admin-user-form-grid {
     grid-template-columns: 1fr;

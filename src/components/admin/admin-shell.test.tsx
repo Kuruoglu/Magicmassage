@@ -587,6 +587,35 @@ describe("AdminShell", () => {
     );
   });
 
+  it("highlights the next operational client action", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    const nextAction = within(card).getByLabelText("Следующее действие клиента");
+
+    expect(within(nextAction).getByRole("heading", { name: "Подготовить PDF сертификата" })).toBeInTheDocument();
+    expect(within(nextAction).getByText("MMN-2407-1023 · 250 €")).toBeInTheDocument();
+    expect(within(nextAction).getByText("Ожидает PDF")).toBeInTheDocument();
+    expect(within(nextAction).getByRole("link", { name: "Открыть сертификат" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+    );
+  });
+
+  it("offers appointment creation when the selected client has no upcoming appointment", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Maria Georgieva" />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    const nextAction = within(card).getByLabelText("Следующее действие клиента");
+
+    expect(within(nextAction).getByRole("heading", { name: "Записать клиента" })).toBeInTheDocument();
+    expect(within(nextAction).getByText("В календаре нет будущей записи для этого клиента.")).toBeInTheDocument();
+    expect(within(nextAction).getByRole("link", { name: "Создать запись" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&client=Maria%20Georgieva&action=create",
+    );
+  });
+
   it("filters the selected client working activity feed", async () => {
     const user = userEvent.setup();
 

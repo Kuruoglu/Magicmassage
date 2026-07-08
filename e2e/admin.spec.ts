@@ -464,6 +464,29 @@ test("client profile summarizes related work records", async ({ page }) => {
   );
 });
 
+test("client profile highlights the next operational action", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const nextAction = page.getByLabel("Следующее действие клиента");
+  await expect(nextAction.getByRole("heading", { name: "Подготовить PDF сертификата" })).toBeVisible();
+  await expect(nextAction.getByText("MMN-2407-1023 · 250 €")).toBeVisible();
+  await expect(nextAction.getByText("Ожидает PDF")).toBeVisible();
+  await expect(nextAction.getByRole("link", { name: "Открыть сертификат" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+  );
+
+  await page.goto("/admin?section=clients&client=Maria%20Georgieva", { waitUntil: "networkidle" });
+
+  const emptyScheduleAction = page.getByLabel("Следующее действие клиента");
+  await expect(emptyScheduleAction.getByRole("heading", { name: "Записать клиента" })).toBeVisible();
+  await expect(emptyScheduleAction.getByText("В календаре нет будущей записи для этого клиента.")).toBeVisible();
+  await expect(emptyScheduleAction.getByRole("link", { name: "Создать запись" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&client=Maria%20Georgieva&action=create",
+  );
+});
+
 test("client profile filters the working activity feed", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

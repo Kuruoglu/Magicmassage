@@ -54,6 +54,16 @@ type ClientVisit = {
   status: string;
 };
 type ClientFeedFilterId = "all" | "visits" | "certificates" | "notes";
+type ClientNextAction = {
+  badgeClassName: string;
+  calendarCreateIntent?: boolean;
+  ctaLabel: string;
+  description: string;
+  href: string;
+  status: string;
+  title: string;
+  typeLabel: string;
+};
 type ClientRecord = {
   email: string;
   history: ClientVisit[];
@@ -1317,6 +1327,60 @@ function findClientLastCompletedVisit(client: ClientRecord) {
 
 function findClientActiveCertificate(certificates: CertificateRecord[]) {
   return certificates.find((certificate) => certificate.status !== "Погашен") ?? certificates[0];
+}
+
+function buildClientNextAction(
+  client: ClientRecord,
+  nextAppointment: Appointment | undefined,
+  activeCertificate: CertificateRecord | undefined,
+  role: AdminRoleId,
+): ClientNextAction {
+  if (activeCertificate?.status === "Ожидает PDF") {
+    return {
+      badgeClassName: statusClass(activeCertificate.status),
+      ctaLabel: "Открыть сертификат",
+      description: `${activeCertificate.code} · ${activeCertificate.amount}`,
+      href: certificateDetailHref(activeCertificate.code, role),
+      status: activeCertificate.status,
+      title: "Подготовить PDF сертификата",
+      typeLabel: "Сертификат",
+    };
+  }
+
+  if (nextAppointment && nextAppointment.status !== "Подтверждена") {
+    return {
+      badgeClassName: statusClass(nextAppointment.status),
+      ctaLabel: "Открыть запись",
+      description: `${appointmentVisitLabel(nextAppointment)} · ${nextAppointment.service}`,
+      href: calendarAppointmentHref(nextAppointment, role, client.name),
+      status: nextAppointment.status,
+      title: "Подтвердить запись клиента",
+      typeLabel: "Запись",
+    };
+  }
+
+  if (!nextAppointment) {
+    return {
+      badgeClassName: "admin-status admin-status-warning",
+      calendarCreateIntent: true,
+      ctaLabel: "Создать запись",
+      description: "В календаре нет будущей записи для этого клиента.",
+      href: calendarCreateHref(client.name, role),
+      status: "Нет записи",
+      title: "Записать клиента",
+      typeLabel: "Календарь",
+    };
+  }
+
+  return {
+    badgeClassName: statusClass(nextAppointment.status),
+    ctaLabel: "Открыть запись",
+    description: `${appointmentVisitLabel(nextAppointment)} · ${nextAppointment.service}`,
+    href: calendarAppointmentHref(nextAppointment, role, client.name),
+    status: nextAppointment.status,
+    title: "Проверить ближайшую запись",
+    typeLabel: "Запись",
+  };
 }
 
 function sortAppointments(appointments: Appointment[]) {
@@ -3564,6 +3628,7 @@ function ClientDetailCard({
   const nextAppointment = findClientNextAppointment(client.name, appointments);
   const lastCompletedVisit = findClientLastCompletedVisit(client);
   const activeCertificate = findClientActiveCertificate(certificates);
+  const nextClientAction = buildClientNextAction(client, nextAppointment, activeCertificate, role);
   const shouldShowVisits = activeFeedFilter === "all" || activeFeedFilter === "visits";
   const shouldShowCertificates = activeFeedFilter === "all" || activeFeedFilter === "certificates";
   const shouldShowNotes = activeFeedFilter === "all" || activeFeedFilter === "notes";
@@ -3677,6 +3742,22 @@ function ClientDetailCard({
           <strong>{client.totalSpend}</strong>
         </div>
       </div>
+
+      <section className="admin-client-section admin-client-next-action" aria-label="Следующее действие клиента">
+        <div className="admin-client-next-action-copy">
+          <span className="admin-feed-type">{nextClientAction.typeLabel}</span>
+          <h3>{nextClientAction.title}</h3>
+          <p>{nextClientAction.description}</p>
+        </div>
+        <span className={nextClientAction.badgeClassName}>{nextClientAction.status}</span>
+        <Link
+          className="admin-text-action"
+          href={nextClientAction.href}
+          onClick={nextClientAction.calendarCreateIntent ? onCalendarCreateIntent : undefined}
+        >
+          {nextClientAction.ctaLabel}
+        </Link>
+      </section>
 
       <section className="admin-client-section admin-client-work-profile" aria-label="Рабочий профиль клиента">
         <div className="admin-client-section-head">
