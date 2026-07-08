@@ -275,6 +275,16 @@ describe("AdminShell", () => {
     expect(within(details).getByText("LocalBusiness SEO")).toBeInTheDocument();
   });
 
+  it("opens blog details from the blog query", () => {
+    render(<AdminShell activeSection="blog" role="owner" selectedBlogPostId="blog-first-massage-preparation" />);
+
+    const details = screen.getByRole("dialog", { name: "Детали статьи" });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(within(details).getByRole("heading", { name: "Подготовка к первому массажу" })).toBeInTheDocument();
+    expect(within(details).getByText("first-massage-preparation")).toBeInTheDocument();
+    expect(within(details).getByText("Подготовка к первому массажу в Бургасе")).toBeInTheDocument();
+  });
+
   it.each([
     {
       activeSection: "certificates" as const,
@@ -315,6 +325,7 @@ describe("AdminShell", () => {
       activeSection: "blog" as const,
       drawerLabel: "Детали статьи",
       heading: "Подготовка к первому массажу",
+      rowHref: "/admin?section=blog&role=owner&blog=blog-first-massage-preparation",
       rowButton: "Подготовка к первому массажу",
     },
     {
@@ -1403,7 +1414,10 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="blog" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "Контент-план блога" })).toBeInTheDocument();
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Подготовка к первому массажу" }));
+    const firstPostLink = within(screen.getByRole("table")).getByRole("link", { name: "Подготовка к первому массажу" });
+    expect(firstPostLink).toHaveAttribute("href", "/admin?section=blog&role=owner&blog=blog-first-massage-preparation");
+    firstPostLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(firstPostLink);
     expect(screen.getByRole("dialog", { name: "Детали статьи" })).toHaveTextContent("Подготовка к первому массажу");
 
     await user.click(screen.getByRole("button", { name: "Новая статья" }));
@@ -1430,7 +1444,10 @@ describe("AdminShell", () => {
     await user.click(within(createDialog).getByRole("button", { name: "Сохранить статью" }));
 
     expect(screen.queryByRole("dialog", { name: "Новая статья" })).not.toBeInTheDocument();
-    expect(screen.getByRole("table")).toHaveTextContent("Как подготовиться к массажу");
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Как подготовиться к массажу" })).toHaveAttribute(
+      "href",
+      "/admin?section=blog&role=owner&blog=blog-prepare-for-massage",
+    );
 
     const details = screen.getByLabelText("Детали статьи");
     expect(within(details).getByRole("heading", { name: "Как подготовиться к массажу" })).toBeInTheDocument();
@@ -1462,15 +1479,18 @@ describe("AdminShell", () => {
     await user.click(within(filters).getByRole("button", { name: "Черновики" }));
 
     expect(within(filters).getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(table).getByRole("button", { name: "Лимфодренаж: когда он уместен" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Подготовка к первому массажу" })).not.toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Лимфодренаж: когда он уместен" })).toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Подготовка к первому массажу" })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Поиск" }), { target: { value: "сертификат" } });
 
-    expect(within(table).queryByRole("button", { name: "Лимфодренаж: когда он уместен" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Лимфодренаж: когда он уместен" })).not.toBeInTheDocument();
 
     await user.click(within(filters).getByRole("button", { name: "Запланированные" }));
-    expect(within(table).getByRole("button", { name: "Подарочный сертификат без стресса" })).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Подарочный сертификат без стресса" })).toHaveAttribute(
+      "href",
+      "/admin?section=blog&role=owner&blog=blog-gift-certificate",
+    );
   });
 
   it("edits booking and Google Calendar settings from the settings workspace", async () => {

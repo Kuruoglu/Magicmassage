@@ -29,6 +29,7 @@ type AdminShellProps = {
   calendarAction?: AdminCalendarAction;
   role: AdminRoleId;
   selectedAppointmentKey?: string;
+  selectedBlogPostId?: string;
   selectedCalendarDate?: string;
   selectedClientName?: string;
   selectedCertificateCode?: string;
@@ -1303,6 +1304,10 @@ function mediaDetailHref(mediaId: string, role: AdminRoleId) {
 
 function contactDetailHref(contactId: string, role: AdminRoleId) {
   return `/admin?section=contacts&role=${role}&contact=${encodeURIComponent(contactId)}`;
+}
+
+function blogDetailHref(blogPostId: string, role: AdminRoleId) {
+  return `/admin?section=blog&role=${role}&blog=${encodeURIComponent(blogPostId)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -6129,15 +6134,20 @@ function BlogWorkspace({
   onCloseBlogCreate,
   onSaveBlogPost,
   query,
+  role,
+  selectedBlogPostId,
 }: {
   blogPosts: BlogPostRecord[];
   isBlogCreateOpen: boolean;
   onCloseBlogCreate: () => void;
   onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => void;
   query: string;
+  role: AdminRoleId;
+  selectedBlogPostId?: string;
 }) {
-  const [selectedId, setSelectedId] = useState(blogPosts[0]?.id ?? "");
-  const [isBlogDrawerOpen, setIsBlogDrawerOpen] = useState(false);
+  const initialSelectedBlogPost = selectedBlogPostId ? blogPosts.find((post) => post.id === selectedBlogPostId) : undefined;
+  const [selectedId, setSelectedId] = useState(initialSelectedBlogPost?.id ?? blogPosts[0]?.id ?? "");
+  const [isBlogDrawerOpen, setIsBlogDrawerOpen] = useState(Boolean(initialSelectedBlogPost));
   const [editingPost, setEditingPost] = useState<BlogPostRecord | undefined>();
   const [statusFilter, setStatusFilter] = useState<"all" | BlogStatus>("all");
   const filteredPosts = blogPosts
@@ -6247,9 +6257,9 @@ function BlogWorkspace({
               {filteredPosts.map((post) => (
                 <tr aria-selected={isBlogDrawerOpen && post.id === selectedPost.id} key={post.id}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openPost(post)} type="button">
+                    <Link className="admin-row-action admin-row-link" href={blogDetailHref(post.id, role)} onClick={() => openPost(post)}>
                       {post.title}
-                    </button>
+                    </Link>
                   </td>
                   <td>{post.category}</td>
                   <td>
@@ -6929,6 +6939,7 @@ function Workspace({
   query,
   role,
   section,
+  selectedBlogPostId,
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
@@ -6987,6 +6998,7 @@ function Workspace({
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
+  selectedBlogPostId?: string;
   selectedCalendarDate?: string;
   selectedCertificateCode?: string;
   selectedClientName?: string;
@@ -7108,9 +7120,12 @@ function Workspace({
       <BlogWorkspace
         blogPosts={blogPosts}
         isBlogCreateOpen={isBlogCreateOpen}
+        key={selectedBlogPostId ?? "default-blog"}
         onCloseBlogCreate={onCloseBlogCreate}
         onSaveBlogPost={onSaveBlogPost}
         query={query}
+        role={role}
+        selectedBlogPostId={selectedBlogPostId}
       />
     );
   }
@@ -7172,6 +7187,7 @@ export function AdminShell({
   calendarAction,
   role,
   selectedAppointmentKey,
+  selectedBlogPostId,
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
@@ -7839,6 +7855,7 @@ export function AdminShell({
           query={query}
           role={role}
           section={activeSection}
+          selectedBlogPostId={selectedBlogPostId}
           selectedCalendarDate={selectedCalendarDate}
           selectedCertificateCode={selectedCertificateCode}
           selectedClientName={selectedClientName}

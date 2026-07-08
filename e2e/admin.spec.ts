@@ -266,6 +266,20 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await page.goto("/admin?section=contacts&contact=contact-phone", { waitUntil: "networkidle" });
   await expect(page.getByRole("dialog", { name: "Детали контакта" }).getByRole("heading", { name: "Телефон салона" })).toBeVisible();
+
+  await page.goto("/admin?section=blog", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали статьи" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Подготовка к первому массажу" })).toHaveAttribute(
+    "href",
+    "/admin?section=blog&role=owner&blog=blog-first-massage-preparation",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Подготовка к первому массажу" }).click();
+  await expect(page).toHaveURL(/section=blog/);
+  await expect(page).toHaveURL(/blog=blog-first-massage-preparation/);
+  await expect(page.getByRole("dialog", { name: "Детали статьи" }).getByRole("heading", { name: "Подготовка к первому массажу" })).toBeVisible();
+
+  await page.goto("/admin?section=blog&blog=blog-first-massage-preparation", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали статьи" }).getByRole("heading", { name: "Подготовка к первому массажу" })).toBeVisible();
 });
 
 test("admin record drawers expose linked client workspaces", async ({ page }) => {
@@ -993,8 +1007,13 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await page.goto("/admin?section=blog", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Контент-план блога" })).toBeVisible();
-  await page.getByRole("table").getByRole("button", { name: "Подготовка к первому массажу" }).click();
+  await expect(page.getByRole("table").getByRole("link", { name: "Подготовка к первому массажу" })).toHaveAttribute(
+    "href",
+    "/admin?section=blog&role=owner&blog=blog-first-massage-preparation",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Подготовка к первому массажу" }).click();
   const initialDetails = page.getByRole("dialog", { name: "Детали статьи" });
+  await expect(page).toHaveURL(/blog=blog-first-massage-preparation/);
   await expect(initialDetails.getByRole("heading", { name: "Подготовка к первому массажу" })).toBeVisible();
   await initialDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(initialDetails).toHaveCount(0);
@@ -1017,7 +1036,10 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await createDialog.getByRole("button", { name: "Сохранить статью" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("button", { name: "Как подготовиться к массажу" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Как подготовиться к массажу" })).toHaveAttribute(
+    "href",
+    "/admin?section=blog&role=owner&blog=blog-prepare-for-massage",
+  );
 
   const details = page.getByLabel("Детали статьи");
   await expect(details.getByRole("heading", { name: "Как подготовиться к массажу" })).toBeVisible();
@@ -1038,7 +1060,10 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Черновики" }).click();
   await expect(page.getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("table").getByRole("button", { name: "Лимфодренаж: когда он уместен" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Лимфодренаж: когда он уместен" })).toHaveAttribute(
+    "href",
+    "/admin?section=blog&role=owner&blog=blog-lymphatic-draft",
+  );
 });
 
 test("settings workspace edits booking rules and confirms dangerous actions", async ({ page }) => {
