@@ -4314,6 +4314,29 @@ function AppointmentDetailDrawer({
           <dd>{appointment.note || "Комментарий к записи пока пуст."}</dd>
         </div>
       </dl>
+      {appointmentClient ? (
+        <section className="admin-client-section admin-linked-client-actions" aria-label="Связанные действия клиента">
+          <div className="admin-client-section-head">
+            <h3>Связанные действия</h3>
+            <span className={statusClass(appointmentClient.status)}>{appointmentClient.status}</span>
+          </div>
+          <p>Быстрые переходы к клиентской работе по этой записи.</p>
+          <div className="admin-client-next-actions">
+            <Link className="admin-client-inline-link" href={clientProfileHref(appointment.client, role)}>
+              Карточка клиента
+            </Link>
+            <Link className="admin-client-inline-link" href={calendarClientHref(appointment.client, role)}>
+              Все записи клиента
+            </Link>
+            <Link className="admin-client-inline-link" href={certificateClientHref(appointment.client, role)}>
+              Все сертификаты клиента
+            </Link>
+            <Link className="admin-client-inline-link" href={calendarCreateHref(appointment.client, role)}>
+              Записать снова
+            </Link>
+          </div>
+        </section>
+      ) : null}
     </aside>
   );
 }
@@ -4625,6 +4648,30 @@ function CertificatesWorkspace({
             <dd>{selectedCertificate.note || "Заметка по сертификату пока пустая."}</dd>
           </div>
         </dl>
+
+        {linkedClient ? (
+          <section className="admin-client-section admin-linked-client-actions" aria-label="Связанные действия клиента">
+            <div className="admin-client-section-head">
+              <h3>Связанные действия</h3>
+              <span className={statusClass(linkedClient.status)}>{linkedClient.status}</span>
+            </div>
+            <p>Быстрые переходы к клиентской работе по этому сертификату.</p>
+            <div className="admin-client-next-actions">
+              <Link className="admin-client-inline-link" href={clientProfileHref(linkedClient.name, role)}>
+                Карточка клиента
+              </Link>
+              <Link className="admin-client-inline-link" href={calendarClientHref(linkedClient.name, role)}>
+                Все записи клиента
+              </Link>
+              <Link className="admin-client-inline-link" href={certificateClientHref(linkedClient.name, role)}>
+                Все сертификаты клиента
+              </Link>
+              <Link className="admin-client-inline-link" href={calendarCreateHref(linkedClient.name, role)}>
+                Записать клиента
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
         <section className="admin-client-section">
           <h3>История</h3>

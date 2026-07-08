@@ -201,6 +201,23 @@ describe("AdminShell", () => {
     expect(within(details).getByRole("heading", { name: "MMN-2407-1023" })).toBeInTheDocument();
     expect(within(details).getByText("Oksana → Self")).toBeInTheDocument();
     expect(within(details).getByText("Ожидает PDF")).toBeInTheDocument();
+    const linkedActions = within(details).getByLabelText("Связанные действия клиента");
+    expect(within(linkedActions).getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Olena%20K.",
+    );
+    expect(within(linkedActions).getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&client=Olena%20K.",
+    );
+    expect(within(linkedActions).getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&client=Olena%20K.",
+    );
+    expect(within(linkedActions).getByRole("link", { name: "Записать клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+    );
   });
 
   it.each([
@@ -847,6 +864,23 @@ describe("AdminShell", () => {
     expect(
       within(screen.getByLabelText("Детали выбранной записи")).getByRole("link", { name: "Открыть клиента" }),
     ).toHaveAttribute("href", "/admin?section=clients&role=owner&client=Olena%20K.");
+    const linkedActions = within(screen.getByLabelText("Детали выбранной записи")).getByLabelText("Связанные действия клиента");
+    expect(within(linkedActions).getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Olena%20K.",
+    );
+    expect(within(linkedActions).getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&client=Olena%20K.",
+    );
+    expect(within(linkedActions).getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&client=Olena%20K.",
+    );
+    expect(within(linkedActions).getByRole("link", { name: "Записать снова" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+    );
   });
 
   it("switches the calendar to a month view with selectable days", async () => {

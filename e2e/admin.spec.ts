@@ -202,6 +202,51 @@ test("admin record details open as full-height drawers over full-width workspace
   await expect(drawer).toHaveCount(0);
 });
 
+test("admin record drawers expose linked client workspaces", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Список" }).click();
+  await page.getByRole("button", { name: /Olena K./ }).click();
+
+  const appointmentLinks = page.getByLabel("Детали выбранной записи").getByLabel("Связанные действия клиента");
+  await expect(appointmentLinks.getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=Olena%20K.",
+  );
+  await expect(appointmentLinks.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&client=Olena%20K.",
+  );
+  await expect(appointmentLinks.getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&client=Olena%20K.",
+  );
+  await expect(appointmentLinks.getByRole("link", { name: "Записать снова" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+  );
+
+  await page.goto("/admin?section=certificates&certificate=MMN-2407-1023", { waitUntil: "networkidle" });
+
+  const certificateLinks = page.getByLabel("Детали сертификата").getByLabel("Связанные действия клиента");
+  await expect(certificateLinks.getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=Olena%20K.",
+  );
+  await expect(certificateLinks.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&client=Olena%20K.",
+  );
+  await expect(certificateLinks.getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&client=Olena%20K.",
+  );
+  await expect(certificateLinks.getByRole("link", { name: "Записать клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+  );
+});
+
 test("calendar week and list modes are distinct", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 
