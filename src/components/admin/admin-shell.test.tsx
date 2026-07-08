@@ -241,6 +241,7 @@ describe("AdminShell", () => {
       activeSection: "certificates" as const,
       drawerLabel: "Детали сертификата",
       heading: "MMN-2407-1023",
+      rowHref: "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
       rowButton: "MMN-2407-1023",
     },
     {
@@ -285,12 +286,20 @@ describe("AdminShell", () => {
       heading: "Natali Ivanova",
       rowButton: "Natali Ivanova",
     },
-  ])("opens $drawerLabel as a full-height drawer after selecting a row", ({ activeSection, drawerLabel, heading, rowButton }) => {
+  ])("opens $drawerLabel as a full-height drawer after selecting a row", ({ activeSection, drawerLabel, heading, rowButton, rowHref }) => {
     render(<AdminShell activeSection={activeSection} role="owner" />);
 
     expect(screen.queryByLabelText(drawerLabel)).not.toBeInTheDocument();
 
-    fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: rowButton }));
+    const rowControl = rowHref
+      ? within(screen.getByRole("table")).getByRole("link", { name: rowButton })
+      : within(screen.getByRole("table")).getByRole("button", { name: rowButton });
+    if (rowHref) {
+      expect(rowControl).toHaveAttribute("href", rowHref);
+      rowControl.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    }
+
+    fireEvent.click(rowControl);
 
     const details = screen.getByRole("dialog", { name: drawerLabel });
     expect(details).toHaveClass("admin-drawer-panel");
@@ -321,7 +330,10 @@ describe("AdminShell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить сертификат" }));
 
     expect(screen.queryByRole("dialog", { name: "Новый сертификат" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("button", { name: "MMN-2407-1999" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "MMN-2407-1999" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1999",
+    );
 
     const details = screen.getByLabelText("Детали сертификата");
     expect(within(details).getByRole("heading", { name: "MMN-2407-1999" })).toBeInTheDocument();
@@ -334,7 +346,10 @@ describe("AdminShell", () => {
   it("updates certificate delivery, redemption, and editable details", () => {
     render(<AdminShell activeSection="certificates" role="owner" />);
 
-    fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "MMN-2407-1023" }));
+    const certificateLink = within(screen.getByRole("table")).getByRole("link", { name: "MMN-2407-1023" });
+    expect(certificateLink).toHaveAttribute("href", "/admin?section=certificates&role=owner&certificate=MMN-2407-1023");
+    certificateLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(certificateLink);
 
     const details = screen.getByLabelText("Детали сертификата");
     expect(within(details).getByRole("heading", { name: "MMN-2407-1023" })).toBeInTheDocument();
@@ -355,7 +370,7 @@ describe("AdminShell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
 
     expect(screen.queryByRole("dialog", { name: "Редактировать сертификат" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "MMN-2407-1023" })).toHaveLength(1);
+    expect(within(screen.getByRole("table")).getAllByRole("link", { name: "MMN-2407-1023" })).toHaveLength(1);
     expect(within(details).getByText("Oksana → Olena K.")).toBeInTheDocument();
     expect(within(details).getByText("260 €")).toBeInTheDocument();
     expect(within(details).getByText("Погашен после записи клиента.")).toBeInTheDocument();

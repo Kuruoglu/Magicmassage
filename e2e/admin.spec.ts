@@ -722,7 +722,10 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
   await createDialog.getByRole("button", { name: "Сохранить сертификат" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("button", { name: "MMN-2407-1999" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "MMN-2407-1999" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&certificate=MMN-2407-1999",
+  );
 
   const details = page.getByLabel("Детали сертификата");
   await expect(details.getByRole("heading", { name: "MMN-2407-1999" })).toBeVisible();
@@ -732,7 +735,12 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
 
   await details.getByRole("button", { name: "Закрыть" }).click();
   await expect(details).toHaveCount(0);
-  await page.getByRole("table").getByRole("button", { name: "MMN-2407-1023" }).click();
+  await expect(page.getByRole("table").getByRole("link", { name: "MMN-2407-1023" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+  );
+  await page.getByRole("table").getByRole("link", { name: "MMN-2407-1023" }).click();
+  await expect(page).toHaveURL(/certificate=MMN-2407-1023/);
   await expect(details.getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
 
   await details.getByRole("button", { name: "Отправить PDF" }).click();

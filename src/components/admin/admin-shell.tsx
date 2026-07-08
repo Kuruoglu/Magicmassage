@@ -4573,9 +4573,13 @@ function CertificatesWorkspace({
               {filteredCertificates.map((certificate) => (
                 <tr aria-selected={isCertificateDrawerOpen && certificate.code === selectedCertificate.code} key={certificate.code}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openCertificate(certificate.code)} type="button">
+                    <Link
+                      className="admin-row-action admin-row-link"
+                      href={certificateDetailHref(certificate.code, role)}
+                      onClick={() => openCertificate(certificate.code)}
+                    >
                       {certificate.code}
-                    </button>
+                    </Link>
                   </td>
                   <td>{certificate.buyer}</td>
                   <td>{certificate.clientName}</td>
