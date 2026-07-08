@@ -434,6 +434,25 @@ test("client profile shows the next calendar appointment", async ({ page }) => {
   );
 });
 
+test("client profile can issue a prefilled certificate", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
+  await card.getByRole("button", { name: "Выдать сертификат" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Новый сертификат" });
+  await expect(dialog.getByLabel("Код")).toHaveValue("MMN-2407-1024");
+  await expect(dialog.getByLabel("Покупатель")).toHaveValue("Olena K.");
+  await expect(dialog.getByRole("textbox", { name: "Клиент", exact: true })).toHaveValue("Olena K.");
+  await expect(dialog.getByLabel("Получатель")).toHaveValue("Olena K.");
+  await dialog.getByLabel("Сумма").fill("95 €");
+  await dialog.getByRole("button", { name: "Сохранить сертификат" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "MMN-2407-1024" })).toBeVisible();
+  await expect(card.getByText("95 €")).toBeVisible();
+});
+
 test("client profile links visit history and certificates to their workspaces", async ({ page }) => {
   await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
 

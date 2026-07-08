@@ -550,6 +550,31 @@ describe("AdminShell", () => {
     );
   });
 
+  it("issues a prefilled certificate from the selected client card", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    fireEvent.click(within(card).getByRole("button", { name: "Выдать сертификат" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новый сертификат" });
+    expect(within(dialog).getByLabelText("Код")).toHaveValue("MMN-2407-1024");
+    expect(within(dialog).getByLabelText("Покупатель")).toHaveValue("Olena K.");
+    expect(within(dialog).getByLabelText("Клиент")).toHaveValue("Olena K.");
+    expect(within(dialog).getByLabelText("Получатель")).toHaveValue("Olena K.");
+    expect(within(dialog).getByLabelText("Заметка")).toHaveValue("Выдано из карточки клиента Olena K.");
+
+    fireEvent.change(within(dialog).getByLabelText("Сумма"), { target: { value: "95 €" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить сертификат" }));
+
+    expect(screen.queryByRole("dialog", { name: "Новый сертификат" })).not.toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "MMN-2407-1024" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1024",
+    );
+    expect(within(card).getByText("95 €")).toBeInTheDocument();
+    expect(within(card).getAllByText("Оплачено").length).toBeGreaterThan(0);
+  });
+
   it("edits and saves the selected client note", async () => {
     const user = userEvent.setup();
 

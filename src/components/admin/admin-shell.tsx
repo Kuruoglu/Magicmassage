@@ -926,6 +926,32 @@ function buildCertificateFormState(certificate?: CertificateRecord): Certificate
   };
 }
 
+function buildClientCertificateDraft(client: ClientRecord, certificates: CertificateRecord[]): CertificateRecord {
+  const nextSuffix =
+    Math.max(
+      1020,
+      ...certificates.map((certificate) => {
+        const suffixMatch = certificate.code.match(/(\d+)$/);
+
+        return suffixMatch ? Number(suffixMatch[1]) : 0;
+      }),
+    ) + 1;
+
+  return {
+    amount: "0 €",
+    buyer: client.name,
+    clientName: client.name,
+    code: `MMN-2407-${nextSuffix}`,
+    expiresAt: "2027-01-07",
+    history: [],
+    note: `Выдано из карточки клиента ${client.name}`,
+    paymentDate: "2026-07-07",
+    recipient: client.name,
+    status: "Оплачено",
+    stripeId: "manual",
+  };
+}
+
 function buildServiceFormState(service?: ServiceRecord): ServiceFormState {
   return {
     category: service?.category ?? "Массаж",
@@ -1816,16 +1842,18 @@ function AdminUserDialog({
 
 function CertificateFormDialog({
   initialCertificate,
+  isCreatePrefill = false,
   onClose,
   onSave,
 }: {
   initialCertificate?: CertificateRecord;
+  isCreatePrefill?: boolean;
   onClose: () => void;
   onSave: (certificate: CertificateRecord, originalCode?: string) => void;
 }) {
   const [form, setForm] = useState<CertificateFormState>(() => buildCertificateFormState(initialCertificate));
   const [error, setError] = useState("");
-  const isEditing = Boolean(initialCertificate);
+  const isEditing = Boolean(initialCertificate) && !isCreatePrefill;
 
   function updateForm<Field extends keyof CertificateFormState>(field: Field, value: CertificateFormState[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1851,14 +1879,14 @@ function CertificateFormDialog({
         clientName: form.clientName.trim() || recipient,
         code,
         expiresAt: form.expiresAt,
-        history: initialCertificate?.history.map((entry) => entry) ?? [`${form.paymentDate}: сертификат создан вручную.`],
+        history: isEditing ? (initialCertificate?.history.map((entry) => entry) ?? []) : [`${form.paymentDate}: сертификат создан вручную.`],
         note: form.note.trim(),
         paymentDate: form.paymentDate,
         recipient,
         status: form.status,
         stripeId: form.stripeId.trim() || "manual",
       },
-      initialCertificate?.code,
+      isEditing ? initialCertificate?.code : undefined,
     );
   }
 
@@ -3420,6 +3448,7 @@ function ClientDetailCard({
   onCalendarCreateIntent,
   onClose,
   onEditClient,
+  onIssueCertificate,
   onSaveNote,
   role,
 }: {
@@ -3429,6 +3458,7 @@ function ClientDetailCard({
   onCalendarCreateIntent: () => void;
   onClose: () => void;
   onEditClient: (client: ClientRecord) => void;
+  onIssueCertificate: (client: ClientRecord) => void;
   onSaveNote: (clientName: string, note: string) => void;
   role: AdminRoleId;
 }) {
@@ -3520,6 +3550,9 @@ function ClientDetailCard({
         </Link>
         <button className="admin-outline-action" onClick={() => onEditClient(client)} type="button">
           Редактировать клиента
+        </button>
+        <button className="admin-outline-action" onClick={() => onIssueCertificate(client)} type="button">
+          Выдать сертификат
         </button>
         <a className="admin-outline-action" href={phoneHref(client.phone)}>
           Позвонить
@@ -3678,6 +3711,7 @@ function ClientsWorkspace({
   isClientCreateOpen,
   onCalendarCreateIntent,
   onCloseClientCreate,
+  onSaveCertificate,
   onSaveClient,
   onSaveClientNote,
   query,
@@ -3690,6 +3724,7 @@ function ClientsWorkspace({
   isClientCreateOpen: boolean;
   onCalendarCreateIntent: () => void;
   onCloseClientCreate: () => void;
+  onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
   query: string;
@@ -3700,6 +3735,7 @@ function ClientsWorkspace({
   const [selectedName, setSelectedName] = useState(initialSelectedClientName);
   const [isClientDrawerOpen, setIsClientDrawerOpen] = useState(Boolean(selectedClientName));
   const [editingClient, setEditingClient] = useState<ClientRecord | undefined>();
+  const [certificateDraft, setCertificateDraft] = useState<CertificateRecord | undefined>();
   const [clientFilter, setClientFilter] = useState<ClientFilterId>("all");
   const filteredClients = clients.filter(
     (client) =>
@@ -3729,12 +3765,28 @@ function ClientsWorkspace({
 
   function openClientEdit(client: ClientRecord) {
     onCloseClientCreate();
+    setCertificateDraft(undefined);
     setEditingClient(client);
   }
 
   function closeClientForm() {
     setEditingClient(undefined);
     onCloseClientCreate();
+  }
+
+  function openClientCertificateDraft(client: ClientRecord) {
+    onCloseClientCreate();
+    setEditingClient(undefined);
+    setCertificateDraft(buildClientCertificateDraft(client, certificates));
+  }
+
+  function closeClientCertificateDraft() {
+    setCertificateDraft(undefined);
+  }
+
+  function saveClientCertificate(certificate: CertificateRecord, originalCode?: string) {
+    onSaveCertificate(certificate, originalCode);
+    setCertificateDraft(undefined);
   }
 
   function saveClientForm(client: ClientRecord, originalClientName?: string) {
@@ -3854,6 +3906,7 @@ function ClientsWorkspace({
             onCalendarCreateIntent={onCalendarCreateIntent}
             onClose={() => setIsClientDrawerOpen(false)}
             onEditClient={openClientEdit}
+            onIssueCertificate={openClientCertificateDraft}
             onSaveNote={onSaveClientNote}
             role={role}
           />
@@ -3865,6 +3918,15 @@ function ClientsWorkspace({
           key={editingClient?.name ?? "new-client"}
           onClose={closeClientForm}
           onSave={saveClientForm}
+        />
+      ) : null}
+      {certificateDraft ? (
+        <CertificateFormDialog
+          initialCertificate={certificateDraft}
+          isCreatePrefill
+          key={certificateDraft.code}
+          onClose={closeClientCertificateDraft}
+          onSave={saveClientCertificate}
         />
       ) : null}
     </div>
@@ -6472,6 +6534,7 @@ function Workspace({
         key={selectedClientName ?? "default-client"}
         onCalendarCreateIntent={onCalendarCreateIntent}
         onCloseClientCreate={onCloseClientCreate}
+        onSaveCertificate={onSaveCertificate}
         onSaveClient={onSaveClient}
         onSaveClientNote={onSaveClientNote}
         query={query}
