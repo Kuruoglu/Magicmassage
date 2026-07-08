@@ -1290,6 +1290,14 @@ function findClientNextAppointment(clientName: string, appointments: Appointment
   );
 }
 
+function findClientLastCompletedVisit(client: ClientRecord) {
+  return client.history.find((visit) => normalizeSearch(visit.status).includes("заверш")) ?? client.history[client.history.length - 1];
+}
+
+function findClientActiveCertificate(certificates: CertificateRecord[]) {
+  return certificates.find((certificate) => certificate.status !== "Погашен") ?? certificates[0];
+}
+
 function sortAppointments(appointments: Appointment[]) {
   return [...appointments].sort((first, second) =>
     `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
@@ -3532,6 +3540,8 @@ function ClientDetailCard({
     .toUpperCase();
   const activity = clientActivitySummary(client);
   const nextAppointment = findClientNextAppointment(client.name, appointments);
+  const lastCompletedVisit = findClientLastCompletedVisit(client);
+  const activeCertificate = findClientActiveCertificate(certificates);
 
   function startNoteEdit() {
     setDraftNote(client.note);
@@ -3638,6 +3648,49 @@ function ClientDetailCard({
           <strong>{client.totalSpend}</strong>
         </div>
       </div>
+
+      <section className="admin-client-section admin-client-work-profile" aria-label="Рабочий профиль клиента">
+        <div className="admin-client-section-head">
+          <h3>Рабочий профиль</h3>
+          <span className={statusClass(client.status)}>{client.status}</span>
+        </div>
+        <div className="admin-client-work-grid">
+          <article>
+            <span>Последний завершенный визит</span>
+            <strong>{lastCompletedVisit?.date ?? "Нет завершенных визитов"}</strong>
+            <small>{lastCompletedVisit?.service ?? "История пока пустая"}</small>
+          </article>
+          <article>
+            <span>Ближайшая запись</span>
+            <strong>{nextAppointment ? appointmentVisitLabel(nextAppointment) : "Не назначена"}</strong>
+            <small>{nextAppointment?.service ?? "Можно записать клиента вручную"}</small>
+          </article>
+          <article>
+            <span>Активный сертификат</span>
+            <strong>{activeCertificate ? `${activeCertificate.code} · ${activeCertificate.amount}` : "Нет активного сертификата"}</strong>
+            <small>{activeCertificate?.status ?? "Можно выдать сертификат из карточки"}</small>
+          </article>
+        </div>
+        <p className="admin-client-work-note">
+          <strong>Заметка к работе</strong>
+          {client.note || "Заметка пока пустая."}
+        </p>
+        <div className="admin-client-next-actions">
+          {nextAppointment ? (
+            <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role)}>
+              Открыть ближайшую запись
+            </Link>
+          ) : null}
+          {activeCertificate ? (
+            <Link className="admin-client-inline-link" href={certificateDetailHref(activeCertificate.code, role)}>
+              Открыть активный сертификат
+            </Link>
+          ) : null}
+          <Link className="admin-client-inline-link" href={calendarCreateHref(client.name, role)} onClick={onCalendarCreateIntent}>
+            Записать снова
+          </Link>
+        </div>
+      </section>
 
       <section className="admin-client-section admin-client-next-appointment" aria-label="Ближайшая запись клиента">
         <div className="admin-client-section-head">

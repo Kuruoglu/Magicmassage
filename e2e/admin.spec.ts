@@ -417,7 +417,7 @@ test("client profile saves a note and exposes contact actions", async ({ page })
   await card.getByRole("button", { name: "Сохранить заметку" }).click();
 
   await expect(card.getByRole("status")).toHaveText("Заметка сохранена.");
-  await expect(card.getByText("Клиентка просит напоминать за 2 часа.")).toBeVisible();
+  await expect(card.getByText("Клиентка просит напоминать за 2 часа.").first()).toBeVisible();
 });
 
 test("client profile shows the next calendar appointment", async ({ page }) => {
@@ -431,6 +431,28 @@ test("client profile shows the next calendar appointment", async ({ page }) => {
   await expect(nextAppointment.getByRole("link", { name: "Открыть запись" })).toHaveAttribute(
     "href",
     "/admin?section=calendar&role=owner&date=2026-07-08",
+  );
+});
+
+test("client profile summarizes related work records", async ({ page }) => {
+  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+
+  const profile = page.getByLabel("Рабочий профиль клиента");
+  await expect(profile.getByRole("heading", { name: "Рабочий профиль" })).toBeVisible();
+  await expect(profile.getByText("Последний завершенный визит")).toBeVisible();
+  await expect(profile.getByText("24 июня, 18:30")).toBeVisible();
+  await expect(profile.getByText("Ближайшая запись")).toBeVisible();
+  await expect(profile.getByText("8 июля, 15:00")).toBeVisible();
+  await expect(profile.getByText("Активный сертификат", { exact: true })).toBeVisible();
+  await expect(profile.getByText("MMN-2407-1023 · 250 €")).toBeVisible();
+  await expect(profile.getByText(/вечерние слоты и сильное давление/)).toBeVisible();
+  await expect(profile.getByRole("link", { name: "Открыть ближайшую запись" })).toHaveAttribute(
+    "href",
+    "/admin?section=calendar&role=owner&date=2026-07-08",
+  );
+  await expect(profile.getByRole("link", { name: "Открыть активный сертификат" })).toHaveAttribute(
+    "href",
+    "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
   );
 });
 
@@ -511,7 +533,7 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(card.getByText("Обновлено после звонка, лучше писать на email.")).toBeVisible();
+  await expect(card.getByText("Обновлено после звонка, лучше писать на email.", { exact: true })).toBeVisible();
   await expect(card.getByText("email", { exact: true })).toBeVisible();
 });
 
@@ -922,9 +944,10 @@ test("client filters update the table and profile certificate block", async ({ p
   await page.getByRole("button", { name: "Все" }).click();
   await page.getByRole("button", { name: "Olena K." }).click();
 
-  await expect(card.getByRole("heading", { name: "Сертификаты" })).toBeVisible();
-  await expect(card.getByText("MMN-2407-1023")).toBeVisible();
-  await expect(card.getByText("250 €")).toBeVisible();
+  const certificatesSection = card.getByRole("heading", { name: "Сертификаты" }).locator("..");
+  await expect(certificatesSection).toBeVisible();
+  await expect(certificatesSection.getByRole("link", { name: "MMN-2407-1023" })).toBeVisible();
+  await expect(certificatesSection.getByText("250 €", { exact: true })).toBeVisible();
 
   await card.getByRole("button", { name: "Закрыть" }).click();
   await page.getByRole("button", { name: "Активные" }).click();

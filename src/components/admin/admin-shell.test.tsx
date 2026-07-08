@@ -171,7 +171,7 @@ describe("AdminShell", () => {
       "href",
       "/admin?section=calendar&role=owner&date=2026-07-08",
     );
-    expect(within(card).getByText(/Предпочитает вечерние слоты/)).toBeInTheDocument();
+    expect(within(card).getAllByText(/Предпочитает вечерние слоты/).length).toBeGreaterThan(0);
   });
 
   it("shows certificates linked to the selected client", () => {
@@ -185,7 +185,7 @@ describe("AdminShell", () => {
     );
     expect(within(card).getByText("Oksana → Self")).toBeInTheDocument();
     expect(within(card).getByText("250 €")).toBeInTheDocument();
-    expect(within(card).getByText("Ожидает PDF")).toBeInTheDocument();
+    expect(within(card).getAllByText("Ожидает PDF").length).toBeGreaterThan(0);
   });
 
   it("opens certificate details from the certificate query", () => {
@@ -550,6 +550,30 @@ describe("AdminShell", () => {
     );
   });
 
+  it("summarizes the selected client working profile with related records", () => {
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    const profile = within(card).getByLabelText("Рабочий профиль клиента");
+
+    expect(within(profile).getByRole("heading", { name: "Рабочий профиль" })).toBeInTheDocument();
+    expect(within(profile).getByText("Последний завершенный визит")).toBeInTheDocument();
+    expect(within(profile).getByText("24 июня, 18:30")).toBeInTheDocument();
+    expect(within(profile).getByText("Ближайшая запись")).toBeInTheDocument();
+    expect(within(profile).getByText("8 июля, 15:00")).toBeInTheDocument();
+    expect(within(profile).getByText("Активный сертификат")).toBeInTheDocument();
+    expect(within(profile).getByText("MMN-2407-1023 · 250 €")).toBeInTheDocument();
+    expect(within(profile).getByText(/вечерние слоты и сильное давление/)).toBeInTheDocument();
+    expect(within(profile).getByRole("link", { name: "Открыть ближайшую запись" })).toHaveAttribute(
+      "href",
+      "/admin?section=calendar&role=owner&date=2026-07-08",
+    );
+    expect(within(profile).getByRole("link", { name: "Открыть активный сертификат" })).toHaveAttribute(
+      "href",
+      "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
+    );
+  });
+
   it("issues a prefilled certificate from the selected client card", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
@@ -589,7 +613,7 @@ describe("AdminShell", () => {
     await user.click(within(card).getByRole("button", { name: "Сохранить заметку" }));
 
     expect(within(card).getByRole("status")).toHaveTextContent("Заметка сохранена.");
-    expect(within(card).getByText(/напоминать за 2 часа/)).toBeInTheDocument();
+    expect(within(card).getAllByText(/напоминать за 2 часа/).length).toBeGreaterThan(0);
     expect(within(card).queryByLabelText("Заметка клиента")).not.toBeInTheDocument();
   });
 
@@ -621,7 +645,7 @@ describe("AdminShell", () => {
     expect(within(card).getByText("+359 88 777 1122")).toBeInTheDocument();
     expect(within(card).getByText("irina@example.com")).toBeInTheDocument();
     expect(within(card).getByText("BG · Новый клиент")).toBeInTheDocument();
-    expect(within(card).getByText(/предпочитает дневные слоты/)).toBeInTheDocument();
+    expect(within(card).getAllByText(/предпочитает дневные слоты/).length).toBeGreaterThan(0);
     expect(within(card).getByText("new")).toBeInTheDocument();
   });
 
@@ -669,7 +693,7 @@ describe("AdminShell", () => {
     expect(within(card).getByText("+359 87 333 4499")).toBeInTheDocument();
     expect(within(card).getByText("olena.updated@example.com")).toBeInTheDocument();
     expect(within(card).getAllByText("Email").length).toBeGreaterThan(0);
-    expect(within(card).getByText(/Обновленная заметка/)).toBeInTheDocument();
+    expect(within(card).getAllByText(/Обновленная заметка/).length).toBeGreaterThan(0);
     expect(within(card).getByText("email")).toBeInTheDocument();
   });
 

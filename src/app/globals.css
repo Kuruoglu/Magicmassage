@@ -3455,6 +3455,60 @@ button.admin-calendar-item[aria-pressed="true"] {
   gap: 6px;
 }
 
+.admin-client-work-profile {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-client-work-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-client-work-grid article {
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.admin-client-work-grid span,
+.admin-client-work-note strong {
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-client-work-grid strong {
+  color: var(--admin-text);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-work-grid small {
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-work-note {
+  background: rgba(124, 77, 161, 0.07);
+  border: 1px solid rgba(124, 77, 161, 0.12);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
 .admin-client-history {
   display: grid;
   gap: 10px;
@@ -4649,6 +4703,7 @@ button.admin-calendar-item[aria-pressed="true"] {
   .admin-certificate-form-grid,
   .admin-content-form-grid,
   .admin-client-form-grid,
+  .admin-client-work-grid,
   .admin-user-form-grid {
     grid-template-columns: 1fr;
   }
