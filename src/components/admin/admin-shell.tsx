@@ -3428,8 +3428,18 @@ function CalendarAppointmentCancelDialog({
   );
 }
 
-function DashboardWorkspace({ certificates, query, role }: { certificates: CertificateRecord[]; query: string; role: AdminRoleId }) {
-  const filteredAppointments = upcomingAppointments.filter((appointment) =>
+function DashboardWorkspace({
+  appointments,
+  certificates,
+  query,
+  role,
+}: {
+  appointments: Appointment[];
+  certificates: CertificateRecord[];
+  query: string;
+  role: AdminRoleId;
+}) {
+  const filteredAppointments = appointments.filter((appointment) =>
     matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
   );
   const filteredCertificates = certificates.filter((certificate) =>
@@ -3535,7 +3545,7 @@ function DashboardWorkspace({ certificates, query, role }: { certificates: Certi
                     <span className={statusClass(appointment.status)}>{appointment.status}</span>
                   </td>
                   <td>
-                    <Link className="admin-row-action admin-row-link" href={calendarDateHref(appointment.date, role)}>
+                    <Link className="admin-row-action admin-row-link" href={calendarAppointmentHref(appointment, role, appointment.client)}>
                       Календарь
                     </Link>
                   </td>
@@ -6927,7 +6937,7 @@ function Workspace({
   settings: SettingsRecord;
 }) {
   if (section === "dashboard") {
-    return <DashboardWorkspace certificates={certificates} query={query} role={role} />;
+    return <DashboardWorkspace appointments={appointments} certificates={certificates} query={query} role={role} />;
   }
 
   if (section === "clients") {

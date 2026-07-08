@@ -29,15 +29,23 @@ test("dashboard links to connected admin workspaces", async ({ page }) => {
   await expect(page.getByLabel("Детали сертификата").getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
 });
 
-test("dashboard calendar row link opens the matching day", async ({ page }) => {
+test("dashboard calendar row link opens the exact appointment", async ({ page }) => {
   await page.goto("/admin", { waitUntil: "networkidle" });
 
   await page.getByRole("row", { name: /17:30 Светлана/ }).getByRole("link", { name: "Календарь" }).click();
 
   await expect(page).toHaveURL(/section=calendar/);
   await expect(page).toHaveURL(/date=2026-07-10/);
+  await expect(page).toHaveURL(/client=%D0%A1%D0%B2%D0%B5%D1%82%D0%BB%D0%B0%D0%BD%D0%B0/);
+  await expect(page).toHaveURL(/appointment=demo-4/);
   await expect(page.getByRole("heading", { name: "10 июля" })).toBeVisible();
   await expect(page.getByRole("button", { name: "День" })).toHaveAttribute("aria-pressed", "true");
+  const focusedAppointment = page.getByLabel("Детали выбранной записи");
+  await expect(focusedAppointment.getByRole("heading", { name: "Светлана" })).toBeVisible();
+  await expect(focusedAppointment.getByText("SPA процедура")).toBeVisible();
+  await expect(focusedAppointment.getByText("17:30")).toBeVisible();
+  await focusedAppointment.getByRole("button", { name: "Закрыть" }).click();
+  await expect(focusedAppointment).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Светлана/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 });
