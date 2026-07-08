@@ -32,6 +32,7 @@ type AdminShellProps = {
   selectedCalendarDate?: string;
   selectedClientName?: string;
   selectedCertificateCode?: string;
+  selectedMediaId?: string;
   selectedPriceId?: string;
   selectedServiceSlug?: string;
 };
@@ -1293,6 +1294,10 @@ function serviceDetailHref(serviceSlug: string, role: AdminRoleId) {
 
 function priceDetailHref(priceId: string, role: AdminRoleId) {
   return `/admin?section=price&role=${role}&price=${encodeURIComponent(priceId)}`;
+}
+
+function mediaDetailHref(mediaId: string, role: AdminRoleId) {
+  return `/admin?section=media&role=${role}&media=${encodeURIComponent(mediaId)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -5656,15 +5661,20 @@ function MediaWorkspace({
   onCloseMediaCreate,
   onSaveMedia,
   query,
+  role,
+  selectedMediaId,
 }: {
   isMediaCreateOpen: boolean;
   media: MediaRecord[];
   onCloseMediaCreate: () => void;
   onSaveMedia: (media: MediaRecord, originalId?: string) => void;
   query: string;
+  role: AdminRoleId;
+  selectedMediaId?: string;
 }) {
-  const [selectedId, setSelectedId] = useState(media[0]?.id ?? "");
-  const [isMediaDrawerOpen, setIsMediaDrawerOpen] = useState(false);
+  const initialSelectedMedia = selectedMediaId ? media.find((item) => item.id === selectedMediaId) : undefined;
+  const [selectedId, setSelectedId] = useState(initialSelectedMedia?.id ?? media[0]?.id ?? "");
+  const [isMediaDrawerOpen, setIsMediaDrawerOpen] = useState(Boolean(initialSelectedMedia));
   const [editingMedia, setEditingMedia] = useState<MediaRecord | undefined>();
   const [filter, setFilter] = useState<"all" | "photo" | "documents" | "needsAlt">("all");
   const filteredMedia = media
@@ -5777,9 +5787,9 @@ function MediaWorkspace({
               {filteredMedia.map((item) => (
                 <tr aria-selected={isMediaDrawerOpen && item.id === selectedMedia.id} key={item.id}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openMedia(item)} type="button">
+                    <Link className="admin-row-action admin-row-link" href={mediaDetailHref(item.id, role)} onClick={() => openMedia(item)}>
                       {item.name}
-                    </button>
+                    </Link>
                   </td>
                   <td>{item.folder}</td>
                   <td>{item.type}</td>
@@ -6912,6 +6922,7 @@ function Workspace({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedMediaId,
   selectedPriceId,
   selectedServiceSlug,
   services,
@@ -6968,6 +6979,7 @@ function Workspace({
   selectedCalendarDate?: string;
   selectedCertificateCode?: string;
   selectedClientName?: string;
+  selectedMediaId?: string;
   selectedPriceId?: string;
   selectedServiceSlug?: string;
   services: ServiceRecord[];
@@ -7051,10 +7063,13 @@ function Workspace({
     return (
       <MediaWorkspace
         isMediaCreateOpen={isMediaCreateOpen}
+        key={selectedMediaId ?? "default-media"}
         media={media}
         onCloseMediaCreate={onCloseMediaCreate}
         onSaveMedia={onSaveMedia}
         query={query}
+        role={role}
+        selectedMediaId={selectedMediaId}
       />
     );
   }
@@ -7145,6 +7160,7 @@ export function AdminShell({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedMediaId,
   selectedPriceId,
   selectedServiceSlug,
 }: AdminShellProps) {
@@ -7810,6 +7826,7 @@ export function AdminShell({
           selectedCalendarDate={selectedCalendarDate}
           selectedCertificateCode={selectedCertificateCode}
           selectedClientName={selectedClientName}
+          selectedMediaId={selectedMediaId}
           selectedPriceId={selectedPriceId}
           selectedServiceSlug={selectedServiceSlug}
           services={services}

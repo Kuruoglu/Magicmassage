@@ -238,6 +238,20 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await page.goto("/admin?section=price&price=price-classic-60", { waitUntil: "networkidle" });
   await expect(page.getByRole("dialog", { name: "Детали цены" }).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeVisible();
+
+  await page.goto("/admin?section=media", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали медиа" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Классический массаж" })).toHaveAttribute(
+    "href",
+    "/admin?section=media&role=owner&media=media-classic-cover",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Классический массаж" }).click();
+  await expect(page).toHaveURL(/section=media/);
+  await expect(page).toHaveURL(/media=media-classic-cover/);
+  await expect(page.getByRole("dialog", { name: "Детали медиа" }).getByRole("heading", { name: "Классический массаж" })).toBeVisible();
+
+  await page.goto("/admin?section=media&media=media-classic-cover", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали медиа" }).getByRole("heading", { name: "Классический массаж" })).toBeVisible();
 });
 
 test("admin record drawers expose linked client workspaces", async ({ page }) => {
@@ -881,7 +895,10 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
   await createDialog.getByRole("button", { name: "Сохранить медиа" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("button", { name: "Арома обложка" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Арома обложка" })).toHaveAttribute(
+    "href",
+    `/admin?section=media&role=owner&media=${encodeURIComponent("media-арома-обложка")}`,
+  );
 
   const details = page.getByLabel("Детали медиа");
   await expect(details.getByRole("heading", { name: "Арома обложка" })).toBeVisible();
@@ -902,7 +919,7 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
   await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Требует alt" }).click();
   await expect(page.getByRole("button", { name: "Требует alt" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("table").getByRole("button", { name: "Арома обложка" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Арома обложка" })).toBeVisible();
 });
 
 test("contacts workspace edits site settings and contact channels", async ({ page }) => {

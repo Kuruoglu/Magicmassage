@@ -255,6 +255,16 @@ describe("AdminShell", () => {
     expect(within(details).getByText("EUR")).toBeInTheDocument();
   });
 
+  it("opens media details from the media query", () => {
+    render(<AdminShell activeSection="media" role="owner" selectedMediaId="media-classic-cover" />);
+
+    const details = screen.getByRole("dialog", { name: "Детали медиа" });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(within(details).getByRole("heading", { name: "Классический массаж" })).toBeInTheDocument();
+    expect(within(details).getByText("/media/services/classic-massage.jpg")).toBeInTheDocument();
+    expect(within(details).getByText("Услуга: Классический массаж")).toBeInTheDocument();
+  });
+
   it.each([
     {
       activeSection: "certificates" as const,
@@ -281,6 +291,7 @@ describe("AdminShell", () => {
       activeSection: "media" as const,
       drawerLabel: "Детали медиа",
       heading: "Классический массаж",
+      rowHref: "/admin?section=media&role=owner&media=media-classic-cover",
       rowButton: "Классический массаж",
     },
     {
@@ -558,7 +569,10 @@ describe("AdminShell", () => {
     fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить медиа" }));
 
     expect(screen.queryByRole("dialog", { name: "Новое медиа" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("button", { name: "Арома обложка" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Арома обложка" })).toHaveAttribute(
+      "href",
+      `/admin?section=media&role=owner&media=${encodeURIComponent("media-арома-обложка")}`,
+    );
 
     const details = screen.getByLabelText("Детали медиа");
     expect(within(details).getByRole("heading", { name: "Арома обложка" })).toBeInTheDocument();
@@ -581,21 +595,25 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="media" role="owner" />);
 
     const table = screen.getByRole("table");
-    expect(within(table).getByRole("button", { name: "Классический массаж" })).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Классический массаж" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Документы" }));
 
     expect(screen.getByRole("button", { name: "Документы" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(table).getByRole("button", { name: "Сертификат Natali" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Классический массаж" })).not.toBeInTheDocument();
-    fireEvent.click(within(table).getByRole("button", { name: "Сертификат Natali" }));
+    const certificateMediaLink = within(table).getByRole("link", { name: "Сертификат Natali" });
+    expect(certificateMediaLink).toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Классический массаж" })).not.toBeInTheDocument();
+    certificateMediaLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(certificateMediaLink);
     expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("heading", { name: "Сертификат Natali" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Требует alt" }));
 
-    expect(within(table).getByRole("button", { name: "Фото кабинета" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Сертификат Natali" })).not.toBeInTheDocument();
-    fireEvent.click(within(table).getByRole("button", { name: "Фото кабинета" }));
+    const needsAltMediaLink = within(table).getByRole("link", { name: "Фото кабинета" });
+    expect(needsAltMediaLink).toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Сертификат Natali" })).not.toBeInTheDocument();
+    needsAltMediaLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(needsAltMediaLink);
     expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("heading", { name: "Фото кабинета" })).toBeInTheDocument();
     expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("img", { name: "Фото кабинета" })).toBeInTheDocument();
   });
