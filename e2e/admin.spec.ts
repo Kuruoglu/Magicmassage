@@ -173,6 +173,35 @@ test("calendar appointment details open as a right drawer and leave the calendar
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test("admin record details open as full-height drawers over full-width workspaces", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/admin?section=services", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("dialog", { name: "Детали услуги" })).toHaveCount(0);
+  const panel = page.locator(".admin-content-workspace > .admin-panel-large");
+  const panelBox = await panel.boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(panelBox!.width).toBeGreaterThan(900);
+
+  await page.getByRole("table").getByRole("button", { name: "Классический массаж" }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Детали услуги" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toHaveClass(/admin-drawer-panel/);
+  await expect(drawer.getByRole("heading", { name: "Классический массаж" })).toBeVisible();
+
+  const drawerBox = await drawer.boundingBox();
+  const panelBoxAfter = await panel.boundingBox();
+  expect(drawerBox).not.toBeNull();
+  expect(panelBoxAfter).not.toBeNull();
+  expect(Math.round(drawerBox!.x + drawerBox!.width)).toBe(1440);
+  expect(Math.round(drawerBox!.height)).toBe(900);
+  expect(Math.round(panelBoxAfter!.width)).toBe(Math.round(panelBox!.width));
+
+  await drawer.getByRole("button", { name: "Закрыть" }).click();
+  await expect(drawer).toHaveCount(0);
+});
+
 test("calendar week and list modes are distinct", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 
@@ -476,6 +505,8 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
   await expect(details.getByText("90 €")).toBeVisible();
   await expect(details.getByText("manual")).toBeVisible();
 
+  await details.getByRole("button", { name: "Закрыть" }).click();
+  await expect(details).toHaveCount(0);
   await page.getByRole("table").getByRole("button", { name: "MMN-2407-1023" }).click();
   await expect(details.getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
 
@@ -604,6 +635,8 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
   await expect(details.getByText("Требует alt")).toBeVisible();
   await expect(details.getByText("Нужно уточнить alt перед публикацией")).toBeVisible();
 
+  await details.getByRole("button", { name: "Закрыть" }).click();
+  await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Требует alt" }).click();
   await expect(page.getByRole("button", { name: "Требует alt" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("table").getByRole("button", { name: "Арома обложка" })).toBeVisible();
@@ -613,7 +646,11 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
   await page.goto("/admin?section=contacts", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Контактные настройки сайта" })).toBeVisible();
-  await expect(page.getByLabel("Детали контакта").getByRole("heading", { name: "Телефон салона" })).toBeVisible();
+  await page.getByRole("table").getByRole("button", { name: "Телефон салона" }).click();
+  const contactDetails = page.getByRole("dialog", { name: "Детали контакта" });
+  await expect(contactDetails.getByRole("heading", { name: "Телефон салона" })).toBeVisible();
+  await contactDetails.getByRole("button", { name: "Закрыть" }).click();
+  await expect(contactDetails).toHaveCount(0);
 
   await page.getByRole("button", { name: "Сохранить" }).click();
 
@@ -625,14 +662,17 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
   await expect(settingsDialog).toHaveCount(0);
   await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("+359 87 555 0000")).toBeVisible();
   await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("ул. Места 49, Бургас")).toBeVisible();
-  await expect(page.getByLabel("Детали контакта").getByText("+359 87 555 0000")).toBeVisible();
+  await page.getByRole("table").getByRole("button", { name: "Телефон салона" }).click();
+  await expect(contactDetails.getByText("+359 87 555 0000")).toBeVisible();
+  await contactDetails.getByRole("button", { name: "Закрыть" }).click();
+  await expect(contactDetails).toHaveCount(0);
 
   await page.getByRole("button", { name: "Мессенджеры" }).click();
   await expect(page.getByRole("button", { name: "Мессенджеры" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("table").getByRole("button", { name: "Telegram" })).toBeVisible();
   await expect(page.getByRole("table").getByRole("button", { name: "Google Maps" })).toHaveCount(0);
 
-  const details = page.getByLabel("Детали контакта");
+  const details = page.getByRole("dialog", { name: "Детали контакта" });
   await page.getByRole("table").getByRole("button", { name: "Telegram" }).click();
   await details.getByRole("button", { name: "Редактировать" }).click();
 
@@ -650,7 +690,11 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await page.goto("/admin?section=blog", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Контент-план блога" })).toBeVisible();
-  await expect(page.getByLabel("Детали статьи").getByRole("heading", { name: "Подготовка к первому массажу" })).toBeVisible();
+  await page.getByRole("table").getByRole("button", { name: "Подготовка к первому массажу" }).click();
+  const initialDetails = page.getByRole("dialog", { name: "Детали статьи" });
+  await expect(initialDetails.getByRole("heading", { name: "Подготовка к первому массажу" })).toBeVisible();
+  await initialDetails.getByRole("button", { name: "Закрыть" }).click();
+  await expect(initialDetails).toHaveCount(0);
 
   await page.getByRole("button", { name: "Новая статья" }).click();
 
@@ -687,6 +731,8 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await expect(details.getByText("Опубликована")).toBeVisible();
   await expect(details.getByText("Обновленная памятка перед визитом.")).toBeVisible();
 
+  await details.getByRole("button", { name: "Закрыть" }).click();
+  await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Черновики" }).click();
   await expect(page.getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("table").getByRole("button", { name: "Лимфодренаж: когда он уместен" })).toBeVisible();
@@ -696,9 +742,12 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
   await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Настройки админки" })).toBeVisible();
-  const details = page.getByLabel("Детали настроек");
+  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
+  const details = page.getByRole("dialog", { name: "Детали настроек" });
   await expect(details.getByRole("heading", { name: "Запись и календарь" })).toBeVisible();
   await expect(details.getByText("30 минут")).toBeVisible();
+  await details.getByRole("button", { name: "Закрыть" }).click();
+  await expect(details).toHaveCount(0);
 
   await page.getByRole("button", { name: "Сохранить" }).click();
   const dialog = page.getByRole("dialog", { name: "Настройки админки" });
@@ -709,12 +758,15 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
   await dialog.getByRole("button", { name: "Сохранить настройки" }).click();
 
   await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status")).toHaveText("Настройки сохранены.");
+  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
   await expect(details.getByText("45 минут")).toBeVisible();
   await expect(details.getByText("5 слотов")).toBeVisible();
   await expect(details.getByText("Односторонняя")).toBeVisible();
   await expect(details.getByText("natali@example.com")).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText("Настройки сохранены.");
 
+  await details.getByRole("button", { name: "Закрыть" }).click();
+  await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Роли и аудит" }).click();
   await expect(details.getByRole("heading", { name: "Роли и аудит" })).toBeVisible();
   await details.getByRole("button", { name: "Сбросить демо-данные" }).click();
@@ -729,7 +781,10 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
 test("calendar availability uses saved booking settings", async ({ page }) => {
   await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
 
-  const settingsDetails = page.getByLabel("Детали настроек");
+  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
+  const settingsDetails = page.getByRole("dialog", { name: "Детали настроек" });
+  await settingsDetails.getByRole("button", { name: "Закрыть" }).click();
+  await expect(settingsDetails).toHaveCount(0);
   await page.getByRole("button", { name: "Сохранить" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Настройки админки" });
@@ -738,9 +793,12 @@ test("calendar availability uses saved booking settings", async ({ page }) => {
   await dialog.getByRole("button", { name: "Сохранить настройки" }).click();
 
   await expect(dialog).toHaveCount(0);
+  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
   await expect(settingsDetails.getByText("45 минут")).toBeVisible();
   await expect(settingsDetails.getByText("5 слотов")).toBeVisible();
 
+  await settingsDetails.getByRole("button", { name: "Закрыть" }).click();
+  await expect(settingsDetails).toHaveCount(0);
   await page.getByRole("link", { name: "Календарь" }).click();
   await page.getByRole("button", { name: "Месяц" }).click();
 
@@ -756,7 +814,7 @@ test("users workspace invites, filters and edits accountant access", async ({ pa
   await page.goto("/admin?section=users", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Пользователи админки" })).toBeVisible();
-  await expect(page.getByLabel("Детали пользователя").getByText("Stripe-отчеты недоступны")).toBeVisible();
+  await expect(page.getByLabel("Детали пользователя")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Пригласить" }).click();
 
@@ -775,11 +833,14 @@ test("users workspace invites, filters and edits accountant access", async ({ pa
   await expect(details.getByText("Stripe-продажи за период")).toBeVisible();
   await expect(details.getByText("Экспорт CSV/XLSX/PDF")).toBeVisible();
 
+  await details.getByRole("button", { name: "Закрыть" }).click();
+  await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Бухгалтеры" }).click();
   await expect(page.getByRole("button", { name: "Бухгалтеры" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("table").getByRole("button", { name: "Елена Бухгалтер" })).toBeVisible();
   await expect(page.getByRole("table").getByRole("button", { name: "Natali Ivanova" })).toHaveCount(0);
 
+  await page.getByRole("table").getByRole("button", { name: "Елена Бухгалтер" }).click();
   await details.getByRole("button", { name: "Редактировать" }).click();
   const editDialog = page.getByRole("dialog", { name: "Редактировать пользователя" });
   await editDialog.getByLabel("Статус").selectOption("Активен");

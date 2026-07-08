@@ -3295,14 +3295,6 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-split-view {
-  grid-template-columns: minmax(0, 1fr) minmax(270px, 340px);
-}
-
-.admin-calendar-workspace {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.admin-clients-workspace {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -4416,6 +4408,7 @@ button.admin-calendar-item[aria-pressed="true"] {
 .admin-drawer-panel {
   border-radius: 8px 0 0 8px;
   box-shadow: 0 24px 70px rgba(20, 13, 27, 0.28);
+  height: 100dvh;
   max-height: 100dvh;
   overflow: auto;
   width: min(100%, 560px);

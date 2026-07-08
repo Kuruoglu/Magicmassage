@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   calculateFinanceSummary,
@@ -3913,6 +3913,36 @@ function AppointmentDetailDrawer({
   );
 }
 
+function AdminDetailDrawer({
+  ariaLabel,
+  children,
+  className = "",
+  kicker,
+  onClose,
+}: {
+  ariaLabel: string;
+  children: ReactNode;
+  className?: string;
+  kicker: string;
+  onClose: () => void;
+}) {
+  const drawerClassName = ["admin-panel", "admin-detail-panel", "admin-drawer-panel", className].filter(Boolean).join(" ");
+
+  return (
+    <div className="admin-drawer-backdrop">
+      <aside aria-label={ariaLabel} aria-modal="true" className={drawerClassName} role="dialog">
+        <div className="admin-panel-head">
+          <span className="admin-kicker">{kicker}</span>
+          <button className="admin-icon-button" onClick={onClose} type="button">
+            Закрыть
+          </button>
+        </div>
+        {children}
+      </aside>
+    </div>
+  );
+}
+
 function CertificatesWorkspace({
   certificates,
   clients,
@@ -3941,6 +3971,7 @@ function CertificatesWorkspace({
 
     return certificates[0]?.code ?? "";
   });
+  const [isCertificateDrawerOpen, setIsCertificateDrawerOpen] = useState(Boolean(selectedCertificateCode));
   const [editingCertificate, setEditingCertificate] = useState<CertificateRecord | undefined>();
   const [actionNotice, setActionNotice] = useState("");
   const filteredCertificates = certificates.filter((certificate) =>
@@ -3972,6 +4003,7 @@ function CertificatesWorkspace({
   function openCertificate(code: string) {
     setSelectedCode(code);
     setActionNotice("");
+    setIsCertificateDrawerOpen(true);
   }
 
   function openCertificateEdit(certificate: CertificateRecord) {
@@ -3988,6 +4020,7 @@ function CertificatesWorkspace({
   function saveCertificateForm(certificate: CertificateRecord, originalCode?: string) {
     onSaveCertificate(certificate, originalCode);
     setSelectedCode(certificate.code);
+    setIsCertificateDrawerOpen(true);
     setActionNotice(originalCode ? "Сертификат обновлен." : "Сертификат создан.");
     closeCertificateForm();
   }
@@ -4067,7 +4100,7 @@ function CertificatesWorkspace({
             </thead>
             <tbody>
               {filteredCertificates.map((certificate) => (
-                <tr aria-selected={certificate.code === selectedCertificate.code} key={certificate.code}>
+                <tr aria-selected={isCertificateDrawerOpen && certificate.code === selectedCertificate.code} key={certificate.code}>
                   <td>
                     <button className="admin-row-action" onClick={() => openCertificate(certificate.code)} type="button">
                       {certificate.code}
@@ -4088,8 +4121,8 @@ function CertificatesWorkspace({
         {filteredCertificates.length === 0 ? <EmptyState label="Сертификаты не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали сертификата">
-        <span className="admin-kicker">Сертификат</span>
+      {isCertificateDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали сертификата" kicker="Сертификат" onClose={() => setIsCertificateDrawerOpen(false)}>
         <div className="admin-detail-heading">
           <h2>{selectedCertificate.code}</h2>
           <div className="admin-detail-actions">
@@ -4175,7 +4208,8 @@ function CertificatesWorkspace({
             ))}
           </ul>
         </section>
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isCertificateFormOpen ? (
         <CertificateFormDialog
@@ -4205,6 +4239,7 @@ function ServicesWorkspace({
   services: ServiceRecord[];
 }) {
   const [selectedSlug, setSelectedSlug] = useState(services[0]?.slug ?? "");
+  const [isServiceDrawerOpen, setIsServiceDrawerOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceRecord | undefined>();
   const [statusFilter, setStatusFilter] = useState<"all" | ServiceStatus>("all");
   const filteredServices = services
@@ -4228,6 +4263,7 @@ function ServicesWorkspace({
 
   function openService(service: ServiceRecord) {
     setSelectedSlug(service.slug);
+    setIsServiceDrawerOpen(true);
   }
 
   function openServiceEdit(service: ServiceRecord) {
@@ -4243,6 +4279,7 @@ function ServicesWorkspace({
   function saveServiceForm(service: ServiceRecord, originalSlug?: string) {
     onSaveService(service, originalSlug);
     setSelectedSlug(service.slug);
+    setIsServiceDrawerOpen(true);
     closeServiceForm();
   }
 
@@ -4302,7 +4339,7 @@ function ServicesWorkspace({
             </thead>
             <tbody>
               {filteredServices.map((service) => (
-                <tr aria-selected={service.slug === selectedService.slug} key={service.slug}>
+                <tr aria-selected={isServiceDrawerOpen && service.slug === selectedService.slug} key={service.slug}>
                   <td>
                     <button className="admin-row-action" onClick={() => openService(service)} type="button">
                       {service.name}
@@ -4322,8 +4359,8 @@ function ServicesWorkspace({
         {filteredServices.length === 0 ? <EmptyState label="Услуги не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали услуги">
-        <span className="admin-kicker">Услуга</span>
+      {isServiceDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали услуги" kicker="Услуга" onClose={() => setIsServiceDrawerOpen(false)}>
         <div className="admin-detail-heading">
           <h2>{selectedService.name}</h2>
           <div className="admin-detail-actions">
@@ -4384,7 +4421,8 @@ function ServicesWorkspace({
             <p>Для этой услуги пока нет цены.</p>
           )}
         </section>
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isServiceFormOpen ? (
         <ServiceFormDialog
@@ -4414,6 +4452,7 @@ function PriceWorkspace({
   services: ServiceRecord[];
 }) {
   const [selectedId, setSelectedId] = useState(prices[0]?.id ?? "");
+  const [isPriceDrawerOpen, setIsPriceDrawerOpen] = useState(false);
   const [editingPrice, setEditingPrice] = useState<PriceRecord | undefined>();
   const [statusFilter, setStatusFilter] = useState<"all" | PriceStatus>("all");
   const filteredPrices = prices
@@ -4437,6 +4476,7 @@ function PriceWorkspace({
 
   function openPrice(price: PriceRecord) {
     setSelectedId(price.id);
+    setIsPriceDrawerOpen(true);
   }
 
   function openPriceEdit(price: PriceRecord) {
@@ -4452,6 +4492,7 @@ function PriceWorkspace({
   function savePriceForm(price: PriceRecord, originalId?: string) {
     onSavePrice(price, originalId);
     setSelectedId(price.id);
+    setIsPriceDrawerOpen(true);
     closePriceForm();
   }
 
@@ -4510,7 +4551,7 @@ function PriceWorkspace({
             </thead>
             <tbody>
               {filteredPrices.map((price) => (
-                <tr aria-selected={price.id === selectedPrice.id} key={price.id}>
+                <tr aria-selected={isPriceDrawerOpen && price.id === selectedPrice.id} key={price.id}>
                   <td>
                     <button className="admin-row-action" onClick={() => openPrice(price)} type="button">
                       {priceLabel(price, services)}
@@ -4531,8 +4572,8 @@ function PriceWorkspace({
         {filteredPrices.length === 0 ? <EmptyState label="Цены не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали цены">
-        <span className="admin-kicker">Цена</span>
+      {isPriceDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали цены" kicker="Цена" onClose={() => setIsPriceDrawerOpen(false)}>
         <div className="admin-detail-heading">
           <h2>{priceLabel(selectedPrice, services)}</h2>
           <div className="admin-detail-actions">
@@ -4577,7 +4618,8 @@ function PriceWorkspace({
             <dd>{selectedPrice.note || "Заметка по цене пока пустая."}</dd>
           </div>
         </dl>
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isPriceFormOpen ? (
         <PriceFormDialog
@@ -5079,6 +5121,7 @@ function MediaWorkspace({
   query: string;
 }) {
   const [selectedId, setSelectedId] = useState(media[0]?.id ?? "");
+  const [isMediaDrawerOpen, setIsMediaDrawerOpen] = useState(false);
   const [editingMedia, setEditingMedia] = useState<MediaRecord | undefined>();
   const [filter, setFilter] = useState<"all" | "photo" | "documents" | "needsAlt">("all");
   const filteredMedia = media
@@ -5113,6 +5156,7 @@ function MediaWorkspace({
 
   function openMedia(item: MediaRecord) {
     setSelectedId(item.id);
+    setIsMediaDrawerOpen(true);
   }
 
   function openMediaEdit(item: MediaRecord) {
@@ -5128,6 +5172,7 @@ function MediaWorkspace({
   function saveMediaForm(item: MediaRecord, originalId?: string) {
     onSaveMedia(item, originalId);
     setSelectedId(item.id);
+    setIsMediaDrawerOpen(true);
     closeMediaForm();
   }
 
@@ -5187,7 +5232,7 @@ function MediaWorkspace({
             </thead>
             <tbody>
               {filteredMedia.map((item) => (
-                <tr aria-selected={item.id === selectedMedia.id} key={item.id}>
+                <tr aria-selected={isMediaDrawerOpen && item.id === selectedMedia.id} key={item.id}>
                   <td>
                     <button className="admin-row-action" onClick={() => openMedia(item)} type="button">
                       {item.name}
@@ -5207,8 +5252,8 @@ function MediaWorkspace({
         {filteredMedia.length === 0 ? <EmptyState label="Медиа не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали медиа">
-        <span className="admin-kicker">Медиа</span>
+      {isMediaDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали медиа" kicker="Медиа" onClose={() => setIsMediaDrawerOpen(false)}>
         <div className="admin-detail-heading">
           <h2>{selectedMedia.name}</h2>
           <div className="admin-detail-actions">
@@ -5280,7 +5325,8 @@ function MediaWorkspace({
             <p>Файл пока не привязан к страницам.</p>
           )}
         </section>
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isMediaFormOpen ? (
         <MediaFormDialog
@@ -5312,6 +5358,7 @@ function ContactsWorkspace({
   query: string;
 }) {
   const [selectedId, setSelectedId] = useState(contactChannels[0]?.id ?? "");
+  const [isContactDrawerOpen, setIsContactDrawerOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<ContactChannelRecord | undefined>();
   const [filter, setFilter] = useState<"all" | "active" | "messengers" | "seo">("all");
   const filteredChannels = contactChannels
@@ -5342,6 +5389,7 @@ function ContactsWorkspace({
 
   function openChannel(channel: ContactChannelRecord) {
     setSelectedId(channel.id);
+    setIsContactDrawerOpen(true);
   }
 
   function openChannelEdit(channel: ContactChannelRecord) {
@@ -5356,6 +5404,7 @@ function ContactsWorkspace({
   function saveChannelForm(channel: ContactChannelRecord, originalId?: string) {
     onSaveContactChannel(channel, originalId);
     setSelectedId(channel.id);
+    setIsContactDrawerOpen(true);
     closeChannelForm();
   }
 
@@ -5415,7 +5464,7 @@ function ContactsWorkspace({
             </thead>
             <tbody>
               {filteredChannels.map((channel) => (
-                <tr aria-selected={channel.id === selectedChannel?.id} key={channel.id}>
+                <tr aria-selected={isContactDrawerOpen && channel.id === selectedChannel?.id} key={channel.id}>
                   <td>
                     <button className="admin-row-action" onClick={() => openChannel(channel)} type="button">
                       {channel.name}
@@ -5435,10 +5484,10 @@ function ContactsWorkspace({
         {filteredChannels.length === 0 ? <EmptyState label="Контакты не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали контакта">
+      {isContactDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали контакта" kicker="Контакт" onClose={() => setIsContactDrawerOpen(false)}>
         {selectedChannel ? (
           <>
-            <span className="admin-kicker">Контакт</span>
             <div className="admin-detail-heading">
               <h2>{selectedChannel.name}</h2>
               <div className="admin-detail-actions">
@@ -5487,7 +5536,8 @@ function ContactsWorkspace({
         ) : (
           <EmptyState label="Выберите контактный канал." />
         )}
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isContactSettingsOpen ? (
         <ContactSettingsDialog
@@ -5524,6 +5574,7 @@ function BlogWorkspace({
   query: string;
 }) {
   const [selectedId, setSelectedId] = useState(blogPosts[0]?.id ?? "");
+  const [isBlogDrawerOpen, setIsBlogDrawerOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<BlogPostRecord | undefined>();
   const [statusFilter, setStatusFilter] = useState<"all" | BlogStatus>("all");
   const filteredPosts = blogPosts
@@ -5555,6 +5606,7 @@ function BlogWorkspace({
 
   function openPost(post: BlogPostRecord) {
     setSelectedId(post.id);
+    setIsBlogDrawerOpen(true);
   }
 
   function openPostEdit(post: BlogPostRecord) {
@@ -5570,6 +5622,7 @@ function BlogWorkspace({
   function savePostForm(post: BlogPostRecord, originalId?: string) {
     onSaveBlogPost(post, originalId);
     setSelectedId(post.id);
+    setIsBlogDrawerOpen(true);
     closeBlogForm();
   }
 
@@ -5629,7 +5682,7 @@ function BlogWorkspace({
             </thead>
             <tbody>
               {filteredPosts.map((post) => (
-                <tr aria-selected={post.id === selectedPost.id} key={post.id}>
+                <tr aria-selected={isBlogDrawerOpen && post.id === selectedPost.id} key={post.id}>
                   <td>
                     <button className="admin-row-action" onClick={() => openPost(post)} type="button">
                       {post.title}
@@ -5649,8 +5702,8 @@ function BlogWorkspace({
         {filteredPosts.length === 0 ? <EmptyState label="Статьи не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали статьи">
-        <span className="admin-kicker">Статья</span>
+      {isBlogDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали статьи" kicker="Статья" onClose={() => setIsBlogDrawerOpen(false)}>
         <div className="admin-detail-heading">
           <h2>{selectedPost.title}</h2>
           <div className="admin-detail-actions">
@@ -5724,7 +5777,8 @@ function BlogWorkspace({
           <h3>Текст статьи</h3>
           <p>{selectedPost.body || "Текст статьи пока пустой."}</p>
         </section>
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isBlogFormOpen ? (
         <BlogPostDialog
@@ -5754,6 +5808,7 @@ function SettingsWorkspace({
   settings: SettingsRecord;
 }) {
   const [selectedGroupId, setSelectedGroupId] = useState<SettingsGroupId>("booking");
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const [isDangerDialogOpen, setIsDangerDialogOpen] = useState(false);
   const filteredGroups = settingsGroups.filter((group) => matchesSearch([group.title, group.summary, group.status], query));
@@ -5761,6 +5816,7 @@ function SettingsWorkspace({
 
   function openGroup(groupId: SettingsGroupId) {
     setSelectedGroupId(groupId);
+    setIsSettingsDrawerOpen(true);
     setActionNotice("");
   }
 
@@ -5807,7 +5863,7 @@ function SettingsWorkspace({
             </thead>
             <tbody>
               {filteredGroups.map((group) => (
-                <tr aria-selected={group.id === selectedGroup?.id} key={group.id}>
+                <tr aria-selected={isSettingsDrawerOpen && group.id === selectedGroup?.id} key={group.id}>
                   <td>
                     <button className="admin-row-action" onClick={() => openGroup(group.id)} type="button">
                       {group.title}
@@ -5825,8 +5881,8 @@ function SettingsWorkspace({
         {filteredGroups.length === 0 ? <EmptyState label="Настройки не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали настроек">
-        <span className="admin-kicker">Настройки</span>
+      {isSettingsDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали настроек" kicker="Настройки" onClose={() => setIsSettingsDrawerOpen(false)}>
         {!selectedGroup ? (
           <>
             <div className="admin-detail-heading">
@@ -5970,7 +6026,8 @@ function SettingsWorkspace({
         ) : null}
           </>
         )}
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isSettingsEditOpen ? (
         <SettingsDialog key={settings.updatedAt} onClose={onCloseSettingsEdit} onSave={saveSettingsForm} settings={settings} />
@@ -5995,6 +6052,7 @@ function UsersWorkspace({
   query: string;
 }) {
   const [selectedUserId, setSelectedUserId] = useState(adminUsers[0]?.id ?? "");
+  const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUserRecord | undefined>();
   const [userFilter, setUserFilter] = useState<AdminUserFilterId>("all");
   const filteredUsers = adminUsers.filter((adminUser) => {
@@ -6025,6 +6083,7 @@ function UsersWorkspace({
 
   function openUser(user: AdminUserRecord) {
     setSelectedUserId(user.id);
+    setIsUserDrawerOpen(true);
   }
 
   function openUserEdit(user: AdminUserRecord) {
@@ -6040,6 +6099,7 @@ function UsersWorkspace({
   function saveUserForm(user: AdminUserRecord, originalId?: string) {
     onSaveAdminUser(user, originalId);
     setSelectedUserId(user.id);
+    setIsUserDrawerOpen(true);
     closeUserForm();
   }
 
@@ -6104,7 +6164,7 @@ function UsersWorkspace({
             </thead>
             <tbody>
               {filteredUsers.map((adminUser) => (
-                <tr aria-selected={adminUser.id === selectedUser.id} key={adminUser.id}>
+                <tr aria-selected={isUserDrawerOpen && adminUser.id === selectedUser.id} key={adminUser.id}>
                   <td>
                     <button className="admin-row-action" onClick={() => openUser(adminUser)} type="button">
                       {adminUser.name}
@@ -6125,8 +6185,8 @@ function UsersWorkspace({
         {filteredUsers.length === 0 ? <EmptyState label="Пользователи не найдены." /> : null}
       </section>
 
-      <aside className="admin-panel admin-detail-panel" aria-label="Детали пользователя">
-        <span className="admin-kicker">Доступ</span>
+      {isUserDrawerOpen ? (
+        <AdminDetailDrawer ariaLabel="Детали пользователя" kicker="Доступ" onClose={() => setIsUserDrawerOpen(false)}>
         <div className="admin-detail-heading">
           <h2>{selectedUser.name}</h2>
           <div className="admin-detail-actions">
@@ -6191,7 +6251,8 @@ function UsersWorkspace({
             ))}
           </ul>
         </section>
-      </aside>
+        </AdminDetailDrawer>
+      ) : null}
 
       {isUserFormOpen ? (
         <AdminUserDialog

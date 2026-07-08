@@ -191,10 +191,77 @@ describe("AdminShell", () => {
   it("opens certificate details from the certificate query", () => {
     render(<AdminShell activeSection="certificates" role="owner" selectedCertificateCode="MMN-2407-1023" />);
 
-    const details = screen.getByLabelText("Детали сертификата");
+    const details = screen.getByRole("dialog", { name: "Детали сертификата" });
+    expect(details).toHaveClass("admin-drawer-panel");
     expect(within(details).getByRole("heading", { name: "MMN-2407-1023" })).toBeInTheDocument();
     expect(within(details).getByText("Oksana → Self")).toBeInTheDocument();
     expect(within(details).getByText("Ожидает PDF")).toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      activeSection: "certificates" as const,
+      drawerLabel: "Детали сертификата",
+      heading: "MMN-2407-1023",
+      rowButton: "MMN-2407-1023",
+    },
+    {
+      activeSection: "services" as const,
+      drawerLabel: "Детали услуги",
+      heading: "Классический массаж",
+      rowButton: "Классический массаж",
+    },
+    {
+      activeSection: "price" as const,
+      drawerLabel: "Детали цены",
+      heading: "Классический массаж · 60 мин",
+      rowButton: "Классический массаж · 60 мин",
+    },
+    {
+      activeSection: "media" as const,
+      drawerLabel: "Детали медиа",
+      heading: "Классический массаж",
+      rowButton: "Классический массаж",
+    },
+    {
+      activeSection: "contacts" as const,
+      drawerLabel: "Детали контакта",
+      heading: "Телефон салона",
+      rowButton: "Телефон салона",
+    },
+    {
+      activeSection: "blog" as const,
+      drawerLabel: "Детали статьи",
+      heading: "Подготовка к первому массажу",
+      rowButton: "Подготовка к первому массажу",
+    },
+    {
+      activeSection: "settings" as const,
+      drawerLabel: "Детали настроек",
+      heading: "Запись и календарь",
+      rowButton: "Запись и календарь",
+    },
+    {
+      activeSection: "users" as const,
+      drawerLabel: "Детали пользователя",
+      heading: "Natali Ivanova",
+      rowButton: "Natali Ivanova",
+    },
+  ])("opens $drawerLabel as a full-height drawer after selecting a row", ({ activeSection, drawerLabel, heading, rowButton }) => {
+    render(<AdminShell activeSection={activeSection} role="owner" />);
+
+    expect(screen.queryByLabelText(drawerLabel)).not.toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: rowButton }));
+
+    const details = screen.getByRole("dialog", { name: drawerLabel });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(details.parentElement).toHaveClass("admin-drawer-backdrop");
+    expect(within(details).getByRole("heading", { name: heading })).toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Закрыть" }));
+
+    expect(screen.queryByRole("dialog", { name: drawerLabel })).not.toBeInTheDocument();
   });
 
   it("creates a manual certificate and opens its details", () => {
@@ -324,7 +391,8 @@ describe("AdminShell", () => {
     expect(screen.getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
     expect(within(table).getByRole("button", { name: "Deep tissue massage" })).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Классический массаж" })).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали услуги")).getByRole("heading", { name: "Deep tissue massage" })).toBeInTheDocument();
+    fireEvent.click(within(table).getByRole("button", { name: "Deep tissue massage" }));
+    expect(within(screen.getByRole("dialog", { name: "Детали услуги" })).getByRole("heading", { name: "Deep tissue massage" })).toBeInTheDocument();
   });
 
   it("creates and edits a price variant from the price workspace", () => {
@@ -373,13 +441,15 @@ describe("AdminShell", () => {
     expect(screen.getByRole("button", { name: "Скрытые" })).toHaveAttribute("aria-pressed", "true");
     expect(within(table).getByRole("button", { name: "Deep tissue massage · 60 мин" })).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Классический массаж · 60 мин" })).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали цены")).getByRole("heading", { name: "Deep tissue massage · 60 мин" })).toBeInTheDocument();
+    fireEvent.click(within(table).getByRole("button", { name: "Deep tissue massage · 60 мин" }));
+    expect(within(screen.getByRole("dialog", { name: "Детали цены" })).getByRole("heading", { name: "Deep tissue massage · 60 мин" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Активные" }));
 
     expect(within(table).getByRole("button", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Deep tissue massage · 60 мин" })).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали цены")).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
+    fireEvent.click(within(table).getByRole("button", { name: "Классический массаж · 60 мин" }));
+    expect(within(screen.getByRole("dialog", { name: "Детали цены" })).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
   });
 
   it("uploads and edits a media asset from the media workspace", () => {
@@ -430,14 +500,16 @@ describe("AdminShell", () => {
     expect(screen.getByRole("button", { name: "Документы" })).toHaveAttribute("aria-pressed", "true");
     expect(within(table).getByRole("button", { name: "Сертификат Natali" })).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Классический массаж" })).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали медиа")).getByRole("heading", { name: "Сертификат Natali" })).toBeInTheDocument();
+    fireEvent.click(within(table).getByRole("button", { name: "Сертификат Natali" }));
+    expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("heading", { name: "Сертификат Natali" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Требует alt" }));
 
     expect(within(table).getByRole("button", { name: "Фото кабинета" })).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Сертификат Natali" })).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали медиа")).getByRole("heading", { name: "Фото кабинета" })).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали медиа")).getByRole("img", { name: "Фото кабинета" })).toBeInTheDocument();
+    fireEvent.click(within(table).getByRole("button", { name: "Фото кабинета" }));
+    expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("heading", { name: "Фото кабинета" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("img", { name: "Фото кабинета" })).toBeInTheDocument();
   });
 
   it("shows quick contact actions in the selected client card", () => {
@@ -926,7 +998,9 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="contacts" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "Контактные настройки сайта" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Детали контакта")).toHaveTextContent("Телефон салона");
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Телефон салона" }));
+    const details = screen.getByRole("dialog", { name: "Детали контакта" });
+    expect(details).toHaveTextContent("Телефон салона");
 
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
@@ -940,7 +1014,7 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("dialog", { name: "Контактные настройки" })).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("Контактные настройки")).getByText("+359 87 555 0000")).toBeInTheDocument();
     expect(within(screen.getByLabelText("Контактные настройки")).getByText("ул. Места 49, Бургас")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Детали контакта")).getByText("+359 87 555 0000")).toBeInTheDocument();
+    expect(within(details).getByText("+359 87 555 0000")).toBeInTheDocument();
   });
 
   it("filters contact channels and edits the selected channel", async () => {
@@ -978,7 +1052,8 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="blog" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "Контент-план блога" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Детали статьи")).toHaveTextContent("Подготовка к первому массажу");
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Подготовка к первому массажу" }));
+    expect(screen.getByRole("dialog", { name: "Детали статьи" })).toHaveTextContent("Подготовка к первому массажу");
 
     await user.click(screen.getByRole("button", { name: "Новая статья" }));
 
@@ -1053,7 +1128,8 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="settings" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "Настройки админки" })).toBeInTheDocument();
-    const details = screen.getByLabelText("Детали настроек");
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
+    const details = screen.getByRole("dialog", { name: "Детали настроек" });
     expect(within(details).getByRole("heading", { name: "Запись и календарь" })).toBeInTheDocument();
     expect(within(details).getByText("30 минут")).toBeInTheDocument();
     expect(within(details).getByText("Внутренний календарь главный")).toBeInTheDocument();
@@ -1102,9 +1178,10 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="settings" role="owner" />);
 
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
     await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "Stripe");
 
-    const details = screen.getByLabelText("Детали настроек");
+    const details = screen.getByRole("dialog", { name: "Детали настроек" });
     expect(within(details).getByRole("heading", { name: "Платежи" })).toBeInTheDocument();
     expect(within(details).getByText("EUR")).toBeInTheDocument();
     expect(within(details).getByText("Тестовый")).toBeInTheDocument();
@@ -1121,6 +1198,7 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="settings" role="owner" />);
 
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
@@ -1132,6 +1210,7 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="settings" role="owner" />);
 
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
@@ -1141,7 +1220,7 @@ describe("AdminShell", () => {
     expect(screen.getByRole("dialog", { name: "Настройки админки" })).toBeInTheDocument();
     expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите название, буфер записи, слоты и срок хранения audit log.");
     expect(within(dialog).getByLabelText("Перерыв между сеансами")).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByLabelText("Детали настроек")).toHaveTextContent("30 минут");
+    expect(screen.getByRole("dialog", { name: "Детали настроек" })).toHaveTextContent("30 минут");
   });
 
   it("switches settings groups and confirms dangerous settings actions", async () => {
@@ -1171,7 +1250,7 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="users" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "Пользователи админки" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Детали пользователя")).toHaveTextContent("Stripe-отчеты недоступны");
+    expect(screen.queryByLabelText("Детали пользователя")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Пригласить" }));
 
@@ -1234,7 +1313,8 @@ describe("AdminShell", () => {
     expect(within(filters).getByRole("button", { name: "Бухгалтеры" })).toHaveAttribute("aria-pressed", "true");
     expect(within(table).getByRole("button", { name: "Ирина Finance" })).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: "Natali Ivanova" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Детали пользователя")).toHaveTextContent("Stripe-продажи за период");
+    await user.click(within(table).getByRole("button", { name: "Ирина Finance" }));
+    expect(screen.getByRole("dialog", { name: "Детали пользователя" })).toHaveTextContent("Stripe-продажи за период");
 
     await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "stripe");
 
