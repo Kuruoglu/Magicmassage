@@ -32,6 +32,7 @@ type AdminShellProps = {
   selectedCalendarDate?: string;
   selectedClientName?: string;
   selectedCertificateCode?: string;
+  selectedServiceSlug?: string;
 };
 
 type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
@@ -1283,6 +1284,10 @@ function certificateClientHref(clientName: string, role: AdminRoleId) {
 
 function certificateDetailHref(certificateCode: string, role: AdminRoleId) {
   return `/admin?section=certificates&role=${role}&certificate=${encodeURIComponent(certificateCode)}`;
+}
+
+function serviceDetailHref(serviceSlug: string, role: AdminRoleId) {
+  return `/admin?section=services&role=${role}&service=${encodeURIComponent(serviceSlug)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -4728,6 +4733,8 @@ function ServicesWorkspace({
   onSaveService,
   prices,
   query,
+  role,
+  selectedServiceSlug,
   services,
 }: {
   isServiceCreateOpen: boolean;
@@ -4735,10 +4742,13 @@ function ServicesWorkspace({
   onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
   prices: PriceRecord[];
   query: string;
+  role: AdminRoleId;
+  selectedServiceSlug?: string;
   services: ServiceRecord[];
 }) {
-  const [selectedSlug, setSelectedSlug] = useState(services[0]?.slug ?? "");
-  const [isServiceDrawerOpen, setIsServiceDrawerOpen] = useState(false);
+  const initialSelectedService = selectedServiceSlug ? findServiceBySlug(services, selectedServiceSlug) : undefined;
+  const [selectedSlug, setSelectedSlug] = useState(initialSelectedService?.slug ?? services[0]?.slug ?? "");
+  const [isServiceDrawerOpen, setIsServiceDrawerOpen] = useState(Boolean(initialSelectedService));
   const [editingService, setEditingService] = useState<ServiceRecord | undefined>();
   const [statusFilter, setStatusFilter] = useState<"all" | ServiceStatus>("all");
   const filteredServices = services
@@ -4840,9 +4850,9 @@ function ServicesWorkspace({
               {filteredServices.map((service) => (
                 <tr aria-selected={isServiceDrawerOpen && service.slug === selectedService.slug} key={service.slug}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openService(service)} type="button">
+                    <Link className="admin-row-action admin-row-link" href={serviceDetailHref(service.slug, role)} onClick={() => openService(service)}>
                       {service.name}
-                    </button>
+                    </Link>
                   </td>
                   <td className="admin-tabular">{service.slug}</td>
                   <td>{service.category}</td>
@@ -6892,6 +6902,7 @@ function Workspace({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedServiceSlug,
   services,
   settings,
 }: {
@@ -6946,6 +6957,7 @@ function Workspace({
   selectedCalendarDate?: string;
   selectedCertificateCode?: string;
   selectedClientName?: string;
+  selectedServiceSlug?: string;
   services: ServiceRecord[];
   settings: SettingsRecord;
 }) {
@@ -6999,7 +7011,10 @@ function Workspace({
         onSaveService={onSaveService}
         prices={prices}
         query={query}
+        role={role}
+        selectedServiceSlug={selectedServiceSlug}
         services={services}
+        key={selectedServiceSlug ?? "default-service"}
       />
     );
   }
@@ -7115,6 +7130,7 @@ export function AdminShell({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedServiceSlug,
 }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
@@ -7778,6 +7794,7 @@ export function AdminShell({
           selectedCalendarDate={selectedCalendarDate}
           selectedCertificateCode={selectedCertificateCode}
           selectedClientName={selectedClientName}
+          selectedServiceSlug={selectedServiceSlug}
           services={services}
           settings={settings}
         />

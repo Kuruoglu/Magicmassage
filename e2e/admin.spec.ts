@@ -197,7 +197,14 @@ test("admin record details open as full-height drawers over full-width workspace
   expect(panelBox).not.toBeNull();
   expect(panelBox!.width).toBeGreaterThan(900);
 
-  await page.getByRole("table").getByRole("button", { name: "Классический массаж" }).click();
+  await expect(page.getByRole("table").getByRole("link", { name: "Классический массаж" })).toHaveAttribute(
+    "href",
+    "/admin?section=services&role=owner&service=classic-massage",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Классический массаж" }).click();
+
+  await expect(page).toHaveURL(/section=services/);
+  await expect(page).toHaveURL(/service=classic-massage/);
 
   const drawer = page.getByRole("dialog", { name: "Детали услуги" });
   await expect(drawer).toBeVisible();
@@ -214,6 +221,9 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await drawer.getByRole("button", { name: "Закрыть" }).click();
   await expect(drawer).toHaveCount(0);
+
+  await page.goto("/admin?section=services&service=classic-massage", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали услуги" }).getByRole("heading", { name: "Классический массаж" })).toBeVisible();
 });
 
 test("admin record drawers expose linked client workspaces", async ({ page }) => {
@@ -782,7 +792,10 @@ test("services workspace can create and edit a massage service", async ({ page }
   await createDialog.getByRole("button", { name: "Сохранить услугу" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("button", { name: "Арома массаж" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Арома массаж" })).toHaveAttribute(
+    "href",
+    "/admin?section=services&role=owner&service=aroma-massage",
+  );
 
   const details = page.getByLabel("Детали услуги");
   await expect(details.getByRole("heading", { name: "Арома массаж" })).toBeVisible();

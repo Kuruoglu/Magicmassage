@@ -18,6 +18,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const selectedCalendarDate = firstQueryValue(query.date);
   const selectedCertificateCode = firstQueryValue(query.certificate);
   const selectedClientName = firstQueryValue(query.client);
+  const selectedServiceSlug = firstQueryValue(query.service);
 
   return (
     <AdminShell
@@ -28,6 +29,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       selectedCalendarDate={selectedCalendarDate}
       selectedCertificateCode={selectedCertificateCode}
       selectedClientName={selectedClientName}
+      selectedServiceSlug={selectedServiceSlug}
     />
   );
 }

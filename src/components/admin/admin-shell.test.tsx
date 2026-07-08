@@ -236,6 +236,15 @@ describe("AdminShell", () => {
     );
   });
 
+  it("opens service details from the service query", () => {
+    render(<AdminShell activeSection="services" role="owner" selectedServiceSlug="classic-massage" />);
+
+    const details = screen.getByRole("dialog", { name: "Детали услуги" });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(within(details).getByRole("heading", { name: "Классический массаж" })).toBeInTheDocument();
+    expect(within(details).getByText("classic-massage")).toBeInTheDocument();
+  });
+
   it.each([
     {
       activeSection: "certificates" as const,
@@ -248,6 +257,7 @@ describe("AdminShell", () => {
       activeSection: "services" as const,
       drawerLabel: "Детали услуги",
       heading: "Классический массаж",
+      rowHref: "/admin?section=services&role=owner&service=classic-massage",
       rowButton: "Классический массаж",
     },
     {
@@ -395,7 +405,10 @@ describe("AdminShell", () => {
     fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить услугу" }));
 
     expect(screen.queryByRole("dialog", { name: "Новая услуга" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("button", { name: "Арома массаж" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Арома массаж" })).toHaveAttribute(
+      "href",
+      "/admin?section=services&role=owner&service=aroma-massage",
+    );
 
     const details = screen.getByLabelText("Детали услуги");
     expect(within(details).getByRole("heading", { name: "Арома массаж" })).toBeInTheDocument();
@@ -410,7 +423,7 @@ describe("AdminShell", () => {
     fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
 
     expect(screen.queryByRole("dialog", { name: "Редактировать услугу" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "Арома массаж" })).toHaveLength(1);
+    expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Арома массаж" })).toHaveLength(1);
     expect(within(details).getByText("Опубликована")).toBeInTheDocument();
     expect(within(details).getByText("Опубликованное описание услуги для сайта.")).toBeInTheDocument();
   });
@@ -418,7 +431,9 @@ describe("AdminShell", () => {
   it("keeps price variants attached when a service slug changes", () => {
     render(<AdminShell activeSection="services" role="owner" />);
 
-    fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "Классический массаж" }));
+    const serviceLink = within(screen.getByRole("table")).getByRole("link", { name: "Классический массаж" });
+    serviceLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(serviceLink);
 
     const details = screen.getByLabelText("Детали услуги");
     expect(within(details).getByText("70 €")).toBeInTheDocument();
@@ -437,14 +452,16 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="services" role="owner" />);
 
     const table = screen.getByRole("table");
-    expect(within(table).getByRole("button", { name: "Классический массаж" })).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Классический массаж" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Черновики" }));
 
     expect(screen.getByRole("button", { name: "Черновики" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(table).getByRole("button", { name: "Deep tissue massage" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Классический массаж" })).not.toBeInTheDocument();
-    fireEvent.click(within(table).getByRole("button", { name: "Deep tissue massage" }));
+    const draftServiceLink = within(table).getByRole("link", { name: "Deep tissue massage" });
+    expect(draftServiceLink).toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Классический массаж" })).not.toBeInTheDocument();
+    draftServiceLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(draftServiceLink);
     expect(within(screen.getByRole("dialog", { name: "Детали услуги" })).getByRole("heading", { name: "Deep tissue massage" })).toBeInTheDocument();
   });
 
