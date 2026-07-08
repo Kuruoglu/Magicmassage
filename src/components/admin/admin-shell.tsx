@@ -32,6 +32,7 @@ type AdminShellProps = {
   selectedCalendarDate?: string;
   selectedClientName?: string;
   selectedCertificateCode?: string;
+  selectedPriceId?: string;
   selectedServiceSlug?: string;
 };
 
@@ -1288,6 +1289,10 @@ function certificateDetailHref(certificateCode: string, role: AdminRoleId) {
 
 function serviceDetailHref(serviceSlug: string, role: AdminRoleId) {
   return `/admin?section=services&role=${role}&service=${encodeURIComponent(serviceSlug)}`;
+}
+
+function priceDetailHref(priceId: string, role: AdminRoleId) {
+  return `/admin?section=price&role=${role}&price=${encodeURIComponent(priceId)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -4951,6 +4956,8 @@ function PriceWorkspace({
   onSavePrice,
   prices,
   query,
+  role,
+  selectedPriceId,
   services,
 }: {
   isPriceCreateOpen: boolean;
@@ -4958,10 +4965,13 @@ function PriceWorkspace({
   onSavePrice: (price: PriceRecord, originalId?: string) => void;
   prices: PriceRecord[];
   query: string;
+  role: AdminRoleId;
+  selectedPriceId?: string;
   services: ServiceRecord[];
 }) {
-  const [selectedId, setSelectedId] = useState(prices[0]?.id ?? "");
-  const [isPriceDrawerOpen, setIsPriceDrawerOpen] = useState(false);
+  const initialSelectedPrice = selectedPriceId ? prices.find((price) => price.id === selectedPriceId) : undefined;
+  const [selectedId, setSelectedId] = useState(initialSelectedPrice?.id ?? prices[0]?.id ?? "");
+  const [isPriceDrawerOpen, setIsPriceDrawerOpen] = useState(Boolean(initialSelectedPrice));
   const [editingPrice, setEditingPrice] = useState<PriceRecord | undefined>();
   const [statusFilter, setStatusFilter] = useState<"all" | PriceStatus>("all");
   const filteredPrices = prices
@@ -5062,9 +5072,9 @@ function PriceWorkspace({
               {filteredPrices.map((price) => (
                 <tr aria-selected={isPriceDrawerOpen && price.id === selectedPrice.id} key={price.id}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openPrice(price)} type="button">
+                    <Link className="admin-row-action admin-row-link" href={priceDetailHref(price.id, role)} onClick={() => openPrice(price)}>
                       {priceLabel(price, services)}
-                    </button>
+                    </Link>
                   </td>
                   <td className="admin-tabular">{price.durationMinutes} мин</td>
                   <td className="admin-tabular">{priceValue(price)}</td>
@@ -6902,6 +6912,7 @@ function Workspace({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedPriceId,
   selectedServiceSlug,
   services,
   settings,
@@ -6957,6 +6968,7 @@ function Workspace({
   selectedCalendarDate?: string;
   selectedCertificateCode?: string;
   selectedClientName?: string;
+  selectedPriceId?: string;
   selectedServiceSlug?: string;
   services: ServiceRecord[];
   settings: SettingsRecord;
@@ -7027,7 +7039,10 @@ function Workspace({
         onSavePrice={onSavePrice}
         prices={prices}
         query={query}
+        role={role}
+        selectedPriceId={selectedPriceId}
         services={services}
+        key={selectedPriceId ?? "default-price"}
       />
     );
   }
@@ -7130,6 +7145,7 @@ export function AdminShell({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedPriceId,
   selectedServiceSlug,
 }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
@@ -7794,6 +7810,7 @@ export function AdminShell({
           selectedCalendarDate={selectedCalendarDate}
           selectedCertificateCode={selectedCertificateCode}
           selectedClientName={selectedClientName}
+          selectedPriceId={selectedPriceId}
           selectedServiceSlug={selectedServiceSlug}
           services={services}
           settings={settings}

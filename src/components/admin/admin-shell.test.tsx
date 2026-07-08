@@ -245,6 +245,16 @@ describe("AdminShell", () => {
     expect(within(details).getByText("classic-massage")).toBeInTheDocument();
   });
 
+  it("opens price details from the price query", () => {
+    render(<AdminShell activeSection="price" role="owner" selectedPriceId="price-classic-60" />);
+
+    const details = screen.getByRole("dialog", { name: "Детали цены" });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(within(details).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
+    expect(within(details).getByText("70 €")).toBeInTheDocument();
+    expect(within(details).getByText("EUR")).toBeInTheDocument();
+  });
+
   it.each([
     {
       activeSection: "certificates" as const,
@@ -264,6 +274,7 @@ describe("AdminShell", () => {
       activeSection: "price" as const,
       drawerLabel: "Детали цены",
       heading: "Классический массаж · 60 мин",
+      rowHref: "/admin?section=price&role=owner&price=price-classic-60",
       rowButton: "Классический массаж · 60 мин",
     },
     {
@@ -480,7 +491,10 @@ describe("AdminShell", () => {
     fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить цену" }));
 
     expect(screen.queryByRole("dialog", { name: "Новая цена" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("button", { name: "Классический массаж · 90 мин" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Классический массаж · 90 мин" })).toHaveAttribute(
+      "href",
+      "/admin?section=price&role=owner&price=price-classic-massage-90",
+    );
 
     const details = screen.getByLabelText("Детали цены");
     expect(within(details).getByRole("heading", { name: "Классический массаж · 90 мин" })).toBeInTheDocument();
@@ -495,7 +509,7 @@ describe("AdminShell", () => {
     fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
 
     expect(screen.queryByRole("dialog", { name: "Редактировать цену" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getAllByRole("button", { name: "Классический массаж · 90 мин" })).toHaveLength(1);
+    expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Классический массаж · 90 мин" })).toHaveLength(1);
     expect(within(details).getByText("115 €")).toBeInTheDocument();
     expect(within(details).getByText("Скрыта")).toBeInTheDocument();
   });
@@ -504,21 +518,25 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="price" role="owner" />);
 
     const table = screen.getByRole("table");
-    expect(within(table).getByRole("button", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
+    expect(within(table).getByRole("link", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Скрытые" }));
 
     expect(screen.getByRole("button", { name: "Скрытые" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(table).getByRole("button", { name: "Deep tissue massage · 60 мин" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Классический массаж · 60 мин" })).not.toBeInTheDocument();
-    fireEvent.click(within(table).getByRole("button", { name: "Deep tissue massage · 60 мин" }));
+    const hiddenPriceLink = within(table).getByRole("link", { name: "Deep tissue massage · 60 мин" });
+    expect(hiddenPriceLink).toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Классический массаж · 60 мин" })).not.toBeInTheDocument();
+    hiddenPriceLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(hiddenPriceLink);
     expect(within(screen.getByRole("dialog", { name: "Детали цены" })).getByRole("heading", { name: "Deep tissue massage · 60 мин" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Активные" }));
 
-    expect(within(table).getByRole("button", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Deep tissue massage · 60 мин" })).not.toBeInTheDocument();
-    fireEvent.click(within(table).getByRole("button", { name: "Классический массаж · 60 мин" }));
+    const activePriceLink = within(table).getByRole("link", { name: "Классический массаж · 60 мин" });
+    expect(activePriceLink).toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: "Deep tissue massage · 60 мин" })).not.toBeInTheDocument();
+    activePriceLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    fireEvent.click(activePriceLink);
     expect(within(screen.getByRole("dialog", { name: "Детали цены" })).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
   });
 

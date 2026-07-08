@@ -224,6 +224,20 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await page.goto("/admin?section=services&service=classic-massage", { waitUntil: "networkidle" });
   await expect(page.getByRole("dialog", { name: "Детали услуги" }).getByRole("heading", { name: "Классический массаж" })).toBeVisible();
+
+  await page.goto("/admin?section=price", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали цены" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Классический массаж · 60 мин" })).toHaveAttribute(
+    "href",
+    "/admin?section=price&role=owner&price=price-classic-60",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Классический массаж · 60 мин" }).click();
+  await expect(page).toHaveURL(/section=price/);
+  await expect(page).toHaveURL(/price=price-classic-60/);
+  await expect(page.getByRole("dialog", { name: "Детали цены" }).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeVisible();
+
+  await page.goto("/admin?section=price&price=price-classic-60", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали цены" }).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeVisible();
 });
 
 test("admin record drawers expose linked client workspaces", async ({ page }) => {
@@ -828,7 +842,10 @@ test("price workspace can create and edit a euro price variant", async ({ page }
   await createDialog.getByRole("button", { name: "Сохранить цену" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("button", { name: "Классический массаж · 90 мин" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Классический массаж · 90 мин" })).toHaveAttribute(
+    "href",
+    "/admin?section=price&role=owner&price=price-classic-massage-90",
+  );
 
   const details = page.getByLabel("Детали цены");
   await expect(details.getByRole("heading", { name: "Классический массаж · 90 мин" })).toBeVisible();
