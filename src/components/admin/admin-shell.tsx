@@ -32,6 +32,7 @@ type AdminShellProps = {
   selectedCalendarDate?: string;
   selectedClientName?: string;
   selectedCertificateCode?: string;
+  selectedContactId?: string;
   selectedMediaId?: string;
   selectedPriceId?: string;
   selectedServiceSlug?: string;
@@ -1298,6 +1299,10 @@ function priceDetailHref(priceId: string, role: AdminRoleId) {
 
 function mediaDetailHref(mediaId: string, role: AdminRoleId) {
   return `/admin?section=media&role=${role}&media=${encodeURIComponent(mediaId)}`;
+}
+
+function contactDetailHref(contactId: string, role: AdminRoleId) {
+  return `/admin?section=contacts&role=${role}&contact=${encodeURIComponent(contactId)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -5901,6 +5906,8 @@ function ContactsWorkspace({
   onSaveContactChannel,
   onSaveContactSettings,
   query,
+  role,
+  selectedContactId,
 }: {
   contactChannels: ContactChannelRecord[];
   contactSettings: ContactSettingsRecord;
@@ -5909,9 +5916,12 @@ function ContactsWorkspace({
   onSaveContactChannel: (channel: ContactChannelRecord, originalId?: string) => void;
   onSaveContactSettings: (settings: ContactSettingsRecord) => void;
   query: string;
+  role: AdminRoleId;
+  selectedContactId?: string;
 }) {
-  const [selectedId, setSelectedId] = useState(contactChannels[0]?.id ?? "");
-  const [isContactDrawerOpen, setIsContactDrawerOpen] = useState(false);
+  const initialSelectedContact = selectedContactId ? contactChannels.find((channel) => channel.id === selectedContactId) : undefined;
+  const [selectedId, setSelectedId] = useState(initialSelectedContact?.id ?? contactChannels[0]?.id ?? "");
+  const [isContactDrawerOpen, setIsContactDrawerOpen] = useState(Boolean(initialSelectedContact));
   const [editingChannel, setEditingChannel] = useState<ContactChannelRecord | undefined>();
   const [filter, setFilter] = useState<"all" | "active" | "messengers" | "seo">("all");
   const filteredChannels = contactChannels
@@ -6019,9 +6029,9 @@ function ContactsWorkspace({
               {filteredChannels.map((channel) => (
                 <tr aria-selected={isContactDrawerOpen && channel.id === selectedChannel?.id} key={channel.id}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openChannel(channel)} type="button">
+                    <Link className="admin-row-action admin-row-link" href={contactDetailHref(channel.id, role)} onClick={() => openChannel(channel)}>
                       {channel.name}
-                    </button>
+                    </Link>
                   </td>
                   <td>{channel.type}</td>
                   <td>
@@ -6922,6 +6932,7 @@ function Workspace({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedContactId,
   selectedMediaId,
   selectedPriceId,
   selectedServiceSlug,
@@ -6979,6 +6990,7 @@ function Workspace({
   selectedCalendarDate?: string;
   selectedCertificateCode?: string;
   selectedClientName?: string;
+  selectedContactId?: string;
   selectedMediaId?: string;
   selectedPriceId?: string;
   selectedServiceSlug?: string;
@@ -7080,10 +7092,13 @@ function Workspace({
         contactChannels={contactChannels}
         contactSettings={contactSettings}
         isContactSettingsOpen={isContactSettingsOpen}
+        key={selectedContactId ?? "default-contact"}
         onCloseContactSettings={onCloseContactSettings}
         onSaveContactChannel={onSaveContactChannel}
         onSaveContactSettings={onSaveContactSettings}
         query={query}
+        role={role}
+        selectedContactId={selectedContactId}
       />
     );
   }
@@ -7160,6 +7175,7 @@ export function AdminShell({
   selectedCalendarDate,
   selectedCertificateCode,
   selectedClientName,
+  selectedContactId,
   selectedMediaId,
   selectedPriceId,
   selectedServiceSlug,
@@ -7826,6 +7842,7 @@ export function AdminShell({
           selectedCalendarDate={selectedCalendarDate}
           selectedCertificateCode={selectedCertificateCode}
           selectedClientName={selectedClientName}
+          selectedContactId={selectedContactId}
           selectedMediaId={selectedMediaId}
           selectedPriceId={selectedPriceId}
           selectedServiceSlug={selectedServiceSlug}

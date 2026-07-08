@@ -265,6 +265,16 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Услуга: Классический массаж")).toBeInTheDocument();
   });
 
+  it("opens contact details from the contact query", () => {
+    render(<AdminShell activeSection="contacts" role="owner" selectedContactId="contact-phone" />);
+
+    const details = screen.getByRole("dialog", { name: "Детали контакта" });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(within(details).getByRole("heading", { name: "Телефон салона" })).toBeInTheDocument();
+    expect(within(details).getByText("+359 87 333 4411")).toBeInTheDocument();
+    expect(within(details).getByText("LocalBusiness SEO")).toBeInTheDocument();
+  });
+
   it.each([
     {
       activeSection: "certificates" as const,
@@ -298,6 +308,7 @@ describe("AdminShell", () => {
       activeSection: "contacts" as const,
       drawerLabel: "Детали контакта",
       heading: "Телефон салона",
+      rowHref: "/admin?section=contacts&role=owner&contact=contact-phone",
       rowButton: "Телефон салона",
     },
     {
@@ -1334,7 +1345,9 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="contacts" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "Контактные настройки сайта" })).toBeInTheDocument();
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Телефон салона" }));
+    const phoneLink = within(screen.getByRole("table")).getByRole("link", { name: "Телефон салона" });
+    phoneLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(phoneLink);
     const details = screen.getByRole("dialog", { name: "Детали контакта" });
     expect(details).toHaveTextContent("Телефон салона");
 
@@ -1362,10 +1375,12 @@ describe("AdminShell", () => {
 
     const table = screen.getByRole("table");
     expect(screen.getByRole("button", { name: "Мессенджеры" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(table).getByRole("button", { name: "Telegram" })).toBeInTheDocument();
-    expect(within(table).queryByRole("button", { name: "Google Maps" })).not.toBeInTheDocument();
+    const telegramLink = within(table).getByRole("link", { name: "Telegram" });
+    expect(telegramLink).toHaveAttribute("href", "/admin?section=contacts&role=owner&contact=contact-telegram");
+    expect(within(table).queryByRole("link", { name: "Google Maps" })).not.toBeInTheDocument();
 
-    await user.click(within(table).getByRole("button", { name: "Telegram" }));
+    telegramLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(telegramLink);
     const details = screen.getByLabelText("Детали контакта");
     expect(within(details).getByRole("heading", { name: "Telegram" })).toBeInTheDocument();
 

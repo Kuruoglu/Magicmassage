@@ -252,6 +252,20 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await page.goto("/admin?section=media&media=media-classic-cover", { waitUntil: "networkidle" });
   await expect(page.getByRole("dialog", { name: "Детали медиа" }).getByRole("heading", { name: "Классический массаж" })).toBeVisible();
+
+  await page.goto("/admin?section=contacts", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали контакта" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Телефон салона" })).toHaveAttribute(
+    "href",
+    "/admin?section=contacts&role=owner&contact=contact-phone",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Телефон салона" }).click();
+  await expect(page).toHaveURL(/section=contacts/);
+  await expect(page).toHaveURL(/contact=contact-phone/);
+  await expect(page.getByRole("dialog", { name: "Детали контакта" }).getByRole("heading", { name: "Телефон салона" })).toBeVisible();
+
+  await page.goto("/admin?section=contacts&contact=contact-phone", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали контакта" }).getByRole("heading", { name: "Телефон салона" })).toBeVisible();
 });
 
 test("admin record drawers expose linked client workspaces", async ({ page }) => {
@@ -926,8 +940,13 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
   await page.goto("/admin?section=contacts", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Контактные настройки сайта" })).toBeVisible();
-  await page.getByRole("table").getByRole("button", { name: "Телефон салона" }).click();
+  await expect(page.getByRole("table").getByRole("link", { name: "Телефон салона" })).toHaveAttribute(
+    "href",
+    "/admin?section=contacts&role=owner&contact=contact-phone",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Телефон салона" }).click();
   const contactDetails = page.getByRole("dialog", { name: "Детали контакта" });
+  await expect(page).toHaveURL(/contact=contact-phone/);
   await expect(contactDetails.getByRole("heading", { name: "Телефон салона" })).toBeVisible();
   await contactDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(contactDetails).toHaveCount(0);
@@ -942,18 +961,22 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
   await expect(settingsDialog).toHaveCount(0);
   await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("+359 87 555 0000")).toBeVisible();
   await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("ул. Места 49, Бургас")).toBeVisible();
-  await page.getByRole("table").getByRole("button", { name: "Телефон салона" }).click();
+  await page.getByRole("table").getByRole("link", { name: "Телефон салона" }).click();
   await expect(contactDetails.getByText("+359 87 555 0000")).toBeVisible();
   await contactDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(contactDetails).toHaveCount(0);
 
   await page.getByRole("button", { name: "Мессенджеры" }).click();
   await expect(page.getByRole("button", { name: "Мессенджеры" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("table").getByRole("button", { name: "Telegram" })).toBeVisible();
-  await expect(page.getByRole("table").getByRole("button", { name: "Google Maps" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Telegram" })).toHaveAttribute(
+    "href",
+    "/admin?section=contacts&role=owner&contact=contact-telegram",
+  );
+  await expect(page.getByRole("table").getByRole("link", { name: "Google Maps" })).toHaveCount(0);
 
   const details = page.getByRole("dialog", { name: "Детали контакта" });
-  await page.getByRole("table").getByRole("button", { name: "Telegram" }).click();
+  await page.getByRole("table").getByRole("link", { name: "Telegram" }).click();
+  await expect(page).toHaveURL(/contact=contact-telegram/);
   await details.getByRole("button", { name: "Редактировать" }).click();
 
   const channelDialog = page.getByRole("dialog", { name: "Редактировать контакт" });
