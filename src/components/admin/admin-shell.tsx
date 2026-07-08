@@ -1532,7 +1532,17 @@ function ClientFormDialog({
 }) {
   const [form, setForm] = useState<ClientFormState>(() => buildClientFormState(initialClient));
   const [error, setError] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const isEditing = Boolean(initialClient);
+  const hasNameError = Boolean(error && !form.name.trim());
+  const hasPhoneError = Boolean(error && !form.phone.trim());
+
+  function describedBy(...ids: Array<string | false>) {
+    const value = ids.filter(Boolean).join(" ");
+
+    return value || undefined;
+  }
 
   function updateForm<Field extends keyof ClientFormState>(field: Field, value: ClientFormState[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1547,6 +1557,11 @@ function ClientFormDialog({
 
     if (!name || !phone) {
       setError("Укажите имя и телефон клиента.");
+      if (!name) {
+        nameInputRef.current?.focus();
+      } else {
+        phoneInputRef.current?.focus();
+      }
       return;
     }
 
@@ -1586,102 +1601,146 @@ function ClientFormDialog({
         </div>
 
         <form noValidate onSubmit={handleSubmit}>
-          <div className="admin-action-body admin-client-form-grid">
-            <label>
-              Имя
-              <input
-                aria-invalid={error && !form.name.trim() ? "true" : undefined}
-                autoComplete="name"
-                onChange={(event) => updateForm("name", event.target.value)}
-                required
-                type="text"
-                value={form.name}
-              />
-            </label>
-            <label>
-              Телефон
-              <input
-                aria-invalid={error && !form.phone.trim() ? "true" : undefined}
-                autoComplete="tel"
-                onChange={(event) => updateForm("phone", event.target.value)}
-                required
-                type="tel"
-                value={form.phone}
-              />
-            </label>
+          <div className="admin-action-body admin-client-form-layout">
             {error ? (
               <p className="admin-form-alert admin-form-alert-wide" role="alert">
                 {error}
               </p>
             ) : null}
-            <label>
-              Email
-              <input
-                autoComplete="email"
-                onChange={(event) => updateForm("email", event.target.value)}
-                type="email"
-                value={form.email}
-              />
-            </label>
-            <label>
-              Telegram
-              <input
-                autoComplete="url"
-                onChange={(event) => updateForm("telegram", event.target.value)}
-                type="url"
-                value={form.telegram}
-              />
-            </label>
-            <label>
-              Язык
-              <select onChange={(event) => updateForm("language", event.target.value)} value={form.language}>
-                {clientLanguageOptions.map((language) => (
-                  <option key={language.value} value={language.value}>
-                    {language.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Канал связи
-              <select onChange={(event) => updateForm("preferredContact", event.target.value)} value={form.preferredContact}>
-                {clientContactOptions.map((contact) => (
-                  <option key={contact} value={contact}>
-                    {contact}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Статус
-              <select onChange={(event) => updateForm("status", event.target.value)} value={form.status}>
-                {clientStatusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Следующий визит
-              <input onChange={(event) => updateForm("next", event.target.value)} type="text" value={form.next} />
-            </label>
-            <label>
-              Визиты
-              <input min="0" onChange={(event) => updateForm("visits", event.target.value)} type="number" value={form.visits} />
-            </label>
-            <label>
-              Сумма
-              <input onChange={(event) => updateForm("totalSpend", event.target.value)} type="text" value={form.totalSpend} />
-            </label>
-            <label className="admin-form-wide">
-              Заметка клиента
-              <textarea onChange={(event) => updateForm("note", event.target.value)} rows={4} value={form.note} />
-            </label>
-            <label className="admin-form-wide">
-              Теги
-              <input onChange={(event) => updateForm("tags", event.target.value)} type="text" value={form.tags} />
-            </label>
+
+            <fieldset className="admin-form-section">
+              <legend>Контакты клиента</legend>
+              <p className="admin-form-helper" id="client-contact-helper">
+                Имя и телефон нужны для записи и связи с клиентом.
+              </p>
+              <div className="admin-client-form-grid">
+                <div className="admin-field">
+                  <label htmlFor="client-name-input">Имя</label>
+                  <input
+                    aria-describedby={describedBy("client-contact-helper", hasNameError && "client-name-error")}
+                    aria-invalid={hasNameError ? "true" : undefined}
+                    autoComplete="name"
+                    id="client-name-input"
+                    onChange={(event) => updateForm("name", event.target.value)}
+                    ref={nameInputRef}
+                    required
+                    type="text"
+                    value={form.name}
+                  />
+                  {hasNameError ? (
+                    <span className="admin-field-error" id="client-name-error">
+                      Укажите имя клиента.
+                    </span>
+                  ) : null}
+                </div>
+                <div className="admin-field">
+                  <label htmlFor="client-phone-input">Телефон</label>
+                  <input
+                    aria-describedby={describedBy("client-contact-helper", hasPhoneError && "client-phone-error")}
+                    aria-invalid={hasPhoneError ? "true" : undefined}
+                    autoComplete="tel"
+                    id="client-phone-input"
+                    onChange={(event) => updateForm("phone", event.target.value)}
+                    ref={phoneInputRef}
+                    required
+                    type="tel"
+                    value={form.phone}
+                  />
+                  {hasPhoneError ? (
+                    <span className="admin-field-error" id="client-phone-error">
+                      Укажите телефон клиента.
+                    </span>
+                  ) : null}
+                </div>
+                <label>
+                  Email
+                  <input
+                    autoComplete="email"
+                    onChange={(event) => updateForm("email", event.target.value)}
+                    type="email"
+                    value={form.email}
+                  />
+                </label>
+                <label>
+                  Telegram
+                  <input
+                    autoComplete="url"
+                    onChange={(event) => updateForm("telegram", event.target.value)}
+                    type="url"
+                    value={form.telegram}
+                  />
+                </label>
+                <label>
+                  Язык
+                  <select onChange={(event) => updateForm("language", event.target.value)} value={form.language}>
+                    {clientLanguageOptions.map((language) => (
+                      <option key={language.value} value={language.value}>
+                        {language.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Канал связи
+                  <select onChange={(event) => updateForm("preferredContact", event.target.value)} value={form.preferredContact}>
+                    {clientContactOptions.map((contact) => (
+                      <option key={contact} value={contact}>
+                        {contact}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="admin-form-section">
+              <legend>Профиль и активность</legend>
+              <p className="admin-form-helper" id="client-status-helper">
+                Активный клиент: 5+ визитов или ближайшая подтвержденная запись.
+              </p>
+              <div className="admin-client-form-grid">
+                <label>
+                  Статус
+                  <select
+                    aria-describedby="client-status-helper"
+                    onChange={(event) => updateForm("status", event.target.value)}
+                    value={form.status}
+                  >
+                    {clientStatusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Следующий визит
+                  <input onChange={(event) => updateForm("next", event.target.value)} type="text" value={form.next} />
+                </label>
+                <label>
+                  Визиты
+                  <input min="0" onChange={(event) => updateForm("visits", event.target.value)} type="number" value={form.visits} />
+                </label>
+                <label>
+                  Сумма
+                  <input onChange={(event) => updateForm("totalSpend", event.target.value)} type="text" value={form.totalSpend} />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="admin-form-section">
+              <legend>Заметки и теги</legend>
+              <div className="admin-client-form-grid">
+                <label className="admin-form-wide">
+                  Заметка клиента
+                  <textarea onChange={(event) => updateForm("note", event.target.value)} rows={4} value={form.note} />
+                </label>
+                <label className="admin-form-wide">
+                  Теги
+                  <input onChange={(event) => updateForm("tags", event.target.value)} type="text" value={form.tags} />
+                </label>
+              </div>
+            </fieldset>
           </div>
 
           <div className="admin-action-footer">

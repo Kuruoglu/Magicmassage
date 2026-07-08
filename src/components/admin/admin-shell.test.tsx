@@ -629,9 +629,22 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="clients" role="owner" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Новый клиент" })).getByRole("button", { name: "Сохранить клиента" }));
+    const dialog = screen.getByRole("dialog", { name: "Новый клиент" });
+
+    expect(within(dialog).getByRole("group", { name: "Контакты клиента" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("group", { name: "Профиль и активность" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("group", { name: "Заметки и теги" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Имя и телефон нужны для записи и связи с клиентом.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Активный клиент: 5+ визитов или ближайшая подтвержденная запись.")).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent("Укажите имя и телефон клиента.");
+    expect(within(dialog).getByText("Укажите имя клиента.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Укажите телефон клиента.")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Имя")).toHaveFocus();
+    expect(within(dialog).getByLabelText("Имя")).toHaveAttribute("aria-describedby", expect.stringContaining("client-name-error"));
+    expect(within(dialog).getByLabelText("Телефон")).toHaveAttribute("aria-describedby", expect.stringContaining("client-phone-error"));
     expect(within(screen.getByRole("table")).queryByRole("button", { name: "" })).not.toBeInTheDocument();
   });
 

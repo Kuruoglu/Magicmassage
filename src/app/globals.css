@@ -4252,6 +4252,39 @@ button.admin-calendar-item[aria-pressed="true"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.admin-client-form-layout {
+  gap: 14px;
+}
+
+.admin-form-section {
+  border: 1px solid rgba(124, 77, 161, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 14px;
+}
+
+.admin-form-section legend {
+  color: var(--admin-text);
+  font-size: 0.86rem;
+  font-weight: 900;
+  padding: 0 6px;
+}
+
+.admin-form-section .admin-client-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-form-helper {
+  color: var(--admin-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: -4px 0 0;
+}
+
 .admin-action-body label {
   color: var(--admin-muted);
   display: grid;
@@ -4261,17 +4294,34 @@ button.admin-calendar-item[aria-pressed="true"] {
   text-transform: uppercase;
 }
 
+.admin-action-body .admin-field {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-action-body .admin-field > label {
+  color: var(--admin-muted);
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .admin-action-body input,
 .admin-action-body select,
 .admin-action-body textarea {
   background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   border-radius: 8px;
+  box-sizing: border-box;
   color: var(--admin-text);
   font: inherit;
+  max-width: 100%;
   min-height: 42px;
+  min-width: 0;
   padding: 0 12px;
   text-transform: none;
+  width: 100%;
 }
 
 .admin-action-body .admin-checkbox-label {
@@ -4292,6 +4342,14 @@ button.admin-calendar-item[aria-pressed="true"] {
   font-size: 0.82rem;
   font-weight: 800;
   margin: -4px 0 0;
+}
+
+.admin-field-error {
+  color: #9F1D2A;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-transform: none;
 }
 
 .admin-form-alert-wide,
@@ -4523,7 +4581,7 @@ button.admin-calendar-item[aria-pressed="true"] {
     width: 100%;
   }
 
-  .admin-clients-workspace .admin-panel-head {
+  .admin-clients-workspace > .admin-panel > .admin-panel-head {
     display: grid;
     gap: 12px;
     grid-template-columns: 1fr;

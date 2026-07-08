@@ -478,6 +478,10 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await page.getByRole("button", { name: "Добавить клиента" }).click();
 
   const createDialog = page.getByRole("dialog", { name: "Новый клиент" });
+  await expect(createDialog.getByRole("group", { name: "Контакты клиента" })).toBeVisible();
+  await expect(createDialog.getByRole("group", { name: "Профиль и активность" })).toBeVisible();
+  await expect(createDialog.getByRole("group", { name: "Заметки и теги" })).toBeVisible();
+  await expect(createDialog.getByText("Активный клиент: 5+ визитов или ближайшая подтвержденная запись.")).toBeVisible();
   await createDialog.getByRole("textbox", { name: "Имя" }).fill("Ирина Тестова");
   await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359 88 777 1122");
   await createDialog.getByRole("textbox", { name: "Email" }).fill("irina@example.com");
