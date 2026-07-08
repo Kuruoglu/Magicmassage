@@ -37,6 +37,7 @@ type AdminShellProps = {
   selectedMediaId?: string;
   selectedPriceId?: string;
   selectedServiceSlug?: string;
+  selectedSettingsGroupId?: string;
 };
 
 type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
@@ -1308,6 +1309,10 @@ function contactDetailHref(contactId: string, role: AdminRoleId) {
 
 function blogDetailHref(blogPostId: string, role: AdminRoleId) {
   return `/admin?section=blog&role=${role}&blog=${encodeURIComponent(blogPostId)}`;
+}
+
+function settingsDetailHref(settingsGroupId: SettingsGroupId, role: AdminRoleId) {
+  return `/admin?section=settings&role=${role}&settings=${encodeURIComponent(settingsGroupId)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -6371,6 +6376,8 @@ function SettingsWorkspace({
   onOpenSettingsEdit,
   onSaveSettings,
   query,
+  role,
+  selectedSettingsGroupId,
   settings,
 }: {
   isSettingsEditOpen: boolean;
@@ -6378,10 +6385,15 @@ function SettingsWorkspace({
   onOpenSettingsEdit: () => void;
   onSaveSettings: (settings: SettingsRecord) => void;
   query: string;
+  role: AdminRoleId;
+  selectedSettingsGroupId?: string;
   settings: SettingsRecord;
 }) {
-  const [selectedGroupId, setSelectedGroupId] = useState<SettingsGroupId>("booking");
-  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+  const initialSelectedSettingsGroup = selectedSettingsGroupId
+    ? settingsGroups.find((group) => group.id === selectedSettingsGroupId)
+    : undefined;
+  const [selectedGroupId, setSelectedGroupId] = useState<SettingsGroupId>(initialSelectedSettingsGroup?.id ?? "booking");
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(Boolean(initialSelectedSettingsGroup));
   const [actionNotice, setActionNotice] = useState("");
   const [isDangerDialogOpen, setIsDangerDialogOpen] = useState(false);
   const filteredGroups = settingsGroups.filter((group) => matchesSearch([group.title, group.summary, group.status], query));
@@ -6438,9 +6450,13 @@ function SettingsWorkspace({
               {filteredGroups.map((group) => (
                 <tr aria-selected={isSettingsDrawerOpen && group.id === selectedGroup?.id} key={group.id}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openGroup(group.id)} type="button">
+                    <Link
+                      className="admin-row-action admin-row-link"
+                      href={settingsDetailHref(group.id, role)}
+                      onClick={() => openGroup(group.id)}
+                    >
                       {group.title}
-                    </button>
+                    </Link>
                   </td>
                   <td>{group.summary}</td>
                   <td>
@@ -6947,6 +6963,7 @@ function Workspace({
   selectedMediaId,
   selectedPriceId,
   selectedServiceSlug,
+  selectedSettingsGroupId,
   services,
   settings,
 }: {
@@ -7006,6 +7023,7 @@ function Workspace({
   selectedMediaId?: string;
   selectedPriceId?: string;
   selectedServiceSlug?: string;
+  selectedSettingsGroupId?: string;
   services: ServiceRecord[];
   settings: SettingsRecord;
 }) {
@@ -7146,10 +7164,13 @@ function Workspace({
     return (
       <SettingsWorkspace
         isSettingsEditOpen={isSettingsEditOpen}
+        key={selectedSettingsGroupId ?? "default-settings"}
         onCloseSettingsEdit={onCloseSettingsEdit}
         onOpenSettingsEdit={onOpenSettingsEdit}
         onSaveSettings={onSaveSettings}
         query={query}
+        role={role}
+        selectedSettingsGroupId={selectedSettingsGroupId}
         settings={settings}
       />
     );
@@ -7195,6 +7216,7 @@ export function AdminShell({
   selectedMediaId,
   selectedPriceId,
   selectedServiceSlug,
+  selectedSettingsGroupId,
 }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
@@ -7863,6 +7885,7 @@ export function AdminShell({
           selectedMediaId={selectedMediaId}
           selectedPriceId={selectedPriceId}
           selectedServiceSlug={selectedServiceSlug}
+          selectedSettingsGroupId={selectedSettingsGroupId}
           services={services}
           settings={settings}
         />

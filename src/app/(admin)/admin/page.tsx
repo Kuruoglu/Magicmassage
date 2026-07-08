@@ -23,6 +23,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const selectedMediaId = firstQueryValue(query.media);
   const selectedPriceId = firstQueryValue(query.price);
   const selectedServiceSlug = firstQueryValue(query.service);
+  const selectedSettingsGroupId = firstQueryValue(query.settings);
 
   return (
     <AdminShell
@@ -38,6 +39,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       selectedMediaId={selectedMediaId}
       selectedPriceId={selectedPriceId}
       selectedServiceSlug={selectedServiceSlug}
+      selectedSettingsGroupId={selectedSettingsGroupId}
     />
   );
 }

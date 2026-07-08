@@ -285,6 +285,16 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Подготовка к первому массажу в Бургасе")).toBeInTheDocument();
   });
 
+  it("opens settings details from the settings query", () => {
+    render(<AdminShell activeSection="settings" role="owner" selectedSettingsGroupId="booking" />);
+
+    const details = screen.getByRole("dialog", { name: "Детали настроек" });
+    expect(details).toHaveClass("admin-drawer-panel");
+    expect(within(details).getByRole("heading", { name: "Запись и календарь" })).toBeInTheDocument();
+    expect(within(details).getByText("30 минут")).toBeInTheDocument();
+    expect(within(details).getByText("Внутренний календарь главный")).toBeInTheDocument();
+  });
+
   it.each([
     {
       activeSection: "certificates" as const,
@@ -332,6 +342,7 @@ describe("AdminShell", () => {
       activeSection: "settings" as const,
       drawerLabel: "Детали настроек",
       heading: "Запись и календарь",
+      rowHref: "/admin?section=settings&role=owner&settings=booking",
       rowButton: "Запись и календарь",
     },
     {
@@ -1499,7 +1510,10 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="settings" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "Настройки админки" })).toBeInTheDocument();
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
+    const bookingLink = within(screen.getByRole("table")).getByRole("link", { name: "Запись и календарь" });
+    expect(bookingLink).toHaveAttribute("href", "/admin?section=settings&role=owner&settings=booking");
+    bookingLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(bookingLink);
     const details = screen.getByRole("dialog", { name: "Детали настроек" });
     expect(within(details).getByRole("heading", { name: "Запись и календарь" })).toBeInTheDocument();
     expect(within(details).getByText("30 минут")).toBeInTheDocument();
@@ -1549,7 +1563,9 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="settings" role="owner" />);
 
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
+    const bookingLink = within(screen.getByRole("table")).getByRole("link", { name: "Запись и календарь" });
+    bookingLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(bookingLink);
     await user.type(screen.getByRole("searchbox", { name: "Поиск" }), "Stripe");
 
     const details = screen.getByRole("dialog", { name: "Детали настроек" });
@@ -1569,7 +1585,9 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="settings" role="owner" />);
 
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
+    const bookingLink = within(screen.getByRole("table")).getByRole("link", { name: "Запись и календарь" });
+    bookingLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(bookingLink);
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
@@ -1581,7 +1599,9 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="settings" role="owner" />);
 
-    await user.click(within(screen.getByRole("table")).getByRole("button", { name: "Запись и календарь" }));
+    const bookingLink = within(screen.getByRole("table")).getByRole("link", { name: "Запись и календарь" });
+    bookingLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(bookingLink);
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
@@ -1599,7 +1619,10 @@ describe("AdminShell", () => {
 
     render(<AdminShell activeSection="settings" role="owner" />);
 
-    await user.click(screen.getByRole("button", { name: "Роли и аудит" }));
+    const rolesAuditLink = within(screen.getByRole("table")).getByRole("link", { name: "Роли и аудит" });
+    expect(rolesAuditLink).toHaveAttribute("href", "/admin?section=settings&role=owner&settings=rolesAudit");
+    rolesAuditLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(rolesAuditLink);
 
     const details = screen.getByLabelText("Детали настроек");
     expect(within(details).getByRole("heading", { name: "Роли и аудит" })).toBeInTheDocument();

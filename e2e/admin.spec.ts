@@ -280,6 +280,20 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await page.goto("/admin?section=blog&blog=blog-first-massage-preparation", { waitUntil: "networkidle" });
   await expect(page.getByRole("dialog", { name: "Детали статьи" }).getByRole("heading", { name: "Подготовка к первому массажу" })).toBeVisible();
+
+  await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали настроек" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Запись и календарь" })).toHaveAttribute(
+    "href",
+    "/admin?section=settings&role=owner&settings=booking",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Запись и календарь" }).click();
+  await expect(page).toHaveURL(/section=settings/);
+  await expect(page).toHaveURL(/settings=booking/);
+  await expect(page.getByRole("dialog", { name: "Детали настроек" }).getByRole("heading", { name: "Запись и календарь" })).toBeVisible();
+
+  await page.goto("/admin?section=settings&settings=booking", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали настроек" }).getByRole("heading", { name: "Запись и календарь" })).toBeVisible();
 });
 
 test("admin record drawers expose linked client workspaces", async ({ page }) => {
@@ -1070,8 +1084,13 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
   await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "Настройки админки" })).toBeVisible();
-  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
+  await expect(page.getByRole("table").getByRole("link", { name: "Запись и календарь" })).toHaveAttribute(
+    "href",
+    "/admin?section=settings&role=owner&settings=booking",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Запись и календарь" }).click();
   const details = page.getByRole("dialog", { name: "Детали настроек" });
+  await expect(page).toHaveURL(/settings=booking/);
   await expect(details.getByRole("heading", { name: "Запись и календарь" })).toBeVisible();
   await expect(details.getByText("30 минут")).toBeVisible();
   await details.getByRole("button", { name: "Закрыть" }).click();
@@ -1087,7 +1106,7 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveText("Настройки сохранены.");
-  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
+  await page.getByRole("table").getByRole("link", { name: "Запись и календарь" }).click();
   await expect(details.getByText("45 минут")).toBeVisible();
   await expect(details.getByText("5 слотов")).toBeVisible();
   await expect(details.getByText("Односторонняя")).toBeVisible();
@@ -1095,7 +1114,12 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
 
   await details.getByRole("button", { name: "Закрыть" }).click();
   await expect(details).toHaveCount(0);
-  await page.getByRole("button", { name: "Роли и аудит" }).click();
+  await expect(page.getByRole("table").getByRole("link", { name: "Роли и аудит" })).toHaveAttribute(
+    "href",
+    "/admin?section=settings&role=owner&settings=rolesAudit",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Роли и аудит" }).click();
+  await expect(page).toHaveURL(/settings=rolesAudit/);
   await expect(details.getByRole("heading", { name: "Роли и аудит" })).toBeVisible();
   await details.getByRole("button", { name: "Сбросить демо-данные" }).click();
 
@@ -1109,8 +1133,9 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
 test("calendar availability uses saved booking settings", async ({ page }) => {
   await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
 
-  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
+  await page.getByRole("table").getByRole("link", { name: "Запись и календарь" }).click();
   const settingsDetails = page.getByRole("dialog", { name: "Детали настроек" });
+  await expect(page).toHaveURL(/settings=booking/);
   await settingsDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(settingsDetails).toHaveCount(0);
   await page.getByRole("button", { name: "Сохранить" }).click();
@@ -1121,13 +1146,13 @@ test("calendar availability uses saved booking settings", async ({ page }) => {
   await dialog.getByRole("button", { name: "Сохранить настройки" }).click();
 
   await expect(dialog).toHaveCount(0);
-  await page.getByRole("table").getByRole("button", { name: "Запись и календарь" }).click();
+  await page.getByRole("table").getByRole("link", { name: "Запись и календарь" }).click();
   await expect(settingsDetails.getByText("45 минут")).toBeVisible();
   await expect(settingsDetails.getByText("5 слотов")).toBeVisible();
 
   await settingsDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(settingsDetails).toHaveCount(0);
-  await page.getByRole("link", { name: "Календарь" }).click();
+  await page.getByRole("navigation", { name: "Admin sections" }).getByRole("link", { name: "Календарь", exact: true }).click();
   await page.getByRole("button", { name: "Месяц" }).click();
 
   const monthGrid = page.getByRole("grid", { name: "Месяц Июль 2026" });
