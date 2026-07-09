@@ -1,10 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AdminShell } from "./admin-shell";
 
 describe("AdminShell", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders the operational owner dashboard without a marketing hero", () => {
     render(<AdminShell activeSection="dashboard" role="owner" />);
 
@@ -974,6 +978,78 @@ describe("AdminShell", () => {
     expect(within(card).getByText("BG · Новый клиент")).toBeInTheDocument();
     expect(within(card).getAllByText(/предпочитает дневные слоты/).length).toBeGreaterThan(0);
     expect(within(card).getByText("new")).toBeInTheDocument();
+  });
+
+  it("posts saved clients when the admin shell is backed by Supabase", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="clients"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [
+              {
+                email: "existing@example.com",
+                history: [],
+                id: "client-existing",
+                language: "en",
+                name: "Existing Client",
+                next: "Not scheduled",
+                note: "",
+                phone: "+359 88 000 0000",
+                preferredContact: "Email",
+                status: "Новый клиент",
+                tags: ["EN"],
+                telegram: "",
+                totalSpend: "0 €",
+                visits: 0,
+              },
+            ],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новый клиент" });
+    fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Irina Persist" } });
+    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359 88 777 1122" } });
+    fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "irina.persist@example.com" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(requestInit).toMatchObject({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    });
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        email: "irina.persist@example.com",
+        id: "client-359887771122",
+        name: "Irina Persist",
+        phone: "+359 88 777 1122",
+      },
+      type: "client",
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Изменение сохранено в Supabase.");
   });
 
   it("validates required client fields before saving", () => {

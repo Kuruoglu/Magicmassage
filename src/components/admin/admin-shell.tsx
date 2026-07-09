@@ -23,6 +23,7 @@ import {
   upcomingAppointments,
 } from "@/admin/demo-data";
 import type { AdminShellInitialData } from "@/admin/data-source";
+import type { AdminPersistInput } from "@/admin/persistence";
 import {
   appointmentBelongsToClient,
   buildClientIdFromPhone,
@@ -7307,6 +7308,8 @@ export function AdminShell({
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows());
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord());
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers());
+  const [persistenceStatus, setPersistenceStatus] = useState("");
+  const isSupabaseBacked = initialData?.source === "supabase";
   const selectedRouteAppointment = selectedAppointmentKey
     ? calendarAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentKey)
     : undefined;
@@ -7351,6 +7354,44 @@ export function AdminShell({
     : shouldPrefillCalendarClient
       ? `prefill-${calendarActionKey}`
       : "new-empty-appointment";
+
+  async function persistAdminRecord(input: AdminPersistInput) {
+    if (!isSupabaseBacked) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/records", {
+        body: JSON.stringify(input),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => null)) as { message?: string; ok?: boolean } | null;
+
+      if (!response.ok || result?.ok === false) {
+        setPersistenceStatus(result?.message ?? "Изменение сохранено локально, но Supabase не подтвердил запись.");
+        return;
+      }
+
+      setPersistenceStatus("Изменение сохранено в Supabase.");
+    } catch {
+      setPersistenceStatus("Изменение сохранено локально, но Supabase недоступен.");
+    }
+  }
+
+  function persistAppointmentRecord(appointment: Appointment) {
+    if (!appointment.clientId) {
+      if (isSupabaseBacked) {
+        setPersistenceStatus("Запись сохранена локально: выберите клиента из базы для сохранения в Supabase.");
+      }
+
+      return;
+    }
+
+    void persistAdminRecord({ record: appointment, type: "appointment" });
+  }
 
   function handleAppointmentCreate(appointment: Appointment) {
     const createdAppointment = {
@@ -7596,10 +7637,13 @@ export function AdminShell({
   }
 
   function saveCalendarAppointment(appointment: Appointment) {
+    let persistedAppointment = appointment;
+
     if (editingAppointment) {
       handleAppointmentUpdate(appointment);
     } else {
       const createdAppointment = handleAppointmentCreate(appointment);
+      persistedAppointment = createdAppointment;
       updateActiveCalendarDate(createdAppointment.date);
       setCalendarAppointmentFocus({
         appointmentKey: appointmentKey(createdAppointment),
@@ -7608,18 +7652,26 @@ export function AdminShell({
       });
     }
 
+    persistAppointmentRecord(persistedAppointment);
     closeActionDialog();
   }
 
   function cancelCalendarAppointment(appointment: Appointment) {
-    handleAppointmentUpdate({ ...appointment, status: "Отменена" });
+    const cancelledAppointment = { ...appointment, status: "Отменена" as const };
+    handleAppointmentUpdate(cancelledAppointment);
+    persistAppointmentRecord(cancelledAppointment);
     closeCancelDialog();
   }
 
   function saveClientNote(clientIdentity: string, note: string) {
+    const updatedClient = clients.find((client) => matchesClientIdentity(client, clientIdentity));
     setClients((current) =>
       current.map((client) => (matchesClientIdentity(client, clientIdentity) ? { ...client, note } : client)),
     );
+
+    if (updatedClient) {
+      void persistAdminRecord({ record: { ...updatedClient, note }, type: "client" });
+    }
   }
 
   function saveClientRecord(client: ClientRecord, originalClientIdentity?: string) {
@@ -7639,6 +7691,7 @@ export function AdminShell({
 
       return current.map((currentClient, index) => (index === existingIndex ? client : currentClient));
     });
+    void persistAdminRecord({ record: client, type: "client" });
   }
 
   function saveCertificateRecord(certificate: CertificateRecord, originalCode?: string) {
@@ -7897,6 +7950,12 @@ export function AdminShell({
             {activeModule.primaryAction}
           </button>
         </section>
+
+        {persistenceStatus ? (
+          <p className="admin-export-notice" role="status">
+            {persistenceStatus}
+          </p>
+        ) : null}
 
         <Workspace
           adminUsers={adminUsers}

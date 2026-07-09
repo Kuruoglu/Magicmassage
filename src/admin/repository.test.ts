@@ -9,9 +9,10 @@ type QueryFilter = {
 };
 
 type QueryOperation = {
-  action: "insert" | "select";
+  action: "insert" | "select" | "upsert";
   columns?: string;
   filters: QueryFilter[];
+  options?: unknown;
   order?: { ascending: boolean; column: string };
   table: string;
   values?: unknown;
@@ -84,6 +85,10 @@ class FakeSupabaseClient {
       },
       select: (columns: string) =>
         new FakeSelectQuery(table, columns, this.rowsByTable[table] ?? [], this.operations, this.errorsByTable[table]),
+      upsert: (values: unknown, options?: unknown) => {
+        this.operations.push({ action: "upsert", filters: [], options, table, values });
+        return Promise.resolve({ data: null, error: this.errorsByTable[table] ?? null });
+      },
     };
   }
 }
@@ -256,6 +261,103 @@ describe("admin Supabase repository", () => {
         stripe_fee_cents: 1890,
       },
     });
+  });
+
+  it("upserts clients by id for admin edits", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveClient({
+      email: "irina@example.com",
+      history: [],
+      id: "client-359887771122",
+      language: "bg",
+      name: "Irina Test",
+      next: "Not scheduled",
+      note: "Prefers daytime slots.",
+      phone: "+359 88 777 1122",
+      preferredContact: "Telegram",
+      status: "New client",
+      tags: ["BG", "new"],
+      telegram: "https://t.me/irina_demo",
+      totalSpend: "0 EUR",
+      visits: 0,
+    });
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_clients",
+      values: {
+        email: "irina@example.com",
+        full_name: "Irina Test",
+        id: "client-359887771122",
+        locale: "bg",
+        next_visit_label: "Not scheduled",
+        notes: "Prefers daytime slots.",
+        phone: "+359 88 777 1122",
+        phone_normalized: "359887771122",
+        preferred_contact: "Telegram",
+        status: "New client",
+        tags: ["BG", "new"],
+        telegram_url: "https://t.me/irina_demo",
+        total_spend_label: "0 EUR",
+        visit_count: 0,
+      },
+    });
+  });
+
+  it("upserts appointments with a stable client id", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveAppointment({
+      client: "Olena K.",
+      clientId: "client-359873334411",
+      date: "2026-07-08",
+      id: "appointment-1",
+      note: "Check neck and shoulders before session.",
+      service: "Deep tissue massage",
+      status: "Подтверждена",
+      time: "15:00",
+    });
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_appointments",
+      values: {
+        client_id: "client-359873334411",
+        client_name_snapshot: "Olena K.",
+        id: "appointment-1",
+        internal_note: "Check neck and shoulders before session.",
+        service_name: "Deep tissue massage",
+        starts_at: "15:00",
+        starts_on: "2026-07-08",
+        status: "confirmed",
+      },
+    });
+  });
+
+  it("does not persist appointments without an exact client id", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(
+      repository.saveAppointment({
+        client: "Olena K.",
+        date: "2026-07-08",
+        id: "appointment-1",
+        note: "",
+        service: "Deep tissue massage",
+        status: "Ожидает",
+        time: "15:00",
+      }),
+    ).rejects.toThrow("admin_appointments: client_id is required");
+
+    expect(client.operations).toEqual([]);
   });
 
   it("throws table-scoped errors when Supabase rejects a query", async () => {

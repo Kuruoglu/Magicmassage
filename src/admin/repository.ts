@@ -1,4 +1,5 @@
 import type { FinanceRow, FinanceSummary } from "./config";
+import { normalizeClientPhone } from "./domain";
 import type {
   AdminAppointmentDatabaseRow,
   AdminCertificateDatabaseRow,
@@ -34,6 +35,7 @@ type AdminSupabaseSelectQuery<T> = PromiseLike<SupabaseQueryResult<T>> & {
 type AdminSupabaseTable<T> = {
   insert(values: unknown): PromiseLike<SupabaseMutationResult>;
   select(columns: string): AdminSupabaseSelectQuery<T>;
+  upsert(values: unknown, options?: { onConflict?: string }): PromiseLike<SupabaseMutationResult>;
 };
 
 export type AdminSupabaseClient = {
@@ -71,6 +73,8 @@ export type AdminRepository = {
   listStripeSales(period: AdminFinancePeriod): Promise<FinanceRow[]>;
   loadDomainRecords(): Promise<AdminDomainRecords>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
+  saveAppointment(appointment: Appointment): Promise<void>;
+  saveClient(client: ClientRecord): Promise<void>;
 };
 
 const clientColumns = [
@@ -139,6 +143,13 @@ const appointmentStatusByDatabase: Record<string, AppointmentStatus> = {
   Подтверждена: "Подтверждена",
 };
 
+const databaseAppointmentStatusByStatus = new Map<AppointmentStatus, string>([
+  [appointmentStatusByDatabase.cancelled, "cancelled"],
+  [appointmentStatusByDatabase.confirmed, "confirmed"],
+  [appointmentStatusByDatabase.pending, "pending"],
+  [appointmentStatusByDatabase.request, "request"],
+]);
+
 const certificateStatusByDatabase: Record<string, CertificateStatus> = {
   paid: "Оплачено",
   pending_pdf: "Ожидает PDF",
@@ -182,6 +193,10 @@ function mapAppointmentStatus(status: string): AppointmentStatus {
   return appointmentStatusByDatabase[status] ?? "Ожидает";
 }
 
+function mapAppointmentStatusToDatabase(status: AppointmentStatus) {
+  return databaseAppointmentStatusByStatus.get(status) ?? "pending";
+}
+
 function mapCertificateStatus(status: string): CertificateStatus {
   return certificateStatusByDatabase[status] ?? "Оплачено";
 }
@@ -217,6 +232,25 @@ function mapClientRow(row: AdminClientDatabaseRow): ClientRecord {
   };
 }
 
+function mapClientRecordToRow(client: ClientRecord): AdminClientDatabaseRow {
+  return {
+    email: client.email,
+    full_name: client.name,
+    id: client.id,
+    locale: client.language,
+    next_visit_label: client.next,
+    notes: client.note,
+    phone: client.phone,
+    phone_normalized: normalizeClientPhone(client.phone),
+    preferred_contact: client.preferredContact,
+    status: client.status,
+    tags: [...client.tags],
+    telegram_url: client.telegram,
+    total_spend_label: client.totalSpend,
+    visit_count: client.visits,
+  };
+}
+
 function mapAppointmentRow(row: AdminAppointmentDatabaseRow): Appointment {
   return {
     client: row.client_name_snapshot,
@@ -227,6 +261,23 @@ function mapAppointmentRow(row: AdminAppointmentDatabaseRow): Appointment {
     service: row.service_name,
     status: mapAppointmentStatus(row.status),
     time: normalizeTime(row.starts_at),
+  };
+}
+
+function mapAppointmentRecordToRow(appointment: Appointment): AdminAppointmentDatabaseRow {
+  if (!appointment.clientId) {
+    throw new Error("admin_appointments: client_id is required");
+  }
+
+  return {
+    client_id: appointment.clientId,
+    client_name_snapshot: appointment.client,
+    id: appointment.id ?? `${appointment.date}-${appointment.time}-${appointment.clientId}`,
+    internal_note: appointment.note,
+    service_name: appointment.service,
+    starts_at: appointment.time,
+    starts_on: appointment.date,
+    status: mapAppointmentStatusToDatabase(appointment.status),
   };
 }
 
@@ -297,6 +348,19 @@ async function insertRow(client: AdminSupabaseClient, table: string, values: unk
   }
 }
 
+async function upsertRow(
+  client: AdminSupabaseClient,
+  table: string,
+  values: unknown,
+  options?: { onConflict?: string },
+) {
+  const { error } = await client.from(table).upsert(values, options);
+
+  if (error) {
+    throw new Error(`${table}: ${error.message}`);
+  }
+}
+
 export function createAdminSupabaseRepository(client: AdminSupabaseClient): AdminRepository {
   async function listClients() {
     const rows = await selectRows<AdminClientDatabaseRow>(client, "admin_clients", clientColumns, (query) =>
@@ -359,6 +423,14 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     });
   }
 
+  async function saveClient(clientRecord: ClientRecord) {
+    await upsertRow(client, "admin_clients", mapClientRecordToRow(clientRecord), { onConflict: "id" });
+  }
+
+  async function saveAppointment(appointment: Appointment) {
+    await upsertRow(client, "admin_appointments", mapAppointmentRecordToRow(appointment), { onConflict: "id" });
+  }
+
   return {
     listAppointments,
     listCertificates,
@@ -366,5 +438,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     listStripeSales,
     loadDomainRecords,
     logFinanceExport,
+    saveAppointment,
+    saveClient,
   };
 }

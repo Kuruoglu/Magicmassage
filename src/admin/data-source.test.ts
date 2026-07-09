@@ -19,6 +19,8 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     listStripeSales: async () => [],
     loadDomainRecords: async () => emptyRecords,
     logFinanceExport: async () => {},
+    saveAppointment: async () => {},
+    saveClient: async () => {},
     ...overrides,
   };
 }
