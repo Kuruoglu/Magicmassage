@@ -1,4 +1,4 @@
-import type { FinanceRow, FinanceSummary } from "./config";
+import { resolveAdminRole, type FinanceRow, type FinanceSummary } from "./config";
 import { normalizeClientPhone, parseEuroAmountToCents } from "./domain";
 import type {
   AdminAppointmentDatabaseRow,
@@ -10,8 +10,11 @@ import type {
   AdminDomainRecords,
   AdminMediaDatabaseRow,
   AdminPriceDatabaseRow,
+  AdminProfileDatabaseRow,
   AdminServiceDatabaseRow,
   AdminSiteSettingsDatabaseRow,
+  AdminUserRecord,
+  AdminUserStatus,
   Appointment,
   AppointmentStatus,
   BlogPostRecord,
@@ -91,6 +94,7 @@ export type AdminFinanceExportLogInput = {
 
 export type AdminRepository = {
   listAppointments(): Promise<Appointment[]>;
+  listAdminUsers(): Promise<AdminUserRecord[]>;
   listBlogPosts(): Promise<BlogPostRecord[]>;
   listCertificates(): Promise<CertificateRecord[]>;
   listClients(): Promise<ClientRecord[]>;
@@ -229,6 +233,17 @@ const contactSettingsColumns = [
   "phone",
   "seo_area",
   "working_hours",
+].join(", ");
+
+const adminProfileColumns = [
+  "created_at",
+  "display_name",
+  "email",
+  "last_login_at",
+  "role",
+  "status",
+  "updated_at",
+  "user_id",
 ].join(", ");
 
 const blogPostColumns = [
@@ -411,6 +426,16 @@ const databaseStripeModeByMode = new Map<StripeMode, string>([
   [stripeModeByDatabase.test, "test"],
 ]);
 
+const adminUserStatusByDatabase: Record<string, AdminUserStatus> = {
+  active: "Активен",
+  invited: "Приглашен",
+  suspended: "Заблокирован",
+  Активен: "Активен",
+  Заблокирован: "Заблокирован",
+  Пауза: "Пауза",
+  Приглашен: "Приглашен",
+};
+
 const appointmentStatusByDatabase: Record<string, AppointmentStatus> = {
   cancelled: "Отменена",
   confirmed: "Подтверждена",
@@ -561,6 +586,10 @@ function mapStripeMode(mode: string): StripeMode {
 
 function mapStripeModeToDatabase(mode: StripeMode) {
   return databaseStripeModeByMode.get(mode) ?? "test";
+}
+
+function mapAdminUserStatus(status: string): AdminUserStatus {
+  return adminUserStatusByDatabase[status] ?? "Приглашен";
 }
 
 function mapStripeStatus(row: Pick<AdminStripeSaleDatabaseRow, "gross_cents" | "refund_cents">): FinanceRow["status"] {
@@ -903,6 +932,26 @@ function mapSettingsRecordToRow(settings: SettingsRecord): AdminSiteSettingsData
   };
 }
 
+function formatAdminProfileTimestamp(value: string | null) {
+  return value ? value.slice(0, 16).replace("T", " ") : "Еще не входил";
+}
+
+function mapAdminProfileRow(row: AdminProfileDatabaseRow): AdminUserRecord {
+  const lastLogin = formatAdminProfileTimestamp(row.last_login_at);
+
+  return {
+    accessNote: "Профиль Supabase Auth управляется владельцем.",
+    email: row.email,
+    history: row.last_login_at ? [`${lastLogin}: последний успешный вход`] : ["Пользователь приглашен через Supabase Auth."],
+    id: row.user_id,
+    lastLogin,
+    name: row.display_name,
+    role: resolveAdminRole(row.role),
+    status: mapAdminUserStatus(row.status),
+    twoFactor: false,
+  };
+}
+
 function mapStripeSaleRow(row: AdminStripeSaleDatabaseRow): FinanceRow {
   return {
     buyer: row.buyer_name,
@@ -967,6 +1016,14 @@ async function upsertRow(
 }
 
 export function createAdminSupabaseRepository(client: AdminSupabaseClient): AdminRepository {
+  async function listAdminUsers() {
+    const rows = await selectRows<AdminProfileDatabaseRow>(client, "admin_profiles", adminProfileColumns, (query) =>
+      query.order("display_name", { ascending: true }),
+    );
+
+    return rows.map(mapAdminProfileRow);
+  }
+
   async function listClients() {
     const rows = await selectRows<AdminClientDatabaseRow>(client, "admin_clients", clientColumns, (query) =>
       query.order("full_name", { ascending: true }),
@@ -1126,6 +1183,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
 
   return {
     listAppointments,
+    listAdminUsers,
     listBlogPosts,
     listCertificates,
     listClients,

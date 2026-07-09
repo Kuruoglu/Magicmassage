@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type {
+  AdminUserRecord,
   BlogPostRecord,
   ContactChannelRecord,
   ContactSettingsRecord,
@@ -249,6 +250,18 @@ const settingsRecord: SettingsRecord = {
   workingHours: "10:00-19:00",
 };
 
+const adminUserRecord: AdminUserRecord = {
+  accessNote: "Профиль Supabase Auth управляется владельцем.",
+  email: "accountant@example.com",
+  history: ["2026-07-08 09:15: последний успешный вход"],
+  id: "00000000-0000-0000-0000-000000000002",
+  lastLogin: "2026-07-08 09:15",
+  name: "Supabase Accountant",
+  role: "accountant",
+  status: "Активен",
+  twoFactor: false,
+};
+
 const stripeRows = [
   {
     buyer_name: "Oksana",
@@ -263,6 +276,32 @@ const stripeRows = [
 ];
 
 describe("admin Supabase repository", () => {
+  it("loads admin profiles for the users workspace", async () => {
+    const client = new FakeSupabaseClient({
+      admin_profiles: [
+        {
+          created_at: "2026-07-01T08:00:00.000Z",
+          display_name: "Supabase Accountant",
+          email: "accountant@example.com",
+          last_login_at: "2026-07-08T09:15:00.000Z",
+          role: "accountant",
+          status: "active",
+          updated_at: "2026-07-08T09:20:00.000Z",
+          user_id: "00000000-0000-0000-0000-000000000002",
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const users = await repository.listAdminUsers();
+
+    expect(users).toEqual([adminUserRecord]);
+    expect(client.operations[0]).toMatchObject({
+      order: { ascending: true, column: "display_name" },
+      table: "admin_profiles",
+    });
+  });
+
   it("loads massage services from Supabase rows", async () => {
     const client = new FakeSupabaseClient({
       admin_services: [

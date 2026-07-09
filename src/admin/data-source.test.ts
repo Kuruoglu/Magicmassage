@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FinanceRow } from "./config";
 import type {
   AdminDomainRecords,
+  AdminUserRecord,
   BlogPostRecord,
   ContactChannelRecord,
   ContactSettingsRecord,
@@ -23,6 +24,7 @@ const emptyRecords: AdminDomainRecords = {
 function createRepositoryStub(overrides: Partial<AdminRepository>): AdminRepository {
   return {
     listAppointments: async () => [],
+    listAdminUsers: async () => [],
     listCertificates: async () => [],
     listClients: async () => [],
     listBlogPosts: async () => [],
@@ -173,7 +175,21 @@ describe("admin data source", () => {
       workingDays: "Пн-Сб",
       workingHours: "10:00-19:00",
     };
+    const adminUsers: AdminUserRecord[] = [
+      {
+        accessNote: "Профиль Supabase Auth управляется владельцем.",
+        email: "accountant@example.com",
+        history: ["2026-07-08 09:15: последний успешный вход"],
+        id: "00000000-0000-0000-0000-000000000002",
+        lastLogin: "2026-07-08 09:15",
+        name: "Supabase Accountant",
+        role: "accountant",
+        status: "Активен",
+        twoFactor: false,
+      },
+    ];
     const repository = createRepositoryStub({
+      listAdminUsers: async () => adminUsers,
       listBlogPosts: async () => blogPosts,
       listContactChannels: async () => contactChannels,
       listMedia: async () => media,
@@ -234,6 +250,7 @@ describe("admin data source", () => {
     });
 
     expect(data.source).toBe("supabase");
+    expect(data.adminUsers?.[0]?.name).toBe("Supabase Accountant");
     expect(data.records.clients[0]?.name).toBe("Supabase Client");
     expect(data.blogPosts?.[0]?.title).toBe("Supabase Blog");
     expect(data.contactChannels?.[0]?.name).toBe("Supabase Viber");

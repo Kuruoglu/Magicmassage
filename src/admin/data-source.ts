@@ -3,6 +3,7 @@ import { certificateRows, clientRows, financeRows as demoFinanceRows, upcomingAp
 import {
   createAdminDemoRecords,
   type AdminDomainRecords,
+  type AdminUserRecord,
   type BlogPostRecord,
   type ContactChannelRecord,
   type ContactSettingsRecord,
@@ -17,6 +18,7 @@ import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supaba
 export type AdminShellDataSource = "demo" | "supabase";
 
 export type AdminShellInitialData = {
+  adminUsers?: AdminUserRecord[];
   blogPosts?: BlogPostRecord[];
   contactChannels?: ContactChannelRecord[];
   contactSettings?: ContactSettingsRecord;
@@ -36,6 +38,7 @@ type LoadAdminShellDataOptions = {
     client: AdminSupabaseClient,
   ) => Pick<
     AdminRepository,
+    | "listAdminUsers"
     | "listBlogPosts"
     | "listContactChannels"
     | "listMedia"
@@ -105,6 +108,7 @@ export async function loadAdminShellData({
     const [
       records,
       financeRows,
+      adminUsers,
       blogPosts,
       services,
       prices,
@@ -115,6 +119,7 @@ export async function loadAdminShellData({
     ] = await Promise.all([
       repository.loadDomainRecords(),
       repository.listStripeSales(getMonthFinancePeriod(now)),
+      repository.listAdminUsers(),
       repository.listBlogPosts(),
       repository.listServices(),
       repository.listPrices(),
@@ -125,6 +130,7 @@ export async function loadAdminShellData({
     ]);
 
     return {
+      adminUsers,
       blogPosts,
       contactChannels,
       contactSettings,

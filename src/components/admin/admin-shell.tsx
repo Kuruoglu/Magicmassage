@@ -39,6 +39,8 @@ import {
   normalizeClientPhone,
   normalizeSearch,
   type AdminDomainRecords,
+  type AdminUserRecord,
+  type AdminUserStatus,
   type Appointment,
   type AppointmentStatus,
   type BlogPostRecord,
@@ -184,18 +186,6 @@ type SettingsFormState = {
   timezone: string;
   workingDays: string;
   workingHours: string;
-};
-type AdminUserStatus = "Активен" | "Приглашен" | "Пауза" | "Заблокирован";
-type AdminUserRecord = {
-  accessNote: string;
-  email: string;
-  history: string[];
-  id: string;
-  lastLogin: string;
-  name: string;
-  role: AdminRoleId;
-  status: AdminUserStatus;
-  twoFactor: boolean;
 };
 type AdminUserFormState = {
   accessNote: string;
@@ -799,8 +789,8 @@ function buildInitialSettingsRecord(initialData?: AdminShellInitialData): Settin
   return { ...(initialData?.settings ?? initialSettingsRecord) };
 }
 
-function buildInitialAdminUsers(): AdminUserRecord[] {
-  return initialAdminUserRows.map((user) => ({
+function buildInitialAdminUsers(initialData?: AdminShellInitialData): AdminUserRecord[] {
+  return (initialData?.adminUsers ?? initialAdminUserRows).map((user) => ({
     ...user,
     history: [...user.history],
   }));
@@ -7224,7 +7214,7 @@ export function AdminShell({
   const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings(initialData));
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows(initialData));
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord(initialData));
-  const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers());
+  const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers(initialData));
   const [persistenceStatus, setPersistenceStatus] = useState("");
   const isSupabaseBacked = initialData?.source === "supabase";
   const selectedRouteAppointment = selectedAppointmentKey

@@ -1,4 +1,4 @@
-import type { FinanceRow } from "./config";
+import type { AdminRoleId, FinanceRow } from "./config";
 
 export type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
 
@@ -168,6 +168,20 @@ export type SettingsRecord = {
   workingHours: string;
 };
 
+export type AdminUserStatus = "Активен" | "Приглашен" | "Пауза" | "Заблокирован";
+
+export type AdminUserRecord = {
+  accessNote: string;
+  email: string;
+  history: string[];
+  id: string;
+  lastLogin: string;
+  name: string;
+  role: AdminRoleId;
+  status: AdminUserStatus;
+  twoFactor: boolean;
+};
+
 type DemoClientRow = Omit<ClientRecord, "id" | "history" | "tags"> & {
   id?: string;
   history: readonly ClientVisit[];
@@ -330,6 +344,17 @@ export type AdminSiteSettingsDatabaseRow = {
   updated_on: string;
   working_days: string;
   working_hours: string;
+};
+
+export type AdminProfileDatabaseRow = {
+  created_at: string;
+  display_name: string;
+  email: string;
+  last_login_at: string | null;
+  role: string;
+  status: string;
+  updated_at: string;
+  user_id: string;
 };
 
 export type AdminDatabaseSeed = {

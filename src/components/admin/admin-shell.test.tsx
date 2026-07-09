@@ -252,6 +252,45 @@ describe("AdminShell", () => {
     expect(within(details).queryByText("30 минут")).not.toBeInTheDocument();
   });
 
+  it("renders supplied initial admin users instead of demo user records", () => {
+    render(
+      <AdminShell
+        activeSection="users"
+        initialData={{
+          adminUsers: [
+            {
+              accessNote: "Профиль Supabase Auth управляется владельцем.",
+              email: "accountant@example.com",
+              history: ["2026-07-08 09:15: последний успешный вход"],
+              id: "00000000-0000-0000-0000-000000000002",
+              lastLogin: "2026-07-08 09:15",
+              name: "Supabase Accountant",
+              role: "accountant",
+              status: "Активен",
+              twoFactor: false,
+            },
+          ],
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+        selectedAdminUserId="00000000-0000-0000-0000-000000000002"
+      />,
+    );
+
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Supabase Accountant" })).toHaveAttribute(
+      "href",
+      "/admin?section=users&role=owner&user=00000000-0000-0000-0000-000000000002",
+    );
+    expect(screen.getAllByText("accountant@example.com")).toHaveLength(2);
+    expect(screen.queryByText("Natali Ivanova")).not.toBeInTheDocument();
+  });
+
   it("renders supplied initial services instead of demo service records", () => {
     render(
       <AdminShell
