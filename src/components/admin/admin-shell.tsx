@@ -22,6 +22,27 @@ import {
   sectionSamples,
   upcomingAppointments,
 } from "@/admin/demo-data";
+import {
+  appointmentBelongsToClient,
+  buildClientIdFromPhone,
+  certificateBelongsToClient,
+  createAdminDemoRecords,
+  findAppointmentClient,
+  findCertificateClient,
+  findClientAppointments,
+  findClientByIdentity,
+  findClientCertificates,
+  findUniqueClientByName,
+  matchesClientIdentity,
+  normalizeClientPhone,
+  normalizeSearch,
+  type Appointment,
+  type AppointmentStatus,
+  type CertificateRecord,
+  type CertificateStatus,
+  type ClientRecord,
+  type ClientVisit,
+} from "@/admin/domain";
 
 type AdminCalendarAction = "create";
 type AdminShellProps = {
@@ -41,26 +62,10 @@ type AdminShellProps = {
   selectedAdminUserId?: string;
 };
 
-type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
-type Appointment = {
-  id?: string;
-  clientId?: string;
-  date: string;
-  time: string;
-  client: string;
-  note: string;
-  service: string;
-  status: AppointmentStatus;
-};
 type CalendarAppointmentFocus = {
   appointmentKey: string;
   date: string;
   routeDate?: string;
-};
-type ClientVisit = {
-  date: string;
-  service: string;
-  status: string;
 };
 type ClientFeedFilterId = "all" | "visits" | "certificates" | "notes";
 type ClientNextAction = {
@@ -72,37 +77,6 @@ type ClientNextAction = {
   status: string;
   title: string;
   typeLabel: string;
-};
-type ClientRecord = {
-  id: string;
-  email: string;
-  history: ClientVisit[];
-  language: string;
-  name: string;
-  next: string;
-  note: string;
-  phone: string;
-  preferredContact: string;
-  status: string;
-  tags: string[];
-  telegram: string;
-  totalSpend: string;
-  visits: number;
-};
-type CertificateStatus = "Оплачено" | "Отправлен" | "Ожидает PDF" | "Погашен";
-type CertificateRecord = {
-  amount: string;
-  buyer: string;
-  clientId?: string;
-  clientName: string;
-  code: string;
-  expiresAt: string;
-  history: string[];
-  note: string;
-  paymentDate: string;
-  recipient: string;
-  status: CertificateStatus;
-  stripeId: string;
 };
 type CertificateFormState = {
   amount: string;
@@ -783,13 +757,6 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function addMonthsToIsoDate(date: string, months: number) {
-  const nextDate = new Date(`${date}T00:00:00.000Z`);
-  nextDate.setUTCMonth(nextDate.getUTCMonth() + months);
-
-  return nextDate.toISOString().slice(0, 10);
-}
-
 function statusClass(status: string) {
   const normalizedStatus = status.toLowerCase();
 
@@ -816,14 +783,6 @@ function statusClass(status: string) {
   return "admin-status admin-status-success";
 }
 
-function normalizeSearch(value: string) {
-  return value.trim().toLocaleLowerCase("ru-RU");
-}
-
-function normalizeClientPhone(value: string) {
-  return value.replace(/\D/g, "");
-}
-
 function matchesSearch(values: Array<string | number | undefined>, query: string) {
   const normalizedQuery = normalizeSearch(query);
 
@@ -838,47 +797,21 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-function buildClientIdFromPhone(phone: string) {
-  const phoneKey = normalizeClientPhone(phone);
-
-  return phoneKey ? `client-${phoneKey}` : `client-${normalizeSearch(phone) || "manual"}`;
-}
-
-function findInitialClientIdByName(clientName: string) {
-  const normalizedClientName = normalizeSearch(clientName);
-  const client = clientRows.find((row) => normalizeSearch(row.name) === normalizedClientName);
-
-  return client ? buildClientIdFromPhone(client.phone) : undefined;
+function buildInitialAdminRecords() {
+  return createAdminDemoRecords({
+    appointmentRows: upcomingAppointments,
+    certificateRows,
+    clientRows,
+    financeRows,
+  });
 }
 
 function buildInitialClientRows(): ClientRecord[] {
-  return clientRows.map((client) => ({
-    ...client,
-    id: buildClientIdFromPhone(client.phone),
-    history: client.history.map((visit) => ({ ...visit })),
-    tags: [...client.tags],
-  }));
+  return buildInitialAdminRecords().clients;
 }
 
 function buildInitialCertificateRows(): CertificateRecord[] {
-  return certificateRows.map((certificate, index) => {
-    const financeRow = financeRows.find((row) => row.certificateCode === certificate.code);
-    const paymentDate = financeRow?.date ?? "2026-07-01";
-
-    return {
-      ...certificate,
-      clientId: findInitialClientIdByName(certificate.clientName),
-      expiresAt: addMonthsToIsoDate(paymentDate, 6),
-      history: [
-        `${paymentDate}: Stripe оплата связана с ${financeRow?.id ?? "manual"}.`,
-        certificate.status === "Ожидает PDF" ? "PDF ожидает генерации." : "PDF готов к отправке.",
-      ],
-      note: index === 2 ? "Проверить PDF перед повторной отправкой клиенту." : "Автоматически создан из оплаты Stripe.",
-      paymentDate,
-      status: certificate.status as CertificateStatus,
-      stripeId: financeRow?.id ?? "manual",
-    };
-  });
+  return buildInitialAdminRecords().certificates;
 }
 
 function buildInitialServiceRows(): ServiceRecord[] {
@@ -1183,41 +1116,6 @@ function createAdminUserId(name: string, email: string) {
   return `admin-user-${base || "invite"}`;
 }
 
-function matchesClientIdentity(client: ClientRecord, identity: string | undefined) {
-  const normalizedIdentity = identity ? normalizeSearch(identity) : "";
-  const normalizedPhoneIdentity = identity ? normalizeClientPhone(identity) : "";
-
-  return (
-    (Boolean(normalizedIdentity) && normalizeSearch(client.id) === normalizedIdentity) ||
-    (Boolean(normalizedIdentity) && normalizeSearch(client.name) === normalizedIdentity) ||
-    (Boolean(normalizedPhoneIdentity) && normalizeClientPhone(client.phone) === normalizedPhoneIdentity)
-  );
-}
-
-function findClientByIdentity(clients: ClientRecord[], identity: string | undefined) {
-  return clients.find((client) => matchesClientIdentity(client, identity));
-}
-
-function findUniqueClientByName(clients: ClientRecord[], name: string | undefined) {
-  const normalizedName = name ? normalizeSearch(name) : "";
-
-  if (!normalizedName) {
-    return undefined;
-  }
-
-  const matches = clients.filter((client) => normalizeSearch(client.name) === normalizedName);
-
-  return matches.length === 1 ? matches[0] : undefined;
-}
-
-function findAppointmentClient(clients: ClientRecord[], appointment: Appointment) {
-  return findClientByIdentity(clients, appointment.clientId) ?? findUniqueClientByName(clients, appointment.client);
-}
-
-function findCertificateClient(clients: ClientRecord[], certificate: CertificateRecord) {
-  return findClientByIdentity(clients, certificate.clientId) ?? findUniqueClientByName(clients, certificate.clientName);
-}
-
 function findClientPhoneDuplicate(clients: ClientRecord[], phone: string, originalClientIdentity?: string) {
   const candidatePhone = normalizeClientPhone(phone);
 
@@ -1248,40 +1146,6 @@ function findClientNameMatch(clients: ClientRecord[], name: string, originalClie
 
     return normalizeSearch(client.name) === candidateName;
   });
-}
-
-function isClientNameAmbiguous(clients: ClientRecord[], clientName: string) {
-  const normalizedClientName = normalizeSearch(clientName);
-
-  return clients.filter((client) => normalizeSearch(client.name) === normalizedClientName).length > 1;
-}
-
-function appointmentBelongsToClient(appointment: Appointment, client: ClientRecord, clients: ClientRecord[]) {
-  if (appointment.clientId) {
-    return appointment.clientId === client.id;
-  }
-
-  return !isClientNameAmbiguous(clients, client.name) && matchesClientName(appointment.client, client.name);
-}
-
-function certificateBelongsToClient(certificate: CertificateRecord, client: ClientRecord, clients: ClientRecord[]) {
-  if (certificate.clientId) {
-    return certificate.clientId === client.id;
-  }
-
-  return !isClientNameAmbiguous(clients, client.name) && matchesClientName(certificate.clientName, client.name);
-}
-
-function findClientAppointments(appointments: Appointment[], client: ClientRecord, clients: ClientRecord[]) {
-  return appointments.filter((appointment) => appointmentBelongsToClient(appointment, client, clients));
-}
-
-function findClientCertificates(certificates: CertificateRecord[], client: ClientRecord, clients: ClientRecord[]): CertificateRecord[] {
-  return certificates.filter((certificate) => certificateBelongsToClient(certificate, client, clients));
-}
-
-function matchesClientName(value: string, clientName: string | undefined) {
-  return !clientName || normalizeSearch(value) === normalizeSearch(clientName);
 }
 
 function findServiceBySlug(services: ServiceRecord[], slug: string) {
@@ -1524,11 +1388,7 @@ function sortAppointments(appointments: Appointment[]) {
 }
 
 function buildInitialCalendarAppointments() {
-  return upcomingAppointments.map((appointment, index) => ({
-    ...appointment,
-    clientId: findInitialClientIdByName(appointment.client),
-    id: `demo-${index + 1}`,
-  }));
+  return buildInitialAdminRecords().appointments;
 }
 
 function calendarHeadingLabel(mode: CalendarMode, selectedDate: string) {
