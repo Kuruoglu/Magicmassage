@@ -817,6 +817,10 @@ function normalizeSearch(value: string) {
   return value.trim().toLocaleLowerCase("ru-RU");
 }
 
+function normalizeClientPhone(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 function matchesSearch(values: Array<string | number | undefined>, query: string) {
   const normalizedQuery = normalizeSearch(query);
 
@@ -1168,6 +1172,27 @@ function findClientByName(clients: ClientRecord[], name: string | undefined) {
   }
 
   return clients.find((client) => normalizeSearch(client.name) === normalizedName);
+}
+
+function findClientDuplicate(clients: ClientRecord[], candidate: Pick<ClientRecord, "name" | "phone">, originalClientName?: string) {
+  const originalName = originalClientName ? normalizeSearch(originalClientName) : "";
+  const candidateName = normalizeSearch(candidate.name);
+  const candidatePhone = normalizeClientPhone(candidate.phone);
+
+  if (!candidateName && !candidatePhone) {
+    return undefined;
+  }
+
+  return clients.find((client) => {
+    if (originalName && normalizeSearch(client.name) === originalName) {
+      return false;
+    }
+
+    const nameMatches = normalizeSearch(client.name) === candidateName;
+    const phoneMatches = Boolean(candidatePhone) && normalizeClientPhone(client.phone) === candidatePhone;
+
+    return nameMatches || phoneMatches;
+  });
 }
 
 function findClientCertificates(certificates: CertificateRecord[], clientName: string): CertificateRecord[] {
@@ -1651,16 +1676,21 @@ function QuickActionDialog({
 }
 
 function ClientFormDialog({
+  clients,
   initialClient,
   onClose,
   onSave,
+  role,
 }: {
+  clients: ClientRecord[];
   initialClient?: ClientRecord;
   onClose: () => void;
   onSave: (client: ClientRecord, originalClientName?: string) => void;
+  role: AdminRoleId;
 }) {
   const [form, setForm] = useState<ClientFormState>(() => buildClientFormState(initialClient));
   const [error, setError] = useState("");
+  const [duplicateClient, setDuplicateClient] = useState<ClientRecord | undefined>();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const isEditing = Boolean(initialClient);
@@ -1676,6 +1706,7 @@ function ClientFormDialog({
   function updateForm<Field extends keyof ClientFormState>(field: Field, value: ClientFormState[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
     setError("");
+    setDuplicateClient(undefined);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1691,6 +1722,15 @@ function ClientFormDialog({
       } else {
         phoneInputRef.current?.focus();
       }
+      return;
+    }
+
+    const matchingClient = findClientDuplicate(clients, { name, phone }, initialClient?.name);
+
+    if (matchingClient) {
+      setDuplicateClient(matchingClient);
+      setError(`Клиент с таким именем или телефоном уже есть: ${matchingClient.name}.`);
+      nameInputRef.current?.focus();
       return;
     }
 
@@ -1734,6 +1774,14 @@ function ClientFormDialog({
             {error ? (
               <p className="admin-form-alert admin-form-alert-wide" role="alert">
                 {error}
+                {duplicateClient ? (
+                  <>
+                    {" "}
+                    <Link href={clientProfileHref(duplicateClient.name, role)} onClick={onClose}>
+                      Открыть карточку существующего клиента
+                    </Link>
+                  </>
+                ) : null}
               </p>
             ) : null}
 
@@ -4280,10 +4328,12 @@ function ClientsWorkspace({
       ) : null}
       {isClientFormOpen ? (
         <ClientFormDialog
+          clients={clients}
           initialClient={editingClient}
           key={editingClient?.name ?? "new-client"}
           onClose={closeClientForm}
           onSave={saveClientForm}
+          role={role}
         />
       ) : null}
       {certificateDraft ? (
@@ -7576,13 +7626,13 @@ export function AdminShell({
     setClients((current) => {
       const originalKey = originalClientName ? normalizeSearch(originalClientName) : "";
       const nextKey = normalizeSearch(client.name);
-      const nextPhone = normalizeSearch(client.phone);
+      const nextPhone = normalizeClientPhone(client.phone);
       const existingIndex = current.findIndex((currentClient) => {
         if (originalKey) {
           return normalizeSearch(currentClient.name) === originalKey;
         }
 
-        return normalizeSearch(currentClient.name) === nextKey || normalizeSearch(currentClient.phone) === nextPhone;
+        return normalizeSearch(currentClient.name) === nextKey || (Boolean(nextPhone) && normalizeClientPhone(currentClient.phone) === nextPhone);
       });
 
       if (existingIndex === -1) {

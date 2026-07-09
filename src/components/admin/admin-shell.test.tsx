@@ -938,6 +938,32 @@ describe("AdminShell", () => {
     expect(within(screen.getByRole("table")).queryByRole("button", { name: "" })).not.toBeInTheDocument();
   });
 
+  it("keeps the create client form open when the name or phone matches an existing client", () => {
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новый клиент" });
+    fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Olena K." } });
+    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359 88 777 1122" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Клиент с таким именем или телефоном уже есть: Olena K.");
+    expect(within(dialog).getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=Olena%20K.",
+    );
+    expect(screen.queryByRole("dialog", { name: "Карточка клиента" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Olena K." })).toHaveLength(1);
+
+    fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Новая Olena" } });
+    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359873334411" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Клиент с таким именем или телефоном уже есть: Olena K.");
+    expect(within(screen.getByRole("table")).queryByRole("link", { name: "Новая Olena" })).not.toBeInTheDocument();
+  });
+
   it("edits an existing client from the right drawer without creating a duplicate", () => {
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 

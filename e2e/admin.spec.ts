@@ -797,6 +797,32 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await expect(notesSection.getByText("email", { exact: true })).toBeVisible();
 });
 
+test("client form warns before creating a duplicate client", async ({ page }) => {
+  await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Добавить клиента" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новый клиент" });
+  await createDialog.getByRole("textbox", { name: "Имя" }).fill("Olena K.");
+  await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359 88 777 1122");
+  await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
+
+  await expect(createDialog.getByRole("alert")).toContainText("Клиент с таким именем или телефоном уже есть: Olena K.");
+  await expect(createDialog.getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=Olena%20K.",
+  );
+  await expect(page.getByRole("dialog", { name: "Карточка клиента" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Olena K." })).toHaveCount(1);
+
+  await createDialog.getByRole("textbox", { name: "Имя" }).fill("Новая Olena");
+  await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359873334411");
+  await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
+
+  await expect(createDialog.getByRole("alert")).toContainText("Клиент с таким именем или телефоном уже есть: Olena K.");
+  await expect(page.getByRole("table").getByRole("link", { name: "Новая Olena" })).toHaveCount(0);
+});
+
 test("certificate workspace can issue, send, redeem and edit a certificate", async ({ page }) => {
   await page.goto("/admin?section=certificates", { waitUntil: "networkidle" });
 
