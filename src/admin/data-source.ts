@@ -1,6 +1,16 @@
 import type { FinanceRow } from "./config";
 import { certificateRows, clientRows, financeRows as demoFinanceRows, upcomingAppointments } from "./demo-data";
-import { createAdminDemoRecords, type AdminDomainRecords, type BlogPostRecord, type SettingsRecord } from "./domain";
+import {
+  createAdminDemoRecords,
+  type AdminDomainRecords,
+  type BlogPostRecord,
+  type ContactChannelRecord,
+  type ContactSettingsRecord,
+  type MediaRecord,
+  type PriceRecord,
+  type ServiceRecord,
+  type SettingsRecord,
+} from "./domain";
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
 
@@ -8,9 +18,14 @@ export type AdminShellDataSource = "demo" | "supabase";
 
 export type AdminShellInitialData = {
   blogPosts?: BlogPostRecord[];
+  contactChannels?: ContactChannelRecord[];
+  contactSettings?: ContactSettingsRecord;
   financeRows: FinanceRow[];
   loadError?: string;
+  media?: MediaRecord[];
+  prices?: PriceRecord[];
   records: AdminDomainRecords;
+  services?: ServiceRecord[];
   settings?: SettingsRecord;
   source: AdminShellDataSource;
 };
@@ -19,7 +34,18 @@ type LoadAdminShellDataOptions = {
   createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
   createRepository?: (
     client: AdminSupabaseClient,
-  ) => Pick<AdminRepository, "listBlogPosts" | "listStripeSales" | "loadDomainRecords" | "loadSettings">;
+  ) => Pick<
+    AdminRepository,
+    | "listBlogPosts"
+    | "listContactChannels"
+    | "listMedia"
+    | "listPrices"
+    | "listServices"
+    | "listStripeSales"
+    | "loadContactSettings"
+    | "loadDomainRecords"
+    | "loadSettings"
+  >;
   env?: AdminSupabaseEnvSource;
   now?: Date;
 };
@@ -76,17 +102,37 @@ export async function loadAdminShellData({
 
   try {
     const repository = createRepository(client);
-    const [records, financeRows, blogPosts, settings] = await Promise.all([
+    const [
+      records,
+      financeRows,
+      blogPosts,
+      services,
+      prices,
+      media,
+      contactChannels,
+      contactSettings,
+      settings,
+    ] = await Promise.all([
       repository.loadDomainRecords(),
       repository.listStripeSales(getMonthFinancePeriod(now)),
       repository.listBlogPosts(),
+      repository.listServices(),
+      repository.listPrices(),
+      repository.listMedia(),
+      repository.listContactChannels(),
+      repository.loadContactSettings(),
       repository.loadSettings(),
     ]);
 
     return {
       blogPosts,
+      contactChannels,
+      contactSettings,
       financeRows,
+      media,
+      prices,
       records,
+      services,
       settings,
       source: "supabase",
     };

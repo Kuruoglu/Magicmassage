@@ -263,6 +263,194 @@ const stripeRows = [
 ];
 
 describe("admin Supabase repository", () => {
+  it("loads massage services from Supabase rows", async () => {
+    const client = new FakeSupabaseClient({
+      admin_services: [
+        {
+          category: "SPA",
+          cover_image_url: "/media/services/supabase-massage.jpg",
+          display_order: 7,
+          duration_label: "75 мин",
+          locale_codes: ["ru", "bg"],
+          name: "Supabase Massage",
+          seo_title: "Supabase Massage SEO",
+          slug: "supabase-massage",
+          status: "published",
+          summary: "Loaded service summary.",
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const services = await repository.listServices();
+
+    expect(services).toEqual([
+      {
+        category: "SPA",
+        coverImage: "/media/services/supabase-massage.jpg",
+        duration: "75 мин",
+        locales: ["ru", "bg"],
+        name: "Supabase Massage",
+        order: 7,
+        seoTitle: "Supabase Massage SEO",
+        slug: "supabase-massage",
+        status: "Опубликована",
+        summary: "Loaded service summary.",
+      },
+    ]);
+    expect(client.operations[0]).toMatchObject({
+      order: { ascending: true, column: "display_order" },
+      table: "admin_services",
+    });
+  });
+
+  it("loads EUR price variants from Supabase rows", async () => {
+    const client = new FakeSupabaseClient({
+      admin_price_variants: [
+        {
+          currency: "EUR",
+          display_order: 3,
+          duration_minutes: 75,
+          id: "price-supabase-massage-75",
+          internal_note: "Loaded price note.",
+          price_cents: 12000,
+          service_slug: "supabase-massage",
+          status: "active",
+          updated_on: "2026-07-09",
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const prices = await repository.listPrices();
+
+    expect(prices).toEqual([
+      {
+        durationMinutes: 75,
+        id: "price-supabase-massage-75",
+        note: "Loaded price note.",
+        order: 3,
+        priceEur: 120,
+        serviceSlug: "supabase-massage",
+        status: "Активна",
+        updatedAt: "2026-07-09",
+      },
+    ]);
+    expect(client.operations[0]).toMatchObject({
+      order: { ascending: true, column: "display_order" },
+      table: "admin_price_variants",
+    });
+  });
+
+  it("loads media assets from Supabase rows", async () => {
+    const client = new FakeSupabaseClient({
+      admin_media_assets: [
+        {
+          alt_text: "Supabase studio photo",
+          dimensions: "1600x1100",
+          file_size_label: "420 KB",
+          folder: "services",
+          id: "media-supabase-studio",
+          media_type: "photo",
+          name: "Supabase Studio Photo",
+          status: "ready",
+          uploaded_on: "2026-07-09",
+          url: "/media/services/supabase-studio.jpg",
+          usage_contexts: ["Service: Supabase Massage"],
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const media = await repository.listMedia();
+
+    expect(media).toEqual([
+      {
+        altText: "Supabase studio photo",
+        dimensions: "1600x1100",
+        folder: "services",
+        id: "media-supabase-studio",
+        name: "Supabase Studio Photo",
+        size: "420 KB",
+        status: "Готово",
+        type: "Фото",
+        uploadedAt: "2026-07-09",
+        url: "/media/services/supabase-studio.jpg",
+        usage: ["Service: Supabase Massage"],
+      },
+    ]);
+    expect(client.operations[0]).toMatchObject({
+      order: { ascending: false, column: "uploaded_on" },
+      table: "admin_media_assets",
+    });
+  });
+
+  it("loads contact channels and the single contact settings row from Supabase", async () => {
+    const client = new FakeSupabaseClient({
+      admin_contact_channels: [
+        {
+          channel_type: "messenger",
+          id: "contact-supabase-viber",
+          internal_note: "Loaded contact note.",
+          name: "Supabase Viber",
+          status: "active",
+          usage_contexts: ["Contacts", "Fast replies"],
+          value: "viber://chat?number=359880001122",
+        },
+      ],
+      admin_contact_settings: [
+        {
+          address: "Supabase Street 1, Burgas",
+          booking_url: "https://studio24.bg/supabase",
+          business_name: "Supabase Magic Massage",
+          email: "supabase@example.com",
+          id: "site",
+          map_url: "https://maps.google.com/?q=supabase",
+          phone: "+359 88 000 1122",
+          seo_area: "Burgas",
+          working_hours: "Пн-Сб 10:00-19:00",
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.listContactChannels()).resolves.toEqual([
+      {
+        id: "contact-supabase-viber",
+        name: "Supabase Viber",
+        note: "Loaded contact note.",
+        status: "Активен",
+        type: "Мессенджер",
+        usage: ["Contacts", "Fast replies"],
+        value: "viber://chat?number=359880001122",
+      },
+    ]);
+    await expect(repository.loadContactSettings()).resolves.toEqual({
+      address: "Supabase Street 1, Burgas",
+      bookingUrl: "https://studio24.bg/supabase",
+      businessName: "Supabase Magic Massage",
+      email: "supabase@example.com",
+      mapUrl: "https://maps.google.com/?q=supabase",
+      phone: "+359 88 000 1122",
+      seoArea: "Burgas",
+      workingHours: "Пн-Сб 10:00-19:00",
+    });
+    expect(client.operations).toEqual([
+      expect.objectContaining({ order: { ascending: true, column: "name" }, table: "admin_contact_channels" }),
+      expect.objectContaining({
+        filters: [{ column: "id", operator: "eq", value: "site" }],
+        table: "admin_contact_settings",
+      }),
+    ]);
+  });
+
+  it("returns undefined when the contact settings row is not present", async () => {
+    const client = new FakeSupabaseClient({ admin_contact_settings: [] });
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.loadContactSettings()).resolves.toBeUndefined();
+  });
+
   it("loads blog posts from Supabase rows", async () => {
     const client = new FakeSupabaseClient({
       admin_blog_posts: [

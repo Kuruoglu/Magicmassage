@@ -252,6 +252,181 @@ describe("AdminShell", () => {
     expect(within(details).queryByText("30 минут")).not.toBeInTheDocument();
   });
 
+  it("renders supplied initial services instead of demo service records", () => {
+    render(
+      <AdminShell
+        activeSection="services"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          services: [
+            {
+              category: "SPA",
+              coverImage: "/media/services/supabase-massage.jpg",
+              duration: "75 мин",
+              locales: ["ru", "bg"],
+              name: "Supabase Massage",
+              order: 7,
+              seoTitle: "Supabase Massage SEO",
+              slug: "supabase-massage",
+              status: "Опубликована",
+              summary: "Loaded service summary.",
+            },
+          ],
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Supabase Massage" })).toHaveAttribute(
+      "href",
+      "/admin?section=services&role=owner&service=supabase-massage",
+    );
+    expect(screen.queryByText("Классический массаж")).not.toBeInTheDocument();
+  });
+
+  it("renders supplied initial prices with supplied service names", () => {
+    render(
+      <AdminShell
+        activeSection="price"
+        initialData={{
+          financeRows: [],
+          prices: [
+            {
+              durationMinutes: 75,
+              id: "price-supabase-massage-75",
+              note: "Loaded price note.",
+              order: 3,
+              priceEur: 120,
+              serviceSlug: "supabase-massage",
+              status: "Активна",
+              updatedAt: "2026-07-09",
+            },
+          ],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          services: [
+            {
+              category: "SPA",
+              coverImage: "/media/services/supabase-massage.jpg",
+              duration: "75 мин",
+              locales: ["ru", "bg"],
+              name: "Supabase Massage",
+              order: 7,
+              seoTitle: "Supabase Massage SEO",
+              slug: "supabase-massage",
+              status: "Опубликована",
+              summary: "Loaded service summary.",
+            },
+          ],
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Supabase Massage · 75 мин" })).toHaveAttribute(
+      "href",
+      "/admin?section=price&role=owner&price=price-supabase-massage-75",
+    );
+    expect(screen.getByText("120 €")).toBeInTheDocument();
+    expect(screen.queryByText("Классический массаж · 60 мин")).not.toBeInTheDocument();
+  });
+
+  it("renders supplied initial media instead of demo media records", () => {
+    render(
+      <AdminShell
+        activeSection="media"
+        initialData={{
+          financeRows: [],
+          media: [
+            {
+              altText: "Supabase studio photo",
+              dimensions: "1600x1100",
+              folder: "services",
+              id: "media-supabase-studio",
+              name: "Supabase Studio Photo",
+              size: "420 KB",
+              status: "Готово",
+              type: "Фото",
+              uploadedAt: "2026-07-09",
+              url: "/media/services/supabase-studio.jpg",
+              usage: ["Service: Supabase Massage"],
+            },
+          ],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Supabase Studio Photo" })).toHaveAttribute(
+      "href",
+      "/admin?section=media&role=owner&media=media-supabase-studio",
+    );
+    expect(screen.queryByText("Фото кабинета")).not.toBeInTheDocument();
+  });
+
+  it("renders supplied initial contacts and contact settings instead of demo contact records", () => {
+    render(
+      <AdminShell
+        activeSection="contacts"
+        initialData={{
+          contactChannels: [
+            {
+              id: "contact-supabase-viber",
+              name: "Supabase Viber",
+              note: "Loaded contact note.",
+              status: "Активен",
+              type: "Мессенджер",
+              usage: ["Contacts", "Fast replies"],
+              value: "viber://chat?number=359880001122",
+            },
+          ],
+          contactSettings: {
+            address: "Supabase Street 1, Burgas",
+            bookingUrl: "https://studio24.bg/supabase",
+            businessName: "Supabase Magic Massage",
+            email: "supabase@example.com",
+            mapUrl: "https://maps.google.com/?q=supabase",
+            phone: "+359 88 000 1122",
+            seoArea: "Burgas",
+            workingHours: "Пн-Сб 10:00-19:00",
+          },
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    expect(screen.getByText("Supabase Magic Massage")).toBeInTheDocument();
+    expect(screen.getByText("+359 88 000 1122")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Supabase Viber" })).toHaveAttribute(
+      "href",
+      "/admin?section=contacts&role=owner&contact=contact-supabase-viber",
+    );
+    expect(screen.queryByText("Телефон салона")).not.toBeInTheDocument();
+  });
+
   it("filters clients from the global admin search", async () => {
     const user = userEvent.setup();
 

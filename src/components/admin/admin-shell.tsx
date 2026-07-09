@@ -758,33 +758,33 @@ function buildInitialFinanceRows(initialData?: AdminShellInitialData): FinanceRo
   return (initialData?.financeRows ?? demoFinanceRows).map((row) => ({ ...row }));
 }
 
-function buildInitialServiceRows(): ServiceRecord[] {
-  return initialServiceRows.map((service) => ({
+function buildInitialServiceRows(initialData?: AdminShellInitialData): ServiceRecord[] {
+  return (initialData?.services ?? initialServiceRows).map((service) => ({
     ...service,
     locales: [...service.locales],
   }));
 }
 
-function buildInitialPriceRows(): PriceRecord[] {
-  return initialPriceRows.map((price) => ({ ...price }));
+function buildInitialPriceRows(initialData?: AdminShellInitialData): PriceRecord[] {
+  return (initialData?.prices ?? initialPriceRows).map((price) => ({ ...price }));
 }
 
-function buildInitialMediaRows(): MediaRecord[] {
-  return initialMediaRows.map((item) => ({
+function buildInitialMediaRows(initialData?: AdminShellInitialData): MediaRecord[] {
+  return (initialData?.media ?? initialMediaRows).map((item) => ({
     ...item,
     usage: [...item.usage],
   }));
 }
 
-function buildInitialContactChannels(): ContactChannelRecord[] {
-  return initialContactChannels.map((channel) => ({
+function buildInitialContactChannels(initialData?: AdminShellInitialData): ContactChannelRecord[] {
+  return (initialData?.contactChannels ?? initialContactChannels).map((channel) => ({
     ...channel,
     usage: [...channel.usage],
   }));
 }
 
-function buildInitialContactSettings(): ContactSettingsRecord {
-  return { ...initialContactSettings };
+function buildInitialContactSettings(initialData?: AdminShellInitialData): ContactSettingsRecord {
+  return { ...(initialData?.contactSettings ?? initialContactSettings) };
 }
 
 function buildInitialBlogPostRows(initialData?: AdminShellInitialData): BlogPostRecord[] {
@@ -7217,11 +7217,11 @@ export function AdminShell({
   const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows(initialRecords));
   const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows(initialRecords));
   const [stripeSales] = useState<FinanceRow[]>(() => initialFinanceRows);
-  const [services, setServices] = useState<ServiceRecord[]>(() => buildInitialServiceRows());
-  const [prices, setPrices] = useState<PriceRecord[]>(() => buildInitialPriceRows());
-  const [media, setMedia] = useState<MediaRecord[]>(() => buildInitialMediaRows());
-  const [contactChannels, setContactChannels] = useState<ContactChannelRecord[]>(() => buildInitialContactChannels());
-  const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings());
+  const [services, setServices] = useState<ServiceRecord[]>(() => buildInitialServiceRows(initialData));
+  const [prices, setPrices] = useState<PriceRecord[]>(() => buildInitialPriceRows(initialData));
+  const [media, setMedia] = useState<MediaRecord[]>(() => buildInitialMediaRows(initialData));
+  const [contactChannels, setContactChannels] = useState<ContactChannelRecord[]>(() => buildInitialContactChannels(initialData));
+  const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings(initialData));
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows(initialData));
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord(initialData));
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers());

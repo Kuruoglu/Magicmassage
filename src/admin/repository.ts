@@ -94,7 +94,12 @@ export type AdminRepository = {
   listBlogPosts(): Promise<BlogPostRecord[]>;
   listCertificates(): Promise<CertificateRecord[]>;
   listClients(): Promise<ClientRecord[]>;
+  listContactChannels(): Promise<ContactChannelRecord[]>;
+  listMedia(): Promise<MediaRecord[]>;
+  listPrices(): Promise<PriceRecord[]>;
+  listServices(): Promise<ServiceRecord[]>;
   listStripeSales(period: AdminFinancePeriod): Promise<FinanceRow[]>;
+  loadContactSettings(): Promise<ContactSettingsRecord | undefined>;
   loadDomainRecords(): Promise<AdminDomainRecords>;
   loadSettings(): Promise<SettingsRecord | undefined>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
@@ -163,6 +168,67 @@ const stripeSaleColumns = [
   "payment_status",
   "refund_cents",
   "stripe_fee_cents",
+].join(", ");
+
+const serviceColumns = [
+  "category",
+  "cover_image_url",
+  "display_order",
+  "duration_label",
+  "locale_codes",
+  "name",
+  "seo_title",
+  "slug",
+  "status",
+  "summary",
+].join(", ");
+
+const priceColumns = [
+  "currency",
+  "display_order",
+  "duration_minutes",
+  "id",
+  "internal_note",
+  "price_cents",
+  "service_slug",
+  "status",
+  "updated_on",
+].join(", ");
+
+const mediaColumns = [
+  "alt_text",
+  "dimensions",
+  "file_size_label",
+  "folder",
+  "id",
+  "media_type",
+  "name",
+  "status",
+  "uploaded_on",
+  "url",
+  "usage_contexts",
+].join(", ");
+
+const contactChannelColumns = [
+  "channel_type",
+  "id",
+  "internal_note",
+  "name",
+  "status",
+  "usage_contexts",
+  "value",
+].join(", ");
+
+const contactSettingsColumns = [
+  "id",
+  "address",
+  "booking_url",
+  "business_name",
+  "email",
+  "map_url",
+  "phone",
+  "seo_area",
+  "working_hours",
 ].join(", ");
 
 const blogPostColumns = [
@@ -425,24 +491,48 @@ function mapCertificateStatusToDatabase(status: CertificateStatus) {
   return databaseCertificateStatusByStatus.get(status) ?? "paid";
 }
 
+function mapServiceStatus(status: string): ServiceStatus {
+  return serviceStatusByDatabase[status] ?? "Черновик";
+}
+
 function mapServiceStatusToDatabase(status: ServiceStatus) {
   return databaseServiceStatusByStatus.get(status) ?? "draft";
+}
+
+function mapPriceStatus(status: string): PriceStatus {
+  return priceStatusByDatabase[status] ?? "Активна";
 }
 
 function mapPriceStatusToDatabase(status: PriceStatus) {
   return databasePriceStatusByStatus.get(status) ?? "active";
 }
 
+function mapMediaType(type: string): MediaType {
+  return mediaTypeByDatabase[type] ?? "Фото";
+}
+
 function mapMediaTypeToDatabase(type: MediaType) {
   return databaseMediaTypeByType.get(type) ?? "photo";
+}
+
+function mapMediaStatus(status: string): MediaStatus {
+  return mediaStatusByDatabase[status] ?? "Черновик";
 }
 
 function mapMediaStatusToDatabase(status: MediaStatus) {
   return databaseMediaStatusByStatus.get(status) ?? "draft";
 }
 
+function mapContactChannelType(type: string): ContactChannelType {
+  return contactChannelTypeByDatabase[type] ?? "Телефон";
+}
+
 function mapContactChannelTypeToDatabase(type: ContactChannelType) {
   return databaseContactChannelTypeByType.get(type) ?? "phone";
+}
+
+function mapContactStatus(status: string): ContactStatus {
+  return contactStatusByDatabase[status] ?? "Черновик";
 }
 
 function mapContactStatusToDatabase(status: ContactStatus) {
@@ -588,6 +678,21 @@ function mapCertificateRecordToRow(certificate: CertificateRecord): AdminCertifi
   };
 }
 
+function mapServiceRow(row: AdminServiceDatabaseRow): ServiceRecord {
+  return {
+    category: row.category,
+    coverImage: row.cover_image_url,
+    duration: row.duration_label,
+    locales: [...row.locale_codes],
+    name: row.name,
+    order: row.display_order,
+    seoTitle: row.seo_title,
+    slug: row.slug,
+    status: mapServiceStatus(row.status),
+    summary: row.summary,
+  };
+}
+
 function mapServiceRecordToRow(service: ServiceRecord): AdminServiceDatabaseRow {
   return {
     category: service.category,
@@ -603,6 +708,19 @@ function mapServiceRecordToRow(service: ServiceRecord): AdminServiceDatabaseRow 
   };
 }
 
+function mapPriceRow(row: AdminPriceDatabaseRow): PriceRecord {
+  return {
+    durationMinutes: row.duration_minutes,
+    id: row.id,
+    note: row.internal_note,
+    order: row.display_order,
+    priceEur: fromCents(row.price_cents),
+    serviceSlug: row.service_slug,
+    status: mapPriceStatus(row.status),
+    updatedAt: row.updated_on,
+  };
+}
+
 function mapPriceRecordToRow(price: PriceRecord): AdminPriceDatabaseRow {
   return {
     currency: "EUR",
@@ -614,6 +732,22 @@ function mapPriceRecordToRow(price: PriceRecord): AdminPriceDatabaseRow {
     service_slug: price.serviceSlug,
     status: mapPriceStatusToDatabase(price.status),
     updated_on: price.updatedAt,
+  };
+}
+
+function mapMediaRow(row: AdminMediaDatabaseRow): MediaRecord {
+  return {
+    altText: row.alt_text,
+    dimensions: row.dimensions,
+    folder: row.folder,
+    id: row.id,
+    name: row.name,
+    size: row.file_size_label,
+    status: mapMediaStatus(row.status),
+    type: mapMediaType(row.media_type),
+    uploadedAt: row.uploaded_on,
+    url: row.url,
+    usage: [...row.usage_contexts],
   };
 }
 
@@ -633,6 +767,18 @@ function mapMediaRecordToRow(media: MediaRecord): AdminMediaDatabaseRow {
   };
 }
 
+function mapContactChannelRow(row: AdminContactChannelDatabaseRow): ContactChannelRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    note: row.internal_note,
+    status: mapContactStatus(row.status),
+    type: mapContactChannelType(row.channel_type),
+    usage: [...row.usage_contexts],
+    value: row.value,
+  };
+}
+
 function mapContactChannelRecordToRow(channel: ContactChannelRecord): AdminContactChannelDatabaseRow {
   return {
     channel_type: mapContactChannelTypeToDatabase(channel.type),
@@ -642,6 +788,19 @@ function mapContactChannelRecordToRow(channel: ContactChannelRecord): AdminConta
     status: mapContactStatusToDatabase(channel.status),
     usage_contexts: [...channel.usage],
     value: channel.value,
+  };
+}
+
+function mapContactSettingsRow(row: AdminContactSettingsDatabaseRow): ContactSettingsRecord {
+  return {
+    address: row.address,
+    bookingUrl: row.booking_url,
+    businessName: row.business_name,
+    email: row.email,
+    mapUrl: row.map_url,
+    phone: row.phone,
+    seoArea: row.seo_area,
+    workingHours: row.working_hours,
   };
 }
 
@@ -832,6 +991,46 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     return rows.map(mapCertificateRow);
   }
 
+  async function listServices() {
+    const rows = await selectRows<AdminServiceDatabaseRow>(client, "admin_services", serviceColumns, (query) =>
+      query.order("display_order", { ascending: true }),
+    );
+
+    return rows.map(mapServiceRow);
+  }
+
+  async function listPrices() {
+    const rows = await selectRows<AdminPriceDatabaseRow>(client, "admin_price_variants", priceColumns, (query) =>
+      query.order("display_order", { ascending: true }),
+    );
+
+    return rows.map(mapPriceRow);
+  }
+
+  async function listMedia() {
+    const rows = await selectRows<AdminMediaDatabaseRow>(client, "admin_media_assets", mediaColumns, (query) =>
+      query.order("uploaded_on", { ascending: false }),
+    );
+
+    return rows.map(mapMediaRow);
+  }
+
+  async function listContactChannels() {
+    const rows = await selectRows<AdminContactChannelDatabaseRow>(client, "admin_contact_channels", contactChannelColumns, (query) =>
+      query.order("name", { ascending: true }),
+    );
+
+    return rows.map(mapContactChannelRow);
+  }
+
+  async function loadContactSettings() {
+    const rows = await selectRows<AdminContactSettingsDatabaseRow>(client, "admin_contact_settings", contactSettingsColumns, (query) =>
+      query.eq("id", "site"),
+    );
+
+    return rows[0] ? mapContactSettingsRow(rows[0]) : undefined;
+  }
+
   async function listBlogPosts() {
     const rows = await selectRows<AdminBlogPostDatabaseRow>(client, "admin_blog_posts", blogPostColumns, (query) =>
       query.order("published_on", { ascending: false }),
@@ -930,7 +1129,12 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     listBlogPosts,
     listCertificates,
     listClients,
+    listContactChannels,
+    listMedia,
+    listPrices,
+    listServices,
     listStripeSales,
+    loadContactSettings,
     loadDomainRecords,
     loadSettings,
     logFinanceExport,

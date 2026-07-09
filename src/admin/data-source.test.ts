@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import type { FinanceRow } from "./config";
-import type { AdminDomainRecords, BlogPostRecord, SettingsRecord } from "./domain";
+import type {
+  AdminDomainRecords,
+  BlogPostRecord,
+  ContactChannelRecord,
+  ContactSettingsRecord,
+  MediaRecord,
+  PriceRecord,
+  ServiceRecord,
+  SettingsRecord,
+} from "./domain";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
 import { loadAdminShellData } from "./data-source";
 
@@ -17,7 +26,12 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     listCertificates: async () => [],
     listClients: async () => [],
     listBlogPosts: async () => [],
+    listContactChannels: async () => [],
+    listMedia: async () => [],
+    listPrices: async () => [],
+    listServices: async () => [],
     listStripeSales: async () => [],
+    loadContactSettings: async () => undefined,
     loadDomainRecords: async () => emptyRecords,
     loadSettings: async () => undefined,
     logFinanceExport: async () => {},
@@ -77,6 +91,68 @@ describe("admin data source", () => {
         updatedAt: "2026-07-09",
       },
     ];
+    const services: ServiceRecord[] = [
+      {
+        category: "SPA",
+        coverImage: "/media/services/supabase-massage.jpg",
+        duration: "75 мин",
+        locales: ["ru", "bg"],
+        name: "Supabase Massage",
+        order: 7,
+        seoTitle: "Supabase Massage SEO",
+        slug: "supabase-massage",
+        status: "Опубликована",
+        summary: "Loaded service summary.",
+      },
+    ];
+    const prices: PriceRecord[] = [
+      {
+        durationMinutes: 75,
+        id: "price-supabase-massage-75",
+        note: "Loaded price note.",
+        order: 3,
+        priceEur: 120,
+        serviceSlug: "supabase-massage",
+        status: "Активна",
+        updatedAt: "2026-07-09",
+      },
+    ];
+    const media: MediaRecord[] = [
+      {
+        altText: "Supabase studio photo",
+        dimensions: "1600x1100",
+        folder: "services",
+        id: "media-supabase-studio",
+        name: "Supabase Studio Photo",
+        size: "420 KB",
+        status: "Готово",
+        type: "Фото",
+        uploadedAt: "2026-07-09",
+        url: "/media/services/supabase-studio.jpg",
+        usage: ["Service: Supabase Massage"],
+      },
+    ];
+    const contactChannels: ContactChannelRecord[] = [
+      {
+        id: "contact-supabase-viber",
+        name: "Supabase Viber",
+        note: "Loaded contact note.",
+        status: "Активен",
+        type: "Мессенджер",
+        usage: ["Contacts", "Fast replies"],
+        value: "viber://chat?number=359880001122",
+      },
+    ];
+    const contactSettings: ContactSettingsRecord = {
+      address: "Supabase Street 1, Burgas",
+      bookingUrl: "https://studio24.bg/supabase",
+      businessName: "Supabase Magic Massage",
+      email: "supabase@example.com",
+      mapUrl: "https://maps.google.com/?q=supabase",
+      phone: "+359 88 000 1122",
+      seoArea: "Burgas",
+      workingHours: "Пн-Сб 10:00-19:00",
+    };
     const settings: SettingsRecord = {
       auditLogRetentionDays: 540,
       bookingBufferMinutes: 45,
@@ -99,10 +175,15 @@ describe("admin data source", () => {
     };
     const repository = createRepositoryStub({
       listBlogPosts: async () => blogPosts,
+      listContactChannels: async () => contactChannels,
+      listMedia: async () => media,
+      listPrices: async () => prices,
+      listServices: async () => services,
       listStripeSales: async (period) => {
         expect(period).toEqual({ from: "2026-07-01", to: "2026-07-31" });
         return financeRows;
       },
+      loadContactSettings: async () => contactSettings,
       loadSettings: async () => settings,
       loadDomainRecords: async () => ({
         appointments: [
@@ -155,6 +236,11 @@ describe("admin data source", () => {
     expect(data.source).toBe("supabase");
     expect(data.records.clients[0]?.name).toBe("Supabase Client");
     expect(data.blogPosts?.[0]?.title).toBe("Supabase Blog");
+    expect(data.contactChannels?.[0]?.name).toBe("Supabase Viber");
+    expect(data.contactSettings?.businessName).toBe("Supabase Magic Massage");
+    expect(data.media?.[0]?.name).toBe("Supabase Studio Photo");
+    expect(data.prices?.[0]?.id).toBe("price-supabase-massage-75");
+    expect(data.services?.[0]?.name).toBe("Supabase Massage");
     expect(data.settings?.businessName).toBe("Supabase Magic Massage");
     expect(data.financeRows).toBe(financeRows);
   });
