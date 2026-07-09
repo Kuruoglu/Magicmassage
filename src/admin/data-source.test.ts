@@ -20,6 +20,7 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     loadDomainRecords: async () => emptyRecords,
     logFinanceExport: async () => {},
     saveAppointment: async () => {},
+    saveBlogPost: async () => {},
     saveCertificate: async () => {},
     saveClient: async () => {},
     saveContactChannel: async () => {},
@@ -27,6 +28,7 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     saveMedia: async () => {},
     savePrice: async () => {},
     saveService: async () => {},
+    saveSettings: async () => {},
     ...overrides,
   };
 }

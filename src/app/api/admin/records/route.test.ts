@@ -118,6 +118,50 @@ const contactSettingsPayload = {
   type: "contactSettings",
 } as const;
 
+const blogPostPayload = {
+  record: {
+    author: "Natali",
+    body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
+    category: "Советы",
+    coverImage: "/media/blog/prepare-for-massage.jpg",
+    excerpt: "Короткая памятка перед первым визитом.",
+    id: "blog-prepare-for-massage",
+    locales: ["ru", "bg"],
+    publishedAt: "2026-07-20",
+    seoTitle: "Как подготовиться к массажу в Бургасе",
+    slug: "prepare-for-massage",
+    status: "Черновик",
+    tags: ["подготовка", "массаж"],
+    title: "Как подготовиться к массажу",
+    updatedAt: "2026-07-09",
+  },
+  type: "blogPost",
+} as const;
+
+const settingsPayload = {
+  record: {
+    auditLogRetentionDays: 365,
+    bookingBufferMinutes: 45,
+    businessName: "Magic Massage Natali",
+    cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
+    currency: "EUR",
+    dailySlotCapacity: 5,
+    defaultLocale: "ru",
+    defaultSeoTitle: "Magic Massage Natali Burgas",
+    emailSender: "info@magicmassage.bg",
+    googleCalendarId: "natali@example.com",
+    googleCalendarMode: "Односторонняя",
+    reminderTemplate: "Напоминание о записи за день до сеанса.",
+    rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
+    stripeMode: "Тестовый",
+    timezone: "Europe/Sofia",
+    updatedAt: "2026-07-09",
+    workingDays: "Пн-Сб",
+    workingHours: "10:00-19:00",
+  },
+  type: "settings",
+} as const;
+
 vi.mock("@/admin/persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/admin/persistence")>();
 
@@ -229,6 +273,32 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
     expect(persistAdminRecord).toHaveBeenCalledWith(contactSettingsPayload);
+  });
+
+  it("persists valid blog post payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(blogPostPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(blogPostPayload);
+  });
+
+  it("persists valid settings payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(settingsPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(settingsPayload);
   });
 
   it("returns server errors for Supabase write failures", async () => {

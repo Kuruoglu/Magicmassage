@@ -1,5 +1,6 @@
 import type {
   Appointment,
+  BlogPostRecord,
   CertificateRecord,
   ClientRecord,
   ContactChannelRecord,
@@ -7,6 +8,7 @@ import type {
   MediaRecord,
   PriceRecord,
   ServiceRecord,
+  SettingsRecord,
 } from "./domain";
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
@@ -15,6 +17,10 @@ export type AdminPersistInput =
   | {
       record: Appointment;
       type: "appointment";
+    }
+  | {
+      record: BlogPostRecord;
+      type: "blogPost";
     }
   | {
       record: CertificateRecord;
@@ -43,6 +49,10 @@ export type AdminPersistInput =
   | {
       record: ServiceRecord;
       type: "service";
+    }
+  | {
+      record: SettingsRecord;
+      type: "settings";
     };
 
 export type AdminPersistResult =
@@ -63,6 +73,7 @@ type AdminPersistDependencies = {
   ) => Pick<
     AdminRepository,
     | "saveAppointment"
+    | "saveBlogPost"
     | "saveCertificate"
     | "saveClient"
     | "saveContactChannel"
@@ -70,6 +81,7 @@ type AdminPersistDependencies = {
     | "saveMedia"
     | "savePrice"
     | "saveService"
+    | "saveSettings"
   >;
   env?: AdminSupabaseEnvSource;
 };
@@ -213,6 +225,48 @@ function isContactSettingsRecordShape(record: Record<string, unknown>) {
   );
 }
 
+function isBlogPostRecordShape(record: Record<string, unknown>) {
+  return (
+    hasString(record, "author") &&
+    hasString(record, "body") &&
+    hasString(record, "category") &&
+    hasString(record, "coverImage") &&
+    hasString(record, "excerpt") &&
+    hasString(record, "id") &&
+    hasStringArray(record, "locales") &&
+    hasString(record, "publishedAt") &&
+    hasString(record, "seoTitle") &&
+    hasString(record, "slug") &&
+    hasString(record, "status") &&
+    hasStringArray(record, "tags") &&
+    hasString(record, "title") &&
+    hasString(record, "updatedAt")
+  );
+}
+
+function isSettingsRecordShape(record: Record<string, unknown>) {
+  return (
+    hasNumber(record, "auditLogRetentionDays") &&
+    hasNumber(record, "bookingBufferMinutes") &&
+    hasString(record, "businessName") &&
+    hasString(record, "cookiePrivacyMode") &&
+    record.currency === "EUR" &&
+    hasNumber(record, "dailySlotCapacity") &&
+    hasString(record, "defaultLocale") &&
+    hasString(record, "defaultSeoTitle") &&
+    hasString(record, "emailSender") &&
+    hasString(record, "googleCalendarId") &&
+    hasString(record, "googleCalendarMode") &&
+    hasString(record, "reminderTemplate") &&
+    hasString(record, "rolesPolicy") &&
+    hasString(record, "stripeMode") &&
+    hasString(record, "timezone") &&
+    hasString(record, "updatedAt") &&
+    hasString(record, "workingDays") &&
+    hasString(record, "workingHours")
+  );
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to persist admin record.";
 }
@@ -224,6 +278,10 @@ export function isAdminPersistInput(input: unknown): input is AdminPersistInput 
 
   if (input.type === "appointment") {
     return isAppointmentRecordShape(input.record);
+  }
+
+  if (input.type === "blogPost") {
+    return isBlogPostRecordShape(input.record);
   }
 
   if (input.type === "certificate") {
@@ -254,6 +312,10 @@ export function isAdminPersistInput(input: unknown): input is AdminPersistInput 
     return isServiceRecordShape(input.record);
   }
 
+  if (input.type === "settings") {
+    return isSettingsRecordShape(input.record);
+  }
+
   return false;
 }
 
@@ -280,6 +342,8 @@ export async function persistAdminRecord(
 
     if (input.type === "client") {
       await repository.saveClient(input.record);
+    } else if (input.type === "blogPost") {
+      await repository.saveBlogPost(input.record);
     } else if (input.type === "certificate") {
       await repository.saveCertificate(input.record);
     } else if (input.type === "contactChannel") {
@@ -292,6 +356,8 @@ export async function persistAdminRecord(
       await repository.savePrice(input.record);
     } else if (input.type === "service") {
       await repository.saveService(input.record);
+    } else if (input.type === "settings") {
+      await repository.saveSettings(input.record);
     } else {
       await repository.saveAppointment(input.record);
     }

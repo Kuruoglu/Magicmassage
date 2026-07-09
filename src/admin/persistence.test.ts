@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   Appointment,
+  BlogPostRecord,
   CertificateRecord,
   ClientRecord,
   ContactChannelRecord,
@@ -9,6 +10,7 @@ import type {
   MediaRecord,
   PriceRecord,
   ServiceRecord,
+  SettingsRecord,
 } from "./domain";
 import { isAdminPersistInput, persistAdminRecord } from "./persistence";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
@@ -115,9 +117,48 @@ const contactSettingsRecord: ContactSettingsRecord = {
   workingHours: "Пн-Сб 10:00-19:00",
 };
 
+const blogPostRecord: BlogPostRecord = {
+  author: "Natali",
+  body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
+  category: "Советы",
+  coverImage: "/media/blog/prepare-for-massage.jpg",
+  excerpt: "Короткая памятка перед первым визитом.",
+  id: "blog-prepare-for-massage",
+  locales: ["ru", "bg"],
+  publishedAt: "2026-07-20",
+  seoTitle: "Как подготовиться к массажу в Бургасе",
+  slug: "prepare-for-massage",
+  status: "Черновик",
+  tags: ["подготовка", "массаж"],
+  title: "Как подготовиться к массажу",
+  updatedAt: "2026-07-09",
+};
+
+const settingsRecord: SettingsRecord = {
+  auditLogRetentionDays: 365,
+  bookingBufferMinutes: 45,
+  businessName: "Magic Massage Natali",
+  cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
+  currency: "EUR",
+  dailySlotCapacity: 5,
+  defaultLocale: "ru",
+  defaultSeoTitle: "Magic Massage Natali Burgas",
+  emailSender: "info@magicmassage.bg",
+  googleCalendarId: "natali@example.com",
+  googleCalendarMode: "Односторонняя",
+  reminderTemplate: "Напоминание о записи за день до сеанса.",
+  rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
+  stripeMode: "Тестовый",
+  timezone: "Europe/Sofia",
+  updatedAt: "2026-07-09",
+  workingDays: "Пн-Сб",
+  workingHours: "10:00-19:00",
+};
+
 type PersistRepositoryMethods = Pick<
   AdminRepository,
   | "saveAppointment"
+  | "saveBlogPost"
   | "saveCertificate"
   | "saveClient"
   | "saveContactChannel"
@@ -125,6 +166,7 @@ type PersistRepositoryMethods = Pick<
   | "saveMedia"
   | "savePrice"
   | "saveService"
+  | "saveSettings"
 >;
 
 function buildRepository(
@@ -132,6 +174,7 @@ function buildRepository(
 ) {
   return {
     saveAppointment: async () => undefined,
+    saveBlogPost: async () => undefined,
     saveCertificate: async () => undefined,
     saveClient: async () => undefined,
     saveContactChannel: async () => undefined,
@@ -139,6 +182,7 @@ function buildRepository(
     saveMedia: async () => undefined,
     savePrice: async () => undefined,
     saveService: async () => undefined,
+    saveSettings: async () => undefined,
     ...overrides,
   } satisfies PersistRepositoryMethods;
 }
@@ -319,6 +363,46 @@ describe("admin persistence", () => {
     expect(savedSettings).toEqual([contactSettingsRecord]);
   });
 
+  it("persists blog posts through the repository", async () => {
+    const savedPosts: BlogPostRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: blogPostRecord, type: "blogPost" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveBlogPost: async (post) => {
+              savedPosts.push(post);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedPosts).toEqual([blogPostRecord]);
+  });
+
+  it("persists site settings through the repository", async () => {
+    const savedSettings: SettingsRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: settingsRecord, type: "settings" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveSettings: async (settings) => {
+              savedSettings.push(settings);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedSettings).toEqual([settingsRecord]);
+  });
+
   it("returns a Supabase write error without throwing through the API boundary", async () => {
     const result = await persistAdminRecord(
       { record: appointmentRecord, type: "appointment" },
@@ -349,9 +433,13 @@ describe("admin persistence", () => {
     expect(isAdminPersistInput({ record: mediaRecord, type: "media" })).toBe(true);
     expect(isAdminPersistInput({ record: contactChannelRecord, type: "contactChannel" })).toBe(true);
     expect(isAdminPersistInput({ record: contactSettingsRecord, type: "contactSettings" })).toBe(true);
+    expect(isAdminPersistInput({ record: blogPostRecord, type: "blogPost" })).toBe(true);
+    expect(isAdminPersistInput({ record: settingsRecord, type: "settings" })).toBe(true);
     expect(isAdminPersistInput({ record: null, type: "client" })).toBe(false);
     expect(isAdminPersistInput({ record: clientRecord, type: "certificate" })).toBe(false);
     expect(isAdminPersistInput({ record: serviceRecord, type: "price" })).toBe(false);
     expect(isAdminPersistInput({ record: mediaRecord, type: "contactSettings" })).toBe(false);
+    expect(isAdminPersistInput({ record: blogPostRecord, type: "settings" })).toBe(false);
+    expect(isAdminPersistInput({ record: settingsRecord, type: "blogPost" })).toBe(false);
   });
 });

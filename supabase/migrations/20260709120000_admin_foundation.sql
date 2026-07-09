@@ -153,6 +153,49 @@ create table if not exists public.admin_contact_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.admin_blog_posts (
+  id text primary key,
+  slug text not null unique,
+  title text not null,
+  category text not null default 'Общее',
+  status text not null default 'draft' check (status in ('published', 'draft', 'scheduled', 'review')),
+  author text not null default '',
+  published_on date,
+  updated_on date not null default current_date,
+  locale_codes text[] not null default '{}',
+  tag_labels text[] not null default '{}',
+  seo_title text not null default '',
+  cover_image_url text not null default '',
+  excerpt text not null default '',
+  body text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_site_settings (
+  id text primary key default 'site' check (id = 'site'),
+  business_name text not null,
+  default_locale text not null default 'ru' check (default_locale in ('bg', 'ru', 'ua', 'en')),
+  timezone text not null default 'Europe/Sofia',
+  currency text not null default 'EUR' check (currency = 'EUR'),
+  working_days text not null default '',
+  working_hours text not null default '',
+  booking_buffer_minutes integer not null default 30 check (booking_buffer_minutes > 0),
+  daily_slot_capacity integer not null default 6 check (daily_slot_capacity > 0),
+  google_calendar_mode text not null default 'internal' check (google_calendar_mode in ('disabled', 'internal', 'one_way', 'two_way_later')),
+  google_calendar_id text not null default '',
+  stripe_mode text not null default 'test' check (stripe_mode in ('test', 'live_confirmed')),
+  email_sender text not null default '',
+  reminder_template text not null default '',
+  cookie_privacy_mode text not null default '',
+  default_seo_title text not null default '',
+  roles_policy text not null default '',
+  audit_log_retention_days integer not null default 365 check (audit_log_retention_days > 0),
+  updated_on date not null default current_date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.admin_stripe_sales (
   payment_intent_id text primary key,
   charge_id text,
@@ -399,6 +442,84 @@ values
   )
 on conflict (id) do nothing;
 
+insert into public.admin_blog_posts (
+  id,
+  slug,
+  title,
+  category,
+  status,
+  author,
+  published_on,
+  updated_on,
+  locale_codes,
+  tag_labels,
+  seo_title,
+  cover_image_url,
+  excerpt,
+  body
+)
+values (
+  'blog-first-massage-preparation',
+  'first-massage-preparation',
+  'Подготовка к первому массажу',
+  'Советы',
+  'published',
+  'Natali',
+  '2026-07-06',
+  '2026-07-07',
+  array['ru', 'bg', 'ua', 'en'],
+  array['первый визит', 'массаж', 'подготовка'],
+  'Подготовка к первому массажу в Бургасе',
+  '/media/blog/first-massage-preparation.jpg',
+  'Что взять с собой, когда прийти и как выбрать комфортный формат первого визита.',
+  'Стартовая статья для будущего публичного блога и проверки админского workflow.'
+)
+on conflict (id) do nothing;
+
+insert into public.admin_site_settings (
+  id,
+  business_name,
+  default_locale,
+  timezone,
+  currency,
+  working_days,
+  working_hours,
+  booking_buffer_minutes,
+  daily_slot_capacity,
+  google_calendar_mode,
+  google_calendar_id,
+  stripe_mode,
+  email_sender,
+  reminder_template,
+  cookie_privacy_mode,
+  default_seo_title,
+  roles_policy,
+  audit_log_retention_days,
+  updated_on
+)
+values (
+  'site',
+  'Magic Massage Natali',
+  'ru',
+  'Europe/Sofia',
+  'EUR',
+  'Пн-Сб',
+  '10:00-19:00',
+  30,
+  6,
+  'internal',
+  '',
+  'test',
+  'info@magicmassage.bg',
+  'Напоминание о записи за день до сеанса.',
+  'Stripe и Google Maps загружаются только по назначению.',
+  'Magic Massage Natali Burgas',
+  'Бухгалтер: только Stripe-отчеты.',
+  365,
+  '2026-07-07'
+)
+on conflict (id) do nothing;
+
 create index if not exists admin_profiles_role_status_idx on public.admin_profiles (role, status);
 create index if not exists admin_clients_phone_normalized_idx on public.admin_clients (phone_normalized);
 create index if not exists admin_appointments_client_date_idx on public.admin_appointments (client_id, starts_on, starts_at);
@@ -408,6 +529,8 @@ create index if not exists admin_price_variants_service_idx on public.admin_pric
 create index if not exists admin_media_assets_folder_status_idx on public.admin_media_assets (folder, status);
 create index if not exists admin_media_assets_type_idx on public.admin_media_assets (media_type);
 create index if not exists admin_contact_channels_type_status_idx on public.admin_contact_channels (channel_type, status);
+create index if not exists admin_blog_posts_status_published_idx on public.admin_blog_posts (status, published_on);
+create index if not exists admin_blog_posts_slug_idx on public.admin_blog_posts (slug);
 create index if not exists admin_stripe_sales_paid_at_idx on public.admin_stripe_sales (paid_at);
 create index if not exists admin_stripe_sales_certificate_idx on public.admin_stripe_sales (certificate_code);
 create index if not exists admin_finance_export_audit_downloaded_by_idx on public.admin_finance_export_audit (downloaded_by, created_at);
@@ -502,6 +625,8 @@ alter table public.admin_price_variants enable row level security;
 alter table public.admin_media_assets enable row level security;
 alter table public.admin_contact_channels enable row level security;
 alter table public.admin_contact_settings enable row level security;
+alter table public.admin_blog_posts enable row level security;
+alter table public.admin_site_settings enable row level security;
 alter table public.admin_stripe_sales enable row level security;
 alter table public.admin_finance_export_audit enable row level security;
 alter table public.admin_audit_log enable row level security;
@@ -515,6 +640,8 @@ grant select, insert, update, delete on public.admin_price_variants to authentic
 grant select, insert, update, delete on public.admin_media_assets to authenticated;
 grant select, insert, update, delete on public.admin_contact_channels to authenticated;
 grant select, insert, update, delete on public.admin_contact_settings to authenticated;
+grant select, insert, update, delete on public.admin_blog_posts to authenticated;
+grant select, insert, update, delete on public.admin_site_settings to authenticated;
 grant select, insert, update, delete on public.admin_stripe_sales to authenticated;
 grant select, insert on public.admin_finance_export_audit to authenticated;
 grant select on public.admin_audit_log to authenticated;
@@ -656,6 +783,36 @@ for all
 to authenticated
 using (public.admin_can_manage_content())
 with check (public.admin_can_manage_content());
+
+drop policy if exists "content roles can read admin blog posts" on public.admin_blog_posts;
+create policy "content roles can read admin blog posts"
+on public.admin_blog_posts
+for select
+to authenticated
+using (public.admin_can_read_content());
+
+drop policy if exists "editor roles can manage admin blog posts" on public.admin_blog_posts;
+create policy "editor roles can manage admin blog posts"
+on public.admin_blog_posts
+for all
+to authenticated
+using (public.admin_can_manage_content())
+with check (public.admin_can_manage_content());
+
+drop policy if exists "owner can read admin site settings" on public.admin_site_settings;
+create policy "owner can read admin site settings"
+on public.admin_site_settings
+for select
+to authenticated
+using (public.admin_has_role(array['owner']::public.admin_role[]));
+
+drop policy if exists "owner can manage admin site settings" on public.admin_site_settings;
+create policy "owner can manage admin site settings"
+on public.admin_site_settings
+for all
+to authenticated
+using (public.admin_has_role(array['owner']::public.admin_role[]))
+with check (public.admin_has_role(array['owner']::public.admin_role[]));
 
 drop policy if exists "accountant can read stripe sales" on public.admin_stripe_sales;
 create policy "accountant can read stripe sales"

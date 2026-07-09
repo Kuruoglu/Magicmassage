@@ -22,6 +22,8 @@ describe("admin Supabase schema foundation", () => {
       "admin_media_assets",
       "admin_contact_channels",
       "admin_contact_settings",
+      "admin_blog_posts",
+      "admin_site_settings",
       "admin_stripe_sales",
       "admin_finance_export_audit",
       "admin_audit_log",
@@ -60,11 +62,24 @@ describe("admin Supabase schema foundation", () => {
     expect(sql).toContain('create policy "editor roles can manage admin contact channels"');
     expect(sql).toContain('create policy "content roles can read admin contact settings"');
     expect(sql).toContain('create policy "editor roles can manage admin contact settings"');
+    expect(sql).toContain('create policy "content roles can read admin blog posts"');
+    expect(sql).toContain('create policy "editor roles can manage admin blog posts"');
     expect(sql).not.toContain('create policy "accountant can read admin services"');
     expect(sql).not.toContain('create policy "accountant can read admin price variants"');
     expect(sql).not.toContain('create policy "accountant can read admin media assets"');
     expect(sql).not.toContain('create policy "accountant can read admin contact channels"');
     expect(sql).not.toContain('create policy "accountant can read admin contact settings"');
+    expect(sql).not.toContain('create policy "accountant can read admin blog posts"');
+  });
+
+  it("keeps site settings owner-only and outside accountant/content access", () => {
+    const sql = readMigration();
+
+    expect(sql).toContain('create policy "owner can read admin site settings"');
+    expect(sql).toContain('create policy "owner can manage admin site settings"');
+    expect(sql).not.toContain('create policy "content roles can read admin site settings"');
+    expect(sql).not.toContain('create policy "editor roles can manage admin site settings"');
+    expect(sql).not.toContain('create policy "accountant can read admin site settings"');
   });
 
   it("seeds starter services before starter price variants and website content rows", () => {
@@ -75,11 +90,15 @@ describe("admin Supabase schema foundation", () => {
     expect(sql).toContain("insert into public.admin_media_assets");
     expect(sql).toContain("insert into public.admin_contact_settings");
     expect(sql).toContain("insert into public.admin_contact_channels");
+    expect(sql).toContain("insert into public.admin_blog_posts");
+    expect(sql).toContain("insert into public.admin_site_settings");
     expect(sql.indexOf("insert into public.admin_services")).toBeLessThan(sql.indexOf("insert into public.admin_price_variants"));
     expect(sql).toContain("'classic-massage'");
     expect(sql).toContain("'price-classic-60'");
     expect(sql).toContain("'media-classic-cover'");
     expect(sql).toContain("'contact-phone'");
+    expect(sql).toContain("'blog-first-massage-preparation'");
+    expect(sql).toContain("'site',");
   });
 
   it("defines role helpers and policies that keep accountant access finance-only", () => {

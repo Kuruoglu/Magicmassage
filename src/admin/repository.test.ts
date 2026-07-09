@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { ContactChannelRecord, ContactSettingsRecord, MediaRecord, PriceRecord, ServiceRecord } from "./domain";
+import type {
+  BlogPostRecord,
+  ContactChannelRecord,
+  ContactSettingsRecord,
+  MediaRecord,
+  PriceRecord,
+  ServiceRecord,
+  SettingsRecord,
+} from "./domain";
 import { createAdminSupabaseRepository, type AdminFinanceExportLogInput } from "./repository";
 
 type QueryFilter = {
@@ -201,6 +209,44 @@ const contactSettingsRecord: ContactSettingsRecord = {
   phone: "+359 87 333 4411",
   seoArea: "Burgas, Bulgaria",
   workingHours: "Пн-Сб 10:00-19:00",
+};
+
+const blogPostRecord: BlogPostRecord = {
+  author: "Natali",
+  body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
+  category: "Советы",
+  coverImage: "/media/blog/prepare-for-massage.jpg",
+  excerpt: "Короткая памятка перед первым визитом.",
+  id: "blog-prepare-for-massage",
+  locales: ["ru", "bg"],
+  publishedAt: "2026-07-20",
+  seoTitle: "Как подготовиться к массажу в Бургасе",
+  slug: "prepare-for-massage",
+  status: "Черновик",
+  tags: ["подготовка", "массаж"],
+  title: "Как подготовиться к массажу",
+  updatedAt: "2026-07-09",
+};
+
+const settingsRecord: SettingsRecord = {
+  auditLogRetentionDays: 365,
+  bookingBufferMinutes: 45,
+  businessName: "Magic Massage Natali",
+  cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
+  currency: "EUR",
+  dailySlotCapacity: 5,
+  defaultLocale: "ru",
+  defaultSeoTitle: "Magic Massage Natali Burgas",
+  emailSender: "info@magicmassage.bg",
+  googleCalendarId: "natali@example.com",
+  googleCalendarMode: "Односторонняя",
+  reminderTemplate: "Напоминание о записи за день до сеанса.",
+  rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
+  stripeMode: "Тестовый",
+  timezone: "Europe/Sofia",
+  updatedAt: "2026-07-09",
+  workingDays: "Пн-Сб",
+  workingHours: "10:00-19:00",
 };
 
 const stripeRows = [
@@ -584,6 +630,86 @@ describe("admin Supabase repository", () => {
         phone: "+359 87 333 4411",
         seo_area: "Burgas, Bulgaria",
         working_hours: "Пн-Сб 10:00-19:00",
+      },
+    });
+  });
+
+  it("upserts blog posts by id for admin blog edits", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveBlogPost(blogPostRecord);
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_blog_posts",
+      values: {
+        author: "Natali",
+        body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
+        category: "Советы",
+        cover_image_url: "/media/blog/prepare-for-massage.jpg",
+        excerpt: "Короткая памятка перед первым визитом.",
+        id: "blog-prepare-for-massage",
+        locale_codes: ["ru", "bg"],
+        published_on: "2026-07-20",
+        seo_title: "Как подготовиться к массажу в Бургасе",
+        slug: "prepare-for-massage",
+        status: "draft",
+        tag_labels: ["подготовка", "массаж"],
+        title: "Как подготовиться к массажу",
+        updated_on: "2026-07-09",
+      },
+    });
+  });
+
+  it("stores unscheduled blog posts with a null publication date", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveBlogPost({ ...blogPostRecord, publishedAt: "", status: "Черновик" });
+
+    expect(client.operations[0]).toMatchObject({
+      table: "admin_blog_posts",
+      values: {
+        published_on: null,
+        status: "draft",
+      },
+    });
+  });
+
+  it("upserts site settings as the single owner-managed settings record", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveSettings(settingsRecord);
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_site_settings",
+      values: {
+        audit_log_retention_days: 365,
+        booking_buffer_minutes: 45,
+        business_name: "Magic Massage Natali",
+        cookie_privacy_mode: "Stripe и Google Maps загружаются только по назначению.",
+        currency: "EUR",
+        daily_slot_capacity: 5,
+        default_locale: "ru",
+        default_seo_title: "Magic Massage Natali Burgas",
+        email_sender: "info@magicmassage.bg",
+        google_calendar_id: "natali@example.com",
+        google_calendar_mode: "one_way",
+        id: "site",
+        reminder_template: "Напоминание о записи за день до сеанса.",
+        roles_policy: "Бухгалтер: только Stripe-отчеты.",
+        stripe_mode: "test",
+        timezone: "Europe/Sofia",
+        updated_on: "2026-07-09",
+        working_days: "Пн-Сб",
+        working_hours: "10:00-19:00",
       },
     });
   });

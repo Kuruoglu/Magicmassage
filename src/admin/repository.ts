@@ -2,6 +2,7 @@ import type { FinanceRow, FinanceSummary } from "./config";
 import { normalizeClientPhone, parseEuroAmountToCents } from "./domain";
 import type {
   AdminAppointmentDatabaseRow,
+  AdminBlogPostDatabaseRow,
   AdminCertificateDatabaseRow,
   AdminClientDatabaseRow,
   AdminContactChannelDatabaseRow,
@@ -10,8 +11,12 @@ import type {
   AdminMediaDatabaseRow,
   AdminPriceDatabaseRow,
   AdminServiceDatabaseRow,
+  AdminSiteSettingsDatabaseRow,
   Appointment,
   AppointmentStatus,
+  BlogPostRecord,
+  BlogStatus,
+  CalendarSyncMode,
   CertificateRecord,
   CertificateStatus,
   ClientRecord,
@@ -26,6 +31,8 @@ import type {
   PriceStatus,
   ServiceRecord,
   ServiceStatus,
+  SettingsRecord,
+  StripeMode,
 } from "./domain";
 
 type SupabaseError = {
@@ -90,6 +97,7 @@ export type AdminRepository = {
   loadDomainRecords(): Promise<AdminDomainRecords>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
   saveAppointment(appointment: Appointment): Promise<void>;
+  saveBlogPost(post: BlogPostRecord): Promise<void>;
   saveCertificate(certificate: CertificateRecord): Promise<void>;
   saveClient(client: ClientRecord): Promise<void>;
   saveContactChannel(channel: ContactChannelRecord): Promise<void>;
@@ -97,6 +105,7 @@ export type AdminRepository = {
   saveMedia(media: MediaRecord): Promise<void>;
   savePrice(price: PriceRecord): Promise<void>;
   saveService(service: ServiceRecord): Promise<void>;
+  saveSettings(settings: SettingsRecord): Promise<void>;
 };
 
 const clientColumns = [
@@ -247,6 +256,54 @@ const databaseContactStatusByStatus = new Map<ContactStatus, string>([
   [contactStatusByDatabase.hidden, "hidden"],
 ]);
 
+const blogStatusByDatabase: Record<string, BlogStatus> = {
+  draft: "Черновик",
+  published: "Опубликована",
+  review: "На проверке",
+  scheduled: "Запланирована",
+  "На проверке": "На проверке",
+  Запланирована: "Запланирована",
+  Опубликована: "Опубликована",
+  Черновик: "Черновик",
+};
+
+const databaseBlogStatusByStatus = new Map<BlogStatus, string>([
+  [blogStatusByDatabase.draft, "draft"],
+  [blogStatusByDatabase.published, "published"],
+  [blogStatusByDatabase.review, "review"],
+  [blogStatusByDatabase.scheduled, "scheduled"],
+]);
+
+const calendarSyncModeByDatabase: Record<string, CalendarSyncMode> = {
+  disabled: "Отключена",
+  internal: "Внутренний календарь главный",
+  one_way: "Односторонняя",
+  two_way_later: "Двусторонняя позже",
+  "Внутренний календарь главный": "Внутренний календарь главный",
+  "Двусторонняя позже": "Двусторонняя позже",
+  Односторонняя: "Односторонняя",
+  Отключена: "Отключена",
+};
+
+const databaseCalendarSyncModeByMode = new Map<CalendarSyncMode, string>([
+  [calendarSyncModeByDatabase.disabled, "disabled"],
+  [calendarSyncModeByDatabase.internal, "internal"],
+  [calendarSyncModeByDatabase.one_way, "one_way"],
+  [calendarSyncModeByDatabase.two_way_later, "two_way_later"],
+]);
+
+const stripeModeByDatabase: Record<string, StripeMode> = {
+  live_confirmed: "Live после подтверждения",
+  test: "Тестовый",
+  "Live после подтверждения": "Live после подтверждения",
+  Тестовый: "Тестовый",
+};
+
+const databaseStripeModeByMode = new Map<StripeMode, string>([
+  [stripeModeByDatabase.live_confirmed, "live_confirmed"],
+  [stripeModeByDatabase.test, "test"],
+]);
+
 const appointmentStatusByDatabase: Record<string, AppointmentStatus> = {
   cancelled: "Отменена",
   confirmed: "Подтверждена",
@@ -349,6 +406,18 @@ function mapContactChannelTypeToDatabase(type: ContactChannelType) {
 
 function mapContactStatusToDatabase(status: ContactStatus) {
   return databaseContactStatusByStatus.get(status) ?? "draft";
+}
+
+function mapBlogStatusToDatabase(status: BlogStatus) {
+  return databaseBlogStatusByStatus.get(status) ?? "draft";
+}
+
+function mapCalendarSyncModeToDatabase(mode: CalendarSyncMode) {
+  return databaseCalendarSyncModeByMode.get(mode) ?? "internal";
+}
+
+function mapStripeModeToDatabase(mode: StripeMode) {
+  return databaseStripeModeByMode.get(mode) ?? "test";
 }
 
 function mapStripeStatus(row: Pick<AdminStripeSaleDatabaseRow, "gross_cents" | "refund_cents">): FinanceRow["status"] {
@@ -537,6 +606,49 @@ function mapContactSettingsRecordToRow(settings: ContactSettingsRecord): AdminCo
   };
 }
 
+function mapBlogPostRecordToRow(post: BlogPostRecord): AdminBlogPostDatabaseRow {
+  return {
+    author: post.author,
+    body: post.body,
+    category: post.category,
+    cover_image_url: post.coverImage,
+    excerpt: post.excerpt,
+    id: post.id,
+    locale_codes: [...post.locales],
+    published_on: post.publishedAt.trim() || null,
+    seo_title: post.seoTitle,
+    slug: post.slug,
+    status: mapBlogStatusToDatabase(post.status),
+    tag_labels: [...post.tags],
+    title: post.title,
+    updated_on: post.updatedAt,
+  };
+}
+
+function mapSettingsRecordToRow(settings: SettingsRecord): AdminSiteSettingsDatabaseRow {
+  return {
+    audit_log_retention_days: settings.auditLogRetentionDays,
+    booking_buffer_minutes: settings.bookingBufferMinutes,
+    business_name: settings.businessName,
+    cookie_privacy_mode: settings.cookiePrivacyMode,
+    currency: settings.currency,
+    daily_slot_capacity: settings.dailySlotCapacity,
+    default_locale: settings.defaultLocale,
+    default_seo_title: settings.defaultSeoTitle,
+    email_sender: settings.emailSender,
+    google_calendar_id: settings.googleCalendarId,
+    google_calendar_mode: mapCalendarSyncModeToDatabase(settings.googleCalendarMode),
+    id: "site",
+    reminder_template: settings.reminderTemplate,
+    roles_policy: settings.rolesPolicy,
+    stripe_mode: mapStripeModeToDatabase(settings.stripeMode),
+    timezone: settings.timezone,
+    updated_on: settings.updatedAt,
+    working_days: settings.workingDays,
+    working_hours: settings.workingHours,
+  };
+}
+
 function mapStripeSaleRow(row: AdminStripeSaleDatabaseRow): FinanceRow {
   return {
     buyer: row.buyer_name,
@@ -694,6 +806,14 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     await upsertRow(client, "admin_contact_settings", mapContactSettingsRecordToRow(settings), { onConflict: "id" });
   }
 
+  async function saveBlogPost(post: BlogPostRecord) {
+    await upsertRow(client, "admin_blog_posts", mapBlogPostRecordToRow(post), { onConflict: "id" });
+  }
+
+  async function saveSettings(settings: SettingsRecord) {
+    await upsertRow(client, "admin_site_settings", mapSettingsRecordToRow(settings), { onConflict: "id" });
+  }
+
   return {
     listAppointments,
     listCertificates,
@@ -702,6 +822,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     loadDomainRecords,
     logFinanceExport,
     saveAppointment,
+    saveBlogPost,
     saveCertificate,
     saveClient,
     saveContactChannel,
@@ -709,5 +830,6 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     saveMedia,
     savePrice,
     saveService,
+    saveSettings,
   };
 }

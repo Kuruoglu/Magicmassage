@@ -41,6 +41,9 @@ import {
   type AdminDomainRecords,
   type Appointment,
   type AppointmentStatus,
+  type BlogPostRecord,
+  type BlogStatus,
+  type CalendarSyncMode,
   type CertificateRecord,
   type CertificateStatus,
   type ClientRecord,
@@ -56,6 +59,8 @@ import {
   type PriceStatus,
   type ServiceRecord,
   type ServiceStatus,
+  type SettingsRecord,
+  type StripeMode,
 } from "@/admin/domain";
 
 type AdminCalendarAction = "create";
@@ -146,23 +151,6 @@ type ContactChannelFormState = {
   usage: string;
   value: string;
 };
-type BlogStatus = "Опубликована" | "Черновик" | "Запланирована" | "На проверке";
-type BlogPostRecord = {
-  author: string;
-  body: string;
-  category: string;
-  coverImage: string;
-  excerpt: string;
-  id: string;
-  locales: string[];
-  publishedAt: string;
-  seoTitle: string;
-  slug: string;
-  status: BlogStatus;
-  tags: string[];
-  title: string;
-  updatedAt: string;
-};
 type BlogPostFormState = {
   author: string;
   body: string;
@@ -178,28 +166,6 @@ type BlogPostFormState = {
   title: string;
 };
 type SettingsGroupId = "business" | "booking" | "payments" | "email" | "privacySeo" | "rolesAudit";
-type CalendarSyncMode = "Отключена" | "Внутренний календарь главный" | "Односторонняя" | "Двусторонняя позже";
-type StripeMode = "Тестовый" | "Live после подтверждения";
-type SettingsRecord = {
-  auditLogRetentionDays: number;
-  bookingBufferMinutes: number;
-  businessName: string;
-  cookiePrivacyMode: string;
-  currency: "EUR";
-  dailySlotCapacity: number;
-  defaultLocale: string;
-  defaultSeoTitle: string;
-  emailSender: string;
-  googleCalendarId: string;
-  googleCalendarMode: CalendarSyncMode;
-  reminderTemplate: string;
-  rolesPolicy: string;
-  stripeMode: StripeMode;
-  timezone: string;
-  updatedAt: string;
-  workingDays: string;
-  workingHours: string;
-};
 type SettingsFormState = {
   auditLogRetentionDays: string;
   bookingBufferMinutes: string;
@@ -7827,6 +7793,7 @@ export function AdminShell({
 
       return current.map((currentPost, index) => (index === existingIndex ? post : currentPost));
     });
+    void persistAdminRecord({ record: post, type: "blogPost" });
   }
 
   function saveAdminUserRecord(user: AdminUserRecord, originalId?: string) {
@@ -7853,6 +7820,7 @@ export function AdminShell({
   function saveSettingsRecord(nextSettings: SettingsRecord) {
     setSettings(nextSettings);
     setIsSettingsEditOpen(false);
+    void persistAdminRecord({ record: nextSettings, type: "settings" });
   }
 
   return (

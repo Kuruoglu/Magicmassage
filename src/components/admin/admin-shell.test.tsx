@@ -2122,6 +2122,79 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Обновленная памятка перед визитом.")).toBeInTheDocument();
   });
 
+  it("posts saved blog posts when the admin shell is backed by Supabase", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Новая статья" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая статья" });
+    fireEvent.change(within(dialog).getByLabelText("Заголовок"), { target: { value: "Как подготовиться к массажу" } });
+    fireEvent.change(within(dialog).getByLabelText("Slug"), { target: { value: "prepare-for-massage" } });
+    fireEvent.change(within(dialog).getByLabelText("Категория"), { target: { value: "Советы" } });
+    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
+    fireEvent.change(within(dialog).getByLabelText("Автор"), { target: { value: "Natali" } });
+    fireEvent.change(within(dialog).getByLabelText("Дата публикации"), { target: { value: "2026-07-20" } });
+    fireEvent.change(within(dialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
+    fireEvent.change(within(dialog).getByLabelText("SEO title"), {
+      target: { value: "Как подготовиться к массажу в Бургасе" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Обложка"), { target: { value: "/media/blog/prepare-for-massage.jpg" } });
+    fireEvent.change(within(dialog).getByLabelText("Краткое описание"), {
+      target: { value: "Короткая памятка перед первым визитом." },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Текст статьи"), {
+      target: { value: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду." },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Теги"), { target: { value: "подготовка, массаж" } });
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить статью" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        author: "Natali",
+        body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
+        category: "Советы",
+        coverImage: "/media/blog/prepare-for-massage.jpg",
+        excerpt: "Короткая памятка перед первым визитом.",
+        id: "blog-prepare-for-massage",
+        locales: ["ru", "bg"],
+        publishedAt: "2026-07-20",
+        seoTitle: "Как подготовиться к массажу в Бургасе",
+        slug: "prepare-for-massage",
+        status: "Черновик",
+        tags: ["подготовка", "массаж"],
+        title: "Как подготовиться к массажу",
+      },
+      type: "blogPost",
+    });
+  });
+
   it("filters blog posts by status and global search", async () => {
     const user = userEvent.setup();
 
@@ -2177,6 +2250,83 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Односторонняя")).toBeInTheDocument();
     expect(within(details).getByText("natali@example.com")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Настройки сохранены.");
+  });
+
+  it("posts saved settings when the admin shell is backed by Supabase", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="settings"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    fireEvent.change(within(dialog).getByLabelText("Название бизнеса"), { target: { value: "Magic Massage Natali" } });
+    fireEvent.change(within(dialog).getByLabelText("Часовой пояс"), { target: { value: "Europe/Sofia" } });
+    fireEvent.change(within(dialog).getByLabelText("Рабочие дни"), { target: { value: "Пн-Сб" } });
+    fireEvent.change(within(dialog).getByLabelText("Рабочие часы"), { target: { value: "10:00-19:00" } });
+    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
+    fireEvent.change(within(dialog).getByLabelText("Слотов в день"), { target: { value: "5" } });
+    fireEvent.change(within(dialog).getByLabelText("Google Calendar"), { target: { value: "Односторонняя" } });
+    fireEvent.change(within(dialog).getByLabelText("Google Calendar ID"), { target: { value: "natali@example.com" } });
+    fireEvent.change(within(dialog).getByLabelText("Email отправителя"), { target: { value: "info@magicmassage.bg" } });
+    fireEvent.change(within(dialog).getByLabelText("Хранение audit log"), { target: { value: "365" } });
+    fireEvent.change(within(dialog).getByLabelText("SEO title"), { target: { value: "Magic Massage Natali Burgas" } });
+    fireEvent.change(within(dialog).getByLabelText("Cookie/privacy"), {
+      target: { value: "Stripe и Google Maps загружаются только по назначению." },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Шаблон напоминания"), {
+      target: { value: "Напоминание о записи за день до сеанса." },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Политика ролей"), {
+      target: { value: "Бухгалтер: только Stripe-отчеты." },
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        auditLogRetentionDays: 365,
+        bookingBufferMinutes: 45,
+        businessName: "Magic Massage Natali",
+        cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
+        currency: "EUR",
+        dailySlotCapacity: 5,
+        defaultSeoTitle: "Magic Massage Natali Burgas",
+        emailSender: "info@magicmassage.bg",
+        googleCalendarId: "natali@example.com",
+        googleCalendarMode: "Односторонняя",
+        reminderTemplate: "Напоминание о записи за день до сеанса.",
+        rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
+        timezone: "Europe/Sofia",
+        workingDays: "Пн-Сб",
+        workingHours: "10:00-19:00",
+      },
+      type: "settings",
+    });
   });
 
   it("uses saved booking settings for calendar slot availability", async () => {

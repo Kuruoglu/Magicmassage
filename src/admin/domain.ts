@@ -124,6 +124,50 @@ export type ContactSettingsRecord = {
   workingHours: string;
 };
 
+export type BlogStatus = "Опубликована" | "Черновик" | "Запланирована" | "На проверке";
+
+export type BlogPostRecord = {
+  author: string;
+  body: string;
+  category: string;
+  coverImage: string;
+  excerpt: string;
+  id: string;
+  locales: string[];
+  publishedAt: string;
+  seoTitle: string;
+  slug: string;
+  status: BlogStatus;
+  tags: string[];
+  title: string;
+  updatedAt: string;
+};
+
+export type CalendarSyncMode = "Отключена" | "Внутренний календарь главный" | "Односторонняя" | "Двусторонняя позже";
+
+export type StripeMode = "Тестовый" | "Live после подтверждения";
+
+export type SettingsRecord = {
+  auditLogRetentionDays: number;
+  bookingBufferMinutes: number;
+  businessName: string;
+  cookiePrivacyMode: string;
+  currency: "EUR";
+  dailySlotCapacity: number;
+  defaultLocale: string;
+  defaultSeoTitle: string;
+  emailSender: string;
+  googleCalendarId: string;
+  googleCalendarMode: CalendarSyncMode;
+  reminderTemplate: string;
+  rolesPolicy: string;
+  stripeMode: StripeMode;
+  timezone: string;
+  updatedAt: string;
+  workingDays: string;
+  workingHours: string;
+};
+
 type DemoClientRow = Omit<ClientRecord, "id" | "history" | "tags"> & {
   id?: string;
   history: readonly ClientVisit[];
@@ -246,6 +290,45 @@ export type AdminContactSettingsDatabaseRow = {
   map_url: string;
   phone: string;
   seo_area: string;
+  working_hours: string;
+};
+
+export type AdminBlogPostDatabaseRow = {
+  author: string;
+  body: string;
+  category: string;
+  cover_image_url: string;
+  excerpt: string;
+  id: string;
+  locale_codes: string[];
+  published_on: string | null;
+  seo_title: string;
+  slug: string;
+  status: string;
+  tag_labels: string[];
+  title: string;
+  updated_on: string;
+};
+
+export type AdminSiteSettingsDatabaseRow = {
+  audit_log_retention_days: number;
+  booking_buffer_minutes: number;
+  business_name: string;
+  cookie_privacy_mode: string;
+  currency: "EUR";
+  daily_slot_capacity: number;
+  default_locale: string;
+  default_seo_title: string;
+  email_sender: string;
+  google_calendar_id: string;
+  google_calendar_mode: string;
+  id: "site";
+  reminder_template: string;
+  roles_policy: string;
+  stripe_mode: string;
+  timezone: string;
+  updated_on: string;
+  working_days: string;
   working_hours: string;
 };
 
