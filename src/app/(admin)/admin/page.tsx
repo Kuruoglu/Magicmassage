@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/admin/admin-shell";
+import { loadAdminShellData } from "@/admin/data-source";
 import { resolveAdminRole, resolveAdminSection } from "@/admin/config";
 
 type AdminPageProps = {
@@ -25,11 +26,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const selectedPriceId = firstQueryValue(query.price);
   const selectedServiceSlug = firstQueryValue(query.service);
   const selectedSettingsGroupId = firstQueryValue(query.settings);
+  const initialData = await loadAdminShellData();
 
   return (
     <AdminShell
       activeSection={activeSection}
       calendarAction={calendarAction}
+      initialData={initialData}
       role={role}
       selectedAdminUserId={selectedAdminUserId}
       selectedAppointmentKey={selectedAppointmentKey}

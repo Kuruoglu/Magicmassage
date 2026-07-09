@@ -99,6 +99,67 @@ describe("AdminShell", () => {
     expect(screen.getByText("audit log")).toBeInTheDocument();
   });
 
+  it("renders supplied initial admin data instead of only demo records", () => {
+    render(
+      <AdminShell
+        activeSection="finances"
+        initialData={{
+          financeRows: [
+            {
+              buyer: "Supabase Buyer",
+              certificateCode: "MMN-SB-1",
+              date: "2026-07-02",
+              gross: 400,
+              id: "pi_supabase_1",
+              refund: 25,
+              status: "Частичный возврат",
+              stripeFee: 12.5,
+            },
+          ],
+          records: {
+            appointments: [
+              {
+                client: "Supabase Client",
+                clientId: "client-supabase",
+                date: "2026-07-02",
+                id: "appointment-supabase",
+                note: "Loaded from Supabase",
+                service: "Deep tissue massage",
+                status: "Подтверждена",
+                time: "11:00",
+              },
+            ],
+            certificates: [],
+            clients: [
+              {
+                email: "supabase@example.com",
+                history: [],
+                id: "client-supabase",
+                language: "en",
+                name: "Supabase Client",
+                next: "2026-07-02 11:00",
+                note: "Loaded from Supabase",
+                phone: "+359 88 000 0000",
+                preferredContact: "Email",
+                status: "Активный клиент",
+                tags: ["EN"],
+                telegram: "",
+                totalSpend: "400 €",
+                visits: 1,
+              },
+            ],
+          },
+          source: "supabase",
+        }}
+        role="accountant"
+      />,
+    );
+
+    expect(screen.getByText("pi_supabase_1")).toBeInTheDocument();
+    expect(screen.getByText("Supabase Buyer")).toBeInTheDocument();
+    expect(screen.queryByText("pi_3QMMN1021")).not.toBeInTheDocument();
+  });
+
   it("filters clients from the global admin search", async () => {
     const user = userEvent.setup();
 

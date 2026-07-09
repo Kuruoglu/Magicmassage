@@ -18,10 +18,11 @@ import {
   certificateRows,
   clientRows,
   dashboardMetrics,
-  financeRows,
+  financeRows as demoFinanceRows,
   sectionSamples,
   upcomingAppointments,
 } from "@/admin/demo-data";
+import type { AdminShellInitialData } from "@/admin/data-source";
 import {
   appointmentBelongsToClient,
   buildClientIdFromPhone,
@@ -36,6 +37,7 @@ import {
   matchesClientIdentity,
   normalizeClientPhone,
   normalizeSearch,
+  type AdminDomainRecords,
   type Appointment,
   type AppointmentStatus,
   type CertificateRecord,
@@ -48,6 +50,7 @@ type AdminCalendarAction = "create";
 type AdminShellProps = {
   activeSection: AdminSectionId;
   calendarAction?: AdminCalendarAction;
+  initialData?: AdminShellInitialData;
   role: AdminRoleId;
   selectedAppointmentKey?: string;
   selectedBlogPostId?: string;
@@ -797,21 +800,44 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-function buildInitialAdminRecords() {
-  return createAdminDemoRecords({
-    appointmentRows: upcomingAppointments,
-    certificateRows,
-    clientRows,
-    financeRows,
-  });
+function cloneAdminDomainRecords(records: AdminDomainRecords): AdminDomainRecords {
+  return {
+    appointments: records.appointments.map((appointment) => ({ ...appointment })),
+    certificates: records.certificates.map((certificate) => ({
+      ...certificate,
+      history: [...certificate.history],
+    })),
+    clients: records.clients.map((client) => ({
+      ...client,
+      history: client.history.map((visit) => ({ ...visit })),
+      tags: [...client.tags],
+    })),
+  };
 }
 
-function buildInitialClientRows(): ClientRecord[] {
-  return buildInitialAdminRecords().clients;
+function buildInitialAdminRecords(initialData?: AdminShellInitialData) {
+  const records =
+    initialData?.records ??
+    createAdminDemoRecords({
+      appointmentRows: upcomingAppointments,
+      certificateRows,
+      clientRows,
+      financeRows: demoFinanceRows,
+    });
+
+  return cloneAdminDomainRecords(records);
 }
 
-function buildInitialCertificateRows(): CertificateRecord[] {
-  return buildInitialAdminRecords().certificates;
+function buildInitialClientRows(records: AdminDomainRecords): ClientRecord[] {
+  return records.clients;
+}
+
+function buildInitialCertificateRows(records: AdminDomainRecords): CertificateRecord[] {
+  return records.certificates;
+}
+
+function buildInitialFinanceRows(initialData?: AdminShellInitialData): FinanceRow[] {
+  return (initialData?.financeRows ?? demoFinanceRows).map((row) => ({ ...row }));
 }
 
 function buildInitialServiceRows(): ServiceRecord[] {
@@ -1387,8 +1413,8 @@ function sortAppointments(appointments: Appointment[]) {
   );
 }
 
-function buildInitialCalendarAppointments() {
-  return buildInitialAdminRecords().appointments;
+function buildInitialCalendarAppointments(records: AdminDomainRecords) {
+  return records.appointments;
 }
 
 function calendarHeadingLabel(mode: CalendarMode, selectedDate: string) {
@@ -5548,7 +5574,7 @@ function CalendarWorkspace({
   );
 }
 
-function FinanceWorkspace({ query }: { query: string }) {
+function FinanceWorkspace({ financeRows, query }: { financeRows: FinanceRow[]; query: string }) {
   const [exportNotice, setExportNotice] = useState("");
   const [periodStart, setPeriodStart] = useState("2026-07-01");
   const [periodEnd, setPeriodEnd] = useState("2026-07-03");
@@ -5558,7 +5584,7 @@ function FinanceWorkspace({ query }: { query: string }) {
         matchesDatePeriod(row.date, periodStart, periodEnd) &&
         matchesSearch([row.date, row.id, row.certificateCode, row.buyer, row.status, row.gross, row.refund], query),
       ),
-    [periodEnd, periodStart, query],
+    [financeRows, periodEnd, periodStart, query],
   );
   const currentSummary = useMemo(() => calculateFinanceSummary(filteredFinanceRows), [filteredFinanceRows]);
   const financePeriod = formatFinancePeriod(periodStart, periodEnd);
@@ -6946,6 +6972,7 @@ function Workspace({
   clients,
   contactChannels,
   contactSettings,
+  financeRows,
   isBlogCreateOpen,
   isCertificateCreateOpen,
   isClientCreateOpen,
@@ -7007,6 +7034,7 @@ function Workspace({
   clients: ClientRecord[];
   contactChannels: ContactChannelRecord[];
   contactSettings: ContactSettingsRecord;
+  financeRows: FinanceRow[];
   isBlogCreateOpen: boolean;
   isCertificateCreateOpen: boolean;
   isClientCreateOpen: boolean;
@@ -7233,7 +7261,7 @@ function Workspace({
   }
 
   if (section === "finances") {
-    return <FinanceWorkspace query={query} />;
+    return <FinanceWorkspace financeRows={financeRows} query={query} />;
   }
 
   return <GenericWorkspace query={query} section={section} />;
@@ -7242,6 +7270,7 @@ function Workspace({
 export function AdminShell({
   activeSection,
   calendarAction,
+  initialData,
   role,
   selectedAppointmentKey,
   selectedAdminUserId,
@@ -7257,14 +7286,19 @@ export function AdminShell({
 }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
+  const initialRecords = useMemo(() => buildInitialAdminRecords(initialData), [initialData]);
+  const initialFinanceRows = useMemo(() => buildInitialFinanceRows(initialData), [initialData]);
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
   const [dismissedCalendarActionKey, setDismissedCalendarActionKey] = useState("");
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
-  const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() => buildInitialCalendarAppointments());
-  const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows());
-  const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows());
+  const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() =>
+    buildInitialCalendarAppointments(initialRecords),
+  );
+  const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows(initialRecords));
+  const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows(initialRecords));
+  const [stripeSales] = useState<FinanceRow[]>(() => initialFinanceRows);
   const [services, setServices] = useState<ServiceRecord[]>(() => buildInitialServiceRows());
   const [prices, setPrices] = useState<PriceRecord[]>(() => buildInitialPriceRows());
   const [media, setMedia] = useState<MediaRecord[]>(() => buildInitialMediaRows());
@@ -7873,6 +7907,7 @@ export function AdminShell({
           clients={clients}
           contactChannels={contactChannels}
           contactSettings={contactSettings}
+          financeRows={stripeSales}
           isBlogCreateOpen={isBlogCreateOpen}
           isCertificateCreateOpen={isCertificateCreateOpen}
           isClientCreateOpen={isClientCreateOpen}
