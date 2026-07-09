@@ -1,4 +1,4 @@
-import type { Appointment, ClientRecord } from "./domain";
+import type { Appointment, CertificateRecord, ClientRecord } from "./domain";
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
 
@@ -6,6 +6,10 @@ export type AdminPersistInput =
   | {
       record: Appointment;
       type: "appointment";
+    }
+  | {
+      record: CertificateRecord;
+      type: "certificate";
     }
   | {
       record: ClientRecord;
@@ -25,7 +29,7 @@ export type AdminPersistResult =
 
 type AdminPersistDependencies = {
   createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
-  createRepository?: (client: AdminSupabaseClient) => Pick<AdminRepository, "saveAppointment" | "saveClient">;
+  createRepository?: (client: AdminSupabaseClient) => Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient">;
   env?: AdminSupabaseEnvSource;
 };
 
@@ -80,6 +84,25 @@ function isAppointmentRecordShape(record: Record<string, unknown>) {
   );
 }
 
+function isCertificateRecordShape(record: Record<string, unknown>) {
+  const clientId = record.clientId;
+
+  return (
+    hasString(record, "amount") &&
+    hasString(record, "buyer") &&
+    (clientId === undefined || typeof clientId === "string") &&
+    hasString(record, "clientName") &&
+    hasString(record, "code") &&
+    hasString(record, "expiresAt") &&
+    hasStringArray(record, "history") &&
+    hasString(record, "note") &&
+    hasString(record, "paymentDate") &&
+    hasString(record, "recipient") &&
+    hasString(record, "status") &&
+    hasString(record, "stripeId")
+  );
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to persist admin record.";
 }
@@ -91,6 +114,10 @@ export function isAdminPersistInput(input: unknown): input is AdminPersistInput 
 
   if (input.type === "appointment") {
     return isAppointmentRecordShape(input.record);
+  }
+
+  if (input.type === "certificate") {
+    return isCertificateRecordShape(input.record);
   }
 
   if (input.type === "client") {
@@ -123,6 +150,8 @@ export async function persistAdminRecord(
 
     if (input.type === "client") {
       await repository.saveClient(input.record);
+    } else if (input.type === "certificate") {
+      await repository.saveCertificate(input.record);
     } else {
       await repository.saveAppointment(input.record);
     }

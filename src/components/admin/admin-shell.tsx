@@ -7712,9 +7712,12 @@ export function AdminShell({
 
       return current.map((currentCertificate, index) => (index === existingIndex ? certificate : currentCertificate));
     });
+    void persistAdminRecord({ record: certificate, type: "certificate" });
   }
 
   function updateCertificateStatus(certificateCode: string, status: CertificateStatus, historyEntry: string) {
+    const updatedCertificate = certificates.find((certificate) => normalizeSearch(certificate.code) === normalizeSearch(certificateCode));
+
     setCertificates((current) =>
       current.map((certificate) =>
         normalizeSearch(certificate.code) === normalizeSearch(certificateCode)
@@ -7726,6 +7729,17 @@ export function AdminShell({
           : certificate,
       ),
     );
+
+    if (updatedCertificate) {
+      void persistAdminRecord({
+        record: {
+          ...updatedCertificate,
+          history: [historyEntry, ...updatedCertificate.history],
+          status,
+        },
+        type: "certificate",
+      });
+    }
   }
 
   function saveServiceRecord(service: ServiceRecord, originalSlug?: string) {

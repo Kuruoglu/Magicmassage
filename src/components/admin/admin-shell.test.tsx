@@ -484,6 +484,93 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Ручная выдача после оплаты в салоне.")).toBeInTheDocument();
   });
 
+  it("posts saved certificates when the admin shell is backed by Supabase", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="certificates"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [
+              {
+                amount: "120 €",
+                buyer: "Existing Buyer",
+                clientId: "client-existing",
+                clientName: "Existing Client",
+                code: "MMN-2407-1000",
+                expiresAt: "2027-01-07",
+                history: ["2026-07-07: Loaded from Supabase."],
+                note: "Existing certificate.",
+                paymentDate: "2026-07-07",
+                recipient: "Existing Client",
+                status: "Оплачено",
+                stripeId: "manual-existing",
+              },
+            ],
+            clients: [
+              {
+                email: "existing@example.com",
+                history: [],
+                id: "client-existing",
+                language: "en",
+                name: "Existing Client",
+                next: "Not scheduled",
+                note: "",
+                phone: "+359 88 000 0000",
+                preferredContact: "Email",
+                status: "Новый клиент",
+                tags: ["EN"],
+                telegram: "",
+                totalSpend: "0 €",
+                visits: 0,
+              },
+            ],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Выдать вручную" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новый сертификат" });
+    fireEvent.change(within(dialog).getByLabelText("Код"), { target: { value: "MMN-2407-1999" } });
+    fireEvent.change(within(dialog).getByLabelText("Покупатель"), { target: { value: "Irina Persist" } });
+    fireEvent.change(within(dialog).getByLabelText("Клиент"), { target: { value: "Irina Persist" } });
+    fireEvent.change(within(dialog).getByLabelText("Получатель"), { target: { value: "Self" } });
+    fireEvent.change(within(dialog).getByLabelText("Сумма"), { target: { value: "90 €" } });
+    fireEvent.change(within(dialog).getByLabelText("Stripe ID"), { target: { value: "manual" } });
+    fireEvent.change(within(dialog).getByLabelText("Заметка"), { target: { value: "Manual certificate persisted." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить сертификат" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        amount: "90 €",
+        buyer: "Irina Persist",
+        clientName: "Irina Persist",
+        code: "MMN-2407-1999",
+        note: "Manual certificate persisted.",
+        recipient: "Self",
+        stripeId: "manual",
+      },
+      type: "certificate",
+    });
+  });
+
   it("updates certificate delivery, redemption, and editable details", () => {
     render(<AdminShell activeSection="certificates" role="owner" />);
 

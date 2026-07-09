@@ -360,6 +360,48 @@ describe("admin Supabase repository", () => {
     expect(client.operations).toEqual([]);
   });
 
+  it("upserts certificates by code for admin fulfillment edits", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveCertificate({
+      amount: "95 €",
+      buyer: "Olena K.",
+      clientId: "client-359873334411",
+      clientName: "Olena K.",
+      code: "MMN-2407-1024",
+      expiresAt: "2027-01-07",
+      history: ["2026-07-07: PDF sent to buyer."],
+      note: "Issued from client card.",
+      paymentDate: "2026-07-07",
+      recipient: "Self",
+      status: "Отправлен",
+      stripeId: "manual",
+    });
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "code" },
+      table: "admin_certificates",
+      values: {
+        amount_cents: 9500,
+        buyer_name: "Olena K.",
+        client_id: "client-359873334411",
+        client_name_snapshot: "Olena K.",
+        code: "MMN-2407-1024",
+        currency: "EUR",
+        expires_on: "2027-01-07",
+        history: ["2026-07-07: PDF sent to buyer."],
+        internal_note: "Issued from client card.",
+        paid_on: "2026-07-07",
+        recipient_name: "Self",
+        status: "sent",
+        stripe_payment_intent_id: "manual",
+      },
+    });
+  });
+
   it("throws table-scoped errors when Supabase rejects a query", async () => {
     const client = new FakeSupabaseClient({}, { admin_clients: { message: "permission denied" } });
     const repository = createAdminSupabaseRepository(client);

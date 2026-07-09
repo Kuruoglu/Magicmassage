@@ -1,5 +1,5 @@
 import type { FinanceRow, FinanceSummary } from "./config";
-import { normalizeClientPhone } from "./domain";
+import { normalizeClientPhone, parseEuroAmountToCents } from "./domain";
 import type {
   AdminAppointmentDatabaseRow,
   AdminCertificateDatabaseRow,
@@ -74,6 +74,7 @@ export type AdminRepository = {
   loadDomainRecords(): Promise<AdminDomainRecords>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
   saveAppointment(appointment: Appointment): Promise<void>;
+  saveCertificate(certificate: CertificateRecord): Promise<void>;
   saveClient(client: ClientRecord): Promise<void>;
 };
 
@@ -161,6 +162,13 @@ const certificateStatusByDatabase: Record<string, CertificateStatus> = {
   Погашен: "Погашен",
 };
 
+const databaseCertificateStatusByStatus = new Map<CertificateStatus, string>([
+  [certificateStatusByDatabase.paid, "paid"],
+  [certificateStatusByDatabase.pending_pdf, "pending_pdf"],
+  [certificateStatusByDatabase.redeemed, "redeemed"],
+  [certificateStatusByDatabase.sent, "sent"],
+]);
+
 function toCents(value: number) {
   return Math.round(value * 100);
 }
@@ -199,6 +207,10 @@ function mapAppointmentStatusToDatabase(status: AppointmentStatus) {
 
 function mapCertificateStatus(status: string): CertificateStatus {
   return certificateStatusByDatabase[status] ?? "Оплачено";
+}
+
+function mapCertificateStatusToDatabase(status: CertificateStatus) {
+  return databaseCertificateStatusByStatus.get(status) ?? "paid";
 }
 
 function mapStripeStatus(row: Pick<AdminStripeSaleDatabaseRow, "gross_cents" | "refund_cents">): FinanceRow["status"] {
@@ -295,6 +307,24 @@ function mapCertificateRow(row: AdminCertificateDatabaseRow): CertificateRecord 
     recipient: row.recipient_name,
     status: mapCertificateStatus(row.status),
     stripeId: row.stripe_payment_intent_id,
+  };
+}
+
+function mapCertificateRecordToRow(certificate: CertificateRecord): AdminCertificateDatabaseRow {
+  return {
+    amount_cents: parseEuroAmountToCents(certificate.amount),
+    buyer_name: certificate.buyer,
+    client_id: certificate.clientId ?? null,
+    client_name_snapshot: certificate.clientName,
+    code: certificate.code,
+    currency: "EUR",
+    expires_on: certificate.expiresAt,
+    history: [...certificate.history],
+    internal_note: certificate.note,
+    paid_on: certificate.paymentDate,
+    recipient_name: certificate.recipient,
+    status: mapCertificateStatusToDatabase(certificate.status),
+    stripe_payment_intent_id: certificate.stripeId,
   };
 }
 
@@ -431,6 +461,10 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     await upsertRow(client, "admin_appointments", mapAppointmentRecordToRow(appointment), { onConflict: "id" });
   }
 
+  async function saveCertificate(certificate: CertificateRecord) {
+    await upsertRow(client, "admin_certificates", mapCertificateRecordToRow(certificate), { onConflict: "code" });
+  }
+
   return {
     listAppointments,
     listCertificates,
@@ -439,6 +473,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     loadDomainRecords,
     logFinanceExport,
     saveAppointment,
+    saveCertificate,
     saveClient,
   };
 }

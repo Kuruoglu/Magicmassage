@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Appointment, ClientRecord } from "./domain";
+import type { Appointment, CertificateRecord, ClientRecord } from "./domain";
 import { isAdminPersistInput, persistAdminRecord } from "./persistence";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
 
@@ -32,12 +32,30 @@ const appointmentRecord: Appointment = {
   time: "15:00",
 };
 
-function buildRepository(overrides: Partial<Pick<AdminRepository, "saveAppointment" | "saveClient">> = {}) {
+const certificateRecord: CertificateRecord = {
+  amount: "95 €",
+  buyer: "Irina Test",
+  clientId: "client-359887771122",
+  clientName: "Irina Test",
+  code: "MMN-2407-1024",
+  expiresAt: "2027-01-07",
+  history: ["2026-07-07: Created from admin certificates."],
+  note: "Created from admin certificates.",
+  paymentDate: "2026-07-07",
+  recipient: "Self",
+  status: "Оплачено",
+  stripeId: "manual",
+};
+
+function buildRepository(
+  overrides: Partial<Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient">> = {},
+) {
   return {
     saveAppointment: async () => undefined,
+    saveCertificate: async () => undefined,
     saveClient: async () => undefined,
     ...overrides,
-  } satisfies Pick<AdminRepository, "saveAppointment" | "saveClient">;
+  } satisfies Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient">;
 }
 
 describe("admin persistence", () => {
@@ -96,6 +114,26 @@ describe("admin persistence", () => {
     expect(savedAppointments).toEqual([appointmentRecord]);
   });
 
+  it("persists certificate records through the repository", async () => {
+    const savedCertificates: CertificateRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: certificateRecord, type: "certificate" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveCertificate: async (certificate) => {
+              savedCertificates.push(certificate);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedCertificates).toEqual([certificateRecord]);
+  });
+
   it("returns a Supabase write error without throwing through the API boundary", async () => {
     const result = await persistAdminRecord(
       { record: appointmentRecord, type: "appointment" },
@@ -120,6 +158,7 @@ describe("admin persistence", () => {
   it("validates API persistence payloads by type and record shape", () => {
     expect(isAdminPersistInput({ record: clientRecord, type: "client" })).toBe(true);
     expect(isAdminPersistInput({ record: appointmentRecord, type: "appointment" })).toBe(true);
+    expect(isAdminPersistInput({ record: certificateRecord, type: "certificate" })).toBe(true);
     expect(isAdminPersistInput({ record: null, type: "client" })).toBe(false);
     expect(isAdminPersistInput({ record: clientRecord, type: "certificate" })).toBe(false);
   });

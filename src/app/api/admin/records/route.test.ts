@@ -26,6 +26,24 @@ const clientPayload = {
   type: "client",
 } as const;
 
+const certificatePayload = {
+  record: {
+    amount: "95 €",
+    buyer: "Irina Test",
+    clientId: "client-1",
+    clientName: "Irina Test",
+    code: "MMN-2407-1024",
+    expiresAt: "2027-01-07",
+    history: ["2026-07-07: Created from admin certificates."],
+    note: "Created from admin certificates.",
+    paymentDate: "2026-07-07",
+    recipient: "Self",
+    status: "Оплачено",
+    stripeId: "manual",
+  },
+  type: "certificate",
+} as const;
+
 vi.mock("@/admin/persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/admin/persistence")>();
 
@@ -59,6 +77,19 @@ describe("admin records persistence API route", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Invalid admin record payload." });
+  });
+
+  it("persists valid certificate payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(certificatePayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(certificatePayload);
   });
 
   it("returns server errors for Supabase write failures", async () => {
