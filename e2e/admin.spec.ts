@@ -319,7 +319,7 @@ test("admin record drawers expose linked client workspaces", async ({ page }) =>
   const appointmentLinks = page.getByLabel("Детали выбранной записи").getByLabel("Связанные действия клиента");
   await expect(appointmentLinks.getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=Olena%20K.",
+    "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
   );
   await expect(appointmentLinks.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
     "href",
@@ -339,7 +339,7 @@ test("admin record drawers expose linked client workspaces", async ({ page }) =>
   const certificateLinks = page.getByLabel("Детали сертификата").getByLabel("Связанные действия клиента");
   await expect(certificateLinks.getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=Olena%20K.",
+    "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
   );
   await expect(certificateLinks.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
     "href",
@@ -775,7 +775,7 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await expect(createDialog).toHaveCount(0);
   await expect(page.getByRole("table").getByRole("link", { name: "Ирина Тестова" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%D0%98%D1%80%D0%B8%D0%BD%D0%B0%20%D0%A2%D0%B5%D1%81%D1%82%D0%BE%D0%B2%D0%B0",
+    "/admin?section=clients&role=owner&client=%2B359%2088%20777%201122",
   );
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
@@ -797,7 +797,26 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await expect(notesSection.getByText("email", { exact: true })).toBeVisible();
 });
 
-test("client form warns before creating a duplicate client", async ({ page }) => {
+test("client form blocks a duplicate phone before creating a client", async ({ page }) => {
+  await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
+
+  await page.getByRole("button", { name: "Добавить клиента" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новый клиент" });
+  await createDialog.getByRole("textbox", { name: "Имя" }).fill("Новая Olena");
+  await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359873334411");
+  await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
+
+  await expect(createDialog.getByRole("alert")).toContainText("Клиент с таким телефоном уже есть: Olena K.");
+  await expect(createDialog.getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
+    "href",
+    "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
+  );
+  await expect(page.getByRole("dialog", { name: "Карточка клиента" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Новая Olena" })).toHaveCount(0);
+});
+
+test("client form allows the same name when the phone is different", async ({ page }) => {
   await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
 
   await page.getByRole("button", { name: "Добавить клиента" }).click();
@@ -805,22 +824,21 @@ test("client form warns before creating a duplicate client", async ({ page }) =>
   const createDialog = page.getByRole("dialog", { name: "Новый клиент" });
   await createDialog.getByRole("textbox", { name: "Имя" }).fill("Olena K.");
   await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359 88 777 1122");
+
+  await expect(createDialog.getByRole("status")).toContainText("Имя уже есть в базе: Olena K.");
+  await expect(createDialog.getByRole("status")).toContainText("Если телефон другой, можно сохранить нового клиента.");
+
   await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
 
-  await expect(createDialog.getByRole("alert")).toContainText("Клиент с таким именем или телефоном уже есть: Olena K.");
-  await expect(createDialog.getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
-    "href",
-    "/admin?section=clients&role=owner&client=Olena%20K.",
-  );
-  await expect(page.getByRole("dialog", { name: "Карточка клиента" })).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("link", { name: "Olena K." })).toHaveCount(1);
+  await expect(createDialog).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Olena K." })).toHaveCount(2);
 
-  await createDialog.getByRole("textbox", { name: "Имя" }).fill("Новая Olena");
-  await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359873334411");
-  await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
-
-  await expect(createDialog.getByRole("alert")).toContainText("Клиент с таким именем или телефоном уже есть: Olena K.");
-  await expect(page.getByRole("table").getByRole("link", { name: "Новая Olena" })).toHaveCount(0);
+  const card = page.getByRole("dialog", { name: "Карточка клиента" });
+  await expect(card.getByRole("heading", { name: "Olena K." })).toBeVisible();
+  await expect(card.getByText("+359 88 777 1122")).toBeVisible();
+  await expect(card.getByRole("heading", { name: "Записать клиента" })).toBeVisible();
+  await expect(card.getByText("MMN-2407-1023")).toHaveCount(0);
+  await expect(card.getByText("Deep tissue massage")).toHaveCount(0);
 });
 
 test("certificate workspace can issue, send, redeem and edit a certificate", async ({ page }) => {
@@ -1275,10 +1293,10 @@ test("client filters update the table and profile certificate block", async ({ p
   await expect(table.getByRole("row", { name: /Olena K./ })).toHaveCount(0);
   await expect(table.getByRole("link", { name: "Maria Georgieva" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=Maria%20Georgieva",
+    "/admin?section=clients&role=owner&client=%2B359%2089%20555%200099",
   );
   await table.getByRole("link", { name: "Maria Georgieva" }).click();
-  await expect(page).toHaveURL(/client=Maria%20Georgieva/);
+  await expect(page).toHaveURL(/client=%2B359%2089%20555%200099/);
   await expect(card.getByRole("heading", { name: "Maria Georgieva" })).toBeVisible();
 
   await card.getByRole("button", { name: "Закрыть" }).click();
@@ -1286,7 +1304,7 @@ test("client filters update the table and profile certificate block", async ({ p
 
   await page.getByRole("button", { name: "Все" }).click();
   await table.getByRole("link", { name: "Olena K." }).click();
-  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page).toHaveURL(/client=%2B359%2087%20333%204411/);
 
   const certificatesSection = card.getByRole("heading", { name: "Сертификаты" }).locator("..");
   await expect(certificatesSection).toBeVisible();
@@ -1305,7 +1323,7 @@ test("client filters update the table and profile certificate block", async ({ p
   await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toHaveCount(0);
 
   await table.getByRole("link", { name: "Olena K." }).click();
-  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page).toHaveURL(/client=%2B359%2087%20333%204411/);
   await expect(card).toHaveClass(/admin-drawer-panel/);
   await expect(card.getByLabel("Активность клиента")).toContainText("В активных: 5 визитов");
   await expect(card.getByLabel("Активность клиента")).toContainText("Следующий визит: 15 Jul 11:30");
@@ -1324,7 +1342,7 @@ test("mobile client active filter shows status cards without horizontal scrollin
   const annaCard = mobileList.getByRole("listitem").filter({ hasText: "Анна Петрова" });
   await expect(annaCard.getByRole("link", { name: /Анна Петрова/ })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%D0%90%D0%BD%D0%BD%D0%B0%20%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2%D0%B0",
+    "/admin?section=clients&role=owner&client=%2B359%2088%20111%202233",
   );
   await expect(annaCard.getByText("Активный клиент")).toBeVisible();
   await expect(annaCard.locator(".admin-mobile-client-meta").getByText("7 визитов", { exact: true })).toBeVisible();

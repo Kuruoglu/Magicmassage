@@ -108,7 +108,7 @@ describe("AdminShell", () => {
 
     expect(within(screen.getByRole("table")).getByRole("link", { name: "Olena K." })).toHaveAttribute(
       "href",
-      "/admin?section=clients&role=owner&client=Olena%20K.",
+      "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
     );
     expect(screen.queryByText("Maria Georgieva")).not.toBeInTheDocument();
   });
@@ -125,7 +125,7 @@ describe("AdminShell", () => {
     expect(within(filters).getByRole("button", { name: "BG" })).toHaveAttribute("aria-pressed", "true");
     expect(within(table).getByRole("link", { name: "Maria Georgieva" })).toHaveAttribute(
       "href",
-      "/admin?section=clients&role=owner&client=Maria%20Georgieva",
+      "/admin?section=clients&role=owner&client=%2B359%2089%20555%200099",
     );
     expect(within(table).queryByRole("link", { name: "Анна Петрова" })).not.toBeInTheDocument();
     expect(within(table).queryByRole("link", { name: "Olena K." })).not.toBeInTheDocument();
@@ -165,7 +165,7 @@ describe("AdminShell", () => {
     expect(within(mobileList).getByText("7 визитов")).toBeInTheDocument();
     expect(within(mobileList).getByRole("link", { name: /Olena K./ })).toHaveAttribute(
       "href",
-      "/admin?section=clients&role=owner&client=Olena%20K.",
+      "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
     );
   });
 
@@ -220,7 +220,7 @@ describe("AdminShell", () => {
     const linkedActions = within(details).getByLabelText("Связанные действия клиента");
     expect(within(linkedActions).getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
       "href",
-      "/admin?section=clients&role=owner&client=Olena%20K.",
+      "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
     );
     expect(within(linkedActions).getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
       "href",
@@ -903,7 +903,7 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("dialog", { name: "Новый клиент" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("table")).getByRole("link", { name: "Ирина Тестова" })).toHaveAttribute(
       "href",
-      "/admin?section=clients&role=owner&client=%D0%98%D1%80%D0%B8%D0%BD%D0%B0%20%D0%A2%D0%B5%D1%81%D1%82%D0%BE%D0%B2%D0%B0",
+      "/admin?section=clients&role=owner&client=%2B359%2088%20777%201122",
     );
 
     const card = screen.getByRole("dialog", { name: "Карточка клиента" });
@@ -938,7 +938,26 @@ describe("AdminShell", () => {
     expect(within(screen.getByRole("table")).queryByRole("button", { name: "" })).not.toBeInTheDocument();
   });
 
-  it("keeps the create client form open when the name or phone matches an existing client", () => {
+  it("keeps the create client form open when the phone matches an existing client", () => {
+    render(<AdminShell activeSection="clients" role="owner" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новый клиент" });
+    fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Новая Olena" } });
+    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359873334411" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Клиент с таким телефоном уже есть: Olena K.");
+    expect(within(dialog).getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
+    );
+    expect(screen.queryByRole("dialog", { name: "Карточка клиента" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).queryByRole("link", { name: "Новая Olena" })).not.toBeInTheDocument();
+  });
+
+  it("allows a new client with the same name when the phone is different", () => {
     render(<AdminShell activeSection="clients" role="owner" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
@@ -946,22 +965,21 @@ describe("AdminShell", () => {
     const dialog = screen.getByRole("dialog", { name: "Новый клиент" });
     fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Olena K." } });
     fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359 88 777 1122" } });
+
+    expect(within(dialog).getByRole("status")).toHaveTextContent("Имя уже есть в базе: Olena K.");
+    expect(within(dialog).getByRole("status")).toHaveTextContent("Если телефон другой, можно сохранить нового клиента.");
+
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
 
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("Клиент с таким именем или телефоном уже есть: Olena K.");
-    expect(within(dialog).getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
-      "href",
-      "/admin?section=clients&role=owner&client=Olena%20K.",
-    );
-    expect(screen.queryByRole("dialog", { name: "Карточка клиента" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Olena K." })).toHaveLength(1);
+    expect(screen.queryByRole("dialog", { name: "Новый клиент" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Olena K." })).toHaveLength(2);
 
-    fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Новая Olena" } });
-    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359873334411" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
-
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("Клиент с таким именем или телефоном уже есть: Olena K.");
-    expect(within(screen.getByRole("table")).queryByRole("link", { name: "Новая Olena" })).not.toBeInTheDocument();
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    expect(within(card).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
+    expect(within(card).getByText("+359 88 777 1122")).toBeInTheDocument();
+    expect(within(card).getByRole("heading", { name: "Записать клиента" })).toBeInTheDocument();
+    expect(within(card).queryByText("MMN-2407-1023")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Deep tissue massage")).not.toBeInTheDocument();
   });
 
   it("edits an existing client from the right drawer without creating a duplicate", () => {
@@ -982,11 +1000,12 @@ describe("AdminShell", () => {
 
     expect(screen.queryByRole("dialog", { name: "Редактировать клиента" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Olena K." })).toHaveLength(1);
-    expect(within(card).getByText("+359 87 333 4499")).toBeInTheDocument();
-    expect(within(card).getByText("olena.updated@example.com")).toBeInTheDocument();
-    expect(within(card).getAllByText("Email").length).toBeGreaterThan(0);
-    expect(within(card).getAllByText(/Обновленная заметка/).length).toBeGreaterThan(0);
-    expect(within(card).getByText("email")).toBeInTheDocument();
+    const updatedCard = screen.getByRole("dialog", { name: "Карточка клиента" });
+    expect(within(updatedCard).getByText("+359 87 333 4499")).toBeInTheDocument();
+    expect(within(updatedCard).getByText("olena.updated@example.com")).toBeInTheDocument();
+    expect(within(updatedCard).getAllByText("Email").length).toBeGreaterThan(0);
+    expect(within(updatedCard).getAllByText(/Обновленная заметка/).length).toBeGreaterThan(0);
+    expect(within(updatedCard).getByText("email")).toBeInTheDocument();
   });
 
   it("opens selected appointment details in a right drawer", async () => {
@@ -1039,11 +1058,11 @@ describe("AdminShell", () => {
 
     expect(
       within(screen.getByLabelText("Детали выбранной записи")).getByRole("link", { name: "Открыть клиента" }),
-    ).toHaveAttribute("href", "/admin?section=clients&role=owner&client=Olena%20K.");
+    ).toHaveAttribute("href", "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411");
     const linkedActions = within(screen.getByLabelText("Детали выбранной записи")).getByLabelText("Связанные действия клиента");
     expect(within(linkedActions).getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
       "href",
-      "/admin?section=clients&role=owner&client=Olena%20K.",
+      "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
     );
     expect(within(linkedActions).getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
       "href",

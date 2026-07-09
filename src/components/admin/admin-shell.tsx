@@ -1174,25 +1174,56 @@ function findClientByName(clients: ClientRecord[], name: string | undefined) {
   return clients.find((client) => normalizeSearch(client.name) === normalizedName);
 }
 
-function findClientDuplicate(clients: ClientRecord[], candidate: Pick<ClientRecord, "name" | "phone">, originalClientName?: string) {
-  const originalName = originalClientName ? normalizeSearch(originalClientName) : "";
-  const candidateName = normalizeSearch(candidate.name);
-  const candidatePhone = normalizeClientPhone(candidate.phone);
+function matchesClientIdentity(client: ClientRecord, identity: string | undefined) {
+  const normalizedIdentity = identity ? normalizeSearch(identity) : "";
+  const normalizedPhoneIdentity = identity ? normalizeClientPhone(identity) : "";
 
-  if (!candidateName && !candidatePhone) {
+  return (
+    (Boolean(normalizedIdentity) && normalizeSearch(client.name) === normalizedIdentity) ||
+    (Boolean(normalizedPhoneIdentity) && normalizeClientPhone(client.phone) === normalizedPhoneIdentity)
+  );
+}
+
+function findClientByIdentity(clients: ClientRecord[], identity: string | undefined) {
+  return clients.find((client) => matchesClientIdentity(client, identity));
+}
+
+function findClientPhoneDuplicate(clients: ClientRecord[], phone: string, originalClientIdentity?: string) {
+  const candidatePhone = normalizeClientPhone(phone);
+
+  if (!candidatePhone) {
     return undefined;
   }
 
   return clients.find((client) => {
-    if (originalName && normalizeSearch(client.name) === originalName) {
+    if (matchesClientIdentity(client, originalClientIdentity)) {
       return false;
     }
 
-    const nameMatches = normalizeSearch(client.name) === candidateName;
-    const phoneMatches = Boolean(candidatePhone) && normalizeClientPhone(client.phone) === candidatePhone;
-
-    return nameMatches || phoneMatches;
+    return normalizeClientPhone(client.phone) === candidatePhone;
   });
+}
+
+function findClientNameMatch(clients: ClientRecord[], name: string, originalClientIdentity?: string) {
+  const candidateName = normalizeSearch(name);
+
+  if (!candidateName) {
+    return undefined;
+  }
+
+  return clients.find((client) => {
+    if (matchesClientIdentity(client, originalClientIdentity)) {
+      return false;
+    }
+
+    return normalizeSearch(client.name) === candidateName;
+  });
+}
+
+function isClientNameAmbiguous(clients: ClientRecord[], clientName: string) {
+  const normalizedClientName = normalizeSearch(clientName);
+
+  return clients.filter((client) => normalizeSearch(client.name) === normalizedClientName).length > 1;
 }
 
 function findClientCertificates(certificates: CertificateRecord[], clientName: string): CertificateRecord[] {
@@ -1287,8 +1318,8 @@ function visitCountLabel(visits: number) {
   return `${visits} визитов`;
 }
 
-function clientProfileHref(clientName: string, role: AdminRoleId) {
-  return `/admin?section=clients&role=${role}&client=${encodeURIComponent(clientName)}`;
+function clientProfileHref(clientIdentity: string, role: AdminRoleId) {
+  return `/admin?section=clients&role=${role}&client=${encodeURIComponent(clientIdentity)}`;
 }
 
 function adminSectionHref(section: AdminSectionId, role: AdminRoleId) {
@@ -1696,6 +1727,8 @@ function ClientFormDialog({
   const isEditing = Boolean(initialClient);
   const hasNameError = Boolean(error && !form.name.trim());
   const hasPhoneError = Boolean(error && !form.phone.trim());
+  const originalClientIdentity = initialClient?.phone ?? initialClient?.name;
+  const matchingNameClient = findClientNameMatch(clients, form.name, originalClientIdentity);
 
   function describedBy(...ids: Array<string | false>) {
     const value = ids.filter(Boolean).join(" ");
@@ -1725,12 +1758,12 @@ function ClientFormDialog({
       return;
     }
 
-    const matchingClient = findClientDuplicate(clients, { name, phone }, initialClient?.name);
+    const matchingClient = findClientPhoneDuplicate(clients, phone, originalClientIdentity);
 
     if (matchingClient) {
       setDuplicateClient(matchingClient);
-      setError(`Клиент с таким именем или телефоном уже есть: ${matchingClient.name}.`);
-      nameInputRef.current?.focus();
+      setError(`Клиент с таким телефоном уже есть: ${matchingClient.name}.`);
+      phoneInputRef.current?.focus();
       return;
     }
 
@@ -1752,7 +1785,7 @@ function ClientFormDialog({
         totalSpend: form.totalSpend.trim() || "0 €",
         visits: Number.isFinite(visits) ? Math.max(visits, 0) : 0,
       },
-      initialClient?.name,
+      originalClientIdentity,
     );
   }
 
@@ -1777,11 +1810,16 @@ function ClientFormDialog({
                 {duplicateClient ? (
                   <>
                     {" "}
-                    <Link href={clientProfileHref(duplicateClient.name, role)} onClick={onClose}>
+                    <Link href={clientProfileHref(duplicateClient.phone, role)} onClick={onClose}>
                       Открыть карточку существующего клиента
                     </Link>
                   </>
                 ) : null}
+              </p>
+            ) : null}
+            {matchingNameClient && !duplicateClient ? (
+              <p className="admin-form-warning admin-form-alert-wide" role="status">
+                Имя уже есть в базе: {matchingNameClient.name}. Если телефон другой, можно сохранить нового клиента.
               </p>
             ) : null}
 
@@ -4141,8 +4179,8 @@ function ClientsWorkspace({
   role: AdminRoleId;
   selectedClientName?: string;
 }) {
-  const initialSelectedClientName = findClientByName(clients, selectedClientName)?.name ?? clients[0]?.name ?? "";
-  const [selectedName, setSelectedName] = useState(initialSelectedClientName);
+  const initialSelectedClientKey = findClientByIdentity(clients, selectedClientName)?.phone ?? clients[0]?.phone ?? "";
+  const [selectedClientKey, setSelectedClientKey] = useState(initialSelectedClientKey);
   const [isClientDrawerOpen, setIsClientDrawerOpen] = useState(Boolean(selectedClientName));
   const [editingClient, setEditingClient] = useState<ClientRecord | undefined>();
   const [certificateDraft, setCertificateDraft] = useState<CertificateRecord | undefined>();
@@ -4165,11 +4203,14 @@ function ClientsWorkspace({
         query,
       ),
   );
-  const selectedClient = findClientByName(clients, selectedName) ?? filteredClients[0] ?? clients[0];
+  const selectedClient = findClientByIdentity(clients, selectedClientKey) ?? filteredClients[0] ?? clients[0];
+  const hasAmbiguousSelectedClientName = isClientNameAmbiguous(clients, selectedClient.name);
+  const selectedClientAppointments = hasAmbiguousSelectedClientName ? [] : appointments;
+  const selectedClientCertificates = hasAmbiguousSelectedClientName ? [] : findClientCertificates(certificates, selectedClient.name);
   const isClientFormOpen = isClientCreateOpen || Boolean(editingClient);
 
-  function openClient(clientName: string) {
-    setSelectedName(clientName);
+  function openClient(clientKey: string) {
+    setSelectedClientKey(clientKey);
     setIsClientDrawerOpen(true);
   }
 
@@ -4201,7 +4242,7 @@ function ClientsWorkspace({
 
   function saveClientForm(client: ClientRecord, originalClientName?: string) {
     onSaveClient(client, originalClientName);
-    setSelectedName(client.name);
+    setSelectedClientKey(client.phone);
     setIsClientDrawerOpen(true);
     closeClientForm();
   }
@@ -4250,12 +4291,12 @@ function ClientsWorkspace({
                 const activity = clientActivitySummary(client);
 
                 return (
-                  <tr aria-selected={client.name === selectedClient.name} key={client.phone}>
+                  <tr aria-selected={client.phone === selectedClient.phone} key={client.phone}>
                     <td>
                       <Link
                         className="admin-row-action admin-row-link"
-                        href={clientProfileHref(client.name, role)}
-                        onClick={() => openClient(client.name)}
+                        href={clientProfileHref(client.phone, role)}
+                        onClick={() => openClient(client.phone)}
                       >
                         {client.name}
                       </Link>
@@ -4284,10 +4325,10 @@ function ClientsWorkspace({
             return (
               <li key={client.phone}>
                 <Link
-                  aria-current={client.name === selectedClient.name ? "page" : undefined}
+                  aria-current={client.phone === selectedClient.phone ? "page" : undefined}
                   className="admin-mobile-client-card"
-                  href={clientProfileHref(client.name, role)}
-                  onClick={() => openClient(client.name)}
+                  href={clientProfileHref(client.phone, role)}
+                  onClick={() => openClient(client.phone)}
                 >
                   <span className="admin-mobile-client-head">
                     <strong>{client.name}</strong>
@@ -4313,9 +4354,9 @@ function ClientsWorkspace({
       {isClientDrawerOpen ? (
         <div className="admin-drawer-backdrop">
           <ClientDetailCard
-            appointments={appointments}
-            certificates={findClientCertificates(certificates, selectedClient.name)}
-            key={selectedClient.name}
+            appointments={selectedClientAppointments}
+            certificates={selectedClientCertificates}
+            key={selectedClient.phone}
             client={selectedClient}
             onCalendarCreateIntent={onCalendarCreateIntent}
             onClose={() => setIsClientDrawerOpen(false)}
@@ -4381,7 +4422,7 @@ function AppointmentDetailDrawer({
         <h2>{appointment.client}</h2>
         <div className="admin-detail-actions">
           {appointmentClient ? (
-            <Link className="admin-outline-action" href={clientProfileHref(appointment.client, role)}>
+            <Link className="admin-outline-action" href={clientProfileHref(appointmentClient.phone, role)}>
               Открыть клиента
             </Link>
           ) : null}
@@ -4427,7 +4468,7 @@ function AppointmentDetailDrawer({
           </div>
           <p>Быстрые переходы к клиентской работе по этой записи.</p>
           <div className="admin-client-next-actions">
-            <Link className="admin-client-inline-link" href={clientProfileHref(appointment.client, role)}>
+            <Link className="admin-client-inline-link" href={clientProfileHref(appointmentClient.phone, role)}>
               Карточка клиента
             </Link>
             <Link className="admin-client-inline-link" href={calendarClientHref(appointment.client, role)}>
@@ -4687,7 +4728,7 @@ function CertificatesWorkspace({
           <h2>{selectedCertificate.code}</h2>
           <div className="admin-detail-actions">
             {linkedClient ? (
-              <Link className="admin-outline-action" href={clientProfileHref(linkedClient.name, role)}>
+              <Link className="admin-outline-action" href={clientProfileHref(linkedClient.phone, role)}>
                 Открыть клиента
               </Link>
             ) : null}
@@ -4766,7 +4807,7 @@ function CertificatesWorkspace({
             </div>
             <p>Быстрые переходы к клиентской работе по этому сертификату.</p>
             <div className="admin-client-next-actions">
-              <Link className="admin-client-inline-link" href={clientProfileHref(linkedClient.name, role)}>
+              <Link className="admin-client-inline-link" href={clientProfileHref(linkedClient.phone, role)}>
                 Карточка клиента
               </Link>
               <Link className="admin-client-inline-link" href={calendarClientHref(linkedClient.name, role)}>
@@ -7624,15 +7665,13 @@ export function AdminShell({
 
   function saveClientRecord(client: ClientRecord, originalClientName?: string) {
     setClients((current) => {
-      const originalKey = originalClientName ? normalizeSearch(originalClientName) : "";
-      const nextKey = normalizeSearch(client.name);
       const nextPhone = normalizeClientPhone(client.phone);
       const existingIndex = current.findIndex((currentClient) => {
-        if (originalKey) {
-          return normalizeSearch(currentClient.name) === originalKey;
+        if (originalClientName) {
+          return matchesClientIdentity(currentClient, originalClientName);
         }
 
-        return normalizeSearch(currentClient.name) === nextKey || (Boolean(nextPhone) && normalizeClientPhone(currentClient.phone) === nextPhone);
+        return Boolean(nextPhone) && normalizeClientPhone(currentClient.phone) === nextPhone;
       });
 
       if (existingIndex === -1) {

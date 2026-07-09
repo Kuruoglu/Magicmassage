@@ -4553,6 +4553,13 @@ button.admin-calendar-item[aria-pressed="true"] {
   margin: -4px 0 0;
 }
 
+.admin-form-warning {
+  color: #7a4b00;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin: -4px 0 0;
+}
+
 .admin-field-error {
   color: #9F1D2A;
   font-size: 0.76rem;
