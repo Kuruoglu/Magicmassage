@@ -38,6 +38,7 @@ type AdminShellProps = {
   selectedPriceId?: string;
   selectedServiceSlug?: string;
   selectedSettingsGroupId?: string;
+  selectedAdminUserId?: string;
 };
 
 type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
@@ -1313,6 +1314,10 @@ function blogDetailHref(blogPostId: string, role: AdminRoleId) {
 
 function settingsDetailHref(settingsGroupId: SettingsGroupId, role: AdminRoleId) {
   return `/admin?section=settings&role=${role}&settings=${encodeURIComponent(settingsGroupId)}`;
+}
+
+function userDetailHref(userId: string, role: AdminRoleId) {
+  return `/admin?section=users&role=${role}&user=${encodeURIComponent(userId)}`;
 }
 
 function calendarCreateHref(clientName: string, role: AdminRoleId) {
@@ -6633,15 +6638,22 @@ function UsersWorkspace({
   onCloseUserCreate,
   onSaveAdminUser,
   query,
+  role,
+  selectedAdminUserId,
 }: {
   adminUsers: AdminUserRecord[];
   isUserCreateOpen: boolean;
   onCloseUserCreate: () => void;
   onSaveAdminUser: (user: AdminUserRecord, originalId?: string) => void;
   query: string;
+  role: AdminRoleId;
+  selectedAdminUserId?: string;
 }) {
-  const [selectedUserId, setSelectedUserId] = useState(adminUsers[0]?.id ?? "");
-  const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(false);
+  const initialSelectedAdminUser = selectedAdminUserId
+    ? adminUsers.find((adminUser) => adminUser.id === selectedAdminUserId)
+    : undefined;
+  const [selectedUserId, setSelectedUserId] = useState(initialSelectedAdminUser?.id ?? adminUsers[0]?.id ?? "");
+  const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(Boolean(initialSelectedAdminUser));
   const [editingUser, setEditingUser] = useState<AdminUserRecord | undefined>();
   const [userFilter, setUserFilter] = useState<AdminUserFilterId>("all");
   const filteredUsers = adminUsers.filter((adminUser) => {
@@ -6755,9 +6767,13 @@ function UsersWorkspace({
               {filteredUsers.map((adminUser) => (
                 <tr aria-selected={isUserDrawerOpen && adminUser.id === selectedUser.id} key={adminUser.id}>
                   <td>
-                    <button className="admin-row-action" onClick={() => openUser(adminUser)} type="button">
+                    <Link
+                      className="admin-row-action admin-row-link"
+                      href={userDetailHref(adminUser.id, role)}
+                      onClick={() => openUser(adminUser)}
+                    >
                       {adminUser.name}
-                    </button>
+                    </Link>
                   </td>
                   <td>{adminUser.email}</td>
                   <td>{roleLabels[adminUser.role]}</td>
@@ -6955,6 +6971,7 @@ function Workspace({
   query,
   role,
   section,
+  selectedAdminUserId,
   selectedBlogPostId,
   selectedCalendarDate,
   selectedCertificateCode,
@@ -7015,6 +7032,7 @@ function Workspace({
   query: string;
   role: AdminRoleId;
   section: AdminSectionId;
+  selectedAdminUserId?: string;
   selectedBlogPostId?: string;
   selectedCalendarDate?: string;
   selectedCertificateCode?: string;
@@ -7153,9 +7171,12 @@ function Workspace({
       <UsersWorkspace
         adminUsers={adminUsers}
         isUserCreateOpen={isUserCreateOpen}
+        key={selectedAdminUserId ?? "default-admin-user"}
         onCloseUserCreate={onCloseUserCreate}
         onSaveAdminUser={onSaveAdminUser}
         query={query}
+        role={role}
+        selectedAdminUserId={selectedAdminUserId}
       />
     );
   }
@@ -7208,6 +7229,7 @@ export function AdminShell({
   calendarAction,
   role,
   selectedAppointmentKey,
+  selectedAdminUserId,
   selectedBlogPostId,
   selectedCalendarDate,
   selectedCertificateCode,
@@ -7877,6 +7899,7 @@ export function AdminShell({
           query={query}
           role={role}
           section={activeSection}
+          selectedAdminUserId={selectedAdminUserId}
           selectedBlogPostId={selectedBlogPostId}
           selectedCalendarDate={selectedCalendarDate}
           selectedCertificateCode={selectedCertificateCode}

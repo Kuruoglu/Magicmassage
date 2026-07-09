@@ -294,6 +294,20 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await page.goto("/admin?section=settings&settings=booking", { waitUntil: "networkidle" });
   await expect(page.getByRole("dialog", { name: "Детали настроек" }).getByRole("heading", { name: "Запись и календарь" })).toBeVisible();
+
+  await page.goto("/admin?section=users", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали пользователя" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Natali Ivanova" })).toHaveAttribute(
+    "href",
+    "/admin?section=users&role=owner&user=admin-user-owner",
+  );
+  await page.getByRole("table").getByRole("link", { name: "Natali Ivanova" }).click();
+  await expect(page).toHaveURL(/section=users/);
+  await expect(page).toHaveURL(/user=admin-user-owner/);
+  await expect(page.getByRole("dialog", { name: "Детали пользователя" }).getByRole("heading", { name: "Natali Ivanova" })).toBeVisible();
+
+  await page.goto("/admin?section=users&user=admin-user-owner", { waitUntil: "networkidle" });
+  await expect(page.getByRole("dialog", { name: "Детали пользователя" }).getByRole("heading", { name: "Natali Ivanova" })).toBeVisible();
 });
 
 test("admin record drawers expose linked client workspaces", async ({ page }) => {
@@ -1179,7 +1193,10 @@ test("users workspace invites, filters and edits accountant access", async ({ pa
   await createDialog.getByRole("button", { name: "Отправить приглашение" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("button", { name: "Елена Бухгалтер" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Елена Бухгалтер" })).toHaveAttribute(
+    "href",
+    "/admin?section=users&role=owner&user=admin-user-accountant-example-com",
+  );
 
   const details = page.getByLabel("Детали пользователя");
   await expect(details.getByRole("heading", { name: "Елена Бухгалтер" })).toBeVisible();
@@ -1190,10 +1207,11 @@ test("users workspace invites, filters and edits accountant access", async ({ pa
   await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Бухгалтеры" }).click();
   await expect(page.getByRole("button", { name: "Бухгалтеры" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("table").getByRole("button", { name: "Елена Бухгалтер" })).toBeVisible();
-  await expect(page.getByRole("table").getByRole("button", { name: "Natali Ivanova" })).toHaveCount(0);
+  await expect(page.getByRole("table").getByRole("link", { name: "Елена Бухгалтер" })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("link", { name: "Natali Ivanova" })).toHaveCount(0);
 
-  await page.getByRole("table").getByRole("button", { name: "Елена Бухгалтер" }).click();
+  await page.getByRole("table").getByRole("link", { name: "Елена Бухгалтер" }).click();
+  await expect(page).toHaveURL(/user=admin-user-accountant-example-com/);
   await details.getByRole("button", { name: "Редактировать" }).click();
   const editDialog = page.getByRole("dialog", { name: "Редактировать пользователя" });
   await editDialog.getByLabel("Статус").selectOption("Активен");
