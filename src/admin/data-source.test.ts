@@ -243,7 +243,7 @@ describe("admin data source", () => {
         return repository;
       },
       env: {
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_demo",
         NEXT_PUBLIC_SUPABASE_URL: "https://demo.supabase.co",
       },
       now: new Date("2026-07-09T12:00:00.000Z"),
@@ -272,7 +272,7 @@ describe("admin data source", () => {
           },
         }),
       env: {
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_demo",
         NEXT_PUBLIC_SUPABASE_URL: "https://demo.supabase.co",
       },
     });

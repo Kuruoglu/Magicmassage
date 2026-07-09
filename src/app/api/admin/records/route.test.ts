@@ -1,10 +1,25 @@
 // @vitest-environment node
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { persistAdminRecord } from "@/admin/persistence";
 
 import { POST } from "./route";
+
+const supabaseAdminRouteMock = vi.hoisted(() => ({
+  authorizationResult: null as unknown,
+  client: null as unknown,
+}));
+
+vi.mock("@/lib/supabase/admin", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase/admin")>();
+
+  return {
+    ...actual,
+    authorizeSupabaseAdminAccess: vi.fn(async () => supabaseAdminRouteMock.authorizationResult),
+    createSupabaseAdminClient: vi.fn(() => supabaseAdminRouteMock.client),
+  };
+});
 
 const clientPayload = {
   record: {
@@ -172,6 +187,17 @@ vi.mock("@/admin/persistence", async (importOriginal) => {
 });
 
 describe("admin records persistence API route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    supabaseAdminRouteMock.authorizationResult = {
+      mode: "supabase",
+      ok: true,
+      role: "administrator",
+      userId: "11111111-1111-4111-8111-111111111111",
+    };
+    supabaseAdminRouteMock.client = null;
+  });
+
   it("persists valid admin record payloads", async () => {
     const response = await POST(
       new Request("https://example.com/api/admin/records", {
@@ -321,5 +347,31 @@ describe("admin records persistence API route", () => {
       mode: "supabase",
       ok: false,
     });
+  });
+
+  it("requires an authorized admin when the Supabase secret client is configured", async () => {
+    supabaseAdminRouteMock.client = { from: vi.fn() };
+    supabaseAdminRouteMock.authorizationResult = {
+      message: "Admin access requires an authenticated user.",
+      mode: "supabase",
+      ok: false,
+      statusCode: 401,
+    };
+
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(clientPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      message: "Admin access requires an authenticated user.",
+      mode: "supabase",
+      ok: false,
+      statusCode: 401,
+    });
+    expect(persistAdminRecord).not.toHaveBeenCalled();
   });
 });

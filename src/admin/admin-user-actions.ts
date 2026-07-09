@@ -1,6 +1,10 @@
 import type { AdminRoleId } from "./config";
 import type { AdminUserStatus } from "./domain";
-import { createAdminSupabaseServiceClient, type AdminSupabaseServiceClient } from "./supabase-client";
+import {
+  authorizeSupabaseAdminAccess,
+  createSupabaseAdminClient,
+  type SupabaseAdminClient,
+} from "@/lib/supabase/admin";
 
 export type AdminUserActionResult = {
   message: string;
@@ -37,7 +41,7 @@ export type AdminUserActionInput = AdminUserInviteActionInput | AdminUserProfile
 
 type RunAdminUserActionDeps = {
   actorToken?: string;
-  createClient?: () => AdminSupabaseServiceClient | null;
+  createClient?: () => SupabaseAdminClient | null;
   skipAuthorization?: boolean;
 };
 
@@ -58,12 +62,6 @@ const databaseStatusByAdminStatus = new Map<AdminUserStatus, AdminProfileUpsertI
   ["Пауза", "suspended"],
   ["Заблокирован", "suspended"],
 ]);
-
-type AdminActorProfileRow = {
-  role?: string;
-  status?: string;
-  user_id?: string;
-};
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -94,7 +92,7 @@ function isAdminUserStatus(value: unknown): value is AdminUserStatus {
 }
 
 function getServiceClient(deps?: RunAdminUserActionDeps) {
-  return deps?.createClient ? deps.createClient() : createAdminSupabaseServiceClient();
+  return deps?.createClient ? deps.createClient() : createSupabaseAdminClient();
 }
 
 function normalizeUserText(value: string) {
@@ -109,65 +107,7 @@ function mapStatusToDatabase(status: AdminUserStatus | undefined): AdminProfileU
   return status ? (databaseStatusByAdminStatus.get(status) ?? "invited") : "active";
 }
 
-async function authorizeAdminUserAction(
-  client: AdminSupabaseServiceClient,
-  actorToken: string | undefined,
-): Promise<AdminUserActionResult> {
-  if (!actorToken) {
-    return {
-      message: "Admin user action requires an authenticated owner.",
-      mode: "supabase",
-      ok: false,
-      statusCode: 401,
-    };
-  }
-
-  const { data: authData, error: authError } = await client.auth.getUser(actorToken);
-  const actorUserId = authData.user?.id;
-
-  if (authError || !actorUserId) {
-    return {
-      message: `auth.users: ${authError?.message ?? "authenticated user was not found"}`,
-      mode: "supabase",
-      ok: false,
-      statusCode: 401,
-    };
-  }
-
-  const { data: profiles, error: profileError } = await client
-    .from("admin_profiles")
-    .select("role, status, user_id")
-    .eq("user_id", actorUserId);
-
-  if (profileError) {
-    return {
-      message: `admin_profiles: ${profileError.message}`,
-      mode: "supabase",
-      ok: false,
-      statusCode: 500,
-    };
-  }
-
-  const actorProfile = (profiles?.[0] ?? null) as AdminActorProfileRow | null;
-
-  if (actorProfile?.role !== "owner" || actorProfile.status !== "active") {
-    return {
-      message: "Admin user action requires an active owner profile.",
-      mode: "supabase",
-      ok: false,
-      statusCode: 403,
-    };
-  }
-
-  return {
-    message: "Admin user action authorized.",
-    mode: "supabase",
-    ok: true,
-    userId: actorUserId,
-  };
-}
-
-async function upsertAdminProfile(client: AdminSupabaseServiceClient, input: AdminProfileUpsertInput): Promise<AdminUserActionResult> {
+async function upsertAdminProfile(client: SupabaseAdminClient, input: AdminProfileUpsertInput): Promise<AdminUserActionResult> {
   const { error } = await client.from("admin_profiles").upsert(
     {
       display_name: input.name,
@@ -233,14 +173,14 @@ export async function runAdminUserAction(
 
   if (!client) {
     return {
-      message: "Supabase service role is not configured.",
+      message: "Supabase secret key is not configured.",
       mode: "demo",
       ok: false,
     };
   }
 
   if (!deps?.skipAuthorization) {
-    const authorization = await authorizeAdminUserAction(client, deps?.actorToken);
+    const authorization = await authorizeSupabaseAdminAccess(client, deps?.actorToken, { allowedRoles: ["owner"] });
 
     if (!authorization.ok) {
       return authorization;
@@ -257,7 +197,7 @@ export async function runAdminUserAction(
     });
   }
 
-  const inviteOptions: Parameters<AdminSupabaseServiceClient["auth"]["admin"]["inviteUserByEmail"]>[1] = {
+  const inviteOptions: Parameters<SupabaseAdminClient["auth"]["admin"]["inviteUserByEmail"]>[1] = {
     data: {
       admin_role: input.user.role,
       display_name: normalizeUserText(input.user.name),

@@ -2744,10 +2744,12 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Пригласить" }));
 
     const createDialog = screen.getByRole("dialog", { name: "Пригласить пользователя" });
-    await user.type(within(createDialog).getByLabelText("Имя"), "Елена Бухгалтер");
-    await user.type(within(createDialog).getByLabelText("Email"), "accountant@example.com");
+    fireEvent.change(within(createDialog).getByLabelText("Имя"), { target: { value: "Елена Бухгалтер" } });
+    fireEvent.change(within(createDialog).getByLabelText("Email"), { target: { value: "accountant@example.com" } });
     await user.selectOptions(within(createDialog).getByLabelText("Роль"), "accountant");
-    await user.type(within(createDialog).getByLabelText("Комментарий доступа"), "Доступ только для налоговой выгрузки Stripe.");
+    fireEvent.change(within(createDialog).getByLabelText("Комментарий доступа"), {
+      target: { value: "Доступ только для налоговой выгрузки Stripe." },
+    });
     await user.click(within(createDialog).getByRole("button", { name: "Отправить приглашение" }));
 
     expect(screen.queryByRole("dialog", { name: "Пригласить пользователя" })).not.toBeInTheDocument();
@@ -2766,8 +2768,9 @@ describe("AdminShell", () => {
 
     const editDialog = screen.getByRole("dialog", { name: "Редактировать пользователя" });
     await user.selectOptions(within(editDialog).getByLabelText("Статус"), "Активен");
-    await user.clear(within(editDialog).getByLabelText("Комментарий доступа"));
-    await user.type(within(editDialog).getByLabelText("Комментарий доступа"), "Доступ подтвержден владельцем для налоговой отчетности.");
+    fireEvent.change(within(editDialog).getByLabelText("Комментарий доступа"), {
+      target: { value: "Доступ подтвержден владельцем для налоговой отчетности." },
+    });
     await user.click(within(editDialog).getByRole("button", { name: "Сохранить пользователя" }));
 
     expect(screen.queryByRole("dialog", { name: "Редактировать пользователя" })).not.toBeInTheDocument();
@@ -2813,10 +2816,10 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Пригласить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Пригласить пользователя" });
-    await user.type(within(dialog).getByLabelText("Имя"), "Accountant Example");
-    await user.type(within(dialog).getByLabelText("Email"), "accountant@example.com");
+    fireEvent.change(within(dialog).getByLabelText("Имя"), { target: { value: "Accountant Example" } });
+    fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "accountant@example.com" } });
     await user.selectOptions(within(dialog).getByLabelText("Роль"), "accountant");
-    await user.type(within(dialog).getByLabelText("Комментарий доступа"), "Tax exports only.");
+    fireEvent.change(within(dialog).getByLabelText("Комментарий доступа"), { target: { value: "Tax exports only." } });
     await user.click(within(dialog).getByRole("button", { name: "Отправить приглашение" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));

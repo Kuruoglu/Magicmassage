@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AdminSupabaseServiceClient } from "./supabase-client";
+import type { SupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAdminUserActionInput, runAdminUserAction } from "./admin-user-actions";
 
 type Operation =
@@ -115,7 +115,7 @@ describe("admin user actions", () => {
     );
 
     expect(result).toEqual({
-      message: "Supabase service role is not configured.",
+      message: "Supabase secret key is not configured.",
       mode: "demo",
       ok: false,
     });
@@ -134,12 +134,12 @@ describe("admin user actions", () => {
         },
       },
       {
-        createClient: () => client as unknown as AdminSupabaseServiceClient,
+        createClient: () => client as unknown as SupabaseAdminClient,
       },
     );
 
     expect(result).toEqual({
-      message: "Admin user action requires an authenticated owner.",
+      message: "Admin access requires an authenticated user.",
       mode: "supabase",
       ok: false,
       statusCode: 401,
@@ -163,7 +163,7 @@ describe("admin user actions", () => {
       },
       {
         actorToken: "owner-token",
-        createClient: () => client as unknown as AdminSupabaseServiceClient,
+        createClient: () => client as unknown as SupabaseAdminClient,
       },
     );
 
@@ -229,7 +229,7 @@ describe("admin user actions", () => {
       },
       {
         actorToken: "owner-token",
-        createClient: () => client as unknown as AdminSupabaseServiceClient,
+        createClient: () => client as unknown as SupabaseAdminClient,
       },
     );
 
@@ -256,7 +256,7 @@ describe("admin user actions", () => {
       },
       {
         actorToken: "owner-token",
-        createClient: () => client as unknown as AdminSupabaseServiceClient,
+        createClient: () => client as unknown as SupabaseAdminClient,
       },
     );
 
