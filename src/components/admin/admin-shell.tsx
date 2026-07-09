@@ -23,6 +23,7 @@ import {
   upcomingAppointments,
 } from "@/admin/demo-data";
 import type { AdminShellInitialData } from "@/admin/data-source";
+import type { AdminUserActionInput, AdminUserActionResult } from "@/admin/admin-user-actions";
 import type { AdminPersistInput } from "@/admin/persistence";
 import {
   appointmentBelongsToClient,
@@ -1048,6 +1049,10 @@ function createAdminUserId(name: string, email: string) {
     .replace(/^-+|-+$/g, "");
 
   return `admin-user-${base || "invite"}`;
+}
+
+function isSupabaseAuthUserId(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function findClientPhoneDuplicate(clients: ClientRecord[], phone: string, originalClientIdentity?: string) {
@@ -7288,6 +7293,38 @@ export function AdminShell({
     }
   }
 
+  async function persistAdminUserAction(input: AdminUserActionInput): Promise<AdminUserActionResult | undefined> {
+    if (!isSupabaseBacked) {
+      return undefined;
+    }
+
+    try {
+      const response = await fetch("/api/admin/users", {
+        body: JSON.stringify(input),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => null)) as AdminUserActionResult | null;
+
+      if (!response.ok || result?.ok === false) {
+        setPersistenceStatus(result?.message ?? "Пользователь сохранен локально, но Supabase Auth не подтвердил запись.");
+        return result ?? undefined;
+      }
+
+      setPersistenceStatus(
+        input.action === "invite"
+          ? "Приглашение пользователя отправлено через Supabase Auth."
+          : "Роль пользователя сохранена в Supabase.",
+      );
+      return result ?? undefined;
+    } catch {
+      setPersistenceStatus("Пользователь сохранен локально, но Supabase Auth недоступен.");
+      return undefined;
+    }
+  }
+
   function persistAppointmentRecord(appointment: Appointment) {
     if (!appointment.clientId) {
       if (isSupabaseBacked) {
@@ -7805,6 +7842,45 @@ export function AdminShell({
 
       return current.map((currentUser, index) => (index === existingIndex ? user : currentUser));
     });
+
+    if (!originalId) {
+      const draftUserId = user.id;
+
+      void persistAdminUserAction({
+        action: "invite",
+        user: {
+          accessNote: user.accessNote,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+      }).then((result) => {
+        if (!result?.ok || !result.userId || result.userId === draftUserId) {
+          return;
+        }
+
+        const persistedUserId = result.userId;
+
+        setAdminUsers((current) =>
+          current.map((currentUser) => (currentUser.id === draftUserId ? { ...currentUser, id: persistedUserId } : currentUser)),
+        );
+      });
+      return;
+    }
+
+    if (isSupabaseAuthUserId(user.id)) {
+      void persistAdminUserAction({
+        action: "updateProfile",
+        user: {
+          accessNote: user.accessNote,
+          email: user.email,
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          status: user.status,
+        },
+      });
+    }
   }
 
   function saveSettingsRecord(nextSettings: SettingsRecord) {

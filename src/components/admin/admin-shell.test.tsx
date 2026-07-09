@@ -2775,6 +2775,71 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Доступ подтвержден владельцем для налоговой отчетности.")).toBeInTheDocument();
   });
 
+  it("posts admin user invites when the admin shell is backed by Supabase", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(
+        JSON.stringify({
+          message: "Admin user invitation saved in Supabase.",
+          mode: "supabase",
+          ok: true,
+          userId: "00000000-0000-0000-0000-000000000002",
+        }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="users"
+        initialData={{
+          adminUsers: [],
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Пригласить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Пригласить пользователя" });
+    await user.type(within(dialog).getByLabelText("Имя"), "Accountant Example");
+    await user.type(within(dialog).getByLabelText("Email"), "accountant@example.com");
+    await user.selectOptions(within(dialog).getByLabelText("Роль"), "accountant");
+    await user.type(within(dialog).getByLabelText("Комментарий доступа"), "Tax exports only.");
+    await user.click(within(dialog).getByRole("button", { name: "Отправить приглашение" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/users");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toEqual({
+      action: "invite",
+      user: {
+        accessNote: "Tax exports only.",
+        email: "accountant@example.com",
+        name: "Accountant Example",
+        role: "accountant",
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Accountant Example" })).toHaveAttribute(
+        "href",
+        "/admin?section=users&role=owner&user=00000000-0000-0000-0000-000000000002",
+      ),
+    );
+  });
+
   it("rejects an invalid admin user email", async () => {
     const user = userEvent.setup();
 
