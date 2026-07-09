@@ -263,6 +263,118 @@ const stripeRows = [
 ];
 
 describe("admin Supabase repository", () => {
+  it("loads blog posts from Supabase rows", async () => {
+    const client = new FakeSupabaseClient({
+      admin_blog_posts: [
+        {
+          author: "Supabase Natali",
+          body: "Loaded blog body.",
+          category: "Supabase",
+          cover_image_url: "/media/blog/supabase.jpg",
+          excerpt: "Loaded excerpt.",
+          id: "blog-supabase",
+          locale_codes: ["ru", "bg"],
+          published_on: null,
+          seo_title: "Supabase Blog SEO",
+          slug: "supabase-blog",
+          status: "scheduled",
+          tag_labels: ["supabase", "blog"],
+          title: "Supabase Blog",
+          updated_on: "2026-07-09",
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const posts = await repository.listBlogPosts();
+
+    expect(posts).toEqual([
+      {
+        author: "Supabase Natali",
+        body: "Loaded blog body.",
+        category: "Supabase",
+        coverImage: "/media/blog/supabase.jpg",
+        excerpt: "Loaded excerpt.",
+        id: "blog-supabase",
+        locales: ["ru", "bg"],
+        publishedAt: "",
+        seoTitle: "Supabase Blog SEO",
+        slug: "supabase-blog",
+        status: "Запланирована",
+        tags: ["supabase", "blog"],
+        title: "Supabase Blog",
+        updatedAt: "2026-07-09",
+      },
+    ]);
+    expect(client.operations[0]).toMatchObject({
+      order: { ascending: false, column: "published_on" },
+      table: "admin_blog_posts",
+    });
+  });
+
+  it("loads the single site settings row from Supabase", async () => {
+    const client = new FakeSupabaseClient({
+      admin_site_settings: [
+        {
+          audit_log_retention_days: 540,
+          booking_buffer_minutes: 45,
+          business_name: "Supabase Magic Massage",
+          cookie_privacy_mode: "Supabase privacy text.",
+          currency: "EUR",
+          daily_slot_capacity: 5,
+          default_locale: "bg",
+          default_seo_title: "Supabase SEO",
+          email_sender: "admin@magicmassage.bg",
+          google_calendar_id: "natali@example.com",
+          google_calendar_mode: "one_way",
+          id: "site",
+          reminder_template: "Supabase reminder.",
+          roles_policy: "Supabase roles.",
+          stripe_mode: "live_confirmed",
+          timezone: "Europe/Sofia",
+          updated_on: "2026-07-09",
+          working_days: "Пн-Сб",
+          working_hours: "10:00-19:00",
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const settings = await repository.loadSettings();
+
+    expect(settings).toEqual({
+      auditLogRetentionDays: 540,
+      bookingBufferMinutes: 45,
+      businessName: "Supabase Magic Massage",
+      cookiePrivacyMode: "Supabase privacy text.",
+      currency: "EUR",
+      dailySlotCapacity: 5,
+      defaultLocale: "bg",
+      defaultSeoTitle: "Supabase SEO",
+      emailSender: "admin@magicmassage.bg",
+      googleCalendarId: "natali@example.com",
+      googleCalendarMode: "Односторонняя",
+      reminderTemplate: "Supabase reminder.",
+      rolesPolicy: "Supabase roles.",
+      stripeMode: "Live после подтверждения",
+      timezone: "Europe/Sofia",
+      updatedAt: "2026-07-09",
+      workingDays: "Пн-Сб",
+      workingHours: "10:00-19:00",
+    });
+    expect(client.operations[0]).toMatchObject({
+      filters: [{ column: "id", operator: "eq", value: "site" }],
+      table: "admin_site_settings",
+    });
+  });
+
+  it("returns undefined when the site settings row is not present", async () => {
+    const client = new FakeSupabaseClient({ admin_site_settings: [] });
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.loadSettings()).resolves.toBeUndefined();
+  });
+
   it("loads admin domain records from Supabase rows", async () => {
     const client = new FakeSupabaseClient({
       admin_appointments: appointmentRows,

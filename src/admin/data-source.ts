@@ -1,21 +1,25 @@
 import type { FinanceRow } from "./config";
 import { certificateRows, clientRows, financeRows as demoFinanceRows, upcomingAppointments } from "./demo-data";
-import { createAdminDemoRecords, type AdminDomainRecords } from "./domain";
+import { createAdminDemoRecords, type AdminDomainRecords, type BlogPostRecord, type SettingsRecord } from "./domain";
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
 
 export type AdminShellDataSource = "demo" | "supabase";
 
 export type AdminShellInitialData = {
+  blogPosts?: BlogPostRecord[];
   financeRows: FinanceRow[];
   loadError?: string;
   records: AdminDomainRecords;
+  settings?: SettingsRecord;
   source: AdminShellDataSource;
 };
 
 type LoadAdminShellDataOptions = {
   createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
-  createRepository?: (client: AdminSupabaseClient) => Pick<AdminRepository, "listStripeSales" | "loadDomainRecords">;
+  createRepository?: (
+    client: AdminSupabaseClient,
+  ) => Pick<AdminRepository, "listBlogPosts" | "listStripeSales" | "loadDomainRecords" | "loadSettings">;
   env?: AdminSupabaseEnvSource;
   now?: Date;
 };
@@ -72,14 +76,18 @@ export async function loadAdminShellData({
 
   try {
     const repository = createRepository(client);
-    const [records, financeRows] = await Promise.all([
+    const [records, financeRows, blogPosts, settings] = await Promise.all([
       repository.loadDomainRecords(),
       repository.listStripeSales(getMonthFinancePeriod(now)),
+      repository.listBlogPosts(),
+      repository.loadSettings(),
     ]);
 
     return {
+      blogPosts,
       financeRows,
       records,
+      settings,
       source: "supabase",
     };
   } catch (error) {

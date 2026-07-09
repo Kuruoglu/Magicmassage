@@ -164,6 +164,94 @@ describe("AdminShell", () => {
     expect(screen.queryByText("pi_3QMMN1021")).not.toBeInTheDocument();
   });
 
+  it("renders supplied initial blog posts instead of demo blog records", () => {
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts: [
+            {
+              author: "Supabase Natali",
+              body: "Loaded blog body.",
+              category: "Supabase",
+              coverImage: "/media/blog/supabase.jpg",
+              excerpt: "Loaded excerpt.",
+              id: "blog-supabase",
+              locales: ["ru", "bg"],
+              publishedAt: "",
+              seoTitle: "Supabase Blog SEO",
+              slug: "supabase-blog",
+              status: "Запланирована",
+              tags: ["supabase", "blog"],
+              title: "Supabase Blog",
+              updatedAt: "2026-07-09",
+            },
+          ],
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Supabase Blog" })).toHaveAttribute(
+      "href",
+      "/admin?section=blog&role=owner&blog=blog-supabase",
+    );
+    expect(screen.queryByText("Подготовка к первому массажу")).not.toBeInTheDocument();
+  });
+
+  it("renders supplied initial settings instead of demo settings", () => {
+    render(
+      <AdminShell
+        activeSection="settings"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          settings: {
+            auditLogRetentionDays: 540,
+            bookingBufferMinutes: 45,
+            businessName: "Supabase Magic Massage",
+            cookiePrivacyMode: "Supabase privacy text.",
+            currency: "EUR",
+            dailySlotCapacity: 5,
+            defaultLocale: "bg",
+            defaultSeoTitle: "Supabase SEO",
+            emailSender: "admin@magicmassage.bg",
+            googleCalendarId: "natali@example.com",
+            googleCalendarMode: "Односторонняя",
+            reminderTemplate: "Supabase reminder.",
+            rolesPolicy: "Supabase roles.",
+            stripeMode: "Live после подтверждения",
+            timezone: "Europe/Sofia",
+            updatedAt: "2026-07-09",
+            workingDays: "Пн-Сб",
+            workingHours: "10:00-19:00",
+          },
+          source: "supabase",
+        }}
+        role="owner"
+        selectedSettingsGroupId="booking"
+      />,
+    );
+
+    const details = screen.getByRole("dialog", { name: "Детали настроек" });
+    expect(within(details).getByText("45 минут")).toBeInTheDocument();
+    expect(within(details).getByText("5 слотов")).toBeInTheDocument();
+    expect(within(details).getByText("Односторонняя")).toBeInTheDocument();
+    expect(within(details).getByText("natali@example.com")).toBeInTheDocument();
+    expect(within(details).queryByText("30 минут")).not.toBeInTheDocument();
+  });
+
   it("filters clients from the global admin search", async () => {
     const user = userEvent.setup();
 

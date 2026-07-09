@@ -91,10 +91,12 @@ export type AdminFinanceExportLogInput = {
 
 export type AdminRepository = {
   listAppointments(): Promise<Appointment[]>;
+  listBlogPosts(): Promise<BlogPostRecord[]>;
   listCertificates(): Promise<CertificateRecord[]>;
   listClients(): Promise<ClientRecord[]>;
   listStripeSales(period: AdminFinancePeriod): Promise<FinanceRow[]>;
   loadDomainRecords(): Promise<AdminDomainRecords>;
+  loadSettings(): Promise<SettingsRecord | undefined>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
   saveAppointment(appointment: Appointment): Promise<void>;
   saveBlogPost(post: BlogPostRecord): Promise<void>;
@@ -161,6 +163,45 @@ const stripeSaleColumns = [
   "payment_status",
   "refund_cents",
   "stripe_fee_cents",
+].join(", ");
+
+const blogPostColumns = [
+  "id",
+  "author",
+  "body",
+  "category",
+  "cover_image_url",
+  "excerpt",
+  "locale_codes",
+  "published_on",
+  "seo_title",
+  "slug",
+  "status",
+  "tag_labels",
+  "title",
+  "updated_on",
+].join(", ");
+
+const siteSettingsColumns = [
+  "id",
+  "audit_log_retention_days",
+  "booking_buffer_minutes",
+  "business_name",
+  "cookie_privacy_mode",
+  "currency",
+  "daily_slot_capacity",
+  "default_locale",
+  "default_seo_title",
+  "email_sender",
+  "google_calendar_id",
+  "google_calendar_mode",
+  "reminder_template",
+  "roles_policy",
+  "stripe_mode",
+  "timezone",
+  "updated_on",
+  "working_days",
+  "working_hours",
 ].join(", ");
 
 const serviceStatusByDatabase: Record<string, ServiceStatus> = {
@@ -408,12 +449,24 @@ function mapContactStatusToDatabase(status: ContactStatus) {
   return databaseContactStatusByStatus.get(status) ?? "draft";
 }
 
+function mapBlogStatus(status: string): BlogStatus {
+  return blogStatusByDatabase[status] ?? "Черновик";
+}
+
 function mapBlogStatusToDatabase(status: BlogStatus) {
   return databaseBlogStatusByStatus.get(status) ?? "draft";
 }
 
+function mapCalendarSyncMode(mode: string): CalendarSyncMode {
+  return calendarSyncModeByDatabase[mode] ?? "Внутренний календарь главный";
+}
+
 function mapCalendarSyncModeToDatabase(mode: CalendarSyncMode) {
   return databaseCalendarSyncModeByMode.get(mode) ?? "internal";
+}
+
+function mapStripeMode(mode: string): StripeMode {
+  return stripeModeByDatabase[mode] ?? "Тестовый";
 }
 
 function mapStripeModeToDatabase(mode: StripeMode) {
@@ -606,6 +659,25 @@ function mapContactSettingsRecordToRow(settings: ContactSettingsRecord): AdminCo
   };
 }
 
+function mapBlogPostRow(row: AdminBlogPostDatabaseRow): BlogPostRecord {
+  return {
+    author: row.author,
+    body: row.body,
+    category: row.category,
+    coverImage: row.cover_image_url,
+    excerpt: row.excerpt,
+    id: row.id,
+    locales: [...row.locale_codes],
+    publishedAt: row.published_on ?? "",
+    seoTitle: row.seo_title,
+    slug: row.slug,
+    status: mapBlogStatus(row.status),
+    tags: [...row.tag_labels],
+    title: row.title,
+    updatedAt: row.updated_on,
+  };
+}
+
 function mapBlogPostRecordToRow(post: BlogPostRecord): AdminBlogPostDatabaseRow {
   return {
     author: post.author,
@@ -622,6 +694,29 @@ function mapBlogPostRecordToRow(post: BlogPostRecord): AdminBlogPostDatabaseRow 
     tag_labels: [...post.tags],
     title: post.title,
     updated_on: post.updatedAt,
+  };
+}
+
+function mapSettingsRow(row: AdminSiteSettingsDatabaseRow): SettingsRecord {
+  return {
+    auditLogRetentionDays: row.audit_log_retention_days,
+    bookingBufferMinutes: row.booking_buffer_minutes,
+    businessName: row.business_name,
+    cookiePrivacyMode: row.cookie_privacy_mode,
+    currency: row.currency,
+    dailySlotCapacity: row.daily_slot_capacity,
+    defaultLocale: row.default_locale,
+    defaultSeoTitle: row.default_seo_title,
+    emailSender: row.email_sender,
+    googleCalendarId: row.google_calendar_id,
+    googleCalendarMode: mapCalendarSyncMode(row.google_calendar_mode),
+    reminderTemplate: row.reminder_template,
+    rolesPolicy: row.roles_policy,
+    stripeMode: mapStripeMode(row.stripe_mode),
+    timezone: row.timezone,
+    updatedAt: row.updated_on,
+    workingDays: row.working_days,
+    workingHours: row.working_hours,
   };
 }
 
@@ -737,6 +832,22 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     return rows.map(mapCertificateRow);
   }
 
+  async function listBlogPosts() {
+    const rows = await selectRows<AdminBlogPostDatabaseRow>(client, "admin_blog_posts", blogPostColumns, (query) =>
+      query.order("published_on", { ascending: false }),
+    );
+
+    return rows.map(mapBlogPostRow);
+  }
+
+  async function loadSettings() {
+    const rows = await selectRows<AdminSiteSettingsDatabaseRow>(client, "admin_site_settings", siteSettingsColumns, (query) =>
+      query.eq("id", "site"),
+    );
+
+    return rows[0] ? mapSettingsRow(rows[0]) : undefined;
+  }
+
   async function loadDomainRecords() {
     const clients = await listClients();
     const appointments = await listAppointments();
@@ -816,10 +927,12 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
 
   return {
     listAppointments,
+    listBlogPosts,
     listCertificates,
     listClients,
     listStripeSales,
     loadDomainRecords,
+    loadSettings,
     logFinanceExport,
     saveAppointment,
     saveBlogPost,

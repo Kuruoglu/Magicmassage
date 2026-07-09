@@ -787,16 +787,16 @@ function buildInitialContactSettings(): ContactSettingsRecord {
   return { ...initialContactSettings };
 }
 
-function buildInitialBlogPostRows(): BlogPostRecord[] {
-  return initialBlogPostRows.map((post) => ({
+function buildInitialBlogPostRows(initialData?: AdminShellInitialData): BlogPostRecord[] {
+  return (initialData?.blogPosts ?? initialBlogPostRows).map((post) => ({
     ...post,
     locales: [...post.locales],
     tags: [...post.tags],
   }));
 }
 
-function buildInitialSettingsRecord(): SettingsRecord {
-  return { ...initialSettingsRecord };
+function buildInitialSettingsRecord(initialData?: AdminShellInitialData): SettingsRecord {
+  return { ...(initialData?.settings ?? initialSettingsRecord) };
 }
 
 function buildInitialAdminUsers(): AdminUserRecord[] {
@@ -7222,8 +7222,8 @@ export function AdminShell({
   const [media, setMedia] = useState<MediaRecord[]>(() => buildInitialMediaRows());
   const [contactChannels, setContactChannels] = useState<ContactChannelRecord[]>(() => buildInitialContactChannels());
   const [contactSettings, setContactSettings] = useState<ContactSettingsRecord>(() => buildInitialContactSettings());
-  const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows());
-  const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord());
+  const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows(initialData));
+  const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord(initialData));
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers());
   const [persistenceStatus, setPersistenceStatus] = useState("");
   const isSupabaseBacked = initialData?.source === "supabase";

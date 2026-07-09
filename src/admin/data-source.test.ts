@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FinanceRow } from "./config";
-import type { AdminDomainRecords } from "./domain";
+import type { AdminDomainRecords, BlogPostRecord, SettingsRecord } from "./domain";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
 import { loadAdminShellData } from "./data-source";
 
@@ -16,8 +16,10 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     listAppointments: async () => [],
     listCertificates: async () => [],
     listClients: async () => [],
+    listBlogPosts: async () => [],
     listStripeSales: async () => [],
     loadDomainRecords: async () => emptyRecords,
+    loadSettings: async () => undefined,
     logFinanceExport: async () => {},
     saveAppointment: async () => {},
     saveBlogPost: async () => {},
@@ -57,11 +59,51 @@ describe("admin data source", () => {
         stripeFee: 8.6,
       },
     ];
+    const blogPosts: BlogPostRecord[] = [
+      {
+        author: "Supabase Natali",
+        body: "Loaded blog body.",
+        category: "Supabase",
+        coverImage: "/media/blog/supabase.jpg",
+        excerpt: "Loaded excerpt.",
+        id: "blog-supabase",
+        locales: ["ru", "bg"],
+        publishedAt: "",
+        seoTitle: "Supabase Blog SEO",
+        slug: "supabase-blog",
+        status: "Запланирована",
+        tags: ["supabase", "blog"],
+        title: "Supabase Blog",
+        updatedAt: "2026-07-09",
+      },
+    ];
+    const settings: SettingsRecord = {
+      auditLogRetentionDays: 540,
+      bookingBufferMinutes: 45,
+      businessName: "Supabase Magic Massage",
+      cookiePrivacyMode: "Supabase privacy text.",
+      currency: "EUR",
+      dailySlotCapacity: 5,
+      defaultLocale: "bg",
+      defaultSeoTitle: "Supabase SEO",
+      emailSender: "admin@magicmassage.bg",
+      googleCalendarId: "natali@example.com",
+      googleCalendarMode: "Односторонняя",
+      reminderTemplate: "Supabase reminder.",
+      rolesPolicy: "Supabase roles.",
+      stripeMode: "Live после подтверждения",
+      timezone: "Europe/Sofia",
+      updatedAt: "2026-07-09",
+      workingDays: "Пн-Сб",
+      workingHours: "10:00-19:00",
+    };
     const repository = createRepositoryStub({
+      listBlogPosts: async () => blogPosts,
       listStripeSales: async (period) => {
         expect(period).toEqual({ from: "2026-07-01", to: "2026-07-31" });
         return financeRows;
       },
+      loadSettings: async () => settings,
       loadDomainRecords: async () => ({
         appointments: [
           {
@@ -112,6 +154,8 @@ describe("admin data source", () => {
 
     expect(data.source).toBe("supabase");
     expect(data.records.clients[0]?.name).toBe("Supabase Client");
+    expect(data.blogPosts?.[0]?.title).toBe("Supabase Blog");
+    expect(data.settings?.businessName).toBe("Supabase Magic Massage");
     expect(data.financeRows).toBe(financeRows);
   });
 
