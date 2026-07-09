@@ -82,6 +82,35 @@ create table if not exists public.admin_certificates (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.admin_services (
+  slug text primary key,
+  name text not null,
+  category text not null,
+  status text not null default 'draft' check (status in ('published', 'draft', 'hidden')),
+  duration_label text not null default '',
+  locale_codes text[] not null default '{}',
+  seo_title text not null default '',
+  summary text not null default '',
+  cover_image_url text not null default '',
+  display_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_price_variants (
+  id text primary key,
+  service_slug text not null references public.admin_services(slug) on update cascade on delete restrict,
+  duration_minutes integer not null check (duration_minutes > 0),
+  price_cents integer not null default 0 check (price_cents >= 0),
+  currency text not null default 'EUR' check (currency = 'EUR'),
+  status text not null default 'active' check (status in ('active', 'hidden')),
+  display_order integer not null default 0,
+  internal_note text not null default '',
+  updated_on date not null default current_date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.admin_stripe_sales (
   payment_intent_id text primary key,
   charge_id text,
@@ -125,10 +154,110 @@ create table if not exists public.admin_audit_log (
   created_at timestamptz not null default now()
 );
 
+insert into public.admin_services (
+  slug,
+  name,
+  category,
+  status,
+  duration_label,
+  locale_codes,
+  seo_title,
+  summary,
+  cover_image_url,
+  display_order
+)
+values
+  (
+    'classic-massage',
+    'Классический массаж',
+    'Массаж',
+    'published',
+    '60-90 мин',
+    array['bg', 'ru', 'ua', 'en'],
+    'Классический массаж в Бургасе',
+    'Базовая услуга для расслабления, восстановления тонуса и снятия усталости.',
+    '/media/services/classic-massage.jpg',
+    1
+  ),
+  (
+    'lymphatic-drainage-massage',
+    'Лимфодренажный массаж',
+    'Массаж',
+    'published',
+    '60-90 мин',
+    array['bg', 'ru', 'ua', 'en'],
+    'Лимфодренажный массаж в Бургасе',
+    'Мягкие ритмичные техники для ощущения легкости и бережной работы с тканями.',
+    '/media/services/lymphatic-drainage-massage.jpg',
+    2
+  ),
+  (
+    'deep-tissue-massage',
+    'Deep tissue massage',
+    'Массаж',
+    'draft',
+    '60-90 мин',
+    array['bg', 'ru', 'ua', 'en'],
+    'Deep tissue massage Burgas',
+    'Более глубокая и медленная работа с зонами устойчивого напряжения.',
+    '/media/services/deep-tissue-massage.jpg',
+    3
+  )
+on conflict (slug) do nothing;
+
+insert into public.admin_price_variants (
+  id,
+  service_slug,
+  duration_minutes,
+  price_cents,
+  currency,
+  status,
+  display_order,
+  internal_note,
+  updated_on
+)
+values
+  (
+    'price-classic-60',
+    'classic-massage',
+    60,
+    7000,
+    'EUR',
+    'active',
+    1,
+    'Основной вариант для публичного прайса.',
+    '2026-07-07'
+  ),
+  (
+    'price-lymphatic-90',
+    'lymphatic-drainage-massage',
+    90,
+    9500,
+    'EUR',
+    'active',
+    2,
+    'Курс можно уточнять в карточке услуги.',
+    '2026-07-07'
+  ),
+  (
+    'price-deep-60',
+    'deep-tissue-massage',
+    60,
+    8500,
+    'EUR',
+    'hidden',
+    3,
+    'Пока скрыто до финального подтверждения текста.',
+    '2026-07-07'
+  )
+on conflict (id) do nothing;
+
 create index if not exists admin_profiles_role_status_idx on public.admin_profiles (role, status);
 create index if not exists admin_clients_phone_normalized_idx on public.admin_clients (phone_normalized);
 create index if not exists admin_appointments_client_date_idx on public.admin_appointments (client_id, starts_on, starts_at);
 create index if not exists admin_certificates_client_idx on public.admin_certificates (client_id);
+create index if not exists admin_services_status_order_idx on public.admin_services (status, display_order);
+create index if not exists admin_price_variants_service_idx on public.admin_price_variants (service_slug, status, display_order);
 create index if not exists admin_stripe_sales_paid_at_idx on public.admin_stripe_sales (paid_at);
 create index if not exists admin_stripe_sales_certificate_idx on public.admin_stripe_sales (certificate_code);
 create index if not exists admin_finance_export_audit_downloaded_by_idx on public.admin_finance_export_audit (downloaded_by, created_at);
@@ -170,6 +299,26 @@ as $$
   select public.admin_has_role(array['owner', 'administrator', 'specialist', 'viewer']::public.admin_role[]);
 $$;
 
+create or replace function public.admin_can_manage_content()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.admin_has_role(array['owner', 'administrator', 'editor']::public.admin_role[]);
+$$;
+
+create or replace function public.admin_can_read_content()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.admin_has_role(array['owner', 'administrator', 'editor', 'viewer']::public.admin_role[]);
+$$;
+
 create or replace function public.admin_can_read_finance()
 returns boolean
 language sql
@@ -183,17 +332,23 @@ $$;
 revoke all on function public.admin_has_role(public.admin_role[]) from public;
 revoke all on function public.admin_can_manage_operations() from public;
 revoke all on function public.admin_can_read_operations() from public;
+revoke all on function public.admin_can_manage_content() from public;
+revoke all on function public.admin_can_read_content() from public;
 revoke all on function public.admin_can_read_finance() from public;
 
 grant execute on function public.admin_has_role(public.admin_role[]) to authenticated, service_role;
 grant execute on function public.admin_can_manage_operations() to authenticated, service_role;
 grant execute on function public.admin_can_read_operations() to authenticated, service_role;
+grant execute on function public.admin_can_manage_content() to authenticated, service_role;
+grant execute on function public.admin_can_read_content() to authenticated, service_role;
 grant execute on function public.admin_can_read_finance() to authenticated, service_role;
 
 alter table public.admin_profiles enable row level security;
 alter table public.admin_clients enable row level security;
 alter table public.admin_appointments enable row level security;
 alter table public.admin_certificates enable row level security;
+alter table public.admin_services enable row level security;
+alter table public.admin_price_variants enable row level security;
 alter table public.admin_stripe_sales enable row level security;
 alter table public.admin_finance_export_audit enable row level security;
 alter table public.admin_audit_log enable row level security;
@@ -202,6 +357,8 @@ grant select, insert, update, delete on public.admin_profiles to authenticated;
 grant select, insert, update, delete on public.admin_clients to authenticated;
 grant select, insert, update, delete on public.admin_appointments to authenticated;
 grant select, insert, update, delete on public.admin_certificates to authenticated;
+grant select, insert, update, delete on public.admin_services to authenticated;
+grant select, insert, update, delete on public.admin_price_variants to authenticated;
 grant select, insert, update, delete on public.admin_stripe_sales to authenticated;
 grant select, insert on public.admin_finance_export_audit to authenticated;
 grant select on public.admin_audit_log to authenticated;
@@ -268,6 +425,36 @@ for all
 to authenticated
 using (public.admin_can_manage_operations())
 with check (public.admin_can_manage_operations());
+
+drop policy if exists "content roles can read admin services" on public.admin_services;
+create policy "content roles can read admin services"
+on public.admin_services
+for select
+to authenticated
+using (public.admin_can_read_content());
+
+drop policy if exists "editor roles can manage admin services" on public.admin_services;
+create policy "editor roles can manage admin services"
+on public.admin_services
+for all
+to authenticated
+using (public.admin_can_manage_content())
+with check (public.admin_can_manage_content());
+
+drop policy if exists "content roles can read admin price variants" on public.admin_price_variants;
+create policy "content roles can read admin price variants"
+on public.admin_price_variants
+for select
+to authenticated
+using (public.admin_can_read_content());
+
+drop policy if exists "editor roles can manage admin price variants" on public.admin_price_variants;
+create policy "editor roles can manage admin price variants"
+on public.admin_price_variants
+for all
+to authenticated
+using (public.admin_can_manage_content())
+with check (public.admin_can_manage_content());
 
 drop policy if exists "accountant can read stripe sales" on public.admin_stripe_sales;
 create policy "accountant can read stripe sales"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Appointment, CertificateRecord, ClientRecord } from "./domain";
+import type { Appointment, CertificateRecord, ClientRecord, PriceRecord, ServiceRecord } from "./domain";
 import { isAdminPersistInput, persistAdminRecord } from "./persistence";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
 
@@ -47,15 +47,41 @@ const certificateRecord: CertificateRecord = {
   stripeId: "manual",
 };
 
+const serviceRecord: ServiceRecord = {
+  category: "SPA",
+  coverImage: "/media/services/aroma-massage.jpg",
+  duration: "75 мин",
+  locales: ["ru", "bg"],
+  name: "Арома массаж",
+  order: 9,
+  seoTitle: "Арома массаж в Бургасе",
+  slug: "aroma-massage",
+  status: "Черновик",
+  summary: "SPA-услуга с ароматическими маслами.",
+};
+
+const priceRecord: PriceRecord = {
+  durationMinutes: 90,
+  id: "price-aroma-massage-90",
+  note: "Длинный вариант для постоянных клиентов.",
+  order: 4,
+  priceEur: 110,
+  serviceSlug: "aroma-massage",
+  status: "Активна",
+  updatedAt: "2026-07-09",
+};
+
 function buildRepository(
-  overrides: Partial<Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient">> = {},
+  overrides: Partial<Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient" | "savePrice" | "saveService">> = {},
 ) {
   return {
     saveAppointment: async () => undefined,
     saveCertificate: async () => undefined,
     saveClient: async () => undefined,
+    savePrice: async () => undefined,
+    saveService: async () => undefined,
     ...overrides,
-  } satisfies Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient">;
+  } satisfies Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient" | "savePrice" | "saveService">;
 }
 
 describe("admin persistence", () => {
@@ -134,6 +160,46 @@ describe("admin persistence", () => {
     expect(savedCertificates).toEqual([certificateRecord]);
   });
 
+  it("persists massage service records through the repository", async () => {
+    const savedServices: typeof serviceRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: serviceRecord, type: "service" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveService: async (service: typeof serviceRecord) => {
+              savedServices.push(service);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedServices).toEqual([serviceRecord]);
+  });
+
+  it("persists price records through the repository", async () => {
+    const savedPrices: typeof priceRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: priceRecord, type: "price" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            savePrice: async (price: typeof priceRecord) => {
+              savedPrices.push(price);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedPrices).toEqual([priceRecord]);
+  });
+
   it("returns a Supabase write error without throwing through the API boundary", async () => {
     const result = await persistAdminRecord(
       { record: appointmentRecord, type: "appointment" },
@@ -159,7 +225,10 @@ describe("admin persistence", () => {
     expect(isAdminPersistInput({ record: clientRecord, type: "client" })).toBe(true);
     expect(isAdminPersistInput({ record: appointmentRecord, type: "appointment" })).toBe(true);
     expect(isAdminPersistInput({ record: certificateRecord, type: "certificate" })).toBe(true);
+    expect(isAdminPersistInput({ record: serviceRecord, type: "service" })).toBe(true);
+    expect(isAdminPersistInput({ record: priceRecord, type: "price" })).toBe(true);
     expect(isAdminPersistInput({ record: null, type: "client" })).toBe(false);
     expect(isAdminPersistInput({ record: clientRecord, type: "certificate" })).toBe(false);
+    expect(isAdminPersistInput({ record: serviceRecord, type: "price" })).toBe(false);
   });
 });

@@ -646,6 +646,67 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Опубликованное описание услуги для сайта.")).toBeInTheDocument();
   });
 
+  it("posts saved massage services when the admin shell is backed by Supabase", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="services"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить услугу" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая услуга" });
+    fireEvent.change(within(dialog).getByLabelText("Название"), { target: { value: "Арома массаж" } });
+    fireEvent.change(within(dialog).getByLabelText("Slug"), { target: { value: "aroma-massage" } });
+    fireEvent.change(within(dialog).getByLabelText("Категория"), { target: { value: "SPA" } });
+    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
+    fireEvent.change(within(dialog).getByLabelText("Длительность"), { target: { value: "75 мин" } });
+    fireEvent.change(within(dialog).getByLabelText("Порядок"), { target: { value: "9" } });
+    fireEvent.change(within(dialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
+    fireEvent.change(within(dialog).getByLabelText("SEO title"), { target: { value: "Арома массаж в Бургасе" } });
+    fireEvent.change(within(dialog).getByLabelText("Обложка"), { target: { value: "/media/services/aroma-massage.jpg" } });
+    fireEvent.change(within(dialog).getByLabelText("Описание"), { target: { value: "SPA-услуга с ароматическими маслами." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить услугу" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        category: "SPA",
+        coverImage: "/media/services/aroma-massage.jpg",
+        duration: "75 мин",
+        locales: ["ru", "bg"],
+        name: "Арома массаж",
+        order: 9,
+        seoTitle: "Арома массаж в Бургасе",
+        slug: "aroma-massage",
+        status: "Черновик",
+        summary: "SPA-услуга с ароматическими маслами.",
+      },
+      type: "service",
+    });
+  });
+
   it("keeps price variants attached when a service slug changes", () => {
     render(<AdminShell activeSection="services" role="owner" />);
 
@@ -719,6 +780,60 @@ describe("AdminShell", () => {
     expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Классический массаж · 90 мин" })).toHaveLength(1);
     expect(within(details).getByText("115 €")).toBeInTheDocument();
     expect(within(details).getByText("Скрыта")).toBeInTheDocument();
+  });
+
+  it("posts saved price variants when the admin shell is backed by Supabase", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="price"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить цену" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новая цена" });
+    fireEvent.change(within(dialog).getByLabelText("Услуга"), { target: { value: "classic-massage" } });
+    fireEvent.change(within(dialog).getByLabelText("Длительность"), { target: { value: "90" } });
+    fireEvent.change(within(dialog).getByLabelText("Цена"), { target: { value: "110" } });
+    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Активна" } });
+    fireEvent.change(within(dialog).getByLabelText("Порядок"), { target: { value: "4" } });
+    fireEvent.change(within(dialog).getByLabelText("Заметка"), { target: { value: "Длинный вариант для постоянных клиентов." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить цену" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        durationMinutes: 90,
+        id: "price-classic-massage-90",
+        note: "Длинный вариант для постоянных клиентов.",
+        order: 4,
+        priceEur: 110,
+        serviceSlug: "classic-massage",
+        status: "Активна",
+      },
+      type: "price",
+    });
   });
 
   it("filters price rows by active and hidden status", () => {

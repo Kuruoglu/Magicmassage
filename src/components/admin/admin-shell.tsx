@@ -45,6 +45,10 @@ import {
   type CertificateStatus,
   type ClientRecord,
   type ClientVisit,
+  type PriceRecord,
+  type PriceStatus,
+  type ServiceRecord,
+  type ServiceStatus,
 } from "@/admin/domain";
 
 type AdminCalendarAction = "create";
@@ -94,19 +98,6 @@ type CertificateFormState = {
   status: CertificateStatus;
   stripeId: string;
 };
-type ServiceStatus = "Опубликована" | "Черновик" | "Скрыта";
-type ServiceRecord = {
-  category: string;
-  coverImage: string;
-  duration: string;
-  locales: string[];
-  name: string;
-  order: number;
-  seoTitle: string;
-  slug: string;
-  status: ServiceStatus;
-  summary: string;
-};
 type ServiceFormState = {
   category: string;
   coverImage: string;
@@ -118,17 +109,6 @@ type ServiceFormState = {
   slug: string;
   status: ServiceStatus;
   summary: string;
-};
-type PriceStatus = "Активна" | "Скрыта";
-type PriceRecord = {
-  durationMinutes: number;
-  id: string;
-  note: string;
-  order: number;
-  priceEur: number;
-  serviceSlug: string;
-  status: PriceStatus;
-  updatedAt: string;
 };
 type PriceFormState = {
   durationMinutes: string;
@@ -7768,6 +7748,7 @@ export function AdminShell({
 
       return current.map((currentService, index) => (index === existingIndex ? service : currentService));
     });
+    void persistAdminRecord({ record: service, type: "service" });
   }
 
   function savePriceRecord(price: PriceRecord, originalId?: string) {
@@ -7788,6 +7769,7 @@ export function AdminShell({
 
       return current.map((currentPrice, index) => (index === existingIndex ? price : currentPrice));
     });
+    void persistAdminRecord({ record: price, type: "price" });
   }
 
   function saveMediaRecord(mediaRecord: MediaRecord, originalId?: string) {

@@ -44,6 +44,36 @@ const certificatePayload = {
   type: "certificate",
 } as const;
 
+const servicePayload = {
+  record: {
+    category: "SPA",
+    coverImage: "/media/services/aroma-massage.jpg",
+    duration: "75 мин",
+    locales: ["ru", "bg"],
+    name: "Арома массаж",
+    order: 9,
+    seoTitle: "Арома массаж в Бургасе",
+    slug: "aroma-massage",
+    status: "Черновик",
+    summary: "SPA-услуга с ароматическими маслами.",
+  },
+  type: "service",
+} as const;
+
+const pricePayload = {
+  record: {
+    durationMinutes: 90,
+    id: "price-aroma-massage-90",
+    note: "Длинный вариант для постоянных клиентов.",
+    order: 4,
+    priceEur: 110,
+    serviceSlug: "aroma-massage",
+    status: "Активна",
+    updatedAt: "2026-07-09",
+  },
+  type: "price",
+} as const;
+
 vi.mock("@/admin/persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/admin/persistence")>();
 
@@ -90,6 +120,32 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
     expect(persistAdminRecord).toHaveBeenCalledWith(certificatePayload);
+  });
+
+  it("persists valid service payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(servicePayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(servicePayload);
+  });
+
+  it("persists valid price payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(pricePayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(pricePayload);
   });
 
   it("returns server errors for Supabase write failures", async () => {

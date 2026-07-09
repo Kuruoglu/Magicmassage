@@ -22,6 +22,8 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     saveAppointment: async () => {},
     saveCertificate: async () => {},
     saveClient: async () => {},
+    savePrice: async () => {},
+    saveService: async () => {},
     ...overrides,
   };
 }

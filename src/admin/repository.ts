@@ -5,11 +5,17 @@ import type {
   AdminCertificateDatabaseRow,
   AdminClientDatabaseRow,
   AdminDomainRecords,
+  AdminPriceDatabaseRow,
+  AdminServiceDatabaseRow,
   Appointment,
   AppointmentStatus,
   CertificateRecord,
   CertificateStatus,
   ClientRecord,
+  PriceRecord,
+  PriceStatus,
+  ServiceRecord,
+  ServiceStatus,
 } from "./domain";
 
 type SupabaseError = {
@@ -76,6 +82,8 @@ export type AdminRepository = {
   saveAppointment(appointment: Appointment): Promise<void>;
   saveCertificate(certificate: CertificateRecord): Promise<void>;
   saveClient(client: ClientRecord): Promise<void>;
+  savePrice(price: PriceRecord): Promise<void>;
+  saveService(service: ServiceRecord): Promise<void>;
 };
 
 const clientColumns = [
@@ -132,6 +140,33 @@ const stripeSaleColumns = [
   "refund_cents",
   "stripe_fee_cents",
 ].join(", ");
+
+const serviceStatusByDatabase: Record<string, ServiceStatus> = {
+  draft: "Черновик",
+  hidden: "Скрыта",
+  published: "Опубликована",
+  Опубликована: "Опубликована",
+  Скрыта: "Скрыта",
+  Черновик: "Черновик",
+};
+
+const databaseServiceStatusByStatus = new Map<ServiceStatus, string>([
+  [serviceStatusByDatabase.draft, "draft"],
+  [serviceStatusByDatabase.hidden, "hidden"],
+  [serviceStatusByDatabase.published, "published"],
+]);
+
+const priceStatusByDatabase: Record<string, PriceStatus> = {
+  active: "Активна",
+  hidden: "Скрыта",
+  Активна: "Активна",
+  Скрыта: "Скрыта",
+};
+
+const databasePriceStatusByStatus = new Map<PriceStatus, string>([
+  [priceStatusByDatabase.active, "active"],
+  [priceStatusByDatabase.hidden, "hidden"],
+]);
 
 const appointmentStatusByDatabase: Record<string, AppointmentStatus> = {
   cancelled: "Отменена",
@@ -211,6 +246,14 @@ function mapCertificateStatus(status: string): CertificateStatus {
 
 function mapCertificateStatusToDatabase(status: CertificateStatus) {
   return databaseCertificateStatusByStatus.get(status) ?? "paid";
+}
+
+function mapServiceStatusToDatabase(status: ServiceStatus) {
+  return databaseServiceStatusByStatus.get(status) ?? "draft";
+}
+
+function mapPriceStatusToDatabase(status: PriceStatus) {
+  return databasePriceStatusByStatus.get(status) ?? "active";
 }
 
 function mapStripeStatus(row: Pick<AdminStripeSaleDatabaseRow, "gross_cents" | "refund_cents">): FinanceRow["status"] {
@@ -325,6 +368,35 @@ function mapCertificateRecordToRow(certificate: CertificateRecord): AdminCertifi
     recipient_name: certificate.recipient,
     status: mapCertificateStatusToDatabase(certificate.status),
     stripe_payment_intent_id: certificate.stripeId,
+  };
+}
+
+function mapServiceRecordToRow(service: ServiceRecord): AdminServiceDatabaseRow {
+  return {
+    category: service.category,
+    cover_image_url: service.coverImage,
+    display_order: service.order,
+    duration_label: service.duration,
+    locale_codes: [...service.locales],
+    name: service.name,
+    seo_title: service.seoTitle,
+    slug: service.slug,
+    status: mapServiceStatusToDatabase(service.status),
+    summary: service.summary,
+  };
+}
+
+function mapPriceRecordToRow(price: PriceRecord): AdminPriceDatabaseRow {
+  return {
+    currency: "EUR",
+    display_order: price.order,
+    duration_minutes: price.durationMinutes,
+    id: price.id,
+    internal_note: price.note,
+    price_cents: toCents(price.priceEur),
+    service_slug: price.serviceSlug,
+    status: mapPriceStatusToDatabase(price.status),
+    updated_on: price.updatedAt,
   };
 }
 
@@ -465,6 +537,14 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     await upsertRow(client, "admin_certificates", mapCertificateRecordToRow(certificate), { onConflict: "code" });
   }
 
+  async function saveService(service: ServiceRecord) {
+    await upsertRow(client, "admin_services", mapServiceRecordToRow(service), { onConflict: "slug" });
+  }
+
+  async function savePrice(price: PriceRecord) {
+    await upsertRow(client, "admin_price_variants", mapPriceRecordToRow(price), { onConflict: "id" });
+  }
+
   return {
     listAppointments,
     listCertificates,
@@ -475,5 +555,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     saveAppointment,
     saveCertificate,
     saveClient,
+    savePrice,
+    saveService,
   };
 }

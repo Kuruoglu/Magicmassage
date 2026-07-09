@@ -53,6 +53,34 @@ export type CertificateRecord = {
   stripeId: string;
 };
 
+export type ServiceStatus = "Опубликована" | "Черновик" | "Скрыта";
+
+export type ServiceRecord = {
+  category: string;
+  coverImage: string;
+  duration: string;
+  locales: string[];
+  name: string;
+  order: number;
+  seoTitle: string;
+  slug: string;
+  status: ServiceStatus;
+  summary: string;
+};
+
+export type PriceStatus = "Активна" | "Скрыта";
+
+export type PriceRecord = {
+  durationMinutes: number;
+  id: string;
+  note: string;
+  order: number;
+  priceEur: number;
+  serviceSlug: string;
+  status: PriceStatus;
+  updatedAt: string;
+};
+
 type DemoClientRow = Omit<ClientRecord, "id" | "history" | "tags"> & {
   id?: string;
   history: readonly ClientVisit[];
@@ -115,6 +143,31 @@ export type AdminCertificateDatabaseRow = {
   recipient_name: string;
   status: string;
   stripe_payment_intent_id: string;
+};
+
+export type AdminServiceDatabaseRow = {
+  category: string;
+  cover_image_url: string;
+  display_order: number;
+  duration_label: string;
+  locale_codes: string[];
+  name: string;
+  seo_title: string;
+  slug: string;
+  status: string;
+  summary: string;
+};
+
+export type AdminPriceDatabaseRow = {
+  currency: string;
+  display_order: number;
+  duration_minutes: number;
+  id: string;
+  internal_note: string;
+  price_cents: number;
+  service_slug: string;
+  status: string;
+  updated_on: string;
 };
 
 export type AdminDatabaseSeed = {

@@ -1,4 +1,4 @@
-import type { Appointment, CertificateRecord, ClientRecord } from "./domain";
+import type { Appointment, CertificateRecord, ClientRecord, PriceRecord, ServiceRecord } from "./domain";
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
 
@@ -14,6 +14,14 @@ export type AdminPersistInput =
   | {
       record: ClientRecord;
       type: "client";
+    }
+  | {
+      record: PriceRecord;
+      type: "price";
+    }
+  | {
+      record: ServiceRecord;
+      type: "service";
     };
 
 export type AdminPersistResult =
@@ -29,7 +37,9 @@ export type AdminPersistResult =
 
 type AdminPersistDependencies = {
   createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
-  createRepository?: (client: AdminSupabaseClient) => Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient">;
+  createRepository?: (
+    client: AdminSupabaseClient,
+  ) => Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient" | "savePrice" | "saveService">;
   env?: AdminSupabaseEnvSource;
 };
 
@@ -103,6 +113,34 @@ function isCertificateRecordShape(record: Record<string, unknown>) {
   );
 }
 
+function isServiceRecordShape(record: Record<string, unknown>) {
+  return (
+    hasString(record, "category") &&
+    hasString(record, "coverImage") &&
+    hasString(record, "duration") &&
+    hasStringArray(record, "locales") &&
+    hasString(record, "name") &&
+    hasNumber(record, "order") &&
+    hasString(record, "seoTitle") &&
+    hasString(record, "slug") &&
+    hasString(record, "status") &&
+    hasString(record, "summary")
+  );
+}
+
+function isPriceRecordShape(record: Record<string, unknown>) {
+  return (
+    hasNumber(record, "durationMinutes") &&
+    hasString(record, "id") &&
+    hasString(record, "note") &&
+    hasNumber(record, "order") &&
+    hasNumber(record, "priceEur") &&
+    hasString(record, "serviceSlug") &&
+    hasString(record, "status") &&
+    hasString(record, "updatedAt")
+  );
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to persist admin record.";
 }
@@ -122,6 +160,14 @@ export function isAdminPersistInput(input: unknown): input is AdminPersistInput 
 
   if (input.type === "client") {
     return isClientRecordShape(input.record);
+  }
+
+  if (input.type === "price") {
+    return isPriceRecordShape(input.record);
+  }
+
+  if (input.type === "service") {
+    return isServiceRecordShape(input.record);
   }
 
   return false;
@@ -152,6 +198,10 @@ export async function persistAdminRecord(
       await repository.saveClient(input.record);
     } else if (input.type === "certificate") {
       await repository.saveCertificate(input.record);
+    } else if (input.type === "price") {
+      await repository.savePrice(input.record);
+    } else if (input.type === "service") {
+      await repository.saveService(input.record);
     } else {
       await repository.saveAppointment(input.record);
     }

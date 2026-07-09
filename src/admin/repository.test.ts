@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { PriceRecord, ServiceRecord } from "./domain";
 import { createAdminSupabaseRepository, type AdminFinanceExportLogInput } from "./repository";
 
 type QueryFilter = {
@@ -142,6 +143,30 @@ const certificateRows = [
     stripe_payment_intent_id: "pi_3QMMN1023",
   },
 ];
+
+const serviceRecord: ServiceRecord = {
+  category: "SPA",
+  coverImage: "/media/services/aroma-massage.jpg",
+  duration: "75 мин",
+  locales: ["ru", "bg"],
+  name: "Арома массаж",
+  order: 9,
+  seoTitle: "Арома массаж в Бургасе",
+  slug: "aroma-massage",
+  status: "Черновик",
+  summary: "SPA-услуга с ароматическими маслами.",
+};
+
+const priceRecord: PriceRecord = {
+  durationMinutes: 90,
+  id: "price-aroma-massage-90",
+  note: "Длинный вариант для постоянных клиентов.",
+  order: 4,
+  priceEur: 110,
+  serviceSlug: "aroma-massage",
+  status: "Активна",
+  updatedAt: "2026-07-09",
+};
 
 const stripeRows = [
   {
@@ -398,6 +423,57 @@ describe("admin Supabase repository", () => {
         recipient_name: "Self",
         status: "sent",
         stripe_payment_intent_id: "manual",
+      },
+    });
+  });
+
+  it("upserts massage services by slug for admin content edits", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveService(serviceRecord);
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "slug" },
+      table: "admin_services",
+      values: {
+        category: "SPA",
+        cover_image_url: "/media/services/aroma-massage.jpg",
+        display_order: 9,
+        duration_label: "75 мин",
+        locale_codes: ["ru", "bg"],
+        name: "Арома массаж",
+        seo_title: "Арома массаж в Бургасе",
+        slug: "aroma-massage",
+        status: "draft",
+        summary: "SPA-услуга с ароматическими маслами.",
+      },
+    });
+  });
+
+  it("upserts price variants by id with EUR cents", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.savePrice(priceRecord);
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_price_variants",
+      values: {
+        currency: "EUR",
+        display_order: 4,
+        duration_minutes: 90,
+        id: "price-aroma-massage-90",
+        internal_note: "Длинный вариант для постоянных клиентов.",
+        price_cents: 11000,
+        service_slug: "aroma-massage",
+        status: "active",
+        updated_on: "2026-07-09",
       },
     });
   });
