@@ -319,19 +319,19 @@ test("admin record drawers expose linked client workspaces", async ({ page }) =>
   const appointmentLinks = page.getByLabel("Детали выбранной записи").getByLabel("Связанные действия клиента");
   await expect(appointmentLinks.getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
+    "/admin?section=clients&role=owner&client=client-359873334411",
   );
   await expect(appointmentLinks.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&client=Olena%20K.",
+    "/admin?section=calendar&role=owner&client=client-359873334411",
   );
   await expect(appointmentLinks.getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=certificates&role=owner&client=Olena%20K.",
+    "/admin?section=certificates&role=owner&client=client-359873334411",
   );
   await expect(appointmentLinks.getByRole("link", { name: "Записать снова" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+    "/admin?section=calendar&role=owner&client=client-359873334411&action=create",
   );
 
   await page.goto("/admin?section=certificates&certificate=MMN-2407-1023", { waitUntil: "networkidle" });
@@ -339,19 +339,19 @@ test("admin record drawers expose linked client workspaces", async ({ page }) =>
   const certificateLinks = page.getByLabel("Детали сертификата").getByLabel("Связанные действия клиента");
   await expect(certificateLinks.getByRole("link", { name: "Карточка клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
+    "/admin?section=clients&role=owner&client=client-359873334411",
   );
   await expect(certificateLinks.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&client=Olena%20K.",
+    "/admin?section=calendar&role=owner&client=client-359873334411",
   );
   await expect(certificateLinks.getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=certificates&role=owner&client=Olena%20K.",
+    "/admin?section=certificates&role=owner&client=client-359873334411",
   );
   await expect(certificateLinks.getByRole("link", { name: "Записать клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&client=Olena%20K.&action=create",
+    "/admin?section=calendar&role=owner&client=client-359873334411&action=create",
   );
 });
 
@@ -472,7 +472,7 @@ test("calendar create action uses the currently selected day", async ({ page }) 
 });
 
 test("calendar creation resets client field and suggests existing clients", async ({ page }) => {
-  await page.goto("/admin?section=calendar&client=Olena%20K.&action=create", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=calendar&client=client-359873334411&action=create", { waitUntil: "networkidle" });
 
   await page.getByRole("dialog", { name: "Новая запись" }).getByRole("button", { name: "Закрыть" }).click();
   await page.getByRole("button", { name: "Создать запись" }).click();
@@ -555,7 +555,7 @@ test("calendar links an appointment to the matching client profile", async ({ pa
 });
 
 test("client profile saves a note and exposes contact actions", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await expect(card.getByRole("link", { name: "Позвонить" })).toHaveAttribute("href", "tel:+359873334411");
@@ -574,7 +574,7 @@ test("client profile saves a note and exposes contact actions", async ({ page })
 });
 
 test("client profile shows the next calendar appointment", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const nextAppointment = page.getByLabel("Ближайшая запись клиента");
   await expect(nextAppointment.getByRole("heading", { name: "Ближайшая запись" })).toBeVisible();
@@ -583,12 +583,12 @@ test("client profile shows the next calendar appointment", async ({ page }) => {
   await expect(nextAppointment.getByText("Уточнить шею и плечи перед началом сеанса.")).toBeVisible();
   await expect(nextAppointment.getByRole("link", { name: "Открыть запись" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=client-359873334411&appointment=demo-3",
   );
 });
 
 test("client profile summarizes related work records", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const profile = page.getByLabel("Рабочий профиль клиента");
   await expect(profile.getByRole("heading", { name: "Рабочий профиль" })).toBeVisible();
@@ -601,7 +601,7 @@ test("client profile summarizes related work records", async ({ page }) => {
   await expect(profile.getByText(/вечерние слоты и сильное давление/)).toBeVisible();
   await expect(profile.getByRole("link", { name: "Открыть ближайшую запись" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=client-359873334411&appointment=demo-3",
   );
   await expect(profile.getByRole("link", { name: "Открыть активный сертификат" })).toHaveAttribute(
     "href",
@@ -609,16 +609,16 @@ test("client profile summarizes related work records", async ({ page }) => {
   );
   await expect(profile.getByRole("link", { name: "Все записи клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&client=Olena%20K.",
+    "/admin?section=calendar&role=owner&client=client-359873334411",
   );
   await expect(profile.getByRole("link", { name: "Все сертификаты клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=certificates&role=owner&client=Olena%20K.",
+    "/admin?section=certificates&role=owner&client=client-359873334411",
   );
 });
 
 test("client profile highlights the next operational action", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const nextAction = page.getByLabel("Следующее действие клиента");
   await expect(nextAction.getByRole("heading", { name: "Подготовить PDF сертификата" })).toBeVisible();
@@ -629,19 +629,19 @@ test("client profile highlights the next operational action", async ({ page }) =
     "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
   );
 
-  await page.goto("/admin?section=clients&client=Maria%20Georgieva", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359895550099", { waitUntil: "networkidle" });
 
   const emptyScheduleAction = page.getByLabel("Следующее действие клиента");
   await expect(emptyScheduleAction.getByRole("heading", { name: "Записать клиента" })).toBeVisible();
   await expect(emptyScheduleAction.getByText("В календаре нет будущей записи для этого клиента.")).toBeVisible();
   await expect(emptyScheduleAction.getByRole("link", { name: "Создать запись" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&client=Maria%20Georgieva&action=create",
+    "/admin?section=calendar&role=owner&client=client-359895550099&action=create",
   );
 });
 
 test("client profile filters the working activity feed", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const feed = page.getByLabel("Рабочая лента клиента");
   await expect(feed.getByRole("heading", { name: "Рабочая лента" })).toBeVisible();
@@ -650,7 +650,7 @@ test("client profile filters the working activity feed", async ({ page }) => {
   await expect(feed.getByText(/Предпочитает вечерние слоты/)).toBeVisible();
   await expect(feed.getByRole("link", { name: "Открыть запись 8 июля, 15:00" })).toHaveAttribute(
     "href",
-    "/admin?section=calendar&role=owner&date=2026-07-08&client=Olena%20K.&appointment=demo-3",
+    "/admin?section=calendar&role=owner&date=2026-07-08&client=client-359873334411&appointment=demo-3",
   );
   await expect(feed.getByRole("link", { name: "Открыть сертификат MMN-2407-1023" })).toHaveAttribute(
     "href",
@@ -668,7 +668,7 @@ test("client profile filters the working activity feed", async ({ page }) => {
 });
 
 test("client profile can issue a prefilled certificate", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await card.getByRole("button", { name: "Выдать сертификат" }).click();
@@ -688,7 +688,7 @@ test("client profile can issue a prefilled certificate", async ({ page }) => {
 });
 
 test("client profile links visit history and certificates to their workspaces", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
   const visitHistorySection = card.locator("section").filter({ has: page.getByRole("heading", { name: "История визитов" }) });
@@ -696,7 +696,7 @@ test("client profile links visit history and certificates to their workspaces", 
 
   await expect(page).toHaveURL(/section=calendar/);
   await expect(page).toHaveURL(/date=2026-07-08/);
-  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page).toHaveURL(/client=client-359873334411/);
   await expect(page).toHaveURL(/appointment=demo-3/);
   await expect(page.getByLabel("Фильтр календаря по клиенту")).toContainText("Показаны записи клиента Olena K.");
   const focusedAppointment = page.getByLabel("Детали выбранной записи");
@@ -709,7 +709,7 @@ test("client profile links visit history and certificates to their workspaces", 
   await expect(page.getByRole("button", { name: /Olena K.*8 июля.*Deep tissue massage/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
   const refreshedCard = page.getByRole("dialog", { name: "Карточка клиента" });
   const certificatesSection = refreshedCard.locator("section").filter({ has: page.getByRole("heading", { name: "Сертификаты" }) });
   await certificatesSection.getByRole("link", { exact: true, name: "MMN-2407-1023" }).click();
@@ -720,31 +720,31 @@ test("client profile links visit history and certificates to their workspaces", 
 });
 
 test("client profile opens filtered record workspaces", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await card.getByRole("link", { name: "Все записи клиента" }).click();
 
   await expect(page).toHaveURL(/section=calendar/);
-  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page).toHaveURL(/client=client-359873334411/);
   await expect(page.getByLabel("Фильтр календаря по клиенту")).toContainText("Показаны записи клиента Olena K.");
   await expect(page.getByLabel("Фильтр календаря по клиенту").getByRole("link", { name: "Открыть карточку клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=Olena%20K.",
+    "/admin?section=clients&role=owner&client=client-359873334411",
   );
   await expect(page.getByRole("heading", { name: "8 июля" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Olena K.*Deep tissue massage/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
   await page.getByRole("dialog", { name: "Карточка клиента" }).getByRole("link", { name: "Все сертификаты клиента" }).click();
 
   await expect(page).toHaveURL(/section=certificates/);
-  await expect(page).toHaveURL(/client=Olena%20K\./);
+  await expect(page).toHaveURL(/client=client-359873334411/);
   await expect(page.getByLabel("Фильтр сертификатов по клиенту")).toContainText("Показаны сертификаты клиента Olena K.");
   await expect(page.getByLabel("Фильтр сертификатов по клиенту").getByRole("link", { name: "Открыть карточку клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=Olena%20K.",
+    "/admin?section=clients&role=owner&client=client-359873334411",
   );
   await expect(page.getByRole("row", { name: /MMN-2407-1023/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /MMN-2407-1021/ })).toHaveCount(0);
@@ -775,7 +775,7 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await expect(createDialog).toHaveCount(0);
   await expect(page.getByRole("table").getByRole("link", { name: "Ирина Тестова" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%2B359%2088%20777%201122",
+    "/admin?section=clients&role=owner&client=client-359887771122",
   );
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
@@ -810,7 +810,7 @@ test("client form blocks a duplicate phone before creating a client", async ({ p
   await expect(createDialog.getByRole("alert")).toContainText("Клиент с таким телефоном уже есть: Olena K.");
   await expect(createDialog.getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%2B359%2087%20333%204411",
+    "/admin?section=clients&role=owner&client=client-359873334411",
   );
   await expect(page.getByRole("dialog", { name: "Карточка клиента" })).toHaveCount(0);
   await expect(page.getByRole("table").getByRole("link", { name: "Новая Olena" })).toHaveCount(0);
@@ -1268,7 +1268,7 @@ test("users workspace invites, filters and edits accountant access", async ({ pa
 });
 
 test("client profile opens prefilled calendar appointment creation", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=Olena%20K.", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
 
   const card = page.getByRole("dialog", { name: "Карточка клиента" });
   await card.getByRole("link", { name: "Записать клиента" }).click();
@@ -1293,10 +1293,10 @@ test("client filters update the table and profile certificate block", async ({ p
   await expect(table.getByRole("row", { name: /Olena K./ })).toHaveCount(0);
   await expect(table.getByRole("link", { name: "Maria Georgieva" })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%2B359%2089%20555%200099",
+    "/admin?section=clients&role=owner&client=client-359895550099",
   );
   await table.getByRole("link", { name: "Maria Georgieva" }).click();
-  await expect(page).toHaveURL(/client=%2B359%2089%20555%200099/);
+  await expect(page).toHaveURL(/client=client-359895550099/);
   await expect(card.getByRole("heading", { name: "Maria Georgieva" })).toBeVisible();
 
   await card.getByRole("button", { name: "Закрыть" }).click();
@@ -1304,7 +1304,7 @@ test("client filters update the table and profile certificate block", async ({ p
 
   await page.getByRole("button", { name: "Все" }).click();
   await table.getByRole("link", { name: "Olena K." }).click();
-  await expect(page).toHaveURL(/client=%2B359%2087%20333%204411/);
+  await expect(page).toHaveURL(/client=client-359873334411/);
 
   const certificatesSection = card.getByRole("heading", { name: "Сертификаты" }).locator("..");
   await expect(certificatesSection).toBeVisible();
@@ -1323,7 +1323,7 @@ test("client filters update the table and profile certificate block", async ({ p
   await expect(table.getByRole("row", { name: /Maria Georgieva/ })).toHaveCount(0);
 
   await table.getByRole("link", { name: "Olena K." }).click();
-  await expect(page).toHaveURL(/client=%2B359%2087%20333%204411/);
+  await expect(page).toHaveURL(/client=client-359873334411/);
   await expect(card).toHaveClass(/admin-drawer-panel/);
   await expect(card.getByLabel("Активность клиента")).toContainText("В активных: 5 визитов");
   await expect(card.getByLabel("Активность клиента")).toContainText("Следующий визит: 15 Jul 11:30");
@@ -1342,7 +1342,7 @@ test("mobile client active filter shows status cards without horizontal scrollin
   const annaCard = mobileList.getByRole("listitem").filter({ hasText: "Анна Петрова" });
   await expect(annaCard.getByRole("link", { name: /Анна Петрова/ })).toHaveAttribute(
     "href",
-    "/admin?section=clients&role=owner&client=%2B359%2088%20111%202233",
+    "/admin?section=clients&role=owner&client=client-359881112233",
   );
   await expect(annaCard.getByText("Активный клиент")).toBeVisible();
   await expect(annaCard.locator(".admin-mobile-client-meta").getByText("7 визитов", { exact: true })).toBeVisible();

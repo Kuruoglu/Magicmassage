@@ -44,6 +44,7 @@ type AdminShellProps = {
 type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
 type Appointment = {
   id?: string;
+  clientId?: string;
   date: string;
   time: string;
   client: string;
@@ -73,6 +74,7 @@ type ClientNextAction = {
   typeLabel: string;
 };
 type ClientRecord = {
+  id: string;
   email: string;
   history: ClientVisit[];
   language: string;
@@ -91,6 +93,7 @@ type CertificateStatus = "Оплачено" | "Отправлен" | "Ожида
 type CertificateRecord = {
   amount: string;
   buyer: string;
+  clientId?: string;
   clientName: string;
   code: string;
   expiresAt: string;
@@ -835,9 +838,23 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function buildClientIdFromPhone(phone: string) {
+  const phoneKey = normalizeClientPhone(phone);
+
+  return phoneKey ? `client-${phoneKey}` : `client-${normalizeSearch(phone) || "manual"}`;
+}
+
+function findInitialClientIdByName(clientName: string) {
+  const normalizedClientName = normalizeSearch(clientName);
+  const client = clientRows.find((row) => normalizeSearch(row.name) === normalizedClientName);
+
+  return client ? buildClientIdFromPhone(client.phone) : undefined;
+}
+
 function buildInitialClientRows(): ClientRecord[] {
   return clientRows.map((client) => ({
     ...client,
+    id: buildClientIdFromPhone(client.phone),
     history: client.history.map((visit) => ({ ...visit })),
     tags: [...client.tags],
   }));
@@ -850,6 +867,7 @@ function buildInitialCertificateRows(): CertificateRecord[] {
 
     return {
       ...certificate,
+      clientId: findInitialClientIdByName(certificate.clientName),
       expiresAt: addMonthsToIsoDate(paymentDate, 6),
       history: [
         `${paymentDate}: Stripe оплата связана с ${financeRow?.id ?? "manual"}.`,
@@ -969,6 +987,7 @@ function buildClientCertificateDraft(client: ClientRecord, certificates: Certifi
   return {
     amount: "0 €",
     buyer: client.name,
+    clientId: client.id,
     clientName: client.name,
     code: `MMN-2407-${nextSuffix}`,
     expiresAt: "2027-01-07",
@@ -1164,21 +1183,12 @@ function createAdminUserId(name: string, email: string) {
   return `admin-user-${base || "invite"}`;
 }
 
-function findClientByName(clients: ClientRecord[], name: string | undefined) {
-  const normalizedName = name ? normalizeSearch(name) : "";
-
-  if (!normalizedName) {
-    return undefined;
-  }
-
-  return clients.find((client) => normalizeSearch(client.name) === normalizedName);
-}
-
 function matchesClientIdentity(client: ClientRecord, identity: string | undefined) {
   const normalizedIdentity = identity ? normalizeSearch(identity) : "";
   const normalizedPhoneIdentity = identity ? normalizeClientPhone(identity) : "";
 
   return (
+    (Boolean(normalizedIdentity) && normalizeSearch(client.id) === normalizedIdentity) ||
     (Boolean(normalizedIdentity) && normalizeSearch(client.name) === normalizedIdentity) ||
     (Boolean(normalizedPhoneIdentity) && normalizeClientPhone(client.phone) === normalizedPhoneIdentity)
   );
@@ -1186,6 +1196,26 @@ function matchesClientIdentity(client: ClientRecord, identity: string | undefine
 
 function findClientByIdentity(clients: ClientRecord[], identity: string | undefined) {
   return clients.find((client) => matchesClientIdentity(client, identity));
+}
+
+function findUniqueClientByName(clients: ClientRecord[], name: string | undefined) {
+  const normalizedName = name ? normalizeSearch(name) : "";
+
+  if (!normalizedName) {
+    return undefined;
+  }
+
+  const matches = clients.filter((client) => normalizeSearch(client.name) === normalizedName);
+
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+function findAppointmentClient(clients: ClientRecord[], appointment: Appointment) {
+  return findClientByIdentity(clients, appointment.clientId) ?? findUniqueClientByName(clients, appointment.client);
+}
+
+function findCertificateClient(clients: ClientRecord[], certificate: CertificateRecord) {
+  return findClientByIdentity(clients, certificate.clientId) ?? findUniqueClientByName(clients, certificate.clientName);
 }
 
 function findClientPhoneDuplicate(clients: ClientRecord[], phone: string, originalClientIdentity?: string) {
@@ -1226,10 +1256,28 @@ function isClientNameAmbiguous(clients: ClientRecord[], clientName: string) {
   return clients.filter((client) => normalizeSearch(client.name) === normalizedClientName).length > 1;
 }
 
-function findClientCertificates(certificates: CertificateRecord[], clientName: string): CertificateRecord[] {
-  const normalizedName = normalizeSearch(clientName);
+function appointmentBelongsToClient(appointment: Appointment, client: ClientRecord, clients: ClientRecord[]) {
+  if (appointment.clientId) {
+    return appointment.clientId === client.id;
+  }
 
-  return certificates.filter((certificate) => normalizeSearch(certificate.clientName) === normalizedName);
+  return !isClientNameAmbiguous(clients, client.name) && matchesClientName(appointment.client, client.name);
+}
+
+function certificateBelongsToClient(certificate: CertificateRecord, client: ClientRecord, clients: ClientRecord[]) {
+  if (certificate.clientId) {
+    return certificate.clientId === client.id;
+  }
+
+  return !isClientNameAmbiguous(clients, client.name) && matchesClientName(certificate.clientName, client.name);
+}
+
+function findClientAppointments(appointments: Appointment[], client: ClientRecord, clients: ClientRecord[]) {
+  return appointments.filter((appointment) => appointmentBelongsToClient(appointment, client, clients));
+}
+
+function findClientCertificates(certificates: CertificateRecord[], client: ClientRecord, clients: ClientRecord[]): CertificateRecord[] {
+  return certificates.filter((certificate) => certificateBelongsToClient(certificate, client, clients));
 }
 
 function matchesClientName(value: string, clientName: string | undefined) {
@@ -1392,25 +1440,19 @@ function appointmentVisitLabel(appointment: Appointment) {
   return `${formatCalendarDay(appointment.date)}, ${appointment.time}`;
 }
 
-function findClientVisitAppointment(clientName: string, visit: ClientVisit, appointments: Appointment[]) {
-  const normalizedClientName = normalizeSearch(clientName);
+function findClientVisitAppointment(visit: ClientVisit, appointments: Appointment[]) {
   const normalizedVisitDate = normalizeSearch(visit.date);
   const normalizedVisitService = normalizeSearch(visit.service);
 
   return appointments.find(
     (appointment) =>
-      normalizeSearch(appointment.client) === normalizedClientName &&
       normalizeSearch(appointment.service) === normalizedVisitService &&
       normalizeSearch(appointmentVisitLabel(appointment)) === normalizedVisitDate,
   );
 }
 
-function findClientNextAppointment(clientName: string, appointments: Appointment[]) {
-  const normalizedClientName = normalizeSearch(clientName);
-
-  return sortAppointments(appointments).find(
-    (appointment) => normalizeSearch(appointment.client) === normalizedClientName && appointment.status !== "Отменена",
-  );
+function findClientNextAppointment(appointments: Appointment[]) {
+  return sortAppointments(appointments).find((appointment) => appointment.status !== "Отменена");
 }
 
 function findClientLastCompletedVisit(client: ClientRecord) {
@@ -1444,7 +1486,7 @@ function buildClientNextAction(
       badgeClassName: statusClass(nextAppointment.status),
       ctaLabel: "Открыть запись",
       description: `${appointmentVisitLabel(nextAppointment)} · ${nextAppointment.service}`,
-      href: calendarAppointmentHref(nextAppointment, role, client.name),
+      href: calendarAppointmentHref(nextAppointment, role, client.id),
       status: nextAppointment.status,
       title: "Подтвердить запись клиента",
       typeLabel: "Запись",
@@ -1457,7 +1499,7 @@ function buildClientNextAction(
       calendarCreateIntent: true,
       ctaLabel: "Создать запись",
       description: "В календаре нет будущей записи для этого клиента.",
-      href: calendarCreateHref(client.name, role),
+      href: calendarCreateHref(client.id, role),
       status: "Нет записи",
       title: "Записать клиента",
       typeLabel: "Календарь",
@@ -1468,7 +1510,7 @@ function buildClientNextAction(
     badgeClassName: statusClass(nextAppointment.status),
     ctaLabel: "Открыть запись",
     description: `${appointmentVisitLabel(nextAppointment)} · ${nextAppointment.service}`,
-    href: calendarAppointmentHref(nextAppointment, role, client.name),
+    href: calendarAppointmentHref(nextAppointment, role, client.id),
     status: nextAppointment.status,
     title: "Проверить ближайшую запись",
     typeLabel: "Запись",
@@ -1484,6 +1526,7 @@ function sortAppointments(appointments: Appointment[]) {
 function buildInitialCalendarAppointments() {
   return upcomingAppointments.map((appointment, index) => ({
     ...appointment,
+    clientId: findInitialClientIdByName(appointment.client),
     id: `demo-${index + 1}`,
   }));
 }
@@ -1716,7 +1759,7 @@ function ClientFormDialog({
   clients: ClientRecord[];
   initialClient?: ClientRecord;
   onClose: () => void;
-  onSave: (client: ClientRecord, originalClientName?: string) => void;
+  onSave: (client: ClientRecord, originalClientIdentity?: string) => void;
   role: AdminRoleId;
 }) {
   const [form, setForm] = useState<ClientFormState>(() => buildClientFormState(initialClient));
@@ -1727,7 +1770,7 @@ function ClientFormDialog({
   const isEditing = Boolean(initialClient);
   const hasNameError = Boolean(error && !form.name.trim());
   const hasPhoneError = Boolean(error && !form.phone.trim());
-  const originalClientIdentity = initialClient?.phone ?? initialClient?.name;
+  const originalClientIdentity = initialClient?.id ?? initialClient?.phone ?? initialClient?.name;
   const matchingNameClient = findClientNameMatch(clients, form.name, originalClientIdentity);
 
   function describedBy(...ids: Array<string | false>) {
@@ -1773,6 +1816,7 @@ function ClientFormDialog({
       {
         email: form.email.trim(),
         history: initialClient?.history.map((visit) => ({ ...visit })) ?? [],
+        id: initialClient?.id ?? buildClientIdFromPhone(phone),
         language: form.language,
         name,
         next: form.next.trim() || "Не назначен",
@@ -1810,7 +1854,7 @@ function ClientFormDialog({
                 {duplicateClient ? (
                   <>
                     {" "}
-                    <Link href={clientProfileHref(duplicateClient.phone, role)} onClick={onClose}>
+                    <Link href={clientProfileHref(duplicateClient.id, role)} onClick={onClose}>
                       Открыть карточку существующего клиента
                     </Link>
                   </>
@@ -2150,6 +2194,7 @@ function CertificateFormDialog({
       {
         amount: form.amount.trim() || "0 €",
         buyer,
+        clientId: initialCertificate?.clientId,
         clientName: form.clientName.trim() || recipient,
         code,
         expiresAt: form.expiresAt,
@@ -3332,6 +3377,7 @@ function CalendarAppointmentDialog({
   initialAppointment,
   onClose,
   onSave,
+  prefillClient,
   prefillClientName,
   prefillDate,
 }: {
@@ -3339,11 +3385,13 @@ function CalendarAppointmentDialog({
   initialAppointment?: Appointment;
   onClose: () => void;
   onSave: (appointment: Appointment) => void;
+  prefillClient?: ClientRecord;
   prefillClientName?: string;
   prefillDate?: string;
 }) {
   const [form, setForm] = useState<Appointment>({
-    client: initialAppointment?.client ?? prefillClientName ?? "",
+    client: initialAppointment?.client ?? prefillClient?.name ?? prefillClientName ?? "",
+    clientId: initialAppointment?.clientId ?? prefillClient?.id,
     date: initialAppointment?.date ?? prefillDate ?? "2026-07-06",
     id: initialAppointment?.id,
     note: initialAppointment?.note ?? "",
@@ -3373,8 +3421,16 @@ function CalendarAppointmentDialog({
     setError("");
   }
 
+  function updateClientInput(value: string) {
+    const linkedClient = findClientByIdentity(clients, value) ?? findUniqueClientByName(clients, value);
+
+    setForm((current) => ({ ...current, client: value, clientId: linkedClient?.id }));
+    setError("");
+  }
+
   function selectClient(client: ClientRecord) {
-    updateForm("client", client.name);
+    setForm((current) => ({ ...current, client: client.name, clientId: client.id }));
+    setError("");
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -3387,7 +3443,9 @@ function CalendarAppointmentDialog({
       return;
     }
 
-    onSave({ ...form, client, note: form.note.trim() });
+    const linkedClient = findClientByIdentity(clients, form.clientId) ?? findUniqueClientByName(clients, client);
+
+    onSave({ ...form, client, clientId: linkedClient?.id, note: form.note.trim() });
     onClose();
   }
 
@@ -3411,7 +3469,7 @@ function CalendarAppointmentDialog({
               <input
                 aria-invalid={error && !form.client.trim() ? "true" : undefined}
                 autoComplete="name"
-                onChange={(event) => updateForm("client", event.target.value)}
+                onChange={(event) => updateClientInput(event.target.value)}
                 required
                 type="text"
                 value={form.client}
@@ -3422,7 +3480,7 @@ function CalendarAppointmentDialog({
                 {clientSuggestions.map((client) => (
                   <button
                     aria-selected="false"
-                    key={client.name}
+                    key={client.id}
                     onClick={() => selectClient(client)}
                     role="option"
                     type="button"
@@ -3552,11 +3610,13 @@ function CalendarAppointmentCancelDialog({
 function DashboardWorkspace({
   appointments,
   certificates,
+  clients,
   query,
   role,
 }: {
   appointments: Appointment[];
   certificates: CertificateRecord[];
+  clients: ClientRecord[];
   query: string;
   role: AdminRoleId;
 }) {
@@ -3658,25 +3718,30 @@ function DashboardWorkspace({
               </tr>
             </thead>
             <tbody>
-              {filteredAppointments.map((appointment) => (
-                <tr key={appointmentKey(appointment)}>
-                  <td className="admin-tabular">{appointment.time}</td>
-                  <td>
-                    <Link className="admin-row-action admin-row-link" href={clientProfileHref(appointment.client, role)}>
-                      {appointment.client}
-                    </Link>
-                  </td>
-                  <td>{appointment.service}</td>
-                  <td>
-                    <span className={statusClass(appointment.status)}>{appointment.status}</span>
-                  </td>
-                  <td>
-                    <Link className="admin-row-action admin-row-link" href={calendarAppointmentHref(appointment, role, appointment.client)}>
-                      Календарь
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {filteredAppointments.map((appointment) => {
+                const appointmentClient = findAppointmentClient(clients, appointment);
+                const appointmentClientIdentity = appointmentClient?.id ?? appointment.client;
+
+                return (
+                  <tr key={appointmentKey(appointment)}>
+                    <td className="admin-tabular">{appointment.time}</td>
+                    <td>
+                      <Link className="admin-row-action admin-row-link" href={clientProfileHref(appointmentClientIdentity, role)}>
+                        {appointment.client}
+                      </Link>
+                    </td>
+                    <td>{appointment.service}</td>
+                    <td>
+                      <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                    </td>
+                    <td>
+                      <Link className="admin-row-action admin-row-link" href={calendarAppointmentHref(appointment, role, appointmentClientIdentity)}>
+                        Календарь
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -3748,7 +3813,7 @@ function ClientDetailCard({
   onClose: () => void;
   onEditClient: (client: ClientRecord) => void;
   onIssueCertificate: (client: ClientRecord) => void;
-  onSaveNote: (clientName: string, note: string) => void;
+  onSaveNote: (clientId: string, note: string) => void;
   role: AdminRoleId;
 }) {
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -3762,7 +3827,7 @@ function ClientDetailCard({
     .slice(0, 2)
     .toUpperCase();
   const activity = clientActivitySummary(client);
-  const nextAppointment = findClientNextAppointment(client.name, appointments);
+  const nextAppointment = findClientNextAppointment(appointments);
   const lastCompletedVisit = findClientLastCompletedVisit(client);
   const activeCertificate = findClientActiveCertificate(certificates);
   const nextClientAction = buildClientNextAction(client, nextAppointment, activeCertificate, role);
@@ -3789,7 +3854,7 @@ function ClientDetailCard({
     event.preventDefault();
 
     const nextNote = draftNote.trim();
-    onSaveNote(client.name, nextNote);
+    onSaveNote(client.id, nextNote);
     setDraftNote(nextNote);
     setIsEditingNote(false);
     setSaveNotice("Заметка сохранена.");
@@ -3845,7 +3910,7 @@ function ClientDetailCard({
       </dl>
 
       <div className="admin-client-actions" aria-label="Быстрые действия клиента">
-        <Link className="admin-text-action" href={calendarCreateHref(client.name, role)} onClick={onCalendarCreateIntent}>
+        <Link className="admin-text-action" href={calendarCreateHref(client.id, role)} onClick={onCalendarCreateIntent}>
           Записать клиента
         </Link>
         <button className="admin-outline-action" onClick={() => onEditClient(client)} type="button">
@@ -3924,7 +3989,7 @@ function ClientDetailCard({
         </p>
         <div className="admin-client-next-actions">
           {nextAppointment ? (
-            <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role, client.name)}>
+            <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role, client.id)}>
               Открыть ближайшую запись
             </Link>
           ) : null}
@@ -3933,13 +3998,13 @@ function ClientDetailCard({
               Открыть активный сертификат
             </Link>
           ) : null}
-          <Link className="admin-client-inline-link" href={calendarCreateHref(client.name, role)} onClick={onCalendarCreateIntent}>
+          <Link className="admin-client-inline-link" href={calendarCreateHref(client.id, role)} onClick={onCalendarCreateIntent}>
             Записать снова
           </Link>
-          <Link className="admin-client-inline-link" href={calendarClientHref(client.name, role)}>
+          <Link className="admin-client-inline-link" href={calendarClientHref(client.id, role)}>
             Все записи клиента
           </Link>
-          <Link className="admin-client-inline-link" href={certificateClientHref(client.name, role)}>
+          <Link className="admin-client-inline-link" href={certificateClientHref(client.id, role)}>
             Все сертификаты клиента
           </Link>
         </div>
@@ -3965,7 +4030,7 @@ function ClientDetailCard({
           <ol className="admin-client-feed-list">
             {shouldShowVisits
               ? client.history.map((visit) => {
-                  const linkedAppointment = findClientVisitAppointment(client.name, visit, appointments);
+                  const linkedAppointment = findClientVisitAppointment(visit, appointments);
 
                   return (
                     <li key={`feed-visit-${visit.date}-${visit.service}`}>
@@ -3979,7 +4044,7 @@ function ClientDetailCard({
                         <Link
                           aria-label={`Открыть запись ${visit.date}`}
                           className="admin-client-inline-link"
-                          href={calendarAppointmentHref(linkedAppointment, role, client.name)}
+                          href={calendarAppointmentHref(linkedAppointment, role, client.id)}
                         >
                           Открыть запись
                         </Link>
@@ -4041,7 +4106,7 @@ function ClientDetailCard({
             </div>
             <p>{nextAppointment.note || "Комментарий к записи пока пуст."}</p>
             <div className="admin-client-next-actions">
-              <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role, client.name)}>
+          <Link className="admin-client-inline-link" href={calendarAppointmentHref(nextAppointment, role, client.id)}>
                 Открыть запись
               </Link>
             </div>
@@ -4055,7 +4120,7 @@ function ClientDetailCard({
         <h3>История визитов</h3>
         <ol className="admin-client-history">
           {client.history.map((visit) => {
-            const linkedAppointment = findClientVisitAppointment(client.name, visit, appointments);
+                  const linkedAppointment = findClientVisitAppointment(visit, appointments);
 
             return (
               <li key={`${visit.date}-${visit.service}`}>
@@ -4069,7 +4134,7 @@ function ClientDetailCard({
                     <Link
                       aria-label={`Открыть запись ${visit.date}`}
                       className="admin-client-inline-link"
-                      href={calendarAppointmentHref(linkedAppointment, role, client.name)}
+                      href={calendarAppointmentHref(linkedAppointment, role, client.id)}
                     >
                       Открыть запись
                     </Link>
@@ -4173,13 +4238,13 @@ function ClientsWorkspace({
   onCalendarCreateIntent: () => void;
   onCloseClientCreate: () => void;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
-  onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
-  onSaveClientNote: (clientName: string, note: string) => void;
+  onSaveClient: (client: ClientRecord, originalClientIdentity?: string) => void;
+  onSaveClientNote: (clientIdentity: string, note: string) => void;
   query: string;
   role: AdminRoleId;
   selectedClientName?: string;
 }) {
-  const initialSelectedClientKey = findClientByIdentity(clients, selectedClientName)?.phone ?? clients[0]?.phone ?? "";
+  const initialSelectedClientKey = findClientByIdentity(clients, selectedClientName)?.id ?? clients[0]?.id ?? "";
   const [selectedClientKey, setSelectedClientKey] = useState(initialSelectedClientKey);
   const [isClientDrawerOpen, setIsClientDrawerOpen] = useState(Boolean(selectedClientName));
   const [editingClient, setEditingClient] = useState<ClientRecord | undefined>();
@@ -4204,9 +4269,8 @@ function ClientsWorkspace({
       ),
   );
   const selectedClient = findClientByIdentity(clients, selectedClientKey) ?? filteredClients[0] ?? clients[0];
-  const hasAmbiguousSelectedClientName = isClientNameAmbiguous(clients, selectedClient.name);
-  const selectedClientAppointments = hasAmbiguousSelectedClientName ? [] : appointments;
-  const selectedClientCertificates = hasAmbiguousSelectedClientName ? [] : findClientCertificates(certificates, selectedClient.name);
+  const selectedClientAppointments = findClientAppointments(appointments, selectedClient, clients);
+  const selectedClientCertificates = findClientCertificates(certificates, selectedClient, clients);
   const isClientFormOpen = isClientCreateOpen || Boolean(editingClient);
 
   function openClient(clientKey: string) {
@@ -4240,9 +4304,9 @@ function ClientsWorkspace({
     setCertificateDraft(undefined);
   }
 
-  function saveClientForm(client: ClientRecord, originalClientName?: string) {
-    onSaveClient(client, originalClientName);
-    setSelectedClientKey(client.phone);
+  function saveClientForm(client: ClientRecord, originalClientIdentity?: string) {
+    onSaveClient(client, originalClientIdentity);
+    setSelectedClientKey(client.id);
     setIsClientDrawerOpen(true);
     closeClientForm();
   }
@@ -4291,12 +4355,12 @@ function ClientsWorkspace({
                 const activity = clientActivitySummary(client);
 
                 return (
-                  <tr aria-selected={client.phone === selectedClient.phone} key={client.phone}>
+                  <tr aria-selected={client.id === selectedClient.id} key={client.id}>
                     <td>
                       <Link
                         className="admin-row-action admin-row-link"
-                        href={clientProfileHref(client.phone, role)}
-                        onClick={() => openClient(client.phone)}
+                        href={clientProfileHref(client.id, role)}
+                        onClick={() => openClient(client.id)}
                       >
                         {client.name}
                       </Link>
@@ -4323,12 +4387,12 @@ function ClientsWorkspace({
             const activity = clientActivitySummary(client);
 
             return (
-              <li key={client.phone}>
+              <li key={client.id}>
                 <Link
-                  aria-current={client.phone === selectedClient.phone ? "page" : undefined}
+                  aria-current={client.id === selectedClient.id ? "page" : undefined}
                   className="admin-mobile-client-card"
-                  href={clientProfileHref(client.phone, role)}
-                  onClick={() => openClient(client.phone)}
+                  href={clientProfileHref(client.id, role)}
+                  onClick={() => openClient(client.id)}
                 >
                   <span className="admin-mobile-client-head">
                     <strong>{client.name}</strong>
@@ -4356,7 +4420,7 @@ function ClientsWorkspace({
           <ClientDetailCard
             appointments={selectedClientAppointments}
             certificates={selectedClientCertificates}
-            key={selectedClient.phone}
+            key={selectedClient.id}
             client={selectedClient}
             onCalendarCreateIntent={onCalendarCreateIntent}
             onClose={() => setIsClientDrawerOpen(false)}
@@ -4368,13 +4432,13 @@ function ClientsWorkspace({
         </div>
       ) : null}
       {isClientFormOpen ? (
-        <ClientFormDialog
-          clients={clients}
-          initialClient={editingClient}
-          key={editingClient?.name ?? "new-client"}
-          onClose={closeClientForm}
-          onSave={saveClientForm}
-          role={role}
+          <ClientFormDialog
+            clients={clients}
+            initialClient={editingClient}
+            key={editingClient?.id ?? "new-client"}
+            onClose={closeClientForm}
+            onSave={saveClientForm}
+            role={role}
         />
       ) : null}
       {certificateDraft ? (
@@ -4422,7 +4486,7 @@ function AppointmentDetailDrawer({
         <h2>{appointment.client}</h2>
         <div className="admin-detail-actions">
           {appointmentClient ? (
-            <Link className="admin-outline-action" href={clientProfileHref(appointmentClient.phone, role)}>
+            <Link className="admin-outline-action" href={clientProfileHref(appointmentClient.id, role)}>
               Открыть клиента
             </Link>
           ) : null}
@@ -4468,16 +4532,16 @@ function AppointmentDetailDrawer({
           </div>
           <p>Быстрые переходы к клиентской работе по этой записи.</p>
           <div className="admin-client-next-actions">
-            <Link className="admin-client-inline-link" href={clientProfileHref(appointmentClient.phone, role)}>
+            <Link className="admin-client-inline-link" href={clientProfileHref(appointmentClient.id, role)}>
               Карточка клиента
             </Link>
-            <Link className="admin-client-inline-link" href={calendarClientHref(appointment.client, role)}>
+            <Link className="admin-client-inline-link" href={calendarClientHref(appointmentClient.id, role)}>
               Все записи клиента
             </Link>
-            <Link className="admin-client-inline-link" href={certificateClientHref(appointment.client, role)}>
+            <Link className="admin-client-inline-link" href={certificateClientHref(appointmentClient.id, role)}>
               Все сертификаты клиента
             </Link>
-            <Link className="admin-client-inline-link" href={calendarCreateHref(appointment.client, role)}>
+            <Link className="admin-client-inline-link" href={calendarCreateHref(appointmentClient.id, role)}>
               Записать снова
             </Link>
           </div>
@@ -4540,10 +4604,10 @@ function CertificatesWorkspace({
   selectedCertificateCode?: string;
   selectedClientName?: string;
 }) {
-  const selectedClientFilter = findClientByName(clients, selectedClientName);
+  const selectedClientFilter = findClientByIdentity(clients, selectedClientName);
   const selectedClientFilterName = selectedClientFilter?.name;
   const clientScopedCertificates = selectedClientFilterName
-    ? certificates.filter((certificate) => matchesClientName(certificate.clientName, selectedClientFilterName))
+    ? certificates.filter((certificate) => certificateBelongsToClient(certificate, selectedClientFilter, clients))
     : certificates;
   const [selectedCode, setSelectedCode] = useState(() => {
     if (selectedCertificateCode && certificates.some((certificate) => certificate.code === selectedCertificateCode)) {
@@ -4575,7 +4639,7 @@ function CertificatesWorkspace({
     certificates.find((certificate) => certificate.code === selectedCode) ??
     filteredCertificates[0] ??
     certificates[0];
-  const linkedClient = selectedCertificate ? findClientByName(clients, selectedCertificate.clientName) : undefined;
+  const linkedClient = selectedCertificate ? findCertificateClient(clients, selectedCertificate) : undefined;
   const isCertificateFormOpen = isCertificateCreateOpen || Boolean(editingCertificate);
   const paidCount = clientScopedCertificates.filter((certificate) => certificate.status === "Оплачено").length;
   const pendingPdfCount = clientScopedCertificates.filter((certificate) => certificate.status === "Ожидает PDF").length;
@@ -4658,7 +4722,7 @@ function CertificatesWorkspace({
               <span>Таблица, статусы PDF и погашение ограничены сертификатами этой клиентской карточки.</span>
             </div>
             <div className="admin-route-context-actions">
-              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilterName, role)}>
+              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilter.id, role)}>
                 Открыть карточку клиента
               </Link>
               <Link className="admin-client-inline-link" href={adminSectionHref("certificates", role)}>
@@ -4728,7 +4792,7 @@ function CertificatesWorkspace({
           <h2>{selectedCertificate.code}</h2>
           <div className="admin-detail-actions">
             {linkedClient ? (
-              <Link className="admin-outline-action" href={clientProfileHref(linkedClient.phone, role)}>
+              <Link className="admin-outline-action" href={clientProfileHref(linkedClient.id, role)}>
                 Открыть клиента
               </Link>
             ) : null}
@@ -4807,16 +4871,16 @@ function CertificatesWorkspace({
             </div>
             <p>Быстрые переходы к клиентской работе по этому сертификату.</p>
             <div className="admin-client-next-actions">
-              <Link className="admin-client-inline-link" href={clientProfileHref(linkedClient.phone, role)}>
+              <Link className="admin-client-inline-link" href={clientProfileHref(linkedClient.id, role)}>
                 Карточка клиента
               </Link>
-              <Link className="admin-client-inline-link" href={calendarClientHref(linkedClient.name, role)}>
+              <Link className="admin-client-inline-link" href={calendarClientHref(linkedClient.id, role)}>
                 Все записи клиента
               </Link>
-              <Link className="admin-client-inline-link" href={certificateClientHref(linkedClient.name, role)}>
+              <Link className="admin-client-inline-link" href={certificateClientHref(linkedClient.id, role)}>
                 Все сертификаты клиента
               </Link>
-              <Link className="admin-client-inline-link" href={calendarCreateHref(linkedClient.name, role)}>
+              <Link className="admin-client-inline-link" href={calendarCreateHref(linkedClient.id, role)}>
                 Записать клиента
               </Link>
             </div>
@@ -5296,10 +5360,10 @@ function CalendarWorkspace({
   selectedCalendarDate?: string;
   selectedClientName?: string;
 }) {
-  const selectedClientFilter = findClientByName(clients, selectedClientName);
+  const selectedClientFilter = findClientByIdentity(clients, selectedClientName);
   const selectedClientFilterName = selectedClientFilter?.name;
   const clientScopedAppointments = selectedClientFilterName
-    ? appointments.filter((appointment) => matchesClientName(appointment.client, selectedClientFilterName))
+    ? appointments.filter((appointment) => appointmentBelongsToClient(appointment, selectedClientFilter, clients))
     : appointments;
   const fallbackAppointment = appointments[0] ?? {
     client: "Нет записи",
@@ -5339,7 +5403,7 @@ function CalendarWorkspace({
       : fallbackAppointment;
   const selectedAppointmentKey = hasVisibleAppointments ? appointmentKey(selectedAppointment) : "";
   const calendarHeading = calendarHeadingLabel(mode, selectedDate);
-  const selectedAppointmentClient = findClientByName(clients, selectedAppointment.client);
+  const selectedAppointmentClient = findAppointmentClient(clients, selectedAppointment);
   const shouldShowAppointmentDrawer = isAppointmentDrawerOpen && mode !== "month" && hasVisibleAppointments;
   const weekDays = calendarMonthDays.slice(5, 12);
   const selectedDayFreeCount = freeSlotCount(selectedDayAppointments.length, dailySlotCapacity);
@@ -5396,7 +5460,7 @@ function CalendarWorkspace({
               <span>Календарь открыт на ближайшей записи клиента, список и месяц тоже считаются только по нему.</span>
             </div>
             <div className="admin-route-context-actions">
-              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilterName, role)}>
+              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilter.id, role)}>
                 Открыть карточку клиента
               </Link>
               <Link className="admin-client-inline-link" href={adminSectionHref("calendar", role)}>
@@ -7137,7 +7201,7 @@ function Workspace({
   settings: SettingsRecord;
 }) {
   if (section === "dashboard") {
-    return <DashboardWorkspace appointments={appointments} certificates={certificates} query={query} role={role} />;
+    return <DashboardWorkspace appointments={appointments} certificates={certificates} clients={clients} query={query} role={role} />;
   }
 
   if (section === "clients") {
@@ -7387,6 +7451,7 @@ export function AdminShell({
     activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
   const isCalendarActionDialogOpen = activeSection === "calendar" && (isActionOpen || shouldOpenCalendarCreateDialog);
   const shouldPrefillCalendarClient = shouldOpenCalendarCreateDialog && !isActionOpen && !editingAppointment;
+  const prefilledCalendarClient = shouldPrefillCalendarClient ? findClientByIdentity(clients, selectedClientName) : undefined;
   const calendarDialogKey = editingAppointment
     ? `edit-${appointmentKey(editingAppointment)}`
     : shouldPrefillCalendarClient
@@ -7657,18 +7722,18 @@ export function AdminShell({
     closeCancelDialog();
   }
 
-  function saveClientNote(clientName: string, note: string) {
+  function saveClientNote(clientIdentity: string, note: string) {
     setClients((current) =>
-      current.map((client) => (normalizeSearch(client.name) === normalizeSearch(clientName) ? { ...client, note } : client)),
+      current.map((client) => (matchesClientIdentity(client, clientIdentity) ? { ...client, note } : client)),
     );
   }
 
-  function saveClientRecord(client: ClientRecord, originalClientName?: string) {
+  function saveClientRecord(client: ClientRecord, originalClientIdentity?: string) {
     setClients((current) => {
       const nextPhone = normalizeClientPhone(client.phone);
       const existingIndex = current.findIndex((currentClient) => {
-        if (originalClientName) {
-          return matchesClientIdentity(currentClient, originalClientName);
+        if (originalClientIdentity) {
+          return matchesClientIdentity(currentClient, originalClientIdentity);
         }
 
         return Boolean(nextPhone) && normalizeClientPhone(currentClient.phone) === nextPhone;
@@ -8009,6 +8074,7 @@ export function AdminShell({
             key={calendarDialogKey}
             onClose={closeActionDialog}
             onSave={saveCalendarAppointment}
+            prefillClient={prefilledCalendarClient}
             prefillClientName={shouldPrefillCalendarClient ? selectedClientName : undefined}
             prefillDate={editingAppointment ? undefined : activeCalendarDate}
           />
