@@ -103,10 +103,11 @@ export type AdminAppointmentDatabaseRow = {
 
 export type AdminCertificateDatabaseRow = {
   code: string;
-  amount_label: string;
+  amount_cents: number;
   buyer_name: string;
   client_id: string | null;
   client_name_snapshot: string;
+  currency: string;
   expires_on: string;
   history: string[];
   internal_note: string;
@@ -141,6 +142,13 @@ export function addMonthsToIsoDate(date: string, months: number) {
   nextDate.setUTCMonth(nextDate.getUTCMonth() + months);
 
   return nextDate.toISOString().slice(0, 10);
+}
+
+export function parseEuroAmountToCents(amount: string) {
+  const compactAmount = amount.replace(/\s/g, "").replace(",", ".");
+  const valueMatch = compactAmount.match(/\d+(?:\.\d{1,2})?/);
+
+  return valueMatch ? Math.round(Number(valueMatch[0]) * 100) : 0;
 }
 
 export function matchesClientIdentity(client: ClientRecord, identity: string | undefined) {
@@ -301,11 +309,12 @@ export function buildAdminDatabaseSeed(records: AdminDomainRecords): AdminDataba
       status: appointment.status,
     })),
     certificates: records.certificates.map((certificate) => ({
-      amount_label: certificate.amount,
+      amount_cents: parseEuroAmountToCents(certificate.amount),
       buyer_name: certificate.buyer,
       client_id: certificate.clientId ?? null,
       client_name_snapshot: certificate.clientName,
       code: certificate.code,
+      currency: "EUR",
       expires_on: certificate.expiresAt,
       history: [...certificate.history],
       internal_note: certificate.note,

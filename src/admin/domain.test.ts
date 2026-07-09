@@ -53,10 +53,13 @@ describe("admin domain records", () => {
     });
     expect(seed.appointments.find((appointment) => appointment.id === "demo-3")).not.toHaveProperty("client");
     expect(seed.certificates.find((certificate) => certificate.code === "MMN-2407-1023")).toMatchObject({
+      amount_cents: 25000,
       client_id: "client-359873334411",
       client_name_snapshot: "Olena K.",
+      currency: "EUR",
       stripe_payment_intent_id: "pi_3QMMN1023",
     });
+    expect(seed.certificates.find((certificate) => certificate.code === "MMN-2407-1023")).not.toHaveProperty("amount_label");
   });
 
   it("keeps same-name clients separate when records already have client ids", () => {
