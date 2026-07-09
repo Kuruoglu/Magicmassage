@@ -1,4 +1,13 @@
-import type { Appointment, CertificateRecord, ClientRecord, PriceRecord, ServiceRecord } from "./domain";
+import type {
+  Appointment,
+  CertificateRecord,
+  ClientRecord,
+  ContactChannelRecord,
+  ContactSettingsRecord,
+  MediaRecord,
+  PriceRecord,
+  ServiceRecord,
+} from "./domain";
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
 
@@ -14,6 +23,18 @@ export type AdminPersistInput =
   | {
       record: ClientRecord;
       type: "client";
+    }
+  | {
+      record: ContactChannelRecord;
+      type: "contactChannel";
+    }
+  | {
+      record: ContactSettingsRecord;
+      type: "contactSettings";
+    }
+  | {
+      record: MediaRecord;
+      type: "media";
     }
   | {
       record: PriceRecord;
@@ -39,7 +60,17 @@ type AdminPersistDependencies = {
   createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
   createRepository?: (
     client: AdminSupabaseClient,
-  ) => Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient" | "savePrice" | "saveService">;
+  ) => Pick<
+    AdminRepository,
+    | "saveAppointment"
+    | "saveCertificate"
+    | "saveClient"
+    | "saveContactChannel"
+    | "saveContactSettings"
+    | "saveMedia"
+    | "savePrice"
+    | "saveService"
+  >;
   env?: AdminSupabaseEnvSource;
 };
 
@@ -141,6 +172,47 @@ function isPriceRecordShape(record: Record<string, unknown>) {
   );
 }
 
+function isMediaRecordShape(record: Record<string, unknown>) {
+  return (
+    hasString(record, "altText") &&
+    hasString(record, "dimensions") &&
+    hasString(record, "folder") &&
+    hasString(record, "id") &&
+    hasString(record, "name") &&
+    hasString(record, "size") &&
+    hasString(record, "status") &&
+    hasString(record, "type") &&
+    hasString(record, "uploadedAt") &&
+    hasString(record, "url") &&
+    hasStringArray(record, "usage")
+  );
+}
+
+function isContactChannelRecordShape(record: Record<string, unknown>) {
+  return (
+    hasString(record, "id") &&
+    hasString(record, "name") &&
+    hasString(record, "note") &&
+    hasString(record, "status") &&
+    hasString(record, "type") &&
+    hasStringArray(record, "usage") &&
+    hasString(record, "value")
+  );
+}
+
+function isContactSettingsRecordShape(record: Record<string, unknown>) {
+  return (
+    hasString(record, "address") &&
+    hasString(record, "bookingUrl") &&
+    hasString(record, "businessName") &&
+    hasString(record, "email") &&
+    hasString(record, "mapUrl") &&
+    hasString(record, "phone") &&
+    hasString(record, "seoArea") &&
+    hasString(record, "workingHours")
+  );
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to persist admin record.";
 }
@@ -160,6 +232,18 @@ export function isAdminPersistInput(input: unknown): input is AdminPersistInput 
 
   if (input.type === "client") {
     return isClientRecordShape(input.record);
+  }
+
+  if (input.type === "contactChannel") {
+    return isContactChannelRecordShape(input.record);
+  }
+
+  if (input.type === "contactSettings") {
+    return isContactSettingsRecordShape(input.record);
+  }
+
+  if (input.type === "media") {
+    return isMediaRecordShape(input.record);
   }
 
   if (input.type === "price") {
@@ -198,6 +282,12 @@ export async function persistAdminRecord(
       await repository.saveClient(input.record);
     } else if (input.type === "certificate") {
       await repository.saveCertificate(input.record);
+    } else if (input.type === "contactChannel") {
+      await repository.saveContactChannel(input.record);
+    } else if (input.type === "contactSettings") {
+      await repository.saveContactSettings(input.record);
+    } else if (input.type === "media") {
+      await repository.saveMedia(input.record);
     } else if (input.type === "price") {
       await repository.savePrice(input.record);
     } else if (input.type === "service") {

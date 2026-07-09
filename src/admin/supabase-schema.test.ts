@@ -19,6 +19,9 @@ describe("admin Supabase schema foundation", () => {
       "admin_certificates",
       "admin_services",
       "admin_price_variants",
+      "admin_media_assets",
+      "admin_contact_channels",
+      "admin_contact_settings",
       "admin_stripe_sales",
       "admin_finance_export_audit",
       "admin_audit_log",
@@ -42,7 +45,7 @@ describe("admin Supabase schema foundation", () => {
     expect(sql).toContain("downloaded_by uuid not null references auth.users(id) on delete restrict");
   });
 
-  it("defines content policies for editor-managed services and prices", () => {
+  it("defines content policies for editor-managed website content tables", () => {
     const sql = readMigration();
 
     expect(sql).toContain("create or replace function public.admin_can_manage_content()");
@@ -51,18 +54,32 @@ describe("admin Supabase schema foundation", () => {
     expect(sql).toContain('create policy "editor roles can manage admin services"');
     expect(sql).toContain('create policy "content roles can read admin price variants"');
     expect(sql).toContain('create policy "editor roles can manage admin price variants"');
+    expect(sql).toContain('create policy "content roles can read admin media assets"');
+    expect(sql).toContain('create policy "editor roles can manage admin media assets"');
+    expect(sql).toContain('create policy "content roles can read admin contact channels"');
+    expect(sql).toContain('create policy "editor roles can manage admin contact channels"');
+    expect(sql).toContain('create policy "content roles can read admin contact settings"');
+    expect(sql).toContain('create policy "editor roles can manage admin contact settings"');
     expect(sql).not.toContain('create policy "accountant can read admin services"');
     expect(sql).not.toContain('create policy "accountant can read admin price variants"');
+    expect(sql).not.toContain('create policy "accountant can read admin media assets"');
+    expect(sql).not.toContain('create policy "accountant can read admin contact channels"');
+    expect(sql).not.toContain('create policy "accountant can read admin contact settings"');
   });
 
-  it("seeds starter services before starter price variants so price FK writes work", () => {
+  it("seeds starter services before starter price variants and website content rows", () => {
     const sql = readMigration();
 
     expect(sql).toContain("insert into public.admin_services");
     expect(sql).toContain("insert into public.admin_price_variants");
+    expect(sql).toContain("insert into public.admin_media_assets");
+    expect(sql).toContain("insert into public.admin_contact_settings");
+    expect(sql).toContain("insert into public.admin_contact_channels");
     expect(sql.indexOf("insert into public.admin_services")).toBeLessThan(sql.indexOf("insert into public.admin_price_variants"));
     expect(sql).toContain("'classic-massage'");
     expect(sql).toContain("'price-classic-60'");
+    expect(sql).toContain("'media-classic-cover'");
+    expect(sql).toContain("'contact-phone'");
   });
 
   it("defines role helpers and policies that keep accountant access finance-only", () => {

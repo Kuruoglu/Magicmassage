@@ -111,6 +111,48 @@ create table if not exists public.admin_price_variants (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.admin_media_assets (
+  id text primary key,
+  name text not null,
+  url text not null unique,
+  folder text not null default 'media',
+  media_type text not null default 'photo' check (media_type in ('photo', 'document')),
+  status text not null default 'draft' check (status in ('ready', 'needs_alt', 'draft')),
+  alt_text text not null default '',
+  dimensions text not null default '',
+  file_size_label text not null default '',
+  usage_contexts text[] not null default '{}',
+  uploaded_on date not null default current_date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_contact_channels (
+  id text primary key,
+  name text not null,
+  channel_type text not null check (channel_type in ('phone', 'email', 'messenger', 'social', 'map', 'booking')),
+  value text not null,
+  status text not null default 'draft' check (status in ('active', 'draft', 'hidden')),
+  usage_contexts text[] not null default '{}',
+  internal_note text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_contact_settings (
+  id text primary key default 'site' check (id = 'site'),
+  business_name text not null,
+  phone text not null,
+  email text not null default '',
+  address text not null,
+  working_hours text not null default '',
+  booking_url text not null default '',
+  map_url text not null default '',
+  seo_area text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.admin_stripe_sales (
   payment_intent_id text primary key,
   charge_id text,
@@ -252,12 +294,120 @@ values
   )
 on conflict (id) do nothing;
 
+insert into public.admin_media_assets (
+  id,
+  name,
+  url,
+  folder,
+  media_type,
+  status,
+  alt_text,
+  dimensions,
+  file_size_label,
+  usage_contexts,
+  uploaded_on
+)
+values
+  (
+    'media-classic-cover',
+    'Классический массаж',
+    '/media/services/classic-massage.jpg',
+    'services',
+    'photo',
+    'ready',
+    'Классический массаж в кабинете Magic Massage Natali',
+    '1600x1100',
+    '368 KB',
+    array['Услуга: Классический массаж', 'Каталог услуг'],
+    '2026-07-07'
+  ),
+  (
+    'media-studio-room',
+    'Фото кабинета',
+    '/media/gallery/studio-treatment-room.jpg',
+    'gallery',
+    'photo',
+    'needs_alt',
+    '',
+    '1800x1200',
+    '512 KB',
+    array['Галерея', 'Главная'],
+    '2026-07-07'
+  )
+on conflict (id) do nothing;
+
+insert into public.admin_contact_settings (
+  id,
+  business_name,
+  phone,
+  email,
+  address,
+  working_hours,
+  booking_url,
+  map_url,
+  seo_area
+)
+values (
+  'site',
+  'Magic Massage Natali',
+  '+359 87 333 4411',
+  'info@magicmassage.bg',
+  'ул. Места 49, Бургас, Болгария',
+  'Пн-Сб 10:00-19:00',
+  'https://studio24.bg/magic-massage-natali',
+  'https://maps.google.com/?q=Magic+Massage+Natali+Burgas',
+  'Burgas, Bulgaria'
+)
+on conflict (id) do nothing;
+
+insert into public.admin_contact_channels (
+  id,
+  name,
+  channel_type,
+  value,
+  status,
+  usage_contexts,
+  internal_note
+)
+values
+  (
+    'contact-phone',
+    'Телефон салона',
+    'phone',
+    '+359 87 333 4411',
+    'active',
+    array['Шапка сайта', 'Контакты', 'LocalBusiness SEO'],
+    'Основной номер для шапки, контактов, LocalBusiness schema и быстрых CTA.'
+  ),
+  (
+    'contact-email',
+    'Email',
+    'email',
+    'info@magicmassage.bg',
+    'active',
+    array['Контакты', 'Письма по сертификатам'],
+    'Публичный email для сертификатов, вопросов и административной связи.'
+  ),
+  (
+    'contact-studio24',
+    'Studio24 booking',
+    'booking',
+    'https://studio24.bg/magic-massage-natali',
+    'active',
+    array['Hero CTA', 'Услуги', 'Контакты'],
+    'Публичные CTA записи ведут сюда, пока внутреннее бронирование не запущено.'
+  )
+on conflict (id) do nothing;
+
 create index if not exists admin_profiles_role_status_idx on public.admin_profiles (role, status);
 create index if not exists admin_clients_phone_normalized_idx on public.admin_clients (phone_normalized);
 create index if not exists admin_appointments_client_date_idx on public.admin_appointments (client_id, starts_on, starts_at);
 create index if not exists admin_certificates_client_idx on public.admin_certificates (client_id);
 create index if not exists admin_services_status_order_idx on public.admin_services (status, display_order);
 create index if not exists admin_price_variants_service_idx on public.admin_price_variants (service_slug, status, display_order);
+create index if not exists admin_media_assets_folder_status_idx on public.admin_media_assets (folder, status);
+create index if not exists admin_media_assets_type_idx on public.admin_media_assets (media_type);
+create index if not exists admin_contact_channels_type_status_idx on public.admin_contact_channels (channel_type, status);
 create index if not exists admin_stripe_sales_paid_at_idx on public.admin_stripe_sales (paid_at);
 create index if not exists admin_stripe_sales_certificate_idx on public.admin_stripe_sales (certificate_code);
 create index if not exists admin_finance_export_audit_downloaded_by_idx on public.admin_finance_export_audit (downloaded_by, created_at);
@@ -349,6 +499,9 @@ alter table public.admin_appointments enable row level security;
 alter table public.admin_certificates enable row level security;
 alter table public.admin_services enable row level security;
 alter table public.admin_price_variants enable row level security;
+alter table public.admin_media_assets enable row level security;
+alter table public.admin_contact_channels enable row level security;
+alter table public.admin_contact_settings enable row level security;
 alter table public.admin_stripe_sales enable row level security;
 alter table public.admin_finance_export_audit enable row level security;
 alter table public.admin_audit_log enable row level security;
@@ -359,6 +512,9 @@ grant select, insert, update, delete on public.admin_appointments to authenticat
 grant select, insert, update, delete on public.admin_certificates to authenticated;
 grant select, insert, update, delete on public.admin_services to authenticated;
 grant select, insert, update, delete on public.admin_price_variants to authenticated;
+grant select, insert, update, delete on public.admin_media_assets to authenticated;
+grant select, insert, update, delete on public.admin_contact_channels to authenticated;
+grant select, insert, update, delete on public.admin_contact_settings to authenticated;
 grant select, insert, update, delete on public.admin_stripe_sales to authenticated;
 grant select, insert on public.admin_finance_export_audit to authenticated;
 grant select on public.admin_audit_log to authenticated;
@@ -451,6 +607,51 @@ using (public.admin_can_read_content());
 drop policy if exists "editor roles can manage admin price variants" on public.admin_price_variants;
 create policy "editor roles can manage admin price variants"
 on public.admin_price_variants
+for all
+to authenticated
+using (public.admin_can_manage_content())
+with check (public.admin_can_manage_content());
+
+drop policy if exists "content roles can read admin media assets" on public.admin_media_assets;
+create policy "content roles can read admin media assets"
+on public.admin_media_assets
+for select
+to authenticated
+using (public.admin_can_read_content());
+
+drop policy if exists "editor roles can manage admin media assets" on public.admin_media_assets;
+create policy "editor roles can manage admin media assets"
+on public.admin_media_assets
+for all
+to authenticated
+using (public.admin_can_manage_content())
+with check (public.admin_can_manage_content());
+
+drop policy if exists "content roles can read admin contact channels" on public.admin_contact_channels;
+create policy "content roles can read admin contact channels"
+on public.admin_contact_channels
+for select
+to authenticated
+using (public.admin_can_read_content());
+
+drop policy if exists "editor roles can manage admin contact channels" on public.admin_contact_channels;
+create policy "editor roles can manage admin contact channels"
+on public.admin_contact_channels
+for all
+to authenticated
+using (public.admin_can_manage_content())
+with check (public.admin_can_manage_content());
+
+drop policy if exists "content roles can read admin contact settings" on public.admin_contact_settings;
+create policy "content roles can read admin contact settings"
+on public.admin_contact_settings
+for select
+to authenticated
+using (public.admin_can_read_content());
+
+drop policy if exists "editor roles can manage admin contact settings" on public.admin_contact_settings;
+create policy "editor roles can manage admin contact settings"
+on public.admin_contact_settings
 for all
 to authenticated
 using (public.admin_can_manage_content())

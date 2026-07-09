@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { Appointment, CertificateRecord, ClientRecord, PriceRecord, ServiceRecord } from "./domain";
+import type {
+  Appointment,
+  CertificateRecord,
+  ClientRecord,
+  ContactChannelRecord,
+  ContactSettingsRecord,
+  MediaRecord,
+  PriceRecord,
+  ServiceRecord,
+} from "./domain";
 import { isAdminPersistInput, persistAdminRecord } from "./persistence";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
 
@@ -71,17 +80,67 @@ const priceRecord: PriceRecord = {
   updatedAt: "2026-07-09",
 };
 
+const mediaRecord: MediaRecord = {
+  altText: "Арома массаж в кабинете Magic Massage Natali",
+  dimensions: "1600x1100",
+  folder: "services",
+  id: "media-aroma-cover",
+  name: "Арома обложка",
+  size: "410 KB",
+  status: "Готово",
+  type: "Фото",
+  uploadedAt: "2026-07-09",
+  url: "/media/services/aroma-massage.jpg",
+  usage: ["Услуга: Арома массаж", "Hero сайта"],
+};
+
+const contactChannelRecord: ContactChannelRecord = {
+  id: "contact-viber",
+  name: "Viber",
+  note: "Быстрая связь после подтверждения номера клиента.",
+  status: "Активен",
+  type: "Мессенджер",
+  usage: ["Контакты", "Быстрая связь"],
+  value: "viber://chat?number=359887771122",
+};
+
+const contactSettingsRecord: ContactSettingsRecord = {
+  address: "ул. Места 49, Бургас, Болгария",
+  bookingUrl: "https://studio24.bg/magic-massage-natali",
+  businessName: "Magic Massage Natali",
+  email: "info@magicmassage.bg",
+  mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+  phone: "+359 87 333 4411",
+  seoArea: "Burgas, Bulgaria",
+  workingHours: "Пн-Сб 10:00-19:00",
+};
+
+type PersistRepositoryMethods = Pick<
+  AdminRepository,
+  | "saveAppointment"
+  | "saveCertificate"
+  | "saveClient"
+  | "saveContactChannel"
+  | "saveContactSettings"
+  | "saveMedia"
+  | "savePrice"
+  | "saveService"
+>;
+
 function buildRepository(
-  overrides: Partial<Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient" | "savePrice" | "saveService">> = {},
+  overrides: Partial<PersistRepositoryMethods> = {},
 ) {
   return {
     saveAppointment: async () => undefined,
     saveCertificate: async () => undefined,
     saveClient: async () => undefined,
+    saveContactChannel: async () => undefined,
+    saveContactSettings: async () => undefined,
+    saveMedia: async () => undefined,
     savePrice: async () => undefined,
     saveService: async () => undefined,
     ...overrides,
-  } satisfies Pick<AdminRepository, "saveAppointment" | "saveCertificate" | "saveClient" | "savePrice" | "saveService">;
+  } satisfies PersistRepositoryMethods;
 }
 
 describe("admin persistence", () => {
@@ -200,6 +259,66 @@ describe("admin persistence", () => {
     expect(savedPrices).toEqual([priceRecord]);
   });
 
+  it("persists media records through the repository", async () => {
+    const savedMedia: MediaRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: mediaRecord, type: "media" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveMedia: async (media) => {
+              savedMedia.push(media);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedMedia).toEqual([mediaRecord]);
+  });
+
+  it("persists contact channels through the repository", async () => {
+    const savedChannels: ContactChannelRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: contactChannelRecord, type: "contactChannel" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveContactChannel: async (channel) => {
+              savedChannels.push(channel);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedChannels).toEqual([contactChannelRecord]);
+  });
+
+  it("persists contact settings through the repository", async () => {
+    const savedSettings: ContactSettingsRecord[] = [];
+
+    const result = await persistAdminRecord(
+      { record: contactSettingsRecord, type: "contactSettings" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveContactSettings: async (settings) => {
+              savedSettings.push(settings);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedSettings).toEqual([contactSettingsRecord]);
+  });
+
   it("returns a Supabase write error without throwing through the API boundary", async () => {
     const result = await persistAdminRecord(
       { record: appointmentRecord, type: "appointment" },
@@ -227,8 +346,12 @@ describe("admin persistence", () => {
     expect(isAdminPersistInput({ record: certificateRecord, type: "certificate" })).toBe(true);
     expect(isAdminPersistInput({ record: serviceRecord, type: "service" })).toBe(true);
     expect(isAdminPersistInput({ record: priceRecord, type: "price" })).toBe(true);
+    expect(isAdminPersistInput({ record: mediaRecord, type: "media" })).toBe(true);
+    expect(isAdminPersistInput({ record: contactChannelRecord, type: "contactChannel" })).toBe(true);
+    expect(isAdminPersistInput({ record: contactSettingsRecord, type: "contactSettings" })).toBe(true);
     expect(isAdminPersistInput({ record: null, type: "client" })).toBe(false);
     expect(isAdminPersistInput({ record: clientRecord, type: "certificate" })).toBe(false);
     expect(isAdminPersistInput({ record: serviceRecord, type: "price" })).toBe(false);
+    expect(isAdminPersistInput({ record: mediaRecord, type: "contactSettings" })).toBe(false);
   });
 });

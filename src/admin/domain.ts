@@ -81,6 +81,49 @@ export type PriceRecord = {
   updatedAt: string;
 };
 
+export type MediaType = "Фото" | "Документ";
+
+export type MediaStatus = "Готово" | "Требует alt" | "Черновик";
+
+export type MediaRecord = {
+  altText: string;
+  dimensions: string;
+  folder: string;
+  id: string;
+  name: string;
+  size: string;
+  status: MediaStatus;
+  type: MediaType;
+  uploadedAt: string;
+  url: string;
+  usage: string[];
+};
+
+export type ContactChannelType = "Телефон" | "Email" | "Мессенджер" | "Соцсеть" | "Карта" | "Бронирование";
+
+export type ContactStatus = "Активен" | "Черновик" | "Скрыт";
+
+export type ContactChannelRecord = {
+  id: string;
+  name: string;
+  note: string;
+  status: ContactStatus;
+  type: ContactChannelType;
+  usage: string[];
+  value: string;
+};
+
+export type ContactSettingsRecord = {
+  address: string;
+  bookingUrl: string;
+  businessName: string;
+  email: string;
+  mapUrl: string;
+  phone: string;
+  seoArea: string;
+  workingHours: string;
+};
+
 type DemoClientRow = Omit<ClientRecord, "id" | "history" | "tags"> & {
   id?: string;
   history: readonly ClientVisit[];
@@ -168,6 +211,42 @@ export type AdminPriceDatabaseRow = {
   service_slug: string;
   status: string;
   updated_on: string;
+};
+
+export type AdminMediaDatabaseRow = {
+  alt_text: string;
+  dimensions: string;
+  file_size_label: string;
+  folder: string;
+  id: string;
+  media_type: string;
+  name: string;
+  status: string;
+  uploaded_on: string;
+  url: string;
+  usage_contexts: string[];
+};
+
+export type AdminContactChannelDatabaseRow = {
+  channel_type: string;
+  id: string;
+  internal_note: string;
+  name: string;
+  status: string;
+  usage_contexts: string[];
+  value: string;
+};
+
+export type AdminContactSettingsDatabaseRow = {
+  address: string;
+  booking_url: string;
+  business_name: string;
+  email: string;
+  id: string;
+  map_url: string;
+  phone: string;
+  seo_area: string;
+  working_hours: string;
 };
 
 export type AdminDatabaseSeed = {

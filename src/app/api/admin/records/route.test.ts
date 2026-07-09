@@ -74,6 +74,50 @@ const pricePayload = {
   type: "price",
 } as const;
 
+const mediaPayload = {
+  record: {
+    altText: "Арома массаж в кабинете Magic Massage Natali",
+    dimensions: "1600x1100",
+    folder: "services",
+    id: "media-aroma-cover",
+    name: "Арома обложка",
+    size: "410 KB",
+    status: "Готово",
+    type: "Фото",
+    uploadedAt: "2026-07-09",
+    url: "/media/services/aroma-massage.jpg",
+    usage: ["Услуга: Арома массаж", "Hero сайта"],
+  },
+  type: "media",
+} as const;
+
+const contactChannelPayload = {
+  record: {
+    id: "contact-viber",
+    name: "Viber",
+    note: "Быстрая связь после подтверждения номера клиента.",
+    status: "Активен",
+    type: "Мессенджер",
+    usage: ["Контакты", "Быстрая связь"],
+    value: "viber://chat?number=359887771122",
+  },
+  type: "contactChannel",
+} as const;
+
+const contactSettingsPayload = {
+  record: {
+    address: "ул. Места 49, Бургас, Болгария",
+    bookingUrl: "https://studio24.bg/magic-massage-natali",
+    businessName: "Magic Massage Natali",
+    email: "info@magicmassage.bg",
+    mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+    phone: "+359 87 333 4411",
+    seoArea: "Burgas, Bulgaria",
+    workingHours: "Пн-Сб 10:00-19:00",
+  },
+  type: "contactSettings",
+} as const;
+
 vi.mock("@/admin/persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/admin/persistence")>();
 
@@ -146,6 +190,45 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
     expect(persistAdminRecord).toHaveBeenCalledWith(pricePayload);
+  });
+
+  it("persists valid media payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(mediaPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(mediaPayload);
+  });
+
+  it("persists valid contact channel payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(contactChannelPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(contactChannelPayload);
+  });
+
+  it("persists valid contact settings payloads", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(contactSettingsPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(persistAdminRecord).toHaveBeenCalledWith(contactSettingsPayload);
   });
 
   it("returns server errors for Supabase write failures", async () => {

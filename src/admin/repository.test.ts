@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { PriceRecord, ServiceRecord } from "./domain";
+import type { ContactChannelRecord, ContactSettingsRecord, MediaRecord, PriceRecord, ServiceRecord } from "./domain";
 import { createAdminSupabaseRepository, type AdminFinanceExportLogInput } from "./repository";
 
 type QueryFilter = {
@@ -166,6 +166,41 @@ const priceRecord: PriceRecord = {
   serviceSlug: "aroma-massage",
   status: "Активна",
   updatedAt: "2026-07-09",
+};
+
+const mediaRecord: MediaRecord = {
+  altText: "Арома массаж в кабинете Magic Massage Natali",
+  dimensions: "1600x1100",
+  folder: "services",
+  id: "media-aroma-cover",
+  name: "Арома обложка",
+  size: "410 KB",
+  status: "Готово",
+  type: "Фото",
+  uploadedAt: "2026-07-09",
+  url: "/media/services/aroma-massage.jpg",
+  usage: ["Услуга: Арома массаж", "Hero сайта"],
+};
+
+const contactChannelRecord: ContactChannelRecord = {
+  id: "contact-viber",
+  name: "Viber",
+  note: "Быстрая связь после подтверждения номера клиента.",
+  status: "Активен",
+  type: "Мессенджер",
+  usage: ["Контакты", "Быстрая связь"],
+  value: "viber://chat?number=359887771122",
+};
+
+const contactSettingsRecord: ContactSettingsRecord = {
+  address: "ул. Места 49, Бургас, Болгария",
+  bookingUrl: "https://studio24.bg/magic-massage-natali",
+  businessName: "Magic Massage Natali",
+  email: "info@magicmassage.bg",
+  mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+  phone: "+359 87 333 4411",
+  seoArea: "Burgas, Bulgaria",
+  workingHours: "Пн-Сб 10:00-19:00",
 };
 
 const stripeRows = [
@@ -474,6 +509,81 @@ describe("admin Supabase repository", () => {
         service_slug: "aroma-massage",
         status: "active",
         updated_on: "2026-07-09",
+      },
+    });
+  });
+
+  it("upserts media assets by id for admin media edits", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveMedia(mediaRecord);
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_media_assets",
+      values: {
+        alt_text: "Арома массаж в кабинете Magic Massage Natali",
+        dimensions: "1600x1100",
+        file_size_label: "410 KB",
+        folder: "services",
+        id: "media-aroma-cover",
+        media_type: "photo",
+        name: "Арома обложка",
+        status: "ready",
+        uploaded_on: "2026-07-09",
+        url: "/media/services/aroma-massage.jpg",
+        usage_contexts: ["Услуга: Арома массаж", "Hero сайта"],
+      },
+    });
+  });
+
+  it("upserts contact channels by id for admin contact edits", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveContactChannel(contactChannelRecord);
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_contact_channels",
+      values: {
+        channel_type: "messenger",
+        id: "contact-viber",
+        internal_note: "Быстрая связь после подтверждения номера клиента.",
+        name: "Viber",
+        status: "active",
+        usage_contexts: ["Контакты", "Быстрая связь"],
+        value: "viber://chat?number=359887771122",
+      },
+    });
+  });
+
+  it("upserts contact settings as the single site contact record", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveContactSettings(contactSettingsRecord);
+
+    expect(client.operations[0]).toEqual({
+      action: "upsert",
+      filters: [],
+      options: { onConflict: "id" },
+      table: "admin_contact_settings",
+      values: {
+        address: "ул. Места 49, Бургас, Болгария",
+        booking_url: "https://studio24.bg/magic-massage-natali",
+        business_name: "Magic Massage Natali",
+        email: "info@magicmassage.bg",
+        id: "site",
+        map_url: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+        phone: "+359 87 333 4411",
+        seo_area: "Burgas, Bulgaria",
+        working_hours: "Пн-Сб 10:00-19:00",
       },
     });
   });

@@ -45,6 +45,13 @@ import {
   type CertificateStatus,
   type ClientRecord,
   type ClientVisit,
+  type ContactChannelRecord,
+  type ContactChannelType,
+  type ContactSettingsRecord,
+  type ContactStatus,
+  type MediaRecord,
+  type MediaStatus,
+  type MediaType,
   type PriceRecord,
   type PriceStatus,
   type ServiceRecord,
@@ -119,21 +126,6 @@ type PriceFormState = {
   status: PriceStatus;
   updatedAt: string;
 };
-type MediaType = "Фото" | "Документ";
-type MediaStatus = "Готово" | "Требует alt" | "Черновик";
-type MediaRecord = {
-  altText: string;
-  dimensions: string;
-  folder: string;
-  id: string;
-  name: string;
-  size: string;
-  status: MediaStatus;
-  type: MediaType;
-  uploadedAt: string;
-  url: string;
-  usage: string[];
-};
 type MediaFormState = {
   altText: string;
   dimensions: string;
@@ -146,17 +138,6 @@ type MediaFormState = {
   url: string;
   usage: string;
 };
-type ContactChannelType = "Телефон" | "Email" | "Мессенджер" | "Соцсеть" | "Карта" | "Бронирование";
-type ContactStatus = "Активен" | "Черновик" | "Скрыт";
-type ContactChannelRecord = {
-  id: string;
-  name: string;
-  note: string;
-  status: ContactStatus;
-  type: ContactChannelType;
-  usage: string[];
-  value: string;
-};
 type ContactChannelFormState = {
   name: string;
   note: string;
@@ -164,16 +145,6 @@ type ContactChannelFormState = {
   type: ContactChannelType;
   usage: string;
   value: string;
-};
-type ContactSettingsRecord = {
-  address: string;
-  bookingUrl: string;
-  businessName: string;
-  email: string;
-  mapUrl: string;
-  phone: string;
-  seoArea: string;
-  workingHours: string;
 };
 type BlogStatus = "Опубликована" | "Черновик" | "Запланирована" | "На проверке";
 type BlogPostRecord = {
@@ -7790,32 +7761,31 @@ export function AdminShell({
 
       return current.map((currentMedia, index) => (index === existingIndex ? mediaRecord : currentMedia));
     });
+    void persistAdminRecord({ record: mediaRecord, type: "media" });
   }
 
   function saveContactSettingsRecord(settings: ContactSettingsRecord) {
+    const linkedChannelValues = new Map([
+      ["contact-phone", settings.phone],
+      ["contact-email", settings.email],
+      ["contact-map", settings.mapUrl],
+      ["contact-studio24", settings.bookingUrl],
+    ]);
+    const nextContactChannels = contactChannels.map((channel) => {
+      const linkedValue = linkedChannelValues.get(channel.id);
+
+      return linkedValue === undefined ? channel : { ...channel, value: linkedValue };
+    });
+
     setContactSettings(settings);
-    setContactChannels((current) =>
-      current.map((channel) => {
-        if (channel.id === "contact-phone") {
-          return { ...channel, value: settings.phone };
-        }
-
-        if (channel.id === "contact-email") {
-          return { ...channel, value: settings.email };
-        }
-
-        if (channel.id === "contact-map") {
-          return { ...channel, value: settings.mapUrl };
-        }
-
-        if (channel.id === "contact-studio24") {
-          return { ...channel, value: settings.bookingUrl };
-        }
-
-        return channel;
-      }),
-    );
+    setContactChannels(nextContactChannels);
     setIsContactSettingsOpen(false);
+    void persistAdminRecord({ record: settings, type: "contactSettings" });
+    for (const channel of nextContactChannels) {
+      if (linkedChannelValues.has(channel.id)) {
+        void persistAdminRecord({ record: channel, type: "contactChannel" });
+      }
+    }
   }
 
   function saveContactChannelRecord(channel: ContactChannelRecord, originalId?: string) {
@@ -7836,6 +7806,7 @@ export function AdminShell({
 
       return current.map((currentChannel, index) => (index === existingIndex ? channel : currentChannel));
     });
+    void persistAdminRecord({ record: channel, type: "contactChannel" });
   }
 
   function saveBlogPostRecord(post: BlogPostRecord, originalId?: string) {

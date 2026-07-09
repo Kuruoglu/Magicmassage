@@ -4,7 +4,10 @@ import type {
   AdminAppointmentDatabaseRow,
   AdminCertificateDatabaseRow,
   AdminClientDatabaseRow,
+  AdminContactChannelDatabaseRow,
+  AdminContactSettingsDatabaseRow,
   AdminDomainRecords,
+  AdminMediaDatabaseRow,
   AdminPriceDatabaseRow,
   AdminServiceDatabaseRow,
   Appointment,
@@ -12,6 +15,13 @@ import type {
   CertificateRecord,
   CertificateStatus,
   ClientRecord,
+  ContactChannelRecord,
+  ContactChannelType,
+  ContactSettingsRecord,
+  ContactStatus,
+  MediaRecord,
+  MediaStatus,
+  MediaType,
   PriceRecord,
   PriceStatus,
   ServiceRecord,
@@ -82,6 +92,9 @@ export type AdminRepository = {
   saveAppointment(appointment: Appointment): Promise<void>;
   saveCertificate(certificate: CertificateRecord): Promise<void>;
   saveClient(client: ClientRecord): Promise<void>;
+  saveContactChannel(channel: ContactChannelRecord): Promise<void>;
+  saveContactSettings(settings: ContactSettingsRecord): Promise<void>;
+  saveMedia(media: MediaRecord): Promise<void>;
   savePrice(price: PriceRecord): Promise<void>;
   saveService(service: ServiceRecord): Promise<void>;
 };
@@ -166,6 +179,72 @@ const priceStatusByDatabase: Record<string, PriceStatus> = {
 const databasePriceStatusByStatus = new Map<PriceStatus, string>([
   [priceStatusByDatabase.active, "active"],
   [priceStatusByDatabase.hidden, "hidden"],
+]);
+
+const mediaTypeByDatabase: Record<string, MediaType> = {
+  document: "Документ",
+  photo: "Фото",
+  Документ: "Документ",
+  Фото: "Фото",
+};
+
+const databaseMediaTypeByType = new Map<MediaType, string>([
+  [mediaTypeByDatabase.document, "document"],
+  [mediaTypeByDatabase.photo, "photo"],
+]);
+
+const mediaStatusByDatabase: Record<string, MediaStatus> = {
+  draft: "Черновик",
+  needs_alt: "Требует alt",
+  ready: "Готово",
+  Готово: "Готово",
+  "Требует alt": "Требует alt",
+  Черновик: "Черновик",
+};
+
+const databaseMediaStatusByStatus = new Map<MediaStatus, string>([
+  [mediaStatusByDatabase.draft, "draft"],
+  [mediaStatusByDatabase.needs_alt, "needs_alt"],
+  [mediaStatusByDatabase.ready, "ready"],
+]);
+
+const contactChannelTypeByDatabase: Record<string, ContactChannelType> = {
+  booking: "Бронирование",
+  email: "Email",
+  map: "Карта",
+  messenger: "Мессенджер",
+  phone: "Телефон",
+  social: "Соцсеть",
+  Email: "Email",
+  Бронирование: "Бронирование",
+  Карта: "Карта",
+  Мессенджер: "Мессенджер",
+  Соцсеть: "Соцсеть",
+  Телефон: "Телефон",
+};
+
+const databaseContactChannelTypeByType = new Map<ContactChannelType, string>([
+  [contactChannelTypeByDatabase.booking, "booking"],
+  [contactChannelTypeByDatabase.email, "email"],
+  [contactChannelTypeByDatabase.map, "map"],
+  [contactChannelTypeByDatabase.messenger, "messenger"],
+  [contactChannelTypeByDatabase.phone, "phone"],
+  [contactChannelTypeByDatabase.social, "social"],
+]);
+
+const contactStatusByDatabase: Record<string, ContactStatus> = {
+  active: "Активен",
+  draft: "Черновик",
+  hidden: "Скрыт",
+  Активен: "Активен",
+  Скрыт: "Скрыт",
+  Черновик: "Черновик",
+};
+
+const databaseContactStatusByStatus = new Map<ContactStatus, string>([
+  [contactStatusByDatabase.active, "active"],
+  [contactStatusByDatabase.draft, "draft"],
+  [contactStatusByDatabase.hidden, "hidden"],
 ]);
 
 const appointmentStatusByDatabase: Record<string, AppointmentStatus> = {
@@ -254,6 +333,22 @@ function mapServiceStatusToDatabase(status: ServiceStatus) {
 
 function mapPriceStatusToDatabase(status: PriceStatus) {
   return databasePriceStatusByStatus.get(status) ?? "active";
+}
+
+function mapMediaTypeToDatabase(type: MediaType) {
+  return databaseMediaTypeByType.get(type) ?? "photo";
+}
+
+function mapMediaStatusToDatabase(status: MediaStatus) {
+  return databaseMediaStatusByStatus.get(status) ?? "draft";
+}
+
+function mapContactChannelTypeToDatabase(type: ContactChannelType) {
+  return databaseContactChannelTypeByType.get(type) ?? "phone";
+}
+
+function mapContactStatusToDatabase(status: ContactStatus) {
+  return databaseContactStatusByStatus.get(status) ?? "draft";
 }
 
 function mapStripeStatus(row: Pick<AdminStripeSaleDatabaseRow, "gross_cents" | "refund_cents">): FinanceRow["status"] {
@@ -397,6 +492,48 @@ function mapPriceRecordToRow(price: PriceRecord): AdminPriceDatabaseRow {
     service_slug: price.serviceSlug,
     status: mapPriceStatusToDatabase(price.status),
     updated_on: price.updatedAt,
+  };
+}
+
+function mapMediaRecordToRow(media: MediaRecord): AdminMediaDatabaseRow {
+  return {
+    alt_text: media.altText,
+    dimensions: media.dimensions,
+    file_size_label: media.size,
+    folder: media.folder,
+    id: media.id,
+    media_type: mapMediaTypeToDatabase(media.type),
+    name: media.name,
+    status: mapMediaStatusToDatabase(media.status),
+    uploaded_on: media.uploadedAt,
+    url: media.url,
+    usage_contexts: [...media.usage],
+  };
+}
+
+function mapContactChannelRecordToRow(channel: ContactChannelRecord): AdminContactChannelDatabaseRow {
+  return {
+    channel_type: mapContactChannelTypeToDatabase(channel.type),
+    id: channel.id,
+    internal_note: channel.note,
+    name: channel.name,
+    status: mapContactStatusToDatabase(channel.status),
+    usage_contexts: [...channel.usage],
+    value: channel.value,
+  };
+}
+
+function mapContactSettingsRecordToRow(settings: ContactSettingsRecord): AdminContactSettingsDatabaseRow {
+  return {
+    address: settings.address,
+    booking_url: settings.bookingUrl,
+    business_name: settings.businessName,
+    email: settings.email,
+    id: "site",
+    map_url: settings.mapUrl,
+    phone: settings.phone,
+    seo_area: settings.seoArea,
+    working_hours: settings.workingHours,
   };
 }
 
@@ -545,6 +682,18 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     await upsertRow(client, "admin_price_variants", mapPriceRecordToRow(price), { onConflict: "id" });
   }
 
+  async function saveMedia(media: MediaRecord) {
+    await upsertRow(client, "admin_media_assets", mapMediaRecordToRow(media), { onConflict: "id" });
+  }
+
+  async function saveContactChannel(channel: ContactChannelRecord) {
+    await upsertRow(client, "admin_contact_channels", mapContactChannelRecordToRow(channel), { onConflict: "id" });
+  }
+
+  async function saveContactSettings(settings: ContactSettingsRecord) {
+    await upsertRow(client, "admin_contact_settings", mapContactSettingsRecordToRow(settings), { onConflict: "id" });
+  }
+
   return {
     listAppointments,
     listCertificates,
@@ -555,6 +704,9 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     saveAppointment,
     saveCertificate,
     saveClient,
+    saveContactChannel,
+    saveContactSettings,
+    saveMedia,
     savePrice,
     saveService,
   };

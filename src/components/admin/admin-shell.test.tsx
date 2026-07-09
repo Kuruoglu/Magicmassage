@@ -340,6 +340,161 @@ describe("AdminShell", () => {
     expect(within(details).getByText("LocalBusiness SEO")).toBeInTheDocument();
   });
 
+  it("posts saved contact settings when the admin shell is backed by Supabase", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="contacts"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Контактные настройки" });
+    fireEvent.change(within(dialog).getByLabelText("Название"), { target: { value: "Magic Massage Natali" } });
+    fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359 87 333 4411" } });
+    fireEvent.change(within(dialog).getByLabelText("Адрес"), { target: { value: "ул. Места 49, Бургас, Болгария" } });
+    fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "info@magicmassage.bg" } });
+    fireEvent.change(within(dialog).getByLabelText("Часы работы"), { target: { value: "Пн-Сб 10:00-19:00" } });
+    fireEvent.change(within(dialog).getByLabelText("Studio24 URL"), {
+      target: { value: "https://studio24.bg/magic-massage-natali" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Map URL"), {
+      target: { value: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("LocalBusiness area"), {
+      target: { value: "Burgas, Bulgaria" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить контакты" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+
+    const requestBodies = fetchMock.mock.calls.map(([url, requestInit]) => {
+      expect(url).toBe("/api/admin/records");
+      return JSON.parse(String((requestInit as RequestInit).body));
+    });
+    expect(requestBodies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          record: expect.objectContaining({
+            address: "ул. Места 49, Бургас, Болгария",
+            bookingUrl: "https://studio24.bg/magic-massage-natali",
+            businessName: "Magic Massage Natali",
+            email: "info@magicmassage.bg",
+            mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+            phone: "+359 87 333 4411",
+            seoArea: "Burgas, Bulgaria",
+            workingHours: "Пн-Сб 10:00-19:00",
+          }),
+          type: "contactSettings",
+        }),
+        expect.objectContaining({
+          record: expect.objectContaining({
+            id: "contact-phone",
+            value: "+359 87 333 4411",
+          }),
+          type: "contactChannel",
+        }),
+        expect.objectContaining({
+          record: expect.objectContaining({
+            id: "contact-email",
+            value: "info@magicmassage.bg",
+          }),
+          type: "contactChannel",
+        }),
+        expect.objectContaining({
+          record: expect.objectContaining({
+            id: "contact-map",
+            value: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+          }),
+          type: "contactChannel",
+        }),
+        expect.objectContaining({
+          record: expect.objectContaining({
+            id: "contact-studio24",
+            value: "https://studio24.bg/magic-massage-natali",
+          }),
+          type: "contactChannel",
+        }),
+      ]),
+    );
+  });
+
+  it("posts saved contact channels when the admin shell is backed by Supabase", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="contacts"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+        selectedContactId="contact-telegram"
+      />,
+    );
+
+    const details = screen.getByRole("dialog", { name: "Детали контакта" });
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Редактировать контакт" });
+    fireEvent.change(within(dialog).getByLabelText("Название"), { target: { value: "Viber" } });
+    fireEvent.change(within(dialog).getByLabelText("Тип"), { target: { value: "Мессенджер" } });
+    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Активен" } });
+    fireEvent.change(within(dialog).getByLabelText("Значение"), { target: { value: "viber://chat?number=359887771122" } });
+    fireEvent.change(within(dialog).getByLabelText("Места использования"), { target: { value: "Контакты, Быстрая связь" } });
+    fireEvent.change(within(dialog).getByLabelText("Заметка"), {
+      target: { value: "Быстрая связь после подтверждения номера клиента." },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        id: "contact-telegram",
+        name: "Viber",
+        note: "Быстрая связь после подтверждения номера клиента.",
+        status: "Активен",
+        type: "Мессенджер",
+        usage: ["Контакты", "Быстрая связь"],
+        value: "viber://chat?number=359887771122",
+      },
+      type: "contactChannel",
+    });
+  });
+
   it("opens blog details from the blog query", () => {
     render(<AdminShell activeSection="blog" role="owner" selectedBlogPostId="blog-first-massage-preparation" />);
 
@@ -900,6 +1055,70 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("dialog", { name: "Редактировать медиа" })).not.toBeInTheDocument();
     expect(within(details).getByText("Требует alt")).toBeInTheDocument();
     expect(within(details).getByText("Нужно уточнить alt перед публикацией")).toBeInTheDocument();
+  });
+
+  it("posts saved media assets when the admin shell is backed by Supabase", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="media"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Загрузить медиа" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Новое медиа" });
+    fireEvent.change(within(dialog).getByLabelText("Название"), { target: { value: "Арома обложка" } });
+    fireEvent.change(within(dialog).getByLabelText("URL"), { target: { value: "/media/services/aroma-massage.jpg" } });
+    fireEvent.change(within(dialog).getByLabelText("Папка"), { target: { value: "services" } });
+    fireEvent.change(within(dialog).getByLabelText("Тип"), { target: { value: "Фото" } });
+    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Готово" } });
+    fireEvent.change(within(dialog).getByLabelText("Alt-текст"), {
+      target: { value: "Арома массаж в кабинете Magic Massage Natali" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Использование"), {
+      target: { value: "Услуга: Арома массаж, Hero сайта" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Размер файла"), { target: { value: "410 KB" } });
+    fireEvent.change(within(dialog).getByLabelText("Разрешение"), { target: { value: "1600x1100" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить медиа" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [url, requestInit] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
+      record: {
+        altText: "Арома массаж в кабинете Magic Massage Natali",
+        dimensions: "1600x1100",
+        folder: "services",
+        id: "media-арома-обложка",
+        name: "Арома обложка",
+        size: "410 KB",
+        status: "Готово",
+        type: "Фото",
+        url: "/media/services/aroma-massage.jpg",
+        usage: ["Услуга: Арома массаж", "Hero сайта"],
+      },
+      type: "media",
+    });
   });
 
   it("filters media rows by type and missing alt state", () => {
