@@ -6,7 +6,6 @@ import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo,
 
 import {
   calculateFinanceSummary,
-  canAccessAdminSection,
   getAdminModule,
   getAdminNavigationForRole,
   roleLabels,
@@ -28,6 +27,12 @@ import type { AdminPersistInput } from "@/admin/persistence";
 import { businessFacts, businessMapUrls } from "@/config/business";
 import { matchesSearch, isValidEmail, parseClientTags, parseCommaList } from "@/components/admin/lib/filters";
 import { formatCurrency, isPositiveInteger, statusClass } from "@/components/admin/lib/formatters";
+import {
+  AdminDrawer,
+  AdminDrawerBody,
+  AdminDrawerHeader,
+  AdminDrawerSection,
+} from "@/components/admin/drawer";
 import {
   adminSectionHref,
   appointmentKey,
@@ -224,7 +229,6 @@ type CalendarMode = "day" | "week" | "month" | "list";
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
 const clientFilterOptions = [
   { id: "all", label: "Все" },
-  { id: "active", label: "Активные" },
   { id: "ru", label: "RU" },
   { id: "bg", label: "BG" },
 ] as const;
@@ -1058,10 +1062,6 @@ function priceValue(price: PriceRecord) {
 }
 
 function matchesClientFilter(client: ClientRecord, filter: ClientFilterId) {
-  if (filter === "active") {
-    return isActiveClient(client);
-  }
-
   if (filter === "ru" || filter === "bg") {
     return normalizeSearch(client.language) === filter;
   }
@@ -1083,26 +1083,6 @@ function matchesAdminUserFilter(user: AdminUserRecord, filter: AdminUserFilterId
   }
 
   return true;
-}
-
-function isActiveClient(client: ClientRecord) {
-  return clientActivitySummary(client).isActive;
-}
-
-function clientActivitySummary(client: ClientRecord) {
-  const hasActiveStatus = normalizeSearch(client.status).startsWith("актив");
-  const hasEnoughVisits = client.visits >= 5;
-  const isActive = hasActiveStatus && hasEnoughVisits;
-  const visitLabel = visitCountLabel(client.visits);
-
-  return {
-    details: `${hasActiveStatus ? "статус активный" : `статус: ${client.status}`}, ${
-      hasEnoughVisits ? "5+ визитов" : "меньше 5 визитов"
-    }`,
-    isActive,
-    nextVisit: `Следующий визит: ${client.next}`,
-    reason: `${isActive ? "В активных" : "Не в активных"}: ${visitLabel}`,
-  };
 }
 
 function visitCountLabel(visits: number) {
@@ -1610,9 +1590,9 @@ function ClientFormDialog({
             </fieldset>
 
             <fieldset className="admin-form-section">
-              <legend>Профиль и активность</legend>
+              <legend>Профиль клиента</legend>
               <p className="admin-form-helper" id="client-status-helper">
-                Активный клиент: 5+ визитов или ближайшая подтвержденная запись.
+                Статус выбирается вручную и не скрывает клиента из базы.
               </p>
               <div className="admin-client-form-grid">
                 <label>
@@ -3283,67 +3263,6 @@ function DashboardWorkspace({
   const filteredCertificates = certificates.filter((certificate) =>
     matchesSearch([certificate.code, certificate.buyer, certificate.clientName, certificate.recipient, certificate.status], query),
   );
-  const nextCertificateToSend = certificates.find((certificate) => certificate.status === "Ожидает PDF");
-  const operationItems = [
-    ...(canAccessAdminSection("calendar", role)
-      ? [
-          {
-            href: `/admin?section=calendar&role=${role}&action=create`,
-            label: "Создать запись",
-            note: "Быстро открыть чистую форму записи.",
-          },
-        ]
-      : []),
-    ...(canAccessAdminSection("clients", role)
-      ? [
-          {
-            href: adminSectionHref("clients", role),
-            label: "Открыть клиентов",
-            note: "Найти карточку клиента, контакты и историю.",
-          },
-        ]
-      : []),
-    ...(canAccessAdminSection("certificates", role)
-      ? [
-          {
-            href: nextCertificateToSend
-              ? certificateDetailHref(nextCertificateToSend.code, role)
-              : adminSectionHref("certificates", role),
-            label: "Сертификаты к отправке",
-            note: nextCertificateToSend
-              ? `${nextCertificateToSend.code}: проверить PDF, статус и отправку.`
-              : "Проверить PDF, статусы и погашения.",
-          },
-        ]
-      : []),
-    ...(canAccessAdminSection("finances", role)
-      ? [
-          {
-            href: adminSectionHref("finances", role),
-            label: "Выгрузить Stripe",
-            note: "Продажи, комиссии, возвраты и net за период.",
-          },
-        ]
-      : []),
-    ...(canAccessAdminSection("users", role)
-      ? [
-          {
-            href: adminSectionHref("users", role),
-            label: "Пользователи и роли",
-            note: "Проверить доступы сотрудников и бухгалтера.",
-          },
-        ]
-      : []),
-    ...(canAccessAdminSection("settings", role)
-      ? [
-          {
-            href: adminSectionHref("settings", role),
-            label: "Настройки календаря",
-            note: "Буфер между сеансами, рабочее время и правила записи.",
-          },
-        ]
-      : []),
-  ];
 
   return (
     <div className="admin-dashboard-grid">
@@ -3432,22 +3351,6 @@ function DashboardWorkspace({
         {filteredCertificates.length === 0 ? <EmptyState label="Сертификаты не найдены." /> : null}
       </section>
 
-      <section className="admin-panel" aria-labelledby="dashboard-queue-heading">
-        <div className="admin-panel-head">
-          <h2 id="dashboard-queue-heading">Операционная очередь</h2>
-        </div>
-        <div className="admin-list">
-          {operationItems.map((item) => (
-            <Link className="admin-list-item admin-list-link" href={item.href} key={item.label}>
-              <div>
-                <strong>{item.label}</strong>
-                <span>{item.note}</span>
-              </div>
-              <span aria-hidden="true">→</span>
-            </Link>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
@@ -3483,7 +3386,6 @@ function ClientDetailCard({
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const activity = clientActivitySummary(client);
   const nextAppointment = findClientNextAppointment(appointments);
   const lastCompletedVisit = findClientLastCompletedVisit(client);
   const activeCertificate = findClientActiveCertificate(certificates);
@@ -3518,89 +3420,93 @@ function ClientDetailCard({
   }
 
   return (
-    <aside
-      aria-label="Карточка клиента"
-      aria-modal="true"
-      className="admin-panel admin-client-card admin-drawer-panel"
-      role="dialog"
+    <AdminDrawer
+      ariaLabel="Карточка клиента"
+      className="admin-client-card"
+      hasUnsavedChanges={isEditingNote && draftNote.trim() !== client.note.trim()}
+      onClose={onClose}
     >
-      <div className="admin-panel-head">
-        <span className="admin-kicker">Карточка клиента</span>
-        <button className="admin-icon-button" onClick={onClose} type="button">
-          Закрыть
-        </button>
-      </div>
-      <div className="admin-client-profile-head">
-        <span className="admin-client-avatar" aria-hidden="true">
-          {clientInitials}
-        </span>
-        <div>
-          <h2 id="admin-client-card-title">{client.name}</h2>
-          <p>
-            {client.language.toUpperCase()} · {client.status}
-          </p>
-        </div>
-      </div>
+      <AdminDrawerHeader kicker="Карточка клиента" onClose={onClose} title={client.name} titleId="admin-client-card-title">
+        <p>
+          {client.language.toUpperCase()} · {client.status}
+        </p>
+      </AdminDrawerHeader>
+      <AdminDrawerBody>
+        <AdminDrawerSection title="Профиль и статус">
+          <div className="admin-client-profile-head">
+            <span className="admin-client-avatar" aria-hidden="true">
+              {clientInitials}
+            </span>
+            <div>
+              <strong>{client.name}</strong>
+              <small>{client.language.toUpperCase()}</small>
+              <span className={statusClass(client.status)}>{client.status}</span>
+            </div>
+          </div>
+        </AdminDrawerSection>
 
-      <div className="admin-client-activity" aria-label="Активность клиента">
-        <span className={activity.isActive ? "admin-status admin-status-success" : "admin-status admin-status-warning"}>
-          {activity.isActive ? "В активных" : "Не в активных"}
-        </span>
-        <strong>{activity.reason}</strong>
-        <small>{activity.details}</small>
-        <small>{activity.nextVisit}</small>
-      </div>
+        <AdminDrawerSection title="Контактные данные">
+          <dl className="admin-client-contact-list">
+            <div>
+              <dt>Телефон</dt>
+              <dd className="admin-tabular">{client.phone || "Не указан"}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{client.email || "Не указан"}</dd>
+            </div>
+            <div>
+              <dt>Канал связи</dt>
+              <dd>{client.preferredContact || "Не указан"}</dd>
+            </div>
+          </dl>
+        </AdminDrawerSection>
 
-      <dl className="admin-client-contact-list">
-        <div>
-          <dt>Телефон</dt>
-          <dd className="admin-tabular">{client.phone}</dd>
-        </div>
-        <div>
-          <dt>Email</dt>
-          <dd>{client.email}</dd>
-        </div>
-        <div>
-          <dt>Канал связи</dt>
-          <dd>{client.preferredContact}</dd>
-        </div>
-      </dl>
+        <AdminDrawerSection title="Быстрые действия">
+          <div className="admin-client-actions" aria-label="Быстрые действия клиента">
+            <Link className="admin-text-action" href={calendarCreateHref(client.id, role)} onClick={onCalendarCreateIntent}>
+              Записать клиента
+            </Link>
+            <button className="admin-outline-action" onClick={() => onEditClient(client)} type="button">
+              Редактировать клиента
+            </button>
+            <button className="admin-outline-action" onClick={() => onIssueCertificate(client)} type="button">
+              Выдать сертификат
+            </button>
+            {client.phone ? (
+              <a className="admin-outline-action" href={phoneHref(client.phone)}>
+                Позвонить
+              </a>
+            ) : null}
+            {client.email ? (
+              <a className="admin-outline-action" href={`mailto:${client.email}`}>
+                Email
+              </a>
+            ) : null}
+            {client.telegram ? (
+              <a className="admin-outline-action" href={client.telegram} rel="noreferrer" target="_blank">
+                Telegram
+              </a>
+            ) : null}
+          </div>
+        </AdminDrawerSection>
 
-      <div className="admin-client-actions" aria-label="Быстрые действия клиента">
-        <Link className="admin-text-action" href={calendarCreateHref(client.id, role)} onClick={onCalendarCreateIntent}>
-          Записать клиента
-        </Link>
-        <button className="admin-outline-action" onClick={() => onEditClient(client)} type="button">
-          Редактировать клиента
-        </button>
-        <button className="admin-outline-action" onClick={() => onIssueCertificate(client)} type="button">
-          Выдать сертификат
-        </button>
-        <a className="admin-outline-action" href={phoneHref(client.phone)}>
-          Позвонить
-        </a>
-        <a className="admin-outline-action" href={`mailto:${client.email}`}>
-          Email
-        </a>
-        <a className="admin-outline-action" href={client.telegram} rel="noreferrer" target="_blank">
-          Telegram
-        </a>
-      </div>
-
-      <div className="admin-client-metrics" aria-label="Показатели клиента">
-        <div>
-          <span>Визиты</span>
-          <strong>{client.visits}</strong>
-        </div>
-        <div>
-          <span>Следующий</span>
-          <strong>{client.next}</strong>
-        </div>
-        <div>
-          <span>Сумма</span>
-          <strong>{client.totalSpend}</strong>
-        </div>
-      </div>
+        <AdminDrawerSection title="Ключевые показатели">
+          <div className="admin-client-metrics" aria-label="Показатели клиента">
+            <div>
+              <span>Визиты</span>
+              <strong>{client.visits}</strong>
+            </div>
+            <div>
+              <span>Следующий</span>
+              <strong>{client.next}</strong>
+            </div>
+            <div>
+              <span>Сумма</span>
+              <strong>{client.totalSpend}</strong>
+            </div>
+          </div>
+        </AdminDrawerSection>
 
       <section className="admin-client-section admin-client-next-action" aria-label="Следующее действие клиента">
         <div className="admin-client-next-action-copy">
@@ -3870,7 +3776,8 @@ function ClientDetailCard({
           ))}
         </div>
       </section>
-    </aside>
+      </AdminDrawerBody>
+    </AdminDrawer>
   );
 }
 
@@ -3989,10 +3896,6 @@ function ClientsWorkspace({
               </button>
             ))}
           </div>
-          <div className="admin-filter-help admin-client-filter-help" aria-label="Смысл фильтра активных клиентов">
-            <strong>Активные — это клиенты со статусом &quot;Активный клиент&quot; и минимум 5 визитами.</strong>
-            <span>Причина активности показывается в таблице, мобильной карточке и карточке клиента.</span>
-          </div>
         </div>
         <div className="admin-table-scroll admin-clients-table-scroll">
           <table className="admin-data-table">
@@ -4003,90 +3906,74 @@ function ClientsWorkspace({
                 <th>Язык</th>
                 <th>Визиты</th>
                 <th>Статус</th>
-                <th>Активность</th>
                 <th>Следующий визит</th>
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map((client) => {
-                const activity = clientActivitySummary(client);
-
-                return (
-                  <tr aria-selected={client.id === selectedClient.id} key={client.id}>
-                    <td>
-                      <Link
-                        className="admin-row-action admin-row-link"
-                        href={clientProfileHref(client.id, role)}
-                        onClick={() => openClient(client.id)}
-                      >
-                        {client.name}
-                      </Link>
-                    </td>
-                    <td className="admin-tabular">{client.phone}</td>
-                    <td>{client.language.toUpperCase()}</td>
-                    <td className="admin-tabular">{client.visits}</td>
-                    <td>
-                      <span className={statusClass(client.status)}>{client.status}</span>
-                    </td>
-                    <td>
-                      <span className="admin-client-activity-reason">{activity.reason}</span>
-                      <small>{activity.nextVisit}</small>
-                    </td>
-                    <td>{client.next}</td>
-                  </tr>
-                );
-              })}
+              {filteredClients.map((client) => (
+                <tr aria-selected={client.id === selectedClient.id} key={client.id}>
+                  <td>
+                    <Link
+                      className="admin-row-action admin-row-link"
+                      href={clientProfileHref(client.id, role)}
+                      onClick={() => openClient(client.id)}
+                    >
+                      {client.name}
+                    </Link>
+                  </td>
+                  <td className="admin-tabular">{client.phone}</td>
+                  <td>{client.language.toUpperCase()}</td>
+                  <td className="admin-tabular">{client.visits}</td>
+                  <td>
+                    <span className={statusClass(client.status)}>{client.status}</span>
+                  </td>
+                  <td>{client.next}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
         <ul aria-label="Мобильный список клиентов" className="admin-mobile-client-list">
-          {filteredClients.map((client) => {
-            const activity = clientActivitySummary(client);
-
-            return (
-              <li key={client.id}>
-                <Link
-                  aria-current={client.id === selectedClient.id ? "page" : undefined}
-                  className="admin-mobile-client-card"
-                  href={clientProfileHref(client.id, role)}
-                  onClick={() => openClient(client.id)}
-                >
-                  <span className="admin-mobile-client-head">
-                    <strong>{client.name}</strong>
-                    <span>{client.language.toUpperCase()}</span>
-                  </span>
-                  <span className="admin-mobile-client-meta">
-                    <span className="admin-tabular">{client.phone}</span>
-                    <span>{visitCountLabel(client.visits)}</span>
-                  </span>
-                  <span className="admin-mobile-client-activity">{activity.reason}</span>
-                  <span className="admin-mobile-client-foot">
-                    <span className={statusClass(client.status)}>{client.status}</span>
-                    <span>{client.next}</span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
+          {filteredClients.map((client) => (
+            <li key={client.id}>
+              <Link
+                aria-current={client.id === selectedClient.id ? "page" : undefined}
+                className="admin-mobile-client-card"
+                href={clientProfileHref(client.id, role)}
+                onClick={() => openClient(client.id)}
+              >
+                <span className="admin-mobile-client-head">
+                  <strong>{client.name}</strong>
+                  <span>{client.language.toUpperCase()}</span>
+                </span>
+                <span className="admin-mobile-client-meta">
+                  <span className="admin-tabular">{client.phone}</span>
+                  <span>{visitCountLabel(client.visits)}</span>
+                </span>
+                <span className="admin-mobile-client-foot">
+                  <span className={statusClass(client.status)}>{client.status}</span>
+                  <span>{client.next}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
         </ul>
         {filteredClients.length === 0 ? <EmptyState label="Клиенты не найдены." /> : null}
       </section>
 
       {isClientDrawerOpen ? (
-        <div className="admin-drawer-backdrop">
-          <ClientDetailCard
-            appointments={selectedClientAppointments}
-            certificates={selectedClientCertificates}
-            key={selectedClient.id}
-            client={selectedClient}
-            onCalendarCreateIntent={onCalendarCreateIntent}
-            onClose={() => setIsClientDrawerOpen(false)}
-            onEditClient={openClientEdit}
-            onIssueCertificate={openClientCertificateDraft}
-            onSaveNote={onSaveClientNote}
-            role={role}
-          />
-        </div>
+        <ClientDetailCard
+          appointments={selectedClientAppointments}
+          certificates={selectedClientCertificates}
+          key={selectedClient.id}
+          client={selectedClient}
+          onCalendarCreateIntent={onCalendarCreateIntent}
+          onClose={() => setIsClientDrawerOpen(false)}
+          onEditClient={openClientEdit}
+          onIssueCertificate={openClientCertificateDraft}
+          onSaveNote={onSaveClientNote}
+          role={role}
+        />
       ) : null}
       {isClientFormOpen ? (
           <ClientFormDialog
@@ -4127,84 +4014,77 @@ function AppointmentDetailDrawer({
   role: AdminRoleId;
 }) {
   return (
-    <aside
-      aria-label="Детали выбранной записи"
-      aria-modal="true"
-      className="admin-panel admin-detail-panel admin-drawer-panel admin-appointment-drawer"
-      role="dialog"
-    >
-      <div className="admin-panel-head">
-        <span className="admin-kicker">Детали записи</span>
-        <button className="admin-icon-button" onClick={onClose} type="button">
-          Закрыть
-        </button>
-      </div>
-      <div className="admin-detail-heading">
-        <h2>{appointment.client}</h2>
-        <div className="admin-detail-actions">
-          {appointmentClient ? (
-            <Link className="admin-outline-action" href={clientProfileHref(appointmentClient.id, role)}>
-              Открыть клиента
-            </Link>
-          ) : null}
-          <button className="admin-text-action" onClick={() => onEditAppointment(appointment)} type="button">
-            Редактировать
-          </button>
-          {appointment.status === "Отменена" ? null : (
-            <button className="admin-danger-button" onClick={() => onCancelAppointment(appointment)} type="button">
-              Отменить
+    <AdminDrawer ariaLabel="Детали выбранной записи" className="admin-detail-panel admin-appointment-drawer" onClose={onClose}>
+      <AdminDrawerHeader kicker="Детали записи" onClose={onClose} title={appointment.client} titleId="admin-appointment-drawer-title" />
+      <AdminDrawerBody>
+        <AdminDrawerSection title="Запись">
+          <div className="admin-detail-actions">
+            {appointmentClient ? (
+              <Link className="admin-outline-action" href={clientProfileHref(appointmentClient.id, role)}>
+                Открыть клиента
+              </Link>
+            ) : null}
+            <button className="admin-text-action" onClick={() => onEditAppointment(appointment)} type="button">
+              Редактировать
             </button>
-          )}
-        </div>
-      </div>
-      <dl className="admin-detail-list">
-        <div>
-          <dt>Дата</dt>
-          <dd>{formatCalendarDay(appointment.date)}</dd>
-        </div>
-        <div>
-          <dt>Услуга</dt>
-          <dd>{appointment.service}</dd>
-        </div>
-        <div>
-          <dt>Статус</dt>
-          <dd>
-            <span className={statusClass(appointment.status)}>{appointment.status}</span>
-          </dd>
-        </div>
-        <div>
-          <dt>Время</dt>
-          <dd>{appointment.time}</dd>
-        </div>
-        <div>
-          <dt>Комментарий</dt>
-          <dd>{appointment.note || "Комментарий к записи пока пуст."}</dd>
-        </div>
-      </dl>
-      {appointmentClient ? (
-        <section className="admin-client-section admin-linked-client-actions" aria-label="Связанные действия клиента">
-          <div className="admin-client-section-head">
-            <h3>Связанные действия</h3>
-            <span className={statusClass(appointmentClient.status)}>{appointmentClient.status}</span>
+            {appointment.status === "Отменена" ? null : (
+              <button className="admin-danger-button" onClick={() => onCancelAppointment(appointment)} type="button">
+                Отменить
+              </button>
+            )}
           </div>
-          <p>Быстрые переходы к клиентской работе по этой записи.</p>
-          <div className="admin-client-next-actions">
-            <Link className="admin-client-inline-link" href={clientProfileHref(appointmentClient.id, role)}>
-              Карточка клиента
-            </Link>
-            <Link className="admin-client-inline-link" href={calendarClientHref(appointmentClient.id, role)}>
-              Все записи клиента
-            </Link>
-            <Link className="admin-client-inline-link" href={certificateClientHref(appointmentClient.id, role)}>
-              Все сертификаты клиента
-            </Link>
-            <Link className="admin-client-inline-link" href={calendarCreateHref(appointmentClient.id, role)}>
-              Записать снова
-            </Link>
-          </div>
-        </section>
-      ) : null}
-    </aside>
+          <dl className="admin-detail-list">
+            <div>
+              <dt>Дата</dt>
+              <dd>{formatCalendarDay(appointment.date)}</dd>
+            </div>
+            <div>
+              <dt>Услуга</dt>
+              <dd>{appointment.service}</dd>
+            </div>
+            <div>
+              <dt>Статус</dt>
+              <dd>
+                <span className={statusClass(appointment.status)}>{appointment.status}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Время</dt>
+              <dd>{appointment.time}</dd>
+            </div>
+            <div>
+              <dt>Комментарий</dt>
+              <dd>{appointment.note || "Комментарий к записи пока пуст."}</dd>
+            </div>
+          </dl>
+        </AdminDrawerSection>
+        {appointmentClient ? (
+          <AdminDrawerSection title="Связанные действия">
+            <section className="admin-linked-client-actions" aria-label="Связанные действия клиента">
+              <div className="admin-client-section-head">
+                <h3>Клиентская работа</h3>
+                <span className={statusClass(appointmentClient.status)}>{appointmentClient.status}</span>
+              </div>
+              <p>Быстрые переходы к клиентской работе по этой записи.</p>
+              <div className="admin-client-next-actions">
+                <Link className="admin-client-inline-link" href={clientProfileHref(appointmentClient.id, role)}>
+                  Карточка клиента
+                </Link>
+                <Link className="admin-client-inline-link" href={calendarClientHref(appointmentClient.id, role)}>
+                  Все записи клиента
+                </Link>
+                <Link className="admin-client-inline-link" href={certificateClientHref(appointmentClient.id, role)}>
+                  Все сертификаты клиента
+                </Link>
+                <Link className="admin-client-inline-link" href={calendarCreateHref(appointmentClient.id, role)}>
+                  Записать снова
+                </Link>
+              </div>
+            </section>
+          </AdminDrawerSection>
+        ) : null}
+      </AdminDrawerBody>
+    </AdminDrawer>
   );
 }
 
@@ -4221,20 +4101,16 @@ function AdminDetailDrawer({
   kicker: string;
   onClose: () => void;
 }) {
-  const drawerClassName = ["admin-panel", "admin-detail-panel", "admin-drawer-panel", className].filter(Boolean).join(" ");
+  const drawerClassName = ["admin-detail-panel", className].filter(Boolean).join(" ");
+  const titleId = `admin-detail-drawer-${ariaLabel.replace(/\s+/g, "-").toLowerCase()}`;
 
   return (
-    <div className="admin-drawer-backdrop">
-      <aside aria-label={ariaLabel} aria-modal="true" className={drawerClassName} role="dialog">
-        <div className="admin-panel-head">
-          <span className="admin-kicker">{kicker}</span>
-          <button className="admin-icon-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
-        </div>
+    <AdminDrawer ariaLabel={ariaLabel} className={drawerClassName} onClose={onClose}>
+      <AdminDrawerHeader kicker={kicker} onClose={onClose} title={ariaLabel} titleId={titleId} />
+      <AdminDrawerBody>
         {children}
-      </aside>
-    </div>
+      </AdminDrawerBody>
+    </AdminDrawer>
   );
 }
 
@@ -5330,16 +5206,14 @@ function CalendarWorkspace({
       </section>
 
       {shouldShowAppointmentDrawer ? (
-        <div className="admin-drawer-backdrop">
-          <AppointmentDetailDrawer
-            appointment={selectedAppointment}
-            appointmentClient={selectedAppointmentClient}
-            onCancelAppointment={onCancelAppointment}
-            onClose={() => setIsAppointmentDrawerOpen(false)}
-            onEditAppointment={onEditAppointment}
-            role={role}
-          />
-        </div>
+        <AppointmentDetailDrawer
+          appointment={selectedAppointment}
+          appointmentClient={selectedAppointmentClient}
+          onCancelAppointment={onCancelAppointment}
+          onClose={() => setIsAppointmentDrawerOpen(false)}
+          onEditAppointment={onEditAppointment}
+          role={role}
+        />
       ) : null}
     </div>
   );

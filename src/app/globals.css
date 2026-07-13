@@ -3245,14 +3245,6 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   justify-content: flex-start;
 }
 
-.admin-mobile-client-activity {
-  color: var(--admin-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
 .admin-mobile-client-meta span,
 .admin-mobile-client-foot span {
   overflow-wrap: anywhere;
@@ -3467,7 +3459,18 @@ button.admin-calendar-item[aria-pressed="true"] {
   margin: 0;
 }
 
-.admin-client-profile-head p {
+.admin-client-profile-head strong {
+  color: var(--admin-text);
+  font-size: 0.96rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.admin-client-profile-head small {
+  color: var(--admin-muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
   margin-top: 3px;
 }
 
@@ -3482,6 +3485,11 @@ button.admin-calendar-item[aria-pressed="true"] {
 .admin-client-contact-list {
   display: grid;
   gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-client-contact-list div:last-child {
+  grid-column: 1 / -1;
 }
 
 .admin-client-contact-list div {
@@ -3508,28 +3516,6 @@ button.admin-calendar-item[aria-pressed="true"] {
   font-weight: 700;
   line-height: 1.45;
   margin: 0;
-}
-
-.admin-client-filter-help {
-  background: rgba(124, 77, 161, 0.07);
-  border: 1px solid rgba(124, 77, 161, 0.14);
-  border-radius: 8px;
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-}
-
-.admin-client-filter-help strong {
-  color: var(--admin-text);
-  font-size: 0.84rem;
-  font-weight: 900;
-}
-
-.admin-client-filter-help span {
-  color: var(--admin-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.4;
 }
 
 .admin-route-context {
@@ -3570,37 +3556,6 @@ button.admin-calendar-item[aria-pressed="true"] {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
-}
-
-.admin-client-activity {
-  background: var(--admin-surface-muted);
-  border: 1px solid rgba(124, 77, 161, 0.14);
-  border-radius: 8px;
-  display: grid;
-  gap: 7px;
-  margin-top: 14px;
-  padding: 12px;
-}
-
-.admin-client-activity strong,
-.admin-client-activity-reason {
-  color: var(--admin-text);
-  display: block;
-  font-size: 0.86rem;
-  font-weight: 900;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.admin-client-activity small,
-.admin-client-activity-reason + small {
-  color: var(--admin-muted);
-  display: block;
-  font-size: 0.76rem;
-  font-weight: 800;
-  line-height: 1.4;
-  margin-top: 3px;
-  overflow-wrap: anywhere;
 }
 
 .admin-client-contact-list dt,
@@ -4487,7 +4442,7 @@ button.admin-calendar-item[aria-pressed="true"] {
 .admin-detail-list {
   display: grid;
   gap: 12px;
-  margin-top: 16px;
+  margin: 0;
 }
 
 .admin-detail-list div {
@@ -4843,23 +4798,115 @@ button.admin-calendar-item[aria-pressed="true"] {
   font-size: 0.76rem;
 }
 
+body.admin-drawer-open {
+  overflow: hidden;
+}
+
 .admin-drawer-backdrop {
   align-items: stretch;
   background: rgba(20, 13, 27, 0.24);
   display: grid;
   inset: 0;
   justify-items: end;
+  overscroll-behavior: contain;
   position: fixed;
   z-index: 35;
 }
 
 .admin-drawer-panel {
+  background: var(--admin-surface);
+  border-left: 1px solid rgba(124, 77, 161, 0.18);
   border-radius: 8px 0 0 8px;
   box-shadow: 0 24px 70px rgba(20, 13, 27, 0.28);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100dvh;
   max-height: 100dvh;
-  overflow: auto;
+  overscroll-behavior: contain;
+  overflow: hidden;
   width: min(100%, 560px);
+}
+
+.admin-drawer-header {
+  align-items: start;
+  background: var(--admin-surface);
+  border-bottom: 1px solid rgba(124, 77, 161, 0.14);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 18px;
+}
+
+.admin-drawer-header h2 {
+  font-size: 1.2rem;
+  margin: 4px 0 0;
+}
+
+.admin-drawer-header p {
+  color: var(--admin-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 5px 0 0;
+}
+
+.admin-drawer-body {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  overscroll-behavior: contain;
+  overflow: auto;
+  padding: 16px;
+}
+
+.admin-drawer-footer {
+  align-items: center;
+  background: var(--admin-surface);
+  border-top: 1px solid rgba(124, 77, 161, 0.14);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 16px;
+}
+
+.admin-drawer-section {
+  background: var(--admin-surface-muted);
+  border: 1px solid rgba(124, 77, 161, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.admin-drawer-section-head {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-drawer-section-head h3 {
+  color: var(--admin-text);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.admin-drawer-section-head p {
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.admin-drawer-section > .admin-client-contact-list,
+.admin-drawer-section > .admin-client-metrics {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.admin-drawer-section .admin-client-profile-head {
+  margin-top: 0;
 }
 
 .admin-appointment-drawer {
@@ -4947,10 +4994,6 @@ button.admin-calendar-item[aria-pressed="true"] {
   .admin-clients-workspace .admin-filter-row button {
     flex: 1 1 calc(50% - 4px);
     justify-content: center;
-  }
-
-  .admin-client-filter-help {
-    width: 100%;
   }
 
   .admin-route-context {
