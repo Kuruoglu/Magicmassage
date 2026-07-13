@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 
 import type { AdminSupabaseClient } from "./repository";
@@ -35,7 +37,7 @@ function firstConfiguredValue(...values: Array<string | undefined>) {
 
 export function resolveAdminSupabaseEnv(env: AdminSupabaseEnvSource = process.env): AdminSupabaseEnv | null {
   const url = firstConfiguredValue(env.SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_URL);
-  const key = firstConfiguredValue(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  const key = firstConfiguredValue(env.SUPABASE_SECRET_KEY, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
   return url && key ? { key, url } : null;
 }

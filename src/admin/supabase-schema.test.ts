@@ -4,9 +4,19 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const migrationPath = join(process.cwd(), "supabase", "migrations", "20260709120000_admin_foundation.sql");
+const appointmentSnapshotMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260713100000_admin_appointments_client_snapshot.sql",
+);
 
 function readMigration() {
   return readFileSync(migrationPath, "utf8");
+}
+
+function readAppointmentSnapshotMigration() {
+  return readFileSync(appointmentSnapshotMigrationPath, "utf8");
 }
 
 describe("admin Supabase schema foundation", () => {
@@ -126,5 +136,18 @@ describe("admin Supabase schema foundation", () => {
     expect(sql).toContain('create policy "accountant can log finance exports"');
     expect(sql).not.toContain('create policy "accountant can read admin clients"');
     expect(sql).not.toContain('create policy "accountant can read appointments"');
+  });
+
+  it("backfills appointment client snapshots for existing admin schemas", () => {
+    const sql = readAppointmentSnapshotMigration();
+
+    expect(sql).toContain("alter table public.admin_appointments");
+    expect(sql).toContain("add column if not exists client_name_snapshot text;");
+    expect(sql).toContain("set client_name_snapshot = coalesce(nullif(client.full_name, ''), appointment.client_id)");
+    expect(sql).toContain("from public.admin_clients client");
+    expect(sql).toContain("where appointment.client_id = client.id");
+    expect(sql).toContain("and appointment.client_name_snapshot is null;");
+    expect(sql).toContain("set client_name_snapshot = client_id");
+    expect(sql).toContain("alter column client_name_snapshot set not null;");
   });
 });
