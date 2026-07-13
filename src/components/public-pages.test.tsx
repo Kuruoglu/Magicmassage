@@ -7,6 +7,7 @@ import { messengerLinks } from "@/config/messengers";
 import { getPublicPagesContent } from "@/content/public-pages";
 import { AboutPageView } from "./about-page-view";
 import { ContactsPageView } from "./contacts-page-view";
+import { CookieConsentBanner } from "./cookie-consent";
 import { ServiceDetailPageView } from "./service-detail-page-view";
 import { ServicesPageView } from "./services-page-view";
 
@@ -153,11 +154,15 @@ describe("localized public page views", () => {
 
     expect(screen.queryByTitle(content.contacts.mapTitle)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /cookies/i }));
+    await user.click(screen.getByRole("button", { name: /всички/i }));
 
     expect(screen.getByTitle(content.contacts.mapTitle)).toHaveAttribute(
       "src",
       expect.stringContaining("google.com/maps"),
+    );
+    expect(screen.getByTitle(content.contacts.mapTitle)).toHaveAttribute(
+      "referrerpolicy",
+      "no-referrer",
     );
   });
 
@@ -176,11 +181,29 @@ describe("localized public page views", () => {
 
     expect(screen.queryByTitle(content.contacts.mapTitle)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Accept cookies" }));
+    await user.click(screen.getByRole("button", { name: "Accept all" }));
 
     expect(screen.getByTitle(content.contacts.mapTitle)).toHaveAttribute(
       "src",
       expect.stringContaining("google.com/maps"),
     );
+  });
+
+  it("keeps Google Maps gated when non-essential cookies are rejected", async () => {
+    const user = userEvent.setup();
+    const content = getPublicPagesContent("en");
+
+    render(
+      <>
+        <ContactsPageView locale="en" content={content.contacts} />
+        <CookieConsentBanner locale="en" />
+      </>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Reject non-essential" }));
+
+    expect(screen.queryByTitle(content.contacts.mapTitle)).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: content.contacts.mapTitle })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change cookie preferences" })).toBeInTheDocument();
   });
 });

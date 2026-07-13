@@ -6,6 +6,9 @@ export const publicPageKeys = [
   "giftCertificates",
   "about",
   "contacts",
+  "privacy",
+  "cookies",
+  "terms",
 ] as const;
 
 export type PublicPageKey = (typeof publicPageKeys)[number];
@@ -16,6 +19,9 @@ const pageSegments: Record<PublicPageKey, string> = {
   giftCertificates: "gift-certificates",
   about: "about",
   contacts: "contacts",
+  privacy: "privacy",
+  cookies: "cookies",
+  terms: "terms",
 };
 
 export function getPublicPagePath(locale: Locale, page: PublicPageKey): string {

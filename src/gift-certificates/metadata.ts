@@ -2,6 +2,8 @@ import type {
   GiftCertificateFulfillmentOrder,
   GiftCertificatePaymentMetadataOrder,
 } from "./types";
+import { isGiftCertificateServiceSlug } from "@/content/gift-certificates";
+import { isSupportedLocale } from "@/i18n/config";
 
 const metadataChunkPrefix = "gift_order_";
 const metadataChunkSize = 450;
@@ -33,11 +35,56 @@ export function decodeGiftOrderMetadata(
     return undefined;
   }
 
-  return JSON.parse(chunks.join("")) as GiftCertificatePaymentMetadataOrder;
+  try {
+    const parsed = JSON.parse(chunks.join(""));
+
+    return isGiftCertificatePaymentMetadataOrder(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function getChunkNumber(key: string): number {
   return Number(key.slice(metadataChunkPrefix.length));
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isEmail(value: unknown): value is string {
+  return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isGiftCertificatePaymentMetadataOrder(value: unknown): value is GiftCertificatePaymentMetadataOrder {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.locale === "string" &&
+    isSupportedLocale(value.locale) &&
+    (value.purchaseMode === "self" || value.purchaseMode === "gift") &&
+    typeof value.purchaserName === "string" &&
+    isEmail(value.purchaserEmail) &&
+    typeof value.recipientName === "string" &&
+    (value.recipientEmail === undefined || isEmail(value.recipientEmail)) &&
+    (value.recipientMessage === undefined || typeof value.recipientMessage === "string") &&
+    (value.deliveryMode === "buyer_only" || value.deliveryMode === "recipient_email") &&
+    Array.isArray(value.serviceItems) &&
+    value.serviceItems.every(
+      (item) =>
+        isObject(item) &&
+        typeof item.serviceSlug === "string" &&
+        isGiftCertificateServiceSlug(item.serviceSlug) &&
+        typeof item.sessions === "number" &&
+        Number.isInteger(item.sessions),
+    ) &&
+    (value.amountVoucherEur === undefined || typeof value.amountVoucherEur === "number") &&
+    typeof value.expiresOn === "string" &&
+    typeof value.totalEurCents === "number" &&
+    Number.isInteger(value.totalEurCents)
+  );
 }
 
 export function toFulfillmentOrder(

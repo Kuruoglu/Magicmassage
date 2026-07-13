@@ -45,4 +45,9 @@ describe("gift order Stripe metadata", () => {
 
     expect(decodeGiftOrderMetadata(metadata)?.totalEurCents).toBe(4500);
   });
+
+  it("rejects corrupted or incomplete metadata instead of raw casting", () => {
+    expect(decodeGiftOrderMetadata({ gift_order_001: "{broken" })).toBeUndefined();
+    expect(decodeGiftOrderMetadata({ gift_order_001: '{"locale":"en"}' })).toBeUndefined();
+  });
 });

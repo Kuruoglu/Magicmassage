@@ -352,7 +352,7 @@ describe("admin records persistence API route", () => {
   it("requires an authorized admin when the Supabase secret client is configured", async () => {
     supabaseAdminRouteMock.client = { from: vi.fn() };
     supabaseAdminRouteMock.authorizationResult = {
-      message: "Admin access requires an authenticated user.",
+      message: "Unauthorized",
       mode: "supabase",
       ok: false,
       statusCode: 401,
@@ -367,10 +367,7 @@ describe("admin records persistence API route", () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({
-      message: "Admin access requires an authenticated user.",
-      mode: "supabase",
-      ok: false,
-      statusCode: 401,
+      error: "Unauthorized",
     });
     expect(persistAdminRecord).not.toHaveBeenCalled();
   });

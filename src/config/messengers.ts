@@ -1,7 +1,9 @@
-export const telegramUsername = "NATALIBURACHEK";
+import { businessFacts, externalLinkProps } from "./business";
+
+export const telegramUsername = businessFacts.social.telegramUsername;
 export const telegramUrl = `https://t.me/${telegramUsername}`;
 
-export const viberPhone = "+359896778309";
+export const viberPhone = businessFacts.phone.tel;
 export const viberUrl = `viber://chat?number=${encodeURIComponent(viberPhone)}`;
 
 export const messengerLinks = {
@@ -16,6 +18,5 @@ export const messengerLinks = {
 } as const;
 
 export const externalMessengerLinkProps = {
-  rel: "noopener noreferrer",
-  target: "_blank",
+  ...externalLinkProps,
 } as const;

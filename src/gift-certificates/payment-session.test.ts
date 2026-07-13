@@ -11,6 +11,7 @@ const orderPayload = {
   purchaserName: "Anna Buyer",
   purchaserEmail: "anna@example.com",
   recipientName: "Anna Buyer",
+  recipientMessage: "Private gift note.",
   deliveryMode: "buyer_only",
   serviceItems: [{ serviceSlug: "classic-massage", sessions: 2 }],
   amountVoucherEur: 100,
@@ -36,6 +37,7 @@ describe("gift certificate payment session", () => {
       stripe: {
         paymentIntents: { create },
       },
+      idempotencyKey: "gift-intent-key",
     });
 
     const expectedAmount =
@@ -55,11 +57,13 @@ describe("gift certificate payment session", () => {
           allow_redirects: "never",
         },
       }),
+      { idempotencyKey: "gift-intent-key" },
     );
     expect(create.mock.calls[0][0].metadata.gift_order_001).toEqual(expect.any(String));
     expect(create.mock.calls[0][0].metadata.gift_certificate_code).toMatch(
       /^MMN-GC-20260705-[A-Z0-9]{8}$/,
     );
+    expect(JSON.stringify(create.mock.calls[0][0].metadata)).not.toContain("recipientMessage");
   });
 
   it("returns demo mode when Stripe is not configured", async () => {

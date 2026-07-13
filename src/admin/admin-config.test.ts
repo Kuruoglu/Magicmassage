@@ -35,8 +35,9 @@ describe("admin config", () => {
     expect(resolveAdminSection("finances", accountantRoleId)).toBe("finances");
   });
 
-  it("normalizes unknown roles to owner for the local foundation view", () => {
-    expect(resolveAdminRole("unknown")).toBe("owner");
+  it("normalizes unknown roles to a safe read-only role", () => {
+    expect(resolveAdminRole("unknown")).toBe("viewer");
+    expect(resolveAdminRole(undefined)).toBe("viewer");
     expect(resolveAdminRole("accountant")).toBe("accountant");
   });
 

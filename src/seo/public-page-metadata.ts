@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { businessFacts } from "@/config/business";
 import type { Locale } from "@/i18n/config";
 import {
   getPublicPagePath,
@@ -34,6 +35,18 @@ const metadataByLocale: Record<
       title: "Контакти и записване",
       description: "Адрес, телефон и информация за записване в Magic Massage Natali в Бургас.",
     },
+    privacy: {
+      title: "Политика за поверителност",
+      description: "Как Magic Massage Natali обработва данни, плащания и външни услуги.",
+    },
+    cookies: {
+      title: "Политика за cookies",
+      description: "Необходими cookies, Google Maps consent и Stripe payment iframes.",
+    },
+    terms: {
+      title: "Условия за използване",
+      description: "Условия за сайта, Studio24 записване и подаръчни сертификати.",
+    },
   },
   ru: {
     home: {
@@ -57,6 +70,18 @@ const metadataByLocale: Record<
     contacts: {
       title: "Контакты и запись",
       description: "Адрес, телефон и информация для записи в Magic Massage Natali в Бургасе.",
+    },
+    privacy: {
+      title: "Политика конфиденциальности",
+      description: "Как Magic Massage Natali обрабатывает данные, платежи и внешние сервисы.",
+    },
+    cookies: {
+      title: "Политика cookies",
+      description: "Необходимые cookies, согласие для Google Maps и платежные iframe Stripe.",
+    },
+    terms: {
+      title: "Условия использования",
+      description: "Условия сайта, записи через Studio24 и подарочных сертификатов.",
     },
   },
   ua: {
@@ -82,6 +107,18 @@ const metadataByLocale: Record<
       title: "Контакти та запис",
       description: "Адреса, телефон та інформація для запису в Magic Massage Natali у Бургасі.",
     },
+    privacy: {
+      title: "Політика конфіденційності",
+      description: "Як Magic Massage Natali обробляє дані, платежі та зовнішні сервіси.",
+    },
+    cookies: {
+      title: "Політика cookies",
+      description: "Необхідні cookies, згода для Google Maps і платіжні iframe Stripe.",
+    },
+    terms: {
+      title: "Умови використання",
+      description: "Умови сайту, запису через Studio24 і подарункових сертифікатів.",
+    },
   },
   en: {
     home: {
@@ -105,6 +142,18 @@ const metadataByLocale: Record<
     contacts: {
       title: "Contacts and booking",
       description: "Address, phone and booking information for Magic Massage Natali in Burgas.",
+    },
+    privacy: {
+      title: "Privacy policy",
+      description: "How Magic Massage Natali handles data, payments and third-party services.",
+    },
+    cookies: {
+      title: "Cookie policy",
+      description: "Required cookies, Google Maps consent and Stripe payment iframes.",
+    },
+    terms: {
+      title: "Terms of use",
+      description: "Terms for the website, Studio24 booking handoff and gift certificates.",
     },
   },
 };
@@ -138,7 +187,7 @@ export function createPublicPageMetadata(
       },
     },
     openGraph: {
-      title: `${localized.title} | Magic Massage Natali`,
+      title: `${localized.title} | ${businessFacts.name}`,
       description: localized.description,
       type: "website",
       locale: locale === "ua" ? "uk_UA" : locale === "bg" ? "bg_BG" : locale === "en" ? "en" : "ru_RU",

@@ -3,14 +3,18 @@ import {
   messengerLinks,
   telegramUsername,
 } from "@/config/messengers";
+import { businessFacts } from "@/config/business";
 import type { HomeContent } from "@/content/home";
+import type { Locale } from "@/i18n/config";
+import { getPublicPagePath } from "@/navigation/public-routes";
 import { MessengerIcon } from "./messenger-icon";
 
 type SiteFooterProps = {
   content: HomeContent;
+  locale: Locale;
 };
 
-export function SiteFooter({ content }: SiteFooterProps) {
+export function SiteFooter({ content, locale }: SiteFooterProps) {
   return (
     <footer className="site-footer" id="contact">
       <div className="site-footer-inner" data-testid="site-footer-inner">
@@ -25,7 +29,7 @@ export function SiteFooter({ content }: SiteFooterProps) {
           </div>
           <div>
             <dt>{content.contact.phoneLabel}</dt>
-            <dd><a href="tel:+359896778309">{content.contact.phone}</a></dd>
+            <dd><a href={`tel:${businessFacts.phone.tel}`}>{content.contact.phone}</a></dd>
           </div>
           <div className="footer-hours">
             <dt>
@@ -75,6 +79,11 @@ export function SiteFooter({ content }: SiteFooterProps) {
           </a>
         </div>
         <div className="footer-bottom">
+          <nav className="footer-legal-links" aria-label="Legal">
+            <a href={getPublicPagePath(locale, "privacy")}>Privacy</a>
+            <a href={getPublicPagePath(locale, "cookies")}>Cookies</a>
+            <a href={getPublicPagePath(locale, "terms")}>Terms</a>
+          </nav>
           <span>© {new Date().getFullYear()} {content.brand}</span>
           <span className="yin-yang" aria-hidden="true">☯</span>
         </div>

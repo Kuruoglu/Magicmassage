@@ -27,6 +27,8 @@ describe("admin Supabase schema foundation", () => {
       "admin_stripe_sales",
       "admin_finance_export_audit",
       "admin_audit_log",
+      "gift_certificate_orders",
+      "gift_certificate_fulfillment_locks",
     ];
 
     expect(sql).toContain("create type public.admin_role as enum");
@@ -45,6 +47,19 @@ describe("admin Supabase schema foundation", () => {
     expect(sql).toContain("service_slug text not null references public.admin_services(slug) on update cascade on delete restrict");
     expect(sql).toContain("certificate_code text references public.admin_certificates(code) on delete set null");
     expect(sql).toContain("downloaded_by uuid not null references auth.users(id) on delete restrict");
+    expect(sql).toContain("payment_intent_id text primary key");
+    expect(sql).toContain("gift_order_id uuid references public.gift_certificate_orders(id) on delete set null");
+  });
+
+  it("defines gift certificate payment order and fulfillment lock tables", () => {
+    const sql = readMigration();
+
+    expect(sql).toContain("payment_intent_id text unique");
+    expect(sql).toContain("certificate_code text not null unique");
+    expect(sql).toContain("status text not null default 'pending'");
+    expect(sql).toContain("fulfillment_attempts integer not null default 0");
+    expect(sql).toContain("status text not null default 'claimed'");
+    expect(sql).toContain("check (status in ('claimed', 'succeeded', 'failed', 'dead_letter'))");
   });
 
   it("defines content policies for editor-managed website content tables", () => {

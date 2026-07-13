@@ -20,6 +20,7 @@ type GiftPaymentStripe = {
   paymentIntents: {
     create: (
       params: Stripe.PaymentIntentCreateParams,
+      options?: { idempotencyKey?: string },
     ) => Promise<{ id: string; client_secret: string | null }>;
   };
 };
@@ -32,6 +33,7 @@ type GiftPaymentEnvironment = {
 } & GiftCertificateEmailEnvironment;
 
 export type GiftCertificatePaymentSessionInput = {
+  idempotencyKey?: string;
   payload: unknown;
   now?: Date;
   env?: GiftPaymentEnvironment;
@@ -83,6 +85,7 @@ function buildStatementDescriptor(): string {
 
 export async function createGiftCertificatePaymentSession({
   payload,
+  idempotencyKey,
   now = new Date(),
   env = process.env as GiftPaymentEnvironment,
   stripe,
@@ -115,25 +118,32 @@ export async function createGiftCertificatePaymentSession({
 
   getGiftCertificateEmailConfig(env);
 
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: total.totalEurCents,
-    currency: "eur",
-    receipt_email: validation.data.purchaserEmail,
-    description: `Gift certificate ${certificateCode}`,
-    statement_descriptor: buildStatementDescriptor(),
-    automatic_payment_methods: {
-      enabled: true,
-      allow_redirects: "never",
+  const metadataOrder: GiftCertificatePaymentMetadataOrder = {
+    ...order,
+    recipientMessage: undefined,
+  };
+  const paymentIntent = await stripe.paymentIntents.create(
+    {
+      amount: total.totalEurCents,
+      currency: "eur",
+      receipt_email: validation.data.purchaserEmail,
+      description: `Gift certificate ${certificateCode}`,
+      statement_descriptor: buildStatementDescriptor(),
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: "never",
+      },
+      metadata: {
+        gift_order_version: "v1",
+        gift_certificate_code: certificateCode,
+        gift_total_eur_cents: String(total.totalEurCents),
+        gift_locale: validation.data.locale,
+        gift_delivery_mode: validation.data.deliveryMode,
+        ...encodeGiftOrderMetadata(metadataOrder),
+      },
     },
-    metadata: {
-      gift_order_version: "v1",
-      gift_certificate_code: certificateCode,
-      gift_total_eur_cents: String(total.totalEurCents),
-      gift_locale: validation.data.locale,
-      gift_delivery_mode: validation.data.deliveryMode,
-      ...encodeGiftOrderMetadata(order),
-    },
-  });
+    idempotencyKey ? { idempotencyKey } : undefined,
+  );
 
   if (!paymentIntent.client_secret) {
     throw new Error("Stripe did not return a client secret.");

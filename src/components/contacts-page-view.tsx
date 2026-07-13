@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { businessFacts, businessMapUrls } from "@/config/business";
 import {
   externalMessengerLinkProps,
   messengerLinks,
@@ -14,10 +15,6 @@ type ContactsPageViewProps = {
   locale: Locale;
   content: PublicPagesContent["contacts"];
 };
-
-const googleMapsQuery = "49 ulitsa Mesta, Burgas, Bulgaria";
-const googleMapsEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(googleMapsQuery)}&output=embed`;
-const googleMapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(googleMapsQuery)}`;
 
 export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
   return (
@@ -57,7 +54,7 @@ export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
               <div>
                 <dt>{content.phoneLabel}</dt>
                 <dd>
-                  <a href="tel:+359896778309">{content.phone}</a>
+                  <a href={`tel:${businessFacts.phone.tel}`}>{content.phone}</a>
                 </dd>
               </div>
               <div>
@@ -65,7 +62,7 @@ export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
                 <dd>{content.hours}</dd>
               </div>
             </dl>
-            <a className="button" href="tel:+359896778309">
+            <a className="button" href={`tel:${businessFacts.phone.tel}`}>
               {content.callAction}
             </a>
             <div className="messenger-actions" aria-label="Messengers">
@@ -98,7 +95,7 @@ export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
               <ConsentGatedMap
                 locale={locale}
                 title={content.mapTitle}
-                src={googleMapsEmbedUrl}
+                src={businessMapUrls.embed}
               />
             </div>
             <div className="map-copy">
@@ -106,7 +103,7 @@ export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
               <p>{content.mapDescription}</p>
               <a
                 className="button button-light"
-                href={googleMapsDirectionsUrl}
+                href={businessMapUrls.directions}
                 target="_blank"
                 rel="noreferrer"
               >

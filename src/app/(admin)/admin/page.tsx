@@ -1,50 +1,69 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import { loadAdminShellData } from "@/admin/data-source";
-import { resolveAdminRole, resolveAdminSection } from "@/admin/config";
+import type { AdminRoleId } from "@/admin/config";
+import { resolveAdminShellSelection } from "@/admin/page-access";
+import { cookies } from "next/headers";
+import { forbidden, redirect } from "next/navigation";
+import {
+  adminAccessTokenCookieName,
+  allAdminRoles,
+  authorizeSupabaseAdminAccess,
+  createSupabaseAdminClient,
+} from "@/lib/supabase/admin";
+import { isAdminDemoFallbackAllowed } from "@/admin/data-source";
 
 type AdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function firstQueryValue(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const query = await searchParams;
-  const role = resolveAdminRole(firstQueryValue(query.role));
-  const activeSection = resolveAdminSection(firstQueryValue(query.section), role);
-  const calendarAction = firstQueryValue(query.action) === "create" ? "create" : undefined;
-  const selectedAdminUserId = firstQueryValue(query.user);
-  const selectedAppointmentKey = firstQueryValue(query.appointment);
-  const selectedBlogPostId = firstQueryValue(query.blog);
-  const selectedCalendarDate = firstQueryValue(query.date);
-  const selectedCertificateCode = firstQueryValue(query.certificate);
-  const selectedClientName = firstQueryValue(query.client);
-  const selectedContactId = firstQueryValue(query.contact);
-  const selectedMediaId = firstQueryValue(query.media);
-  const selectedPriceId = firstQueryValue(query.price);
-  const selectedServiceSlug = firstQueryValue(query.service);
-  const selectedSettingsGroupId = firstQueryValue(query.settings);
-  const initialData = await loadAdminShellData();
+  const serviceClient = createSupabaseAdminClient();
+  let role: AdminRoleId = "owner";
+
+  if (serviceClient) {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(adminAccessTokenCookieName)?.value;
+    const authorization = await authorizeSupabaseAdminAccess(serviceClient, token, {
+      allowedRoles: allAdminRoles,
+    });
+
+    if (!authorization.ok) {
+      if (authorization.statusCode === 401) {
+        redirect("/admin/login");
+      }
+
+      forbidden();
+    }
+
+    role = authorization.role;
+  } else if (!isAdminDemoFallbackAllowed()) {
+    redirect("/admin/login");
+  }
+
+  const selection = resolveAdminShellSelection(query, role);
+  const initialData = await loadAdminShellData({
+    activeSection: selection.activeSection,
+    role,
+  });
 
   return (
     <AdminShell
-      activeSection={activeSection}
-      calendarAction={calendarAction}
+      activeSection={selection.activeSection}
+      calendarAction={selection.calendarAction}
       initialData={initialData}
       role={role}
-      selectedAdminUserId={selectedAdminUserId}
-      selectedAppointmentKey={selectedAppointmentKey}
-      selectedBlogPostId={selectedBlogPostId}
-      selectedCalendarDate={selectedCalendarDate}
-      selectedCertificateCode={selectedCertificateCode}
-      selectedClientName={selectedClientName}
-      selectedContactId={selectedContactId}
-      selectedMediaId={selectedMediaId}
-      selectedPriceId={selectedPriceId}
-      selectedServiceSlug={selectedServiceSlug}
-      selectedSettingsGroupId={selectedSettingsGroupId}
+      selectedAdminUserId={selection.selectedAdminUserId}
+      selectedAppointmentKey={selection.selectedAppointmentKey}
+      selectedBlogPostId={selection.selectedBlogPostId}
+      selectedCalendarDate={selection.selectedCalendarDate}
+      selectedCertificateCode={selection.selectedCertificateCode}
+      selectedClientName={selection.selectedClientName}
+      selectedContactId={selection.selectedContactId}
+      selectedMediaId={selection.selectedMediaId}
+      selectedPriceId={selection.selectedPriceId}
+      selectedServiceSlug={selection.selectedServiceSlug}
+      selectedSettingsGroupId={selection.selectedSettingsGroupId}
     />
   );
 }

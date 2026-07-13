@@ -1,8 +1,8 @@
-export const studio24BookingUrl =
-  "https://studio24.bg/magic-massage-studio-natali-s8031";
+import { businessFacts, externalLinkProps } from "./business";
+
+export const studio24BookingUrl = businessFacts.bookingUrl;
 
 export const externalBookingLinkProps = {
   href: studio24BookingUrl,
-  rel: "noopener noreferrer",
-  target: "_blank",
+  ...externalLinkProps,
 } as const;

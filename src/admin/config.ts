@@ -171,7 +171,7 @@ export function resolveAdminRole(role: string | null | undefined): AdminRoleId {
     return role;
   }
 
-  return "owner";
+  return "viewer";
 }
 
 export function getAdminNavigationForRole(role: AdminRoleId) {

@@ -37,6 +37,22 @@ describe("gift certificate payload validation", () => {
     expect(!result.success && result.errors).toContain("Choose at least one massage or amount.");
   });
 
+  it("rejects unexpected top-level and service item keys", () => {
+    expect(
+      validateGiftCertificateOrderPayload({
+        ...validSelfPayload,
+        admin: true,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      validateGiftCertificateOrderPayload({
+        ...validSelfPayload,
+        serviceItems: [{ serviceSlug: "classic-massage", sessions: 2, price: 1 }],
+      }).success,
+    ).toBe(false);
+  });
+
   it("enforces the free amount voucher min and max", () => {
     expect(
       validateGiftCertificateOrderPayload({

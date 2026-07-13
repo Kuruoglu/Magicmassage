@@ -42,7 +42,7 @@ export function ConsentGatedMap({ locale, title, src }: ConsentGatedMapProps) {
         title={title}
         src={src}
         loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
+        referrerPolicy="no-referrer"
         allowFullScreen
       />
     );

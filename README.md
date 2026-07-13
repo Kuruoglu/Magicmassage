@@ -31,6 +31,10 @@ accept real payments. Live payments require confirmed prices plus
 `GIFT_CERTIFICATES_ENABLE_LIVE_PAYMENTS=true` and
 `GIFT_CERTIFICATES_FINAL_PRICES_CONFIRMED=true`.
 
+Typography currently uses CSS system fallbacks through `src/app/fonts.ts` so CI
+and offline builds never fetch Google Fonts. To restore branded fonts later, add
+licensed local font files deliberately and switch that module to `next/font/local`.
+
 ## Verification
 
 ```powershell
@@ -43,15 +47,10 @@ npm run build
 
 ## Project Documents
 
-- [AGENTS.md](./AGENTS.md) contains enduring product and engineering rules.
-- [PLANS.md](./PLANS.md) is the living product roadmap.
-- [Current scope](./docs/CURRENT_SCOPE.md) summarizes the active MVP decisions.
-- [Agent notes](./docs/AGENT_NOTES.md) lists decisions that should not be
-  re-reported as bugs.
-- [Review checklist](./docs/REVIEW_CHECKLIST.md) defines verification before
-  completion.
-- [Foundation plan](./docs/superpowers/plans/2026-06-15-foundation-home.md) describes
-  the first implementation slice.
+Start with [AGENTS.md](./AGENTS.md), then use
+[docs/CONTEXT_ROUTER.md](./docs/CONTEXT_ROUTER.md) to choose only the docs that
+match the task. Keep scope in one canonical file and link to it instead of
+duplicating large specifications across README, AGENTS, PLANS, and docs.
 
 Original approved photography remains in `assets/photos`. Optimized derivatives
 used by the application live in `public/media`.

@@ -1,29 +1,18 @@
 import type { Metadata } from "next";
-import { Lora, Montserrat } from "next/font/google";
 import { notFound } from "next/navigation";
 
+import { fontVariables } from "@/app/fonts";
+import { businessFacts } from "@/config/business";
 import { getHtmlLanguage, isSupportedLocale } from "@/i18n/config";
 import { siteUrl } from "@/seo/site-url";
 
 import "../../globals.css";
 
-const sans = Montserrat({
-  variable: "--font-sans",
-  subsets: ["cyrillic", "latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const serif = Lora({
-  variable: "--font-serif",
-  weight: ["500", "600"],
-  subsets: ["cyrillic", "latin"],
-});
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Magic Massage Natali | Burgas",
-    template: "%s | Magic Massage Natali",
+    default: `${businessFacts.name} | Burgas`,
+    template: `%s | ${businessFacts.name}`,
   },
 };
 
@@ -40,7 +29,7 @@ export default async function LocalizedLayout({ children, params }: LocalizedLay
   }
 
   return (
-    <html lang={getHtmlLanguage(locale)} className={`${sans.variable} ${serif.variable}`}>
+    <html lang={getHtmlLanguage(locale)} className={fontVariables}>
       <body>{children}</body>
     </html>
   );

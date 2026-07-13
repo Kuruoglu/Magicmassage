@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { isAdminPersistInput, persistAdminRecord } from "@/admin/persistence";
+import type { AdminPersistInput } from "@/admin/persistence";
+import type { AdminRoleId } from "@/admin/config";
+import { isAdminDemoFallbackAllowed } from "@/admin/data-source";
 import {
   authorizeSupabaseAdminAccess,
   createSupabaseAdminClient,
@@ -8,6 +11,19 @@ import {
   resolveSupabaseAdminEnv,
 } from "@/lib/supabase/admin";
 import { resolveAdminSupabaseEnv } from "@/admin/supabase-client";
+
+const recordWriteRoles: Record<AdminPersistInput["type"], AdminRoleId[]> = {
+  appointment: ["owner", "administrator", "specialist"],
+  blogPost: ["owner", "administrator", "editor"],
+  certificate: ["owner", "administrator", "specialist"],
+  client: ["owner", "administrator", "specialist"],
+  contactChannel: ["owner", "administrator", "editor"],
+  contactSettings: ["owner", "administrator", "editor"],
+  media: ["owner", "administrator", "editor"],
+  price: ["owner", "administrator", "editor"],
+  service: ["owner", "administrator", "editor"],
+  settings: ["owner", "administrator"],
+};
 
 export async function POST(request: Request) {
   let payload: unknown;
@@ -28,12 +44,14 @@ export async function POST(request: Request) {
     const authorization = await authorizeSupabaseAdminAccess(
       supabaseAdminClient,
       getBearerToken(request.headers.get("authorization")),
-      { allowedRoles: ["owner", "administrator"] },
+      { allowedRoles: recordWriteRoles[payload.type] },
     );
 
     if (!authorization.ok) {
-      return NextResponse.json(authorization, { status: authorization.statusCode });
+      return NextResponse.json({ error: authorization.message }, { status: authorization.statusCode });
     }
+  } else if (!isAdminDemoFallbackAllowed()) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   } else if (resolveAdminSupabaseEnv() && !resolveSupabaseAdminEnv()) {
     return NextResponse.json(
       {

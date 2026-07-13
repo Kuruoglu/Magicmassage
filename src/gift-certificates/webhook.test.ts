@@ -1,8 +1,8 @@
 // @vitest-environment node
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { handleGiftCertificateWebhook } from "./webhook";
+import { clearGiftCertificateWebhookLocksForTests, handleGiftCertificateWebhook } from "./webhook";
 
 const rawBody = JSON.stringify({
   id: "evt_123",
@@ -21,6 +21,10 @@ const rawBody = JSON.stringify({
 });
 
 describe("gift certificate Stripe webhook", () => {
+  beforeEach(() => {
+    clearGiftCertificateWebhookLocksForTests();
+  });
+
   it("validates the Stripe signature before fulfillment", async () => {
     const constructEvent = vi.fn(() => {
       throw new Error("Invalid signature");
@@ -48,7 +52,7 @@ describe("gift certificate Stripe webhook", () => {
       metadata: {
         gift_certificate_code: "MMN-GC-20260705-ABC123XY",
         gift_order_1:
-          '{"locale":"en","purchaseMode":"self","purchaserName":"Anna","purchaserEmail":"anna@example.com","recipientName":"Anna","deliveryMode":"buyer_only","serviceItems":[{"serviceSlug":"classic-massage","sessions":1}],"expiresOn":"2027-01-05"}',
+          '{"locale":"en","purchaseMode":"self","purchaserName":"Anna","purchaserEmail":"anna@example.com","recipientName":"Anna","deliveryMode":"buyer_only","serviceItems":[{"serviceSlug":"classic-massage","sessions":1}],"expiresOn":"2027-01-05","totalEurCents":4500}',
       },
     };
     const fulfill = vi.fn().mockResolvedValue({
@@ -110,6 +114,121 @@ describe("gift certificate Stripe webhook", () => {
 
     expect(result).toEqual({ received: true, fulfilled: false });
     expect(fulfill).not.toHaveBeenCalled();
+  });
+
+  it("does not fulfill duplicate events when the fulfillment lock is already held", async () => {
+    const fulfill = vi.fn();
+
+    const result = await handleGiftCertificateWebhook({
+      rawBody,
+      signature: "valid",
+      webhookSecret: "whsec_test",
+      stripe: {
+        webhooks: { constructEvent: vi.fn(() => JSON.parse(rawBody)) },
+        paymentIntents: {
+          retrieve: vi.fn().mockResolvedValue({
+            id: "pi_123",
+            metadata: {
+              gift_certificate_code: "MMN-GC-20260705-ABC123XY",
+              gift_order_1:
+                '{"locale":"en","purchaseMode":"self","purchaserName":"Anna","purchaserEmail":"anna@example.com","recipientName":"Anna","deliveryMode":"buyer_only","serviceItems":[{"serviceSlug":"classic-massage","sessions":1}],"expiresOn":"2027-01-05","totalEurCents":4500}',
+            },
+          }),
+          update: vi.fn(),
+        },
+      },
+      claimFulfillment: vi.fn(async () => false),
+      fulfill,
+    });
+
+    expect(result).toEqual({ received: true, fulfilled: false });
+    expect(fulfill).not.toHaveBeenCalled();
+  });
+
+  it("rejects corrupted metadata without fulfillment", async () => {
+    const fulfill = vi.fn();
+
+    await expect(
+      handleGiftCertificateWebhook({
+        rawBody,
+        signature: "valid",
+        webhookSecret: "whsec_test",
+        stripe: {
+          webhooks: { constructEvent: vi.fn(() => JSON.parse(rawBody)) },
+          paymentIntents: {
+            retrieve: vi.fn().mockResolvedValue({
+              id: "pi_123",
+              metadata: {
+                gift_certificate_code: "MMN-GC-20260705-ABC123XY",
+                gift_order_1: "{broken",
+              },
+            }),
+            update: vi.fn(),
+          },
+        },
+        fulfill,
+      }),
+    ).rejects.toThrow("Missing gift certificate metadata.");
+
+    expect(fulfill).not.toHaveBeenCalled();
+  });
+
+  it("rejects amount mismatches before fulfillment", async () => {
+    const fulfill = vi.fn();
+
+    await expect(
+      handleGiftCertificateWebhook({
+        rawBody,
+        signature: "valid",
+        webhookSecret: "whsec_test",
+        stripe: {
+          webhooks: { constructEvent: vi.fn(() => JSON.parse(rawBody)) },
+          paymentIntents: {
+            retrieve: vi.fn().mockResolvedValue({
+              amount: 9999,
+              currency: "eur",
+              id: "pi_123",
+              metadata: {
+                gift_certificate_code: "MMN-GC-20260705-ABC123XY",
+                gift_order_1:
+                  '{"locale":"en","purchaseMode":"self","purchaserName":"Anna","purchaserEmail":"anna@example.com","recipientName":"Anna","deliveryMode":"buyer_only","serviceItems":[{"serviceSlug":"classic-massage","sessions":1}],"expiresOn":"2027-01-05","totalEurCents":4500}',
+              },
+            }),
+            update: vi.fn(),
+          },
+        },
+        fulfill,
+      }),
+    ).rejects.toThrow("Payment amount does not match gift certificate order.");
+
+    expect(fulfill).not.toHaveBeenCalled();
+  });
+
+  it("rejects live/test mode mismatches", async () => {
+    await expect(
+      handleGiftCertificateWebhook({
+        expectedLivemode: true,
+        rawBody,
+        signature: "valid",
+        webhookSecret: "whsec_test",
+        stripe: {
+          webhooks: { constructEvent: vi.fn(() => JSON.parse(rawBody)) },
+          paymentIntents: {
+            retrieve: vi.fn().mockResolvedValue({
+              id: "pi_123",
+              livemode: false,
+              metadata: {
+                gift_certificate_code: "MMN-GC-20260705-ABC123XY",
+                gift_order_1:
+                  '{"locale":"en","purchaseMode":"self","purchaserName":"Anna","purchaserEmail":"anna@example.com","recipientName":"Anna","deliveryMode":"buyer_only","serviceItems":[{"serviceSlug":"classic-massage","sessions":1}],"expiresOn":"2027-01-05","totalEurCents":4500}',
+              },
+            }),
+            update: vi.fn(),
+          },
+        },
+        fulfill: vi.fn(),
+      }),
+    ).rejects.toThrow("Stripe livemode does not match environment.");
   });
 
   it("does not resend buyer email when retrying after recipient delivery failed", async () => {

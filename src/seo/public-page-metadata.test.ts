@@ -27,4 +27,15 @@ describe("public page metadata", () => {
     expect(metadata.alternates?.languages?.["uk-UA"]).toBe("/ua/gift-certificates");
     expect(metadata.alternates?.languages?.["x-default"]).toBe("/bg/gift-certificates");
   });
+
+  it("creates metadata for localized legal pages", () => {
+    const privacy = createPublicPageMetadata("en", "privacy");
+    const cookies = createPublicPageMetadata("ru", "cookies");
+
+    expect(privacy.title).toBe("Privacy policy");
+    expect(privacy.alternates?.canonical).toBe("/en/privacy");
+    expect(privacy.alternates?.languages?.["bg-BG"]).toBe("/bg/privacy");
+    expect(cookies.alternates?.canonical).toBe("/ru/cookies");
+    expect(cookies.alternates?.languages?.["uk-UA"]).toBe("/ua/cookies");
+  });
 });

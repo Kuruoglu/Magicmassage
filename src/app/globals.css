@@ -1,4 +1,6 @@
 :root {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
   --white: #FFFFFF;
   --cream: #F8F5FA;
   --cream-strong: #FFFFFF;
@@ -34,6 +36,41 @@ body {
   color: var(--graphite);
   font-family: var(--font-sans), Arial, sans-serif;
   min-width: 320px;
+}
+
+.admin-login-page {
+  align-items: center;
+  background: var(--cream);
+  display: flex;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.admin-login-form {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 18px;
+  margin: auto;
+  max-width: 420px;
+  padding: 28px;
+  width: 100%;
+}
+
+.admin-login-form label {
+  color: var(--coffee);
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.admin-login-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  padding: 12px 14px;
 }
 a { color: inherit; text-decoration: none; }
 img { object-fit: cover; }
@@ -561,7 +598,10 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .site-footer .messenger-link small {
   color: #D8D0DC;
 }
-.footer-bottom { align-items: center; color: #D8D0DC; display: flex; font-size: 0.7rem; justify-content: space-between; padding-top: 26px; }
+.footer-bottom { align-items: center; color: #D8D0DC; display: flex; font-size: 0.7rem; gap: 18px; justify-content: space-between; padding-top: 26px; }
+.footer-legal-links { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+.footer-legal-links a { color: inherit; text-decoration: none; }
+.footer-legal-links a:hover { color: var(--gold-light); }
 
 .page-hero {
   background:
@@ -1807,6 +1847,61 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   font-size: 0.9rem;
   line-height: 1.6;
 }
+.cookie-consent-actions,
+.cookie-consent-preferences {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.cookie-consent-preferences {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+.cookie-consent-preferences label {
+  align-items: center;
+  color: #332B3A;
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 700;
+  gap: 8px;
+}
+.cookie-consent-change {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(155, 107, 194, 0.28);
+  border-radius: 999px;
+  bottom: 18px;
+  box-shadow: 0 12px 36px rgba(29, 20, 36, 0.14);
+  color: #332B3A;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 9px 14px;
+  position: fixed;
+  right: 18px;
+  z-index: 30;
+}
+
+.legal-page {
+  background: #FBF8FC;
+}
+.legal-page-inner {
+  display: grid;
+  gap: 28px;
+  max-width: 820px;
+}
+.legal-section h2 {
+  color: var(--graphite);
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  margin-bottom: 12px;
+}
+.legal-section p {
+  color: #54495C;
+  line-height: 1.75;
+  margin-top: 10px;
+}
 
 .gift-page-section {
   background:
@@ -2535,6 +2630,23 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .cookie-consent .button {
     width: 100%;
   }
+
+  .cookie-consent-actions,
+  .cookie-consent-preferences {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cookie-consent-change {
+    bottom: 12px;
+    left: 16px;
+    right: 16px;
+  }
+
+  .footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 1180px) and (min-width: 721px) {
@@ -2576,6 +2688,11 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   .catalog-card:nth-child(11) {
     grid-column: auto;
   }
+}
+
+.font-system-fallback {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
 }
 
 /* Admin platform foundation */
@@ -2756,6 +2873,26 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .admin-user-chip strong {
   background: var(--admin-primary);
   color: #FFFFFF;
+}
+
+.admin-logout-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.admin-logout-button:hover {
+  border-color: rgba(110, 74, 139, 0.45);
+  color: var(--admin-text);
 }
 
 .admin-filter-row span,

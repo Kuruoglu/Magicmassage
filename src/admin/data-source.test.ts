@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { FinanceRow } from "./config";
 import type {
@@ -280,5 +280,78 @@ describe("admin data source", () => {
     expect(data.source).toBe("demo");
     expect(data.loadError).toBe("admin_clients: permission denied");
     expect(data.records.clients.length).toBeGreaterThan(0);
+  });
+
+  it("does not silently return demo admin data in production", async () => {
+    await expect(
+      loadAdminShellData({
+        env: {
+          NODE_ENV: "production",
+        },
+      }),
+    ).rejects.toThrow("Admin demo data is disabled in production.");
+  });
+
+  it("allows explicit demo fallback in production only when flagged", async () => {
+    const data = await loadAdminShellData({
+      env: {
+        ADMIN_DEMO_FALLBACK_ENABLED: "true",
+        NODE_ENV: "production",
+      },
+    });
+
+    expect(data.source).toBe("demo");
+    expect(data.records.clients.length).toBeGreaterThan(0);
+  });
+
+  it("limits accountant initial data to finance rows", async () => {
+    const fakeClient = { from: () => ({}) } as unknown as AdminSupabaseClient;
+    const financeRows: FinanceRow[] = [
+      {
+        buyer: "Tax Buyer",
+        certificateCode: "MMN-TAX-1",
+        date: "2026-07-03",
+        gross: 250,
+        id: "pi_tax_1",
+        refund: 0,
+        stripeFee: 8.6,
+      },
+    ];
+    const listStripeSales = vi.fn(async () => financeRows);
+    const repository = createRepositoryStub({
+      listAdminUsers: vi.fn(async () => {
+        throw new Error("accountant must not load users");
+      }),
+      listStripeSales,
+      loadDomainRecords: vi.fn(async () => {
+        throw new Error("accountant must not load clients");
+      }),
+      loadSettings: vi.fn(async () => {
+        throw new Error("accountant must not load settings");
+      }),
+    });
+
+    const data = await loadAdminShellData({
+      createClient: () => fakeClient,
+      createRepository: () => repository,
+      env: {
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_demo",
+        NEXT_PUBLIC_SUPABASE_URL: "https://demo.supabase.co",
+        NODE_ENV: "production",
+      },
+      now: new Date("2026-07-09T12:00:00.000Z"),
+      role: "accountant",
+    });
+
+    expect(data).toEqual({
+      financeRows,
+      records: {
+        appointments: [],
+        certificates: [],
+        clients: [],
+      },
+      source: "supabase",
+    });
+    expect(listStripeSales).toHaveBeenCalledWith({ from: "2026-07-01", to: "2026-07-31" });
   });
 });

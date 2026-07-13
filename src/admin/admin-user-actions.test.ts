@@ -139,7 +139,7 @@ describe("admin user actions", () => {
     );
 
     expect(result).toEqual({
-      message: "Admin access requires an authenticated user.",
+      message: "Unauthorized",
       mode: "supabase",
       ok: false,
       statusCode: 401,
@@ -234,7 +234,7 @@ describe("admin user actions", () => {
     );
 
     expect(result).toEqual({
-      message: "auth.users: User already registered",
+      message: "Admin user action failed.",
       mode: "supabase",
       ok: false,
     });

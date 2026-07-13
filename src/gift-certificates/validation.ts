@@ -4,6 +4,7 @@ import {
   type GiftCertificateServiceItem,
 } from "@/content/gift-certificates";
 import { isSupportedLocale } from "@/i18n/config";
+import { randomBytes } from "node:crypto";
 import type {
   GiftCertificateDeliveryMode,
   GiftCertificatePurchaseMode,
@@ -16,9 +17,15 @@ const maxRecipientMessageLength = 180;
 const maxServiceItems = 6;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null
+  return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
+}
+
+function hasOnlyKeys(source: Record<string, unknown>, allowedKeys: readonly string[]) {
+  const allowed = new Set(allowedKeys);
+
+  return Object.keys(source).every((key) => allowed.has(key));
 }
 
 function readString(source: Record<string, unknown>, key: string): string {
@@ -53,6 +60,11 @@ function readServiceItems(value: unknown, errors: string[]): GiftCertificateServ
   return value.slice(0, maxServiceItems).flatMap((item) => {
     const record = asRecord(item);
     if (!record) {
+      errors.push("Invalid massage item.");
+      return [];
+    }
+
+    if (!hasOnlyKeys(record, ["serviceSlug", "sessions"])) {
       errors.push("Invalid massage item.");
       return [];
     }
@@ -97,6 +109,24 @@ export function validateGiftCertificateOrderPayload(
   const errors: string[] = [];
 
   if (!source) {
+    return { success: false, errors: ["Invalid request payload."] };
+  }
+
+  if (
+    !hasOnlyKeys(source, [
+      "amountVoucherEur",
+      "clientTotalEurCents",
+      "deliveryMode",
+      "locale",
+      "purchaseMode",
+      "purchaserEmail",
+      "purchaserName",
+      "recipientEmail",
+      "recipientMessage",
+      "recipientName",
+      "serviceItems",
+    ])
+  ) {
     return { success: false, errors: ["Invalid request payload."] };
   }
 
@@ -189,15 +219,7 @@ export function validateGiftCertificateOrderPayload(
 
 function randomCodeSuffix(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(8);
-
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let index = 0; index < bytes.length; index += 1) {
-      bytes[index] = Math.floor(Math.random() * 256);
-    }
-  }
+  const bytes = randomBytes(8);
 
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }

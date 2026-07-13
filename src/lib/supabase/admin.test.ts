@@ -153,7 +153,7 @@ describe("server-only Supabase admin client", () => {
     const client = new FakeSupabaseAdminClient();
 
     await expect(authorizeSupabaseAdminAccess(client as unknown as SupabaseAdminClient, undefined)).resolves.toEqual({
-      message: "Admin access requires an authenticated user.",
+      message: "Unauthorized",
       mode: "supabase",
       ok: false,
       statusCode: 401,
@@ -173,7 +173,29 @@ describe("server-only Supabase admin client", () => {
         allowedRoles: ["owner", "administrator"],
       }),
     ).resolves.toEqual({
-      message: "Admin access requires an active admin profile.",
+      message: "Forbidden",
+      mode: "supabase",
+      ok: false,
+      statusCode: 403,
+    });
+  });
+
+  it("distinguishes inactive profiles from role denials", async () => {
+    const client = new FakeSupabaseAdminClient();
+    client.profileRows = [
+      {
+        role: "administrator",
+        status: "suspended",
+        user_id: "11111111-1111-4111-8111-111111111111",
+      },
+    ];
+
+    await expect(
+      authorizeSupabaseAdminAccess(client as unknown as SupabaseAdminClient, "admin-token", {
+        allowedRoles: ["owner", "administrator"],
+      }),
+    ).resolves.toEqual({
+      message: "Admin profile is not active",
       mode: "supabase",
       ok: false,
       statusCode: 403,

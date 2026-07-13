@@ -638,7 +638,7 @@ describe("AdminShell", () => {
     const details = screen.getByRole("dialog", { name: "Детали контакта" });
     expect(details).toHaveClass("admin-drawer-panel");
     expect(within(details).getByRole("heading", { name: "Телефон салона" })).toBeInTheDocument();
-    expect(within(details).getByText("+359 87 333 4411")).toBeInTheDocument();
+    expect(within(details).getByText("+359 89 677 8309")).toBeInTheDocument();
     expect(within(details).getByText("LocalBusiness SEO")).toBeInTheDocument();
   });
 
@@ -2275,16 +2275,45 @@ describe("AdminShell", () => {
 
   it("acknowledges CSV exports in the accountant finance workspace", async () => {
     const user = userEvent.setup();
+    const fetchMock = vi.fn(async () =>
+      new Response('"date"\r\n"2026-07-01"', {
+        headers: {
+          "content-disposition": 'attachment; filename="magic-massage-stripe-sales.csv"',
+          "content-type": "text/csv",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<AdminShell activeSection="finances" role="accountant" />);
 
     await user.click(screen.getByRole("button", { name: "CSV" }));
 
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/finance/export",
+      expect.objectContaining({
+        body: JSON.stringify({
+          format: "csv",
+          periodEnd: "2026-07-03",
+          periodStart: "2026-07-01",
+        }),
+      }),
+    );
     expect(screen.getByText("CSV отчет за 2026-07-01 - 2026-07-03 готов к скачиванию.")).toBeInTheDocument();
   });
 
   it("filters accountant Stripe rows by selected period", async () => {
     const user = userEvent.setup();
+    const fetchMock = vi.fn(async () =>
+      new Response('"date"\r\n"2026-07-02"', {
+        headers: {
+          "content-disposition": 'attachment; filename="magic-massage-stripe-sales.csv"',
+          "content-type": "text/csv",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<AdminShell activeSection="finances" role="accountant" />);
 
@@ -2303,6 +2332,17 @@ describe("AdminShell", () => {
 
     await user.click(screen.getByRole("button", { name: "CSV" }));
 
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/finance/export",
+      expect.objectContaining({
+        body: JSON.stringify({
+          format: "csv",
+          periodEnd: "2026-07-02",
+          periodStart: "2026-07-02",
+        }),
+      }),
+    );
     expect(screen.getByRole("status")).toHaveTextContent("CSV отчет за 2026-07-02 - 2026-07-02 готов к скачиванию.");
   });
 

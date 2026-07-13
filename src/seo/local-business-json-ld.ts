@@ -1,5 +1,6 @@
 import type { HomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
+import { businessFacts } from "@/config/business";
 import type { Locale } from "@/i18n/config";
 import { siteUrl } from "@/seo/site-url";
 
@@ -17,21 +18,21 @@ export function createLocalBusinessJsonLd(locale: Locale, content: HomeContent) 
     "@context": "https://schema.org",
     "@type": "HealthAndBeautyBusiness",
     "@id": `${siteUrl}/#business`,
-    name: "Magic Massage Natali",
+    name: businessFacts.name,
     description: descriptions[locale],
     url: `${siteUrl}/${locale}`,
     image: `${siteUrl}/media/hero/hero-massage-session.jpg`,
-    telephone: content.contact.phone,
+    telephone: businessFacts.phone.display,
     priceRange: "$$",
     address: {
       "@type": "PostalAddress",
-      streetAddress: "ul. Mesta 49",
-      addressLocality: "Burgas",
-      addressCountry: "BG",
+      streetAddress: businessFacts.address.streetAddress,
+      addressLocality: businessFacts.address.locality,
+      addressCountry: businessFacts.address.countryCode,
     },
     areaServed: {
       "@type": "City",
-      name: "Burgas",
+      name: businessFacts.address.locality,
     },
     availableLanguage: ["Bulgarian", "Russian", "Ukrainian", "English"],
     makesOffer: services.map((service) => ({

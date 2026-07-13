@@ -1,4 +1,5 @@
 import type { FinanceRow } from "./config";
+import type { AdminRoleId, AdminSectionId } from "./config";
 import { certificateRows, clientRows, financeRows as demoFinanceRows, upcomingAppointments } from "./demo-data";
 import {
   createAdminDemoRecords,
@@ -33,6 +34,7 @@ export type AdminShellInitialData = {
 };
 
 type LoadAdminShellDataOptions = {
+  activeSection?: AdminSectionId;
   createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
   createRepository?: (
     client: AdminSupabaseClient,
@@ -51,6 +53,13 @@ type LoadAdminShellDataOptions = {
   >;
   env?: AdminSupabaseEnvSource;
   now?: Date;
+  role?: AdminRoleId;
+};
+
+const emptyRecords: AdminDomainRecords = {
+  appointments: [],
+  certificates: [],
+  clients: [],
 };
 
 function cloneFinanceRows(rows: readonly FinanceRow[]): FinanceRow[] {
@@ -64,6 +73,16 @@ function buildDemoRecords() {
     clientRows,
     financeRows: demoFinanceRows,
   });
+}
+
+export function isAdminDemoFallbackAllowed(env: AdminSupabaseEnvSource = process.env) {
+  return env.ADMIN_DEMO_FALLBACK_ENABLED === "true" || env.NODE_ENV !== "production";
+}
+
+function assertDemoFallbackAllowed(env: AdminSupabaseEnvSource) {
+  if (!isAdminDemoFallbackAllowed(env)) {
+    throw new Error("Admin demo data is disabled in production.");
+  }
 }
 
 export function buildDemoAdminShellData(loadError?: string): AdminShellInitialData {
@@ -92,19 +111,69 @@ function errorMessage(error: unknown) {
 }
 
 export async function loadAdminShellData({
+  activeSection,
   createClient = createAdminSupabaseClient,
   createRepository = createAdminSupabaseRepository,
   env = process.env,
   now = new Date(),
+  role = "owner",
 }: LoadAdminShellDataOptions = {}): Promise<AdminShellInitialData> {
   const client = createClient(env);
 
   if (!client) {
+    assertDemoFallbackAllowed(env);
     return buildDemoAdminShellData();
   }
 
   try {
     const repository = createRepository(client);
+
+    if (role === "accountant") {
+      return {
+        financeRows: await repository.listStripeSales(getMonthFinancePeriod(now)),
+        records: emptyRecords,
+        source: "supabase",
+      };
+    }
+
+    if (role === "specialist") {
+      return {
+        financeRows: [],
+        records: await repository.loadDomainRecords(),
+        source: "supabase",
+      };
+    }
+
+    if (role === "viewer") {
+      return {
+        blogPosts: activeSection === "blog" ? await repository.listBlogPosts() : undefined,
+        contactChannels: activeSection === "contacts" ? await repository.listContactChannels() : undefined,
+        contactSettings: activeSection === "contacts" ? await repository.loadContactSettings() : undefined,
+        financeRows: [],
+        media: activeSection === "media" ? await repository.listMedia() : undefined,
+        prices: activeSection === "price" ? await repository.listPrices() : undefined,
+        records: ["dashboard", "clients", "certificates", "calendar"].includes(activeSection ?? "")
+          ? await repository.loadDomainRecords()
+          : emptyRecords,
+        services: activeSection === "services" ? await repository.listServices() : undefined,
+        source: "supabase",
+      };
+    }
+
+    if (role === "editor") {
+      return {
+        blogPosts: activeSection === "blog" ? await repository.listBlogPosts() : undefined,
+        contactChannels: activeSection === "contacts" ? await repository.listContactChannels() : undefined,
+        contactSettings: activeSection === "contacts" ? await repository.loadContactSettings() : undefined,
+        financeRows: [],
+        media: activeSection === "media" ? await repository.listMedia() : undefined,
+        prices: activeSection === "price" ? await repository.listPrices() : undefined,
+        records: emptyRecords,
+        services: activeSection === "services" ? await repository.listServices() : undefined,
+        source: "supabase",
+      };
+    }
+
     const [
       records,
       financeRows,
@@ -143,6 +212,7 @@ export async function loadAdminShellData({
       source: "supabase",
     };
   } catch (error) {
+    assertDemoFallbackAllowed(env);
     return buildDemoAdminShellData(errorMessage(error));
   }
 }

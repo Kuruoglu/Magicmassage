@@ -94,6 +94,12 @@ function hasString(value: Record<string, unknown>, key: string) {
   return typeof value[key] === "string";
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]) {
+  const allowed = new Set(keys);
+
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
 function hasNumber(value: Record<string, unknown>, key: string) {
   return typeof value[key] === "number" && Number.isFinite(value[key]);
 }
@@ -106,19 +112,61 @@ function hasArray(value: Record<string, unknown>, key: string) {
   return Array.isArray(value[key]);
 }
 
+function isEmail(value: unknown) {
+  return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isPhone(value: unknown) {
+  return typeof value === "string" && /^\+?[0-9\s().-]{7,24}$/.test(value.trim()) && value.replace(/\D/g, "").length >= 7;
+}
+
+function isHttpUrl(value: unknown) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function isHttpUrlOrPath(value: unknown) {
+  return isHttpUrl(value) || (typeof value === "string" && value.startsWith("/") && !value.startsWith("//"));
+}
+
 function isClientRecordShape(record: Record<string, unknown>) {
   return (
-    hasString(record, "email") &&
+    hasOnlyKeys(record, [
+      "email",
+      "history",
+      "id",
+      "language",
+      "name",
+      "next",
+      "note",
+      "phone",
+      "preferredContact",
+      "status",
+      "tags",
+      "telegram",
+      "totalSpend",
+      "visits",
+    ]) &&
+    isEmail(record.email) &&
     hasArray(record, "history") &&
     hasString(record, "id") &&
     hasString(record, "language") &&
     hasString(record, "name") &&
     hasString(record, "next") &&
     hasString(record, "note") &&
-    hasString(record, "phone") &&
+    isPhone(record.phone) &&
     hasString(record, "preferredContact") &&
     hasString(record, "status") &&
-    hasString(record, "telegram") &&
+    (record.telegram === "" || isHttpUrl(record.telegram)) &&
     hasString(record, "totalSpend") &&
     hasNumber(record, "visits") &&
     hasStringArray(record, "tags")
@@ -127,6 +175,7 @@ function isClientRecordShape(record: Record<string, unknown>) {
 
 function isAppointmentRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, ["client", "clientId", "date", "id", "note", "service", "status", "time"]) &&
     hasString(record, "client") &&
     hasString(record, "clientId") &&
     hasString(record, "date") &&
@@ -141,6 +190,20 @@ function isCertificateRecordShape(record: Record<string, unknown>) {
   const clientId = record.clientId;
 
   return (
+    hasOnlyKeys(record, [
+      "amount",
+      "buyer",
+      "clientId",
+      "clientName",
+      "code",
+      "expiresAt",
+      "history",
+      "note",
+      "paymentDate",
+      "recipient",
+      "status",
+      "stripeId",
+    ]) &&
     hasString(record, "amount") &&
     hasString(record, "buyer") &&
     (clientId === undefined || typeof clientId === "string") &&
@@ -158,8 +221,9 @@ function isCertificateRecordShape(record: Record<string, unknown>) {
 
 function isServiceRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, ["category", "coverImage", "duration", "locales", "name", "order", "seoTitle", "slug", "status", "summary"]) &&
     hasString(record, "category") &&
-    hasString(record, "coverImage") &&
+    isHttpUrlOrPath(record.coverImage) &&
     hasString(record, "duration") &&
     hasStringArray(record, "locales") &&
     hasString(record, "name") &&
@@ -173,6 +237,7 @@ function isServiceRecordShape(record: Record<string, unknown>) {
 
 function isPriceRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, ["durationMinutes", "id", "note", "order", "priceEur", "serviceSlug", "status", "updatedAt"]) &&
     hasNumber(record, "durationMinutes") &&
     hasString(record, "id") &&
     hasString(record, "note") &&
@@ -186,6 +251,7 @@ function isPriceRecordShape(record: Record<string, unknown>) {
 
 function isMediaRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, ["altText", "dimensions", "folder", "id", "name", "size", "status", "type", "uploadedAt", "url", "usage"]) &&
     hasString(record, "altText") &&
     hasString(record, "dimensions") &&
     hasString(record, "folder") &&
@@ -195,13 +261,14 @@ function isMediaRecordShape(record: Record<string, unknown>) {
     hasString(record, "status") &&
     hasString(record, "type") &&
     hasString(record, "uploadedAt") &&
-    hasString(record, "url") &&
+    isHttpUrlOrPath(record.url) &&
     hasStringArray(record, "usage")
   );
 }
 
 function isContactChannelRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, ["id", "name", "note", "status", "type", "usage", "value"]) &&
     hasString(record, "id") &&
     hasString(record, "name") &&
     hasString(record, "note") &&
@@ -214,12 +281,13 @@ function isContactChannelRecordShape(record: Record<string, unknown>) {
 
 function isContactSettingsRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, ["address", "bookingUrl", "businessName", "email", "mapUrl", "phone", "seoArea", "workingHours"]) &&
     hasString(record, "address") &&
-    hasString(record, "bookingUrl") &&
+    isHttpUrl(record.bookingUrl) &&
     hasString(record, "businessName") &&
-    hasString(record, "email") &&
-    hasString(record, "mapUrl") &&
-    hasString(record, "phone") &&
+    isEmail(record.email) &&
+    isHttpUrl(record.mapUrl) &&
+    isPhone(record.phone) &&
     hasString(record, "seoArea") &&
     hasString(record, "workingHours")
   );
@@ -227,10 +295,26 @@ function isContactSettingsRecordShape(record: Record<string, unknown>) {
 
 function isBlogPostRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, [
+      "author",
+      "body",
+      "category",
+      "coverImage",
+      "excerpt",
+      "id",
+      "locales",
+      "publishedAt",
+      "seoTitle",
+      "slug",
+      "status",
+      "tags",
+      "title",
+      "updatedAt",
+    ]) &&
     hasString(record, "author") &&
     hasString(record, "body") &&
     hasString(record, "category") &&
-    hasString(record, "coverImage") &&
+    isHttpUrlOrPath(record.coverImage) &&
     hasString(record, "excerpt") &&
     hasString(record, "id") &&
     hasStringArray(record, "locales") &&
@@ -246,6 +330,26 @@ function isBlogPostRecordShape(record: Record<string, unknown>) {
 
 function isSettingsRecordShape(record: Record<string, unknown>) {
   return (
+    hasOnlyKeys(record, [
+      "auditLogRetentionDays",
+      "bookingBufferMinutes",
+      "businessName",
+      "cookiePrivacyMode",
+      "currency",
+      "dailySlotCapacity",
+      "defaultLocale",
+      "defaultSeoTitle",
+      "emailSender",
+      "googleCalendarId",
+      "googleCalendarMode",
+      "reminderTemplate",
+      "rolesPolicy",
+      "stripeMode",
+      "timezone",
+      "updatedAt",
+      "workingDays",
+      "workingHours",
+    ]) &&
     hasNumber(record, "auditLogRetentionDays") &&
     hasNumber(record, "bookingBufferMinutes") &&
     hasString(record, "businessName") &&
@@ -254,7 +358,7 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     hasNumber(record, "dailySlotCapacity") &&
     hasString(record, "defaultLocale") &&
     hasString(record, "defaultSeoTitle") &&
-    hasString(record, "emailSender") &&
+    isEmail(record.emailSender) &&
     hasString(record, "googleCalendarId") &&
     hasString(record, "googleCalendarMode") &&
     hasString(record, "reminderTemplate") &&

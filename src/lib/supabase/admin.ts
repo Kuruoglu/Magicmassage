@@ -87,6 +87,15 @@ const serverSafeAuthOptions: AdminSupabaseAuthOptions = {
 };
 
 const defaultAdminRoles = ["owner", "administrator"] satisfies AdminRoleId[];
+export const adminAccessTokenCookieName = "mmn_admin_access_token";
+export const allAdminRoles = [
+  "owner",
+  "administrator",
+  "specialist",
+  "editor",
+  "accountant",
+  "viewer",
+] satisfies AdminRoleId[];
 
 function firstConfiguredValue(...values: Array<string | undefined>) {
   const value = values.find((item) => item?.trim());
@@ -142,7 +151,7 @@ export async function authorizeSupabaseAdminAccess(
 ): Promise<SupabaseAdminAuthorizationResult> {
   if (!actorToken) {
     return {
-      message: "Admin access requires an authenticated user.",
+      message: "Unauthorized",
       mode: "supabase",
       ok: false,
       statusCode: 401,
@@ -153,8 +162,10 @@ export async function authorizeSupabaseAdminAccess(
   const actorUserId = authData.user?.id;
 
   if (authError || !actorUserId) {
+    console.error("Supabase admin auth failed", authError?.message ?? "authenticated user was not found");
+
     return {
-      message: `auth.users: ${authError?.message ?? "authenticated user was not found"}`,
+      message: "Unauthorized",
       mode: "supabase",
       ok: false,
       statusCode: 401,
@@ -167,20 +178,40 @@ export async function authorizeSupabaseAdminAccess(
     .eq("user_id", actorUserId);
 
   if (profileError) {
+    console.error("Supabase admin profile lookup failed", profileError.message);
+
     return {
-      message: `admin_profiles: ${profileError.message}`,
+      message: "Forbidden",
       mode: "supabase",
       ok: false,
-      statusCode: 500,
+      statusCode: 403,
     };
   }
 
   const actorProfile = (profiles?.[0] ?? null) as AdminActorProfileRow | null;
   const allowedRoles = new Set(options.allowedRoles ?? defaultAdminRoles);
 
-  if (!isAdminRoleId(actorProfile?.role) || actorProfile.status !== "active" || !allowedRoles.has(actorProfile.role)) {
+  if (!actorProfile || !isAdminRoleId(actorProfile.role)) {
     return {
-      message: "Admin access requires an active admin profile.",
+      message: "Forbidden",
+      mode: "supabase",
+      ok: false,
+      statusCode: 403,
+    };
+  }
+
+  if (actorProfile.status !== "active") {
+    return {
+      message: "Admin profile is not active",
+      mode: "supabase",
+      ok: false,
+      statusCode: 403,
+    };
+  }
+
+  if (!allowedRoles.has(actorProfile.role)) {
+    return {
+      message: "Forbidden",
       mode: "supabase",
       ok: false,
       statusCode: 403,

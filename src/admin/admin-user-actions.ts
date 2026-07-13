@@ -120,8 +120,10 @@ async function upsertAdminProfile(client: SupabaseAdminClient, input: AdminProfi
   );
 
   if (error) {
+    console.error("Supabase admin profile upsert failed", error.message);
+
     return {
-      message: `admin_profiles: ${error.message}`,
+      message: "Admin user action failed.",
       mode: "supabase",
       ok: false,
     };
@@ -180,7 +182,7 @@ export async function runAdminUserAction(
   }
 
   if (!deps?.skipAuthorization) {
-    const authorization = await authorizeSupabaseAdminAccess(client, deps?.actorToken, { allowedRoles: ["owner"] });
+    const authorization = await authorizeSupabaseAdminAccess(client, deps?.actorToken, { allowedRoles: ["owner", "administrator"] });
 
     if (!authorization.ok) {
       return authorization;
@@ -219,8 +221,10 @@ export async function runAdminUserAction(
   const inviteResult = await client.auth.admin.inviteUserByEmail(normalizeEmail(input.user.email), inviteOptions);
 
   if (inviteResult.error) {
+    console.error("Supabase admin invite failed", inviteResult.error.message);
+
     return {
-      message: `auth.users: ${inviteResult.error.message}`,
+      message: "Admin user action failed.",
       mode: "supabase",
       ok: false,
     };
@@ -229,8 +233,10 @@ export async function runAdminUserAction(
   const invitedUserId = inviteResult.data.user?.id;
 
   if (!invitedUserId) {
+    console.error("Supabase admin invite did not return a user id");
+
     return {
-      message: "auth.users: invite did not return a user id.",
+      message: "Admin user action failed.",
       mode: "supabase",
       ok: false,
     };

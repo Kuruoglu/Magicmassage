@@ -32,7 +32,7 @@ export function PublicPageShell({
       />
       {children}
       <CookieConsentBanner locale={locale} />
-      <SiteFooter content={content} />
+      <SiteFooter content={content} locale={locale} />
     </div>
   );
 }

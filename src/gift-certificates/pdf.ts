@@ -2,6 +2,7 @@ import path from "node:path";
 import pdfMake from "pdfmake";
 import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
 
+import { businessFacts } from "@/config/business";
 import { getGiftCertificateServiceDefinition } from "@/content/gift-certificates";
 import type { GiftCertificateFulfillmentOrder } from "./types";
 
@@ -17,9 +18,9 @@ type GenerateGiftCertificatePdfInput = {
 };
 
 const studioFacts = [
-  "Magic Massage Natali",
-  "Mesta Street 49, Burgas",
-  "+359 89 677 8309",
+  businessFacts.name,
+  businessFacts.address.display,
+  businessFacts.phone.display,
 ];
 
 function configurePdfFonts() {
@@ -70,7 +71,7 @@ function createDocumentDefinition(
   const serviceLines = getServiceLine(order);
   const contentLines: Content[] = [
     { text: "Gift certificate", style: "eyebrow" },
-    { text: "Magic Massage Natali", style: "title" },
+    { text: businessFacts.name, style: "title" },
     { text: certificateCode, style: "code" },
     { text: `Recipient: ${order.recipientName}`, margin: [0, 18, 0, 0] },
   ];

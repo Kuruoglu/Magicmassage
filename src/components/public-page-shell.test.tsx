@@ -56,6 +56,9 @@ describe("PublicPageShell", () => {
     expect(screen.getByRole("link", { name: "BG" })).toHaveAttribute("href", "/bg/contacts");
     expect(screen.getByRole("link", { name: "UA" })).toHaveAttribute("href", "/ua/contacts");
     expect(screen.getByRole("link", { name: "EN" })).toHaveAttribute("href", "/en/contacts");
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/ru/privacy");
+    expect(screen.getByRole("link", { name: "Cookies" })).toHaveAttribute("href", "/ru/cookies");
+    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/ru/terms");
     expect(screen.getByRole("link", { name: "Записаться" })).toHaveAttribute(
       "href",
       studio24BookingUrl,

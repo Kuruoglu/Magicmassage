@@ -33,6 +33,13 @@ type WebhookStripe = {
 };
 
 type HandleGiftCertificateWebhookInput = {
+  claimFulfillment?: (
+    paymentIntentId: string,
+    order: ReturnType<typeof toFulfillmentOrder>,
+    certificateCode: string,
+    amountEurCents: number,
+  ) => Promise<boolean>;
+  expectedLivemode?: boolean;
   rawBody: string;
   signature: string | null;
   webhookSecret: string;
@@ -59,6 +66,21 @@ type HandleGiftCertificateWebhookInput = {
   now?: Date;
 };
 
+const claimedPaymentIntents = new Set<string>();
+
+export function clearGiftCertificateWebhookLocksForTests() {
+  claimedPaymentIntents.clear();
+}
+
+async function claimInMemoryFulfillment(paymentIntentId: string) {
+  if (claimedPaymentIntents.has(paymentIntentId)) {
+    return false;
+  }
+
+  claimedPaymentIntents.add(paymentIntentId);
+  return true;
+}
+
 function getPaymentIntentId(event: Stripe.Event): string | undefined {
   const object = event.data.object as { id?: string; object?: string };
 
@@ -81,6 +103,8 @@ function verifyPaymentIntentMatchesOrder(
 }
 
 export async function handleGiftCertificateWebhook({
+  claimFulfillment = claimInMemoryFulfillment,
+  expectedLivemode,
   rawBody,
   signature,
   webhookSecret,
@@ -109,6 +133,10 @@ export async function handleGiftCertificateWebhook({
 
   const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
+  if (expectedLivemode !== undefined && paymentIntent.livemode !== expectedLivemode) {
+    throw new Error("Stripe livemode does not match environment.");
+  }
+
   if (paymentIntent.metadata.gift_fulfilled_at) {
     return { received: true, fulfilled: false };
   }
@@ -124,69 +152,87 @@ export async function handleGiftCertificateWebhook({
 
   const order = toFulfillmentOrder(metadataOrder);
 
-  if (fulfill) {
-    const emailResult = await fulfill({
-      certificateCode,
-      order,
-      paymentIntentId,
-    });
+  if (!(await claimFulfillment(paymentIntentId, order, certificateCode, metadataOrder.totalEurCents))) {
+    return { received: true, fulfilled: false };
+  }
+
+  try {
+    if (fulfill) {
+      const emailResult = await fulfill({
+        certificateCode,
+        order,
+        paymentIntentId,
+      });
+
+      await stripe.paymentIntents.update(paymentIntentId, {
+        metadata: {
+          gift_fulfilled_at: now.toISOString(),
+          gift_fulfillment_status: "succeeded",
+          gift_buyer_email_id: emailResult.buyerEmailId,
+          gift_recipient_email_id: emailResult.recipientEmailId,
+        },
+      });
+
+      return { received: true, fulfilled: true };
+    }
+
+    const pdf = await generatePdf({ certificateCode, order });
+    const existingBuyerEmailId = paymentIntent.metadata.gift_buyer_email_id;
+    const buyerEmailId =
+      existingBuyerEmailId ??
+      (await sendBuyerEmail({
+        certificateCode,
+        order,
+        pdf,
+      }));
+
+    if (!existingBuyerEmailId) {
+      await stripe.paymentIntents.update(paymentIntentId, {
+        metadata: {
+          gift_buyer_email_id: buyerEmailId,
+        },
+      });
+    }
+
+    const needsRecipientEmail = order.deliveryMode === "recipient_email" && order.recipientEmail;
+    const existingRecipientEmailId = paymentIntent.metadata.gift_recipient_email_id;
+    const recipientEmailId =
+      existingRecipientEmailId ??
+      (needsRecipientEmail
+        ? await sendRecipientEmail({
+            certificateCode,
+            order,
+            pdf,
+          })
+        : null);
+
+    if (needsRecipientEmail && !existingRecipientEmailId) {
+      await stripe.paymentIntents.update(paymentIntentId, {
+        metadata: {
+          gift_recipient_email_id: recipientEmailId,
+        },
+      });
+    }
 
     await stripe.paymentIntents.update(paymentIntentId, {
       metadata: {
         gift_fulfilled_at: now.toISOString(),
-        gift_buyer_email_id: emailResult.buyerEmailId,
-        gift_recipient_email_id: emailResult.recipientEmailId,
+        gift_fulfillment_status: "succeeded",
+        gift_buyer_email_id: buyerEmailId,
+        gift_recipient_email_id: recipientEmailId,
       },
     });
 
     return { received: true, fulfilled: true };
-  }
-
-  const pdf = await generatePdf({ certificateCode, order });
-  const existingBuyerEmailId = paymentIntent.metadata.gift_buyer_email_id;
-  const buyerEmailId =
-    existingBuyerEmailId ??
-    (await sendBuyerEmail({
-      certificateCode,
-      order,
-      pdf,
-    }));
-
-  if (!existingBuyerEmailId) {
+  } catch (error) {
     await stripe.paymentIntents.update(paymentIntentId, {
       metadata: {
-        gift_buyer_email_id: buyerEmailId,
+        gift_fulfillment_failed_at: now.toISOString(),
+        gift_fulfillment_status: "failed",
+        gift_fulfillment_error: error instanceof Error ? error.message.slice(0, 200) : "Unknown fulfillment error",
       },
     });
+
+    throw error;
   }
-
-  const needsRecipientEmail = order.deliveryMode === "recipient_email" && order.recipientEmail;
-  const existingRecipientEmailId = paymentIntent.metadata.gift_recipient_email_id;
-  const recipientEmailId =
-    existingRecipientEmailId ??
-    (needsRecipientEmail
-      ? await sendRecipientEmail({
-          certificateCode,
-          order,
-          pdf,
-        })
-      : null);
-
-  if (needsRecipientEmail && !existingRecipientEmailId) {
-    await stripe.paymentIntents.update(paymentIntentId, {
-      metadata: {
-        gift_recipient_email_id: recipientEmailId,
-      },
-    });
-  }
-
-  await stripe.paymentIntents.update(paymentIntentId, {
-    metadata: {
-      gift_fulfilled_at: now.toISOString(),
-      gift_buyer_email_id: buyerEmailId,
-      gift_recipient_email_id: recipientEmailId,
-    },
-  });
-
-  return { received: true, fulfilled: true };
 }

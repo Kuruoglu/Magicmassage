@@ -36,7 +36,22 @@ const stripePromiseCache = new Map<string, Promise<Stripe | null>>();
 const nameMaxLength = 80;
 const emailMaxLength = 254;
 const messageMaxLength = 180;
+let fallbackLineIdCounter = 0;
 type TouchedField = "purchaserName" | "purchaserEmail" | "recipientName" | "recipientEmail";
+
+function createBrowserIdempotencyKey() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  }
+
+  return `gift-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
 
 function getStripePromise(key: string): Promise<Stripe | null> {
   const cached = stripePromiseCache.get(key);
@@ -51,7 +66,19 @@ function getStripePromise(key: string): Promise<Stripe | null> {
 }
 
 function createLineId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `line-${Date.now()}-${Math.random()}`;
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(8);
+
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+    return `line-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  fallbackLineIdCounter += 1;
+  return `line-${Date.now()}-${fallbackLineIdCounter}`;
 }
 
 function formatEur(cents: number): string {
@@ -209,6 +236,7 @@ export function GiftCertificateForm({
     (purchaseMode === "self" ||
       deliveryMode === "buyer_only" ||
       emailPattern.test(recipientEmail.trim()));
+  const [paymentIdempotencyKey] = useState(() => createBrowserIdempotencyKey());
   const stripePromise = useMemo(
     () => (stripePublishableKey ? getStripePromise(stripePublishableKey) : null),
     [stripePublishableKey],
@@ -304,7 +332,10 @@ export function GiftCertificateForm({
     try {
       const response = await fetch("/api/gift-certificates/payment-intent", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": paymentIdempotencyKey,
+        },
         body: JSON.stringify({
           locale,
           purchaseMode,
@@ -320,6 +351,7 @@ export function GiftCertificateForm({
           })),
           amountVoucherEur,
           clientTotalEurCents: total.totalEurCents,
+          website: "",
         }),
       });
 

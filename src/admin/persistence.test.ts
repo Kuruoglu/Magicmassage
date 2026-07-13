@@ -188,6 +188,48 @@ function buildRepository(
 }
 
 describe("admin persistence", () => {
+  it("rejects admin payloads with unexpected keys", () => {
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...clientRecord,
+          unexpected: "do not persist",
+        },
+        type: "client",
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects invalid client email, contact URLs and phone formats", () => {
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...clientRecord,
+          email: "not-an-email",
+        },
+        type: "client",
+      }),
+    ).toBe(false);
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...clientRecord,
+          phone: "short",
+        },
+        type: "client",
+      }),
+    ).toBe(false);
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...contactSettingsRecord,
+          bookingUrl: "javascript:alert(1)",
+        },
+        type: "contactSettings",
+      }),
+    ).toBe(false);
+  });
+
   it("keeps writes in demo mode when Supabase is not configured", async () => {
     const result = await persistAdminRecord(
       { record: clientRecord, type: "client" },

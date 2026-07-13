@@ -74,7 +74,7 @@ describe("admin users API route", () => {
 
   it("returns server errors for Supabase Auth write failures", async () => {
     vi.mocked(runAdminUserAction).mockResolvedValueOnce({
-      message: "auth.users: User already registered",
+      message: "Admin user action failed.",
       mode: "supabase",
       ok: false,
     });
@@ -91,7 +91,7 @@ describe("admin users API route", () => {
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
-      message: "auth.users: User already registered",
+      message: "Admin user action failed.",
       mode: "supabase",
       ok: false,
     });

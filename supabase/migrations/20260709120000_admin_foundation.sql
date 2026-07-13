@@ -536,6 +536,38 @@ create index if not exists admin_stripe_sales_certificate_idx on public.admin_st
 create index if not exists admin_finance_export_audit_downloaded_by_idx on public.admin_finance_export_audit (downloaded_by, created_at);
 create index if not exists admin_audit_log_actor_idx on public.admin_audit_log (actor_user_id, created_at);
 
+create table if not exists public.gift_certificate_orders (
+  id uuid primary key default gen_random_uuid(),
+  payment_intent_id text unique,
+  certificate_code text not null unique,
+  locale text not null check (locale in ('bg', 'ru', 'ua', 'en')),
+  amount_eur_cents integer not null check (amount_eur_cents > 0),
+  purchaser_email text not null,
+  purchaser_name text not null,
+  recipient_email text,
+  recipient_name text not null,
+  status text not null default 'pending' check (status in ('pending', 'paid', 'fulfilled', 'fulfillment_failed')),
+  fulfillment_attempts integer not null default 0,
+  last_fulfillment_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.gift_certificate_fulfillment_locks (
+  payment_intent_id text primary key,
+  gift_order_id uuid references public.gift_certificate_orders(id) on delete set null,
+  certificate_code text not null,
+  status text not null default 'claimed' check (status in ('claimed', 'succeeded', 'failed', 'dead_letter')),
+  claimed_at timestamptz not null default now(),
+  fulfilled_at timestamptz,
+  failed_at timestamptz,
+  last_error text
+);
+
+create index if not exists gift_certificate_orders_payment_intent_idx on public.gift_certificate_orders (payment_intent_id);
+create index if not exists gift_certificate_orders_status_idx on public.gift_certificate_orders (status, created_at);
+create index if not exists gift_certificate_fulfillment_locks_status_idx on public.gift_certificate_fulfillment_locks (status, claimed_at);
+
 create or replace function public.admin_has_role(required_roles public.admin_role[])
 returns boolean
 language sql
@@ -630,6 +662,8 @@ alter table public.admin_site_settings enable row level security;
 alter table public.admin_stripe_sales enable row level security;
 alter table public.admin_finance_export_audit enable row level security;
 alter table public.admin_audit_log enable row level security;
+alter table public.gift_certificate_orders enable row level security;
+alter table public.gift_certificate_fulfillment_locks enable row level security;
 
 grant select, insert, update, delete on public.admin_profiles to authenticated;
 grant select, insert, update, delete on public.admin_clients to authenticated;
@@ -645,6 +679,8 @@ grant select, insert, update, delete on public.admin_site_settings to authentica
 grant select, insert, update, delete on public.admin_stripe_sales to authenticated;
 grant select, insert on public.admin_finance_export_audit to authenticated;
 grant select on public.admin_audit_log to authenticated;
+grant select on public.gift_certificate_orders to authenticated;
+grant select on public.gift_certificate_fulfillment_locks to authenticated;
 
 drop policy if exists "admin profiles are visible to admins and self" on public.admin_profiles;
 create policy "admin profiles are visible to admins and self"
