@@ -4094,19 +4094,25 @@ function AdminDetailDrawer({
   className = "",
   kicker,
   onClose,
+  subtitle,
+  title,
 }: {
   ariaLabel: string;
   children: ReactNode;
   className?: string;
   kicker: string;
   onClose: () => void;
+  subtitle?: string;
+  title: string;
 }) {
   const drawerClassName = ["admin-detail-panel", className].filter(Boolean).join(" ");
   const titleId = `admin-detail-drawer-${ariaLabel.replace(/\s+/g, "-").toLowerCase()}`;
 
   return (
     <AdminDrawer ariaLabel={ariaLabel} className={drawerClassName} onClose={onClose}>
-      <AdminDrawerHeader kicker={kicker} onClose={onClose} title={ariaLabel} titleId={titleId} />
+      <AdminDrawerHeader kicker={kicker} onClose={onClose} title={title} titleId={titleId}>
+        {subtitle ? <p>{subtitle}</p> : null}
+      </AdminDrawerHeader>
       <AdminDrawerBody>
         {children}
       </AdminDrawerBody>
@@ -4320,9 +4326,14 @@ function CertificatesWorkspace({
       </section>
 
       {isCertificateDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали сертификата" kicker="Сертификат" onClose={() => setIsCertificateDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали сертификата"
+          kicker="Сертификат"
+          onClose={() => setIsCertificateDrawerOpen(false)}
+          subtitle={`${selectedCertificate.buyer} → ${selectedCertificate.recipient} · ${selectedCertificate.status}`}
+          title={selectedCertificate.code}
+        >
         <div className="admin-detail-heading">
-          <h2>{selectedCertificate.code}</h2>
           <div className="admin-detail-actions">
             {linkedClient ? (
               <Link className="admin-outline-action" href={clientProfileHref(linkedClient.id, role)}>
@@ -4587,9 +4598,14 @@ function ServicesWorkspace({
       </section>
 
       {isServiceDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали услуги" kicker="Услуга" onClose={() => setIsServiceDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали услуги"
+          kicker="Услуга"
+          onClose={() => setIsServiceDrawerOpen(false)}
+          subtitle={`${selectedService.slug} · ${selectedService.status}`}
+          title={selectedService.name}
+        >
         <div className="admin-detail-heading">
-          <h2>{selectedService.name}</h2>
           <div className="admin-detail-actions">
             <button className="admin-text-action" onClick={() => openServiceEdit(selectedService)} type="button">
               Редактировать
@@ -4805,9 +4821,14 @@ function PriceWorkspace({
       </section>
 
       {isPriceDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали цены" kicker="Цена" onClose={() => setIsPriceDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали цены"
+          kicker="Цена"
+          onClose={() => setIsPriceDrawerOpen(false)}
+          subtitle={`${priceValue(selectedPrice)} · ${selectedPrice.status}`}
+          title={priceLabel(selectedPrice, services)}
+        >
         <div className="admin-detail-heading">
-          <h2>{priceLabel(selectedPrice, services)}</h2>
           <div className="admin-detail-actions">
             <button className="admin-text-action" onClick={() => openPriceEdit(selectedPrice)} type="button">
               Редактировать
@@ -5530,9 +5551,14 @@ function MediaWorkspace({
       </section>
 
       {isMediaDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали медиа" kicker="Медиа" onClose={() => setIsMediaDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали медиа"
+          kicker="Медиа"
+          onClose={() => setIsMediaDrawerOpen(false)}
+          subtitle={`${selectedMedia.type} · ${selectedMedia.status}`}
+          title={selectedMedia.name}
+        >
         <div className="admin-detail-heading">
-          <h2>{selectedMedia.name}</h2>
           <div className="admin-detail-actions">
             <button className="admin-text-action" onClick={() => openMediaEdit(selectedMedia)} type="button">
               Редактировать
@@ -5767,11 +5793,16 @@ function ContactsWorkspace({
       </section>
 
       {isContactDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали контакта" kicker="Контакт" onClose={() => setIsContactDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали контакта"
+          kicker="Контакт"
+          onClose={() => setIsContactDrawerOpen(false)}
+          subtitle={selectedChannel ? `${selectedChannel.type} · ${selectedChannel.status}` : "Выберите контактный канал."}
+          title={selectedChannel?.name ?? "Ничего не найдено"}
+        >
         {selectedChannel ? (
           <>
             <div className="admin-detail-heading">
-              <h2>{selectedChannel.name}</h2>
               <div className="admin-detail-actions">
                 <button className="admin-text-action" onClick={() => openChannelEdit(selectedChannel)} type="button">
                   Редактировать
@@ -5990,9 +6021,14 @@ function BlogWorkspace({
       </section>
 
       {isBlogDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали статьи" kicker="Статья" onClose={() => setIsBlogDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали статьи"
+          kicker="Статья"
+          onClose={() => setIsBlogDrawerOpen(false)}
+          subtitle={`${selectedPost.slug} · ${selectedPost.status}`}
+          title={selectedPost.title}
+        >
         <div className="admin-detail-heading">
-          <h2>{selectedPost.title}</h2>
           <div className="admin-detail-actions">
             <button className="admin-text-action" onClick={() => openPostEdit(selectedPost)} type="button">
               Редактировать
@@ -6180,18 +6216,18 @@ function SettingsWorkspace({
       </section>
 
       {isSettingsDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали настроек" kicker="Настройки" onClose={() => setIsSettingsDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали настроек"
+          kicker="Настройки"
+          onClose={() => setIsSettingsDrawerOpen(false)}
+          subtitle={selectedGroup?.summary ?? "Измените поиск, чтобы выбрать группу настроек."}
+          title={selectedGroup?.title ?? "Ничего не найдено"}
+        >
         {!selectedGroup ? (
-          <>
-            <div className="admin-detail-heading">
-              <h2>Ничего не найдено</h2>
-            </div>
-            <p>Измените поиск, чтобы выбрать группу настроек.</p>
-          </>
+          <p>Измените поиск, чтобы выбрать группу настроек.</p>
         ) : (
           <>
         <div className="admin-detail-heading">
-          <h2>{selectedGroup.title}</h2>
           <div className="admin-detail-actions">
             <button className="admin-text-action" onClick={onOpenSettingsEdit} type="button">
               Редактировать
@@ -6495,9 +6531,14 @@ function UsersWorkspace({
       </section>
 
       {isUserDrawerOpen ? (
-        <AdminDetailDrawer ariaLabel="Детали пользователя" kicker="Доступ" onClose={() => setIsUserDrawerOpen(false)}>
+        <AdminDetailDrawer
+          ariaLabel="Детали пользователя"
+          kicker="Доступ"
+          onClose={() => setIsUserDrawerOpen(false)}
+          subtitle={`${selectedUser.email} · ${roleLabels[selectedUser.role]} · ${selectedUser.status}`}
+          title={selectedUser.name}
+        >
         <div className="admin-detail-heading">
-          <h2>{selectedUser.name}</h2>
           <div className="admin-detail-actions">
             <button className="admin-text-action" onClick={() => openUserEdit(selectedUser)} type="button">
               Редактировать

@@ -855,6 +855,7 @@ describe("AdminShell", () => {
       heading: "MMN-2407-1023",
       rowHref: "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
       rowButton: "MMN-2407-1023",
+      subtitle: "Oksana → Self · Ожидает PDF",
     },
     {
       activeSection: "services" as const,
@@ -862,6 +863,7 @@ describe("AdminShell", () => {
       heading: "Классический массаж",
       rowHref: "/admin?section=services&role=owner&service=classic-massage",
       rowButton: "Классический массаж",
+      subtitle: "classic-massage · Опубликована",
     },
     {
       activeSection: "price" as const,
@@ -869,6 +871,7 @@ describe("AdminShell", () => {
       heading: "Классический массаж · 60 мин",
       rowHref: "/admin?section=price&role=owner&price=price-classic-60",
       rowButton: "Классический массаж · 60 мин",
+      subtitle: "70 € · Активна",
     },
     {
       activeSection: "media" as const,
@@ -876,6 +879,7 @@ describe("AdminShell", () => {
       heading: "Классический массаж",
       rowHref: "/admin?section=media&role=owner&media=media-classic-cover",
       rowButton: "Классический массаж",
+      subtitle: "Фото · Готово",
     },
     {
       activeSection: "contacts" as const,
@@ -883,6 +887,7 @@ describe("AdminShell", () => {
       heading: "Телефон салона",
       rowHref: "/admin?section=contacts&role=owner&contact=contact-phone",
       rowButton: "Телефон салона",
+      subtitle: "Телефон · Активен",
     },
     {
       activeSection: "blog" as const,
@@ -890,6 +895,7 @@ describe("AdminShell", () => {
       heading: "Подготовка к первому массажу",
       rowHref: "/admin?section=blog&role=owner&blog=blog-first-massage-preparation",
       rowButton: "Подготовка к первому массажу",
+      subtitle: "first-massage-preparation · Опубликована",
     },
     {
       activeSection: "settings" as const,
@@ -897,6 +903,7 @@ describe("AdminShell", () => {
       heading: "Запись и календарь",
       rowHref: "/admin?section=settings&role=owner&settings=booking",
       rowButton: "Запись и календарь",
+      subtitle: "Рабочие часы, слоты, буфер между сеансами и Google Calendar.",
     },
     {
       activeSection: "users" as const,
@@ -904,8 +911,9 @@ describe("AdminShell", () => {
       heading: "Natali Ivanova",
       rowHref: "/admin?section=users&role=owner&user=admin-user-owner",
       rowButton: "Natali Ivanova",
+      subtitle: "natali@magicmassage.bg · Владелец · Активен",
     },
-  ])("opens $drawerLabel as a full-height drawer after selecting a row", ({ activeSection, drawerLabel, heading, rowButton, rowHref }) => {
+  ])("opens $drawerLabel as a full-height drawer after selecting a row", ({ activeSection, drawerLabel, heading, rowButton, rowHref, subtitle }) => {
     render(<AdminShell activeSection={activeSection} role="owner" />);
 
     expect(screen.queryByLabelText(drawerLabel)).not.toBeInTheDocument();
@@ -923,7 +931,11 @@ describe("AdminShell", () => {
     const details = screen.getByRole("dialog", { name: drawerLabel });
     expect(details).toHaveClass("admin-drawer-panel");
     expect(details.parentElement).toHaveClass("admin-drawer-backdrop");
-    expect(within(details).getByRole("heading", { name: heading })).toBeInTheDocument();
+    const drawerHeader = details.querySelector<HTMLElement>(".admin-drawer-header");
+    expect(drawerHeader).not.toBeNull();
+    expect(within(drawerHeader!).getByRole("heading", { name: heading })).toBeInTheDocument();
+    expect(within(drawerHeader!).getByText(subtitle, { exact: true })).toBeInTheDocument();
+    expect(within(drawerHeader!).queryByRole("heading", { name: drawerLabel })).not.toBeInTheDocument();
 
     fireEvent.click(within(details).getByRole("button", { name: "Закрыть" }));
 

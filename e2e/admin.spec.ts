@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// This suite mutates deterministic in-memory demo records. The default
+// Playwright config removes Supabase env so it can never touch shared data.
+
 test("admin foundation renders a data-dense dashboard shell", async ({ page }) => {
   await page.goto("/admin");
 
@@ -51,15 +54,14 @@ test("dashboard calendar row link opens the exact appointment", async ({ page })
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 });
 
-test("accountant view exposes only finance navigation", async ({ page }) => {
+test("role query parameters cannot override the effective admin role", async ({ page }) => {
   await page.goto("/admin?role=accountant");
 
   const navigation = page.getByRole("navigation", { name: "Admin sections" });
   await expect(navigation.getByRole("link", { name: "Финансы" })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Клиенты" })).toHaveCount(0);
-  await expect(navigation.getByRole("link", { name: "Календарь" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Финансы" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Выгрузить отчет" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Клиенты" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Календарь" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Дашборд" })).toBeVisible();
 });
 
 test("admin search and action panel are interactive", async ({ page }) => {
@@ -76,16 +78,16 @@ test("admin search and action panel are interactive", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Новый клиент" })).toBeVisible();
 });
 
-test("accountant CSV export provides visible feedback", async ({ page }) => {
-  await page.goto("/admin?role=accountant");
+test("finance CSV export stays blocked without an authenticated server role", async ({ page }) => {
+  await page.goto("/admin?section=finances");
 
   await page.getByRole("button", { name: "CSV" }).click();
 
-  await expect(page.getByText("CSV отчет за 2026-07-01 - 2026-07-03 готов к скачиванию.")).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("CSV отчет недоступен для текущей роли.");
 });
 
-test("accountant filters Stripe sales by tax period", async ({ page }) => {
-  await page.goto("/admin?role=accountant", { waitUntil: "networkidle" });
+test("finance workspace filters Stripe sales by tax period", async ({ page }) => {
+  await page.goto("/admin?section=finances", { waitUntil: "networkidle" });
 
   await page.getByLabel("Начало периода").fill("2026-07-02");
   await page.getByLabel("Конец периода").fill("2026-07-02");
@@ -95,9 +97,6 @@ test("accountant filters Stripe sales by tax period", async ({ page }) => {
   await expect(page.getByText("pi_3QMMN1023")).toHaveCount(0);
   await expect(page.getByLabel("Finance summary").getByText("180,00 €")).toBeVisible();
 
-  await page.getByRole("button", { name: "CSV" }).click();
-
-  await expect(page.getByRole("status")).toHaveText("CSV отчет за 2026-07-02 - 2026-07-02 готов к скачиванию.");
 });
 
 test("calendar month view is selectable", async ({ page }) => {
@@ -204,7 +203,10 @@ test("admin record details open as full-height drawers over full-width workspace
   const drawer = page.getByRole("dialog", { name: "Детали услуги" });
   await expect(drawer).toBeVisible();
   await expect(drawer).toHaveClass(/admin-drawer-panel/);
-  await expect(drawer.getByRole("heading", { name: "Классический массаж" })).toBeVisible();
+  const drawerHeader = drawer.locator(".admin-drawer-header");
+  await expect(drawerHeader.getByRole("heading", { name: "Классический массаж" })).toBeVisible();
+  await expect(drawerHeader.getByText("classic-massage · Опубликована")).toBeVisible();
+  await expect(drawerHeader.getByRole("heading", { name: "Детали услуги" })).toHaveCount(0);
 
   const drawerBox = await drawer.boundingBox();
   const panelBoxAfter = await panel.boundingBox();
@@ -752,9 +754,9 @@ test("client form creates and edits a client profile", async ({ page }) => {
 
   const createDialog = page.getByRole("dialog", { name: "Новый клиент" });
   await expect(createDialog.getByRole("group", { name: "Контакты клиента" })).toBeVisible();
-  await expect(createDialog.getByRole("group", { name: "Профиль и активность" })).toBeVisible();
+  await expect(createDialog.getByRole("group", { name: "Профиль клиента" })).toBeVisible();
   await expect(createDialog.getByRole("group", { name: "Заметки и теги" })).toBeVisible();
-  await expect(createDialog.getByText("Активный клиент: 5+ визитов или ближайшая подтвержденная запись.")).toBeVisible();
+  await expect(createDialog.getByText("Статус выбирается вручную и не скрывает клиента из базы.")).toBeVisible();
   await createDialog.getByRole("textbox", { name: "Имя" }).fill("Ирина Тестова");
   await createDialog.getByRole("textbox", { name: "Телефон" }).fill("+359 88 777 1122");
   await createDialog.getByRole("textbox", { name: "Email" }).fill("irina@example.com");
@@ -862,7 +864,7 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
 
   const details = page.getByLabel("Детали сертификата");
   await expect(details.getByRole("heading", { name: "MMN-2407-1999" })).toBeVisible();
-  await expect(details.getByText("Ирина Тестова → Self")).toBeVisible();
+  await expect(details.getByText("Ирина Тестова → Self", { exact: true })).toBeVisible();
   await expect(details.getByText("90 €")).toBeVisible();
   await expect(details.getByText("manual")).toBeVisible();
 
@@ -891,7 +893,7 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(details.getByText("Oksana → Olena K.")).toBeVisible();
+  await expect(details.getByText("Oksana → Olena K.", { exact: true })).toBeVisible();
   await expect(details.getByText("260 €")).toBeVisible();
   await expect(details.getByText("Погашен после записи клиента.")).toBeVisible();
 });
@@ -932,7 +934,7 @@ test("services workspace can create and edit a massage service", async ({ page }
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(details.getByText("Опубликована")).toBeVisible();
+  await expect(details.getByText("Опубликована", { exact: true })).toBeVisible();
   await expect(details.getByText("Опубликованное описание услуги для сайта.")).toBeVisible();
 });
 
@@ -958,7 +960,7 @@ test("price workspace can create and edit a euro price variant", async ({ page }
 
   const details = page.getByLabel("Детали цены");
   await expect(details.getByRole("heading", { name: "Классический массаж · 90 мин" })).toBeVisible();
-  await expect(details.getByText("110 €")).toBeVisible();
+  await expect(details.getByText("110 €", { exact: true })).toBeVisible();
   await expect(details.getByText("EUR")).toBeVisible();
 
   await details.getByRole("button", { name: "Редактировать" }).click();
@@ -968,8 +970,8 @@ test("price workspace can create and edit a euro price variant", async ({ page }
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(details.getByText("115 €")).toBeVisible();
-  await expect(details.getByText("Скрыта")).toBeVisible();
+  await expect(details.getByText("115 €", { exact: true })).toBeVisible();
+  await expect(details.getByText("Скрыта", { exact: true })).toBeVisible();
 });
 
 test("media workspace can upload, filter and edit an asset", async ({ page }) => {
@@ -1007,7 +1009,7 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(details.getByText("Требует alt")).toBeVisible();
+  await expect(details.getByText("Требует alt", { exact: true })).toBeVisible();
   await expect(details.getByText("Нужно уточнить alt перед публикацией")).toBeVisible();
 
   await details.getByRole("button", { name: "Закрыть" }).click();
@@ -1067,7 +1069,7 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
 
   await expect(channelDialog).toHaveCount(0);
   await expect(details.getByText("https://t.me/magicmassage_burgas")).toBeVisible();
-  await expect(details.getByText("Активен")).toBeVisible();
+  await expect(details.getByText("Активен", { exact: true })).toBeVisible();
 });
 
 test("blog workspace can create, filter and edit an article", async ({ page }) => {
@@ -1120,7 +1122,7 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(details.getByText("Опубликована")).toBeVisible();
+  await expect(details.getByText("Опубликована", { exact: true })).toBeVisible();
   await expect(details.getByText("Обновленная памятка перед визитом.")).toBeVisible();
 
   await details.getByRole("button", { name: "Закрыть" }).click();
@@ -1335,12 +1337,12 @@ test("mobile client language filter shows status cards without horizontal scroll
     "href",
     "/admin?section=clients&role=owner&client=client-359895550099",
   );
-  await expect(mariaCard.getByText("Пауза")).toBeVisible();
+  await expect(mariaCard.getByText("Новый клиент")).toBeVisible();
   await expect(mariaCard.locator(".admin-mobile-client-meta").getByText("3 визита", { exact: true })).toBeVisible();
   await expect(mariaCard.getByText("В активных: 7 визитов")).toHaveCount(0);
   await expect(mobileList.getByText("Olena K.")).toHaveCount(0);
 
-  const statusBox = await mariaCard.getByText("Пауза").boundingBox();
+  const statusBox = await mariaCard.getByText("Новый клиент").boundingBox();
   const viewport = page.viewportSize();
   expect(statusBox).not.toBeNull();
   expect(viewport).not.toBeNull();
