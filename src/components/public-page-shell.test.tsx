@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -132,10 +132,37 @@ describe("PublicPageShell", () => {
     );
   });
 
+  it("removes gift certificates from desktop and mobile navigation when disabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <PublicPageShell
+        locale="ru"
+        currentPage="home"
+        content={getHomeContent("ru")}
+        giftCertificatesEnabled={false}
+      >
+        <main>Home</main>
+      </PublicPageShell>,
+    );
+
+    expect(
+      within(screen.getByRole("navigation", { name: "Primary navigation" })).queryByRole("link", {
+        name: "Сертификаты",
+      }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+    expect(
+      within(screen.getByRole("navigation", { name: "Mobile navigation" })).queryByRole("link", {
+        name: "Сертификаты",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps the closed mobile menu inert and focuses the close button when opened", async () => {
     const user = userEvent.setup();
 
-    render(
+    const { container } = render(
       <PublicPageShell
         locale="ru"
         currentPage="contacts"
@@ -156,5 +183,12 @@ describe("PublicPageShell", () => {
     await user.keyboard("{Escape}");
 
     expect(mobileMenu).toHaveAttribute("inert");
+    expect(screen.getByRole("button", { name: "Open menu" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+    fireEvent.click(container.querySelector(".mobile-menu-backdrop")!);
+
+    expect(mobileMenu).toHaveAttribute("inert");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open menu" })).toHaveFocus());
   });
 });

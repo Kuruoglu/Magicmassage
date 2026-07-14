@@ -238,11 +238,11 @@ test("admin record details open as full-height drawers over full-width workspace
 
   await page.goto("/admin?section=media", { waitUntil: "networkidle" });
   await expect(page.getByRole("dialog", { name: "Детали медиа" })).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("link", { name: "Классический массаж" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: /Классический массаж.*services.*Готово/ })).toHaveAttribute(
     "href",
     "/admin?section=media&role=owner&media=media-classic-cover",
   );
-  await page.getByRole("table").getByRole("link", { name: "Классический массаж" }).click();
+  await page.getByRole("link", { name: /Классический массаж.*services.*Готово/ }).click();
   await expect(page).toHaveURL(/section=media/);
   await expect(page).toHaveURL(/media=media-classic-cover/);
   await expect(page.getByRole("dialog", { name: "Детали медиа" }).getByRole("heading", { name: "Классический массаж" })).toBeVisible();
@@ -360,9 +360,9 @@ test("calendar week and list modes are distinct", async ({ page }) => {
 
   await page.getByRole("button", { name: "Неделя" }).click();
 
-  const weekGrid = page.getByRole("grid", { name: "Неделя 6-12 июля" });
-  await expect(page.getByRole("heading", { name: "Неделя 6-12 июля" })).toBeVisible();
-  await expect(weekGrid.getByText("10 июл")).toBeVisible();
+  const weekGrid = page.getByRole("region", { name: "6 июл. - 12 июл." });
+  await expect(page.getByRole("heading", { name: "6 июл. - 12 июл." })).toBeVisible();
+  await expect(weekGrid.getByRole("button", { name: /Пт 10 июл/ })).toBeVisible();
   await expect(weekGrid.getByText("SPA процедура")).toBeVisible();
 
   await page.getByRole("button", { name: "Список" }).click();
@@ -374,14 +374,14 @@ test("calendar week and list modes are distinct", async ({ page }) => {
 test("calendar day timeline and appointment list use different layouts", async ({ page }) => {
   await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
 
-  await expect(page.locator(".admin-day-timeline")).toBeVisible();
+  await expect(page.locator(".admin-day-time-grid")).toBeVisible();
   await expect(page.locator(".admin-appointment-feed")).toHaveCount(0);
-  await expect(page.getByText("Буфер после сеанса: 30 минут")).toHaveCount(2);
+  await expect(page.getByLabel("Сводка дня 6 июля").getByText("30 минут")).toBeVisible();
 
   await page.getByRole("button", { name: "Список" }).click();
 
   await expect(page.locator(".admin-appointment-feed")).toBeVisible();
-  await expect(page.locator(".admin-day-timeline")).toHaveCount(0);
+  await expect(page.locator(".admin-day-time-grid")).toHaveCount(0);
   await expect(page.getByText("Всего записей")).toBeVisible();
   await expect(page.getByRole("button", { name: /Olena K./ })).toBeVisible();
 
@@ -405,18 +405,19 @@ test("calendar week view uses dense desktop columns", async ({ page }) => {
 
   await page.getByRole("button", { name: "Неделя" }).click();
 
-  const weekGrid = page.getByRole("grid", { name: "Неделя 6-12 июля" });
+  const weekGrid = page.getByRole("region", { name: "6 июл. - 12 июл." });
   await expect(weekGrid).toBeVisible();
 
   const weekMetrics = await weekGrid.evaluate((grid) => {
-    const dayCards = Array.from(grid.querySelectorAll(".admin-calendar-week-day"));
-    const dayHeads = Array.from(grid.querySelectorAll(".admin-week-day-head"));
-    const appointments = Array.from(grid.querySelectorAll(".admin-week-appointment"));
-    const firstRowTop = Math.round(dayCards[0]?.getBoundingClientRect().top ?? 0);
+    const columns = Array.from(grid.querySelectorAll(".admin-calendar-time-column"));
+    const columnGrid = grid.querySelector(".admin-week-time-columns");
+    const dayHeads = Array.from(grid.querySelectorAll(".admin-week-grid-head button"));
+    const appointments = Array.from(grid.querySelectorAll(".admin-timed-appointment"));
+    const firstRowTop = Math.round(columns[0]?.getBoundingClientRect().top ?? 0);
 
     return {
-      columnCount: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
-      allDaysOnOneRow: dayCards.every((card) => Math.round(card.getBoundingClientRect().top) === firstRowTop),
+      columnCount: columnGrid ? getComputedStyle(columnGrid).gridTemplateColumns.split(" ").filter(Boolean).length : 0,
+      allDaysOnOneRow: columns.every((column) => Math.round(column.getBoundingClientRect().top) === firstRowTop),
       maxHeadHeight: Math.max(...dayHeads.map((head) => Math.round(head.getBoundingClientRect().height))),
       maxAppointmentHeight: Math.max(...appointments.map((appointment) => Math.round(appointment.getBoundingClientRect().height))),
       overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -765,6 +766,7 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await createDialog.getByLabel("Статус").selectOption("Новый клиент");
   await createDialog.getByRole("textbox", { name: "Telegram" }).fill("https://t.me/irina_demo");
   await createDialog.getByRole("textbox", { name: "Следующий визит" }).fill("Не назначен");
+  await createDialog.getByRole("button", { name: "Добавить заметку" }).click();
   await createDialog.getByRole("textbox", { name: "Заметка клиента" }).fill("Новая клиентка, предпочитает дневные слоты.");
   await createDialog.getByRole("textbox", { name: "Теги" }).fill("BG, new");
   await createDialog.getByRole("button", { name: "Сохранить клиента" }).click();
@@ -791,7 +793,8 @@ test("client form creates and edits a client profile", async ({ page }) => {
   await expect(editDialog).toHaveCount(0);
   const notesSection = card.locator("section").filter({ has: page.getByRole("heading", { name: "Заметки" }) });
   await expect(notesSection.getByText("Обновлено после звонка, лучше писать на email.", { exact: true })).toBeVisible();
-  await expect(notesSection.getByText("email", { exact: true })).toBeVisible();
+  const tagsSection = card.locator("section").filter({ has: page.getByRole("heading", { name: "Теги", exact: true }) });
+  await expect(tagsSection.getByText("email", { exact: true })).toBeVisible();
 });
 
 test("client form blocks a duplicate phone before creating a client", async ({ page }) => {
@@ -910,10 +913,11 @@ test("services workspace can create and edit a massage service", async ({ page }
   await createDialog.getByLabel("Статус").selectOption("Черновик");
   await createDialog.getByLabel("Длительность").fill("75 мин");
   await createDialog.getByLabel("Порядок").fill("9");
-  await createDialog.getByLabel("Локали").fill("ru, bg");
+  await createDialog.getByLabel("URL обложки").fill("/media/services/classic-massage.jpg");
+  await createDialog.getByLabel("Краткое описание").fill("Расслабляющая SPA-услуга с ароматическими маслами.");
+  await createDialog.getByLabel("Полный текст").fill("Полное описание арома массажа для черновика публичной страницы.");
   await createDialog.getByLabel("SEO title").fill("Арома массаж в Бургасе");
-  await createDialog.getByLabel("Обложка").fill("/media/services/aroma-massage.jpg");
-  await createDialog.getByLabel("Описание").fill("Расслабляющая SPA-услуга с ароматическими маслами.");
+  await createDialog.getByLabel(/SEO description/).fill("Арома массаж в Бургасе: расслабляющая SPA-процедура.");
   await createDialog.getByRole("button", { name: "Сохранить услугу" }).click();
 
   await expect(createDialog).toHaveCount(0);
@@ -928,14 +932,31 @@ test("services workspace can create and edit a massage service", async ({ page }
   await expect(details.getByText("Расслабляющая SPA-услуга с ароматическими маслами.")).toBeVisible();
 
   await details.getByRole("button", { name: "Редактировать" }).click();
-  const editDialog = page.getByRole("dialog", { name: "Редактировать услугу" });
+  const editDialog = page.getByRole("dialog", { name: "Редактировать: Арома массаж" });
+  for (const [locale, title] of [
+    ["RU", "Арома массаж"],
+    ["UA", "Арома масаж"],
+    ["EN", "Aroma massage"],
+  ] as const) {
+    await editDialog.getByRole("tab", { name: new RegExp(`^${locale}`) }).click();
+    await editDialog.getByLabel("Название").fill(title);
+    await editDialog.getByLabel("Краткое описание").fill(`${title}: краткое описание.`);
+    await editDialog.getByLabel("Полный текст").fill(`${title}: полный текст публичной страницы.`);
+    await editDialog.getByLabel(/SEO description/).fill(`${title} в студии Magic Massage Natali в Бургасе.`);
+  }
   await editDialog.getByLabel("Статус").selectOption("Опубликована");
-  await editDialog.getByLabel("Описание").fill("Опубликованное описание услуги для сайта.");
-  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+  await editDialog.getByRole("button", { name: "Сохранить услугу" }).click();
 
   await expect(editDialog).toHaveCount(0);
   await expect(details.getByText("Опубликована", { exact: true })).toBeVisible();
-  await expect(details.getByText("Опубликованное описание услуги для сайта.")).toBeVisible();
+  await expect(details.getByText("Расслабляющая SPA-услуга с ароматическими маслами.")).toBeVisible();
+
+  await details.getByRole("button", { name: "Редактировать" }).click();
+  const savedTranslations = page.getByRole("dialog", { name: "Редактировать: Арома массаж" });
+  await savedTranslations.getByRole("tab", { name: /^EN/ }).click();
+  await expect(savedTranslations.getByLabel("Название")).toHaveValue("Aroma massage");
+  await expect(savedTranslations.getByLabel("Краткое описание")).toHaveValue("Aroma massage: краткое описание.");
+  await savedTranslations.getByRole("button", { name: "Закрыть" }).click();
 });
 
 test("price workspace can create and edit a euro price variant", async ({ page }) => {
@@ -975,24 +996,32 @@ test("price workspace can create and edit a euro price variant", async ({ page }
 });
 
 test("media workspace can upload, filter and edit an asset", async ({ page }) => {
+  await page.route("**/api/admin/media", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({
+        height: 1100,
+        mimeType: "image/jpeg",
+        publicUrl: "/media/services/relaxing-massage.jpg",
+        size: 419840,
+        width: 1600,
+      }),
+      contentType: "application/json",
+      status: 201,
+    });
+  });
   await page.goto("/admin?section=media", { waitUntil: "networkidle" });
 
   await page.getByRole("button", { name: "Загрузить медиа" }).click();
 
   const createDialog = page.getByRole("dialog", { name: "Новое медиа" });
   await createDialog.getByLabel("Название").fill("Арома обложка");
-  await createDialog.getByLabel("URL").fill("/media/services/relaxing-massage.jpg");
-  await createDialog.getByLabel("Папка").fill("services");
-  await createDialog.getByLabel("Тип").selectOption("Фото");
-  await createDialog.getByLabel("Статус").selectOption("Готово");
-  await createDialog.getByLabel("Alt-текст").fill("Арома массаж в кабинете Magic Massage Natali");
-  await createDialog.getByLabel("Использование").fill("Услуга: Арома массаж, Hero сайта");
-  await createDialog.getByLabel("Размер файла").fill("410 KB");
-  await createDialog.getByLabel("Разрешение").fill("1600x1100");
-  await createDialog.getByRole("button", { name: "Сохранить медиа" }).click();
+  await createDialog.getByLabel(/^Файл/).setInputFiles("public/media/services/relaxing-massage.jpg");
+  await createDialog.getByLabel("Alt-текст или описание документа").fill("Арома массаж в кабинете Magic Massage Natali");
+  await createDialog.getByLabel("Права на публикацию").selectOption("not_required");
+  await createDialog.getByRole("button", { name: "Загрузить" }).click();
 
   await expect(createDialog).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("link", { name: "Арома обложка" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: /Арома обложка.*services.*Готово/ })).toHaveAttribute(
     "href",
     `/admin?section=media&role=owner&media=${encodeURIComponent("media-арома-обложка")}`,
   );
@@ -1000,7 +1029,8 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
   const details = page.getByLabel("Детали медиа");
   await expect(details.getByRole("heading", { name: "Арома обложка" })).toBeVisible();
   await expect(details.getByText("/media/services/relaxing-massage.jpg")).toBeVisible();
-  await expect(details.getByText("Услуга: Арома массаж")).toBeVisible();
+  await expect(details.getByRole("heading", { name: "Места использования" })).toBeVisible();
+  await expect(details.getByText("Файл пока не привязан к страницам.")).toBeVisible();
 
   await details.getByRole("button", { name: "Редактировать" }).click();
   const editDialog = page.getByRole("dialog", { name: "Редактировать медиа" });
@@ -1010,13 +1040,13 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
 
   await expect(editDialog).toHaveCount(0);
   await expect(details.getByText("Требует alt", { exact: true })).toBeVisible();
-  await expect(details.getByText("Нужно уточнить alt перед публикацией")).toBeVisible();
+  await expect(details.getByText("Нужно уточнить alt перед публикацией").first()).toBeVisible();
 
   await details.getByRole("button", { name: "Закрыть" }).click();
   await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Требует alt" }).click();
   await expect(page.getByRole("button", { name: "Требует alt" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("table").getByRole("link", { name: "Арома обложка" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Арома обложка.*services.*Требует alt/ })).toBeVisible();
 });
 
 test("contacts workspace edits site settings and contact channels", async ({ page }) => {
@@ -1089,25 +1119,20 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
 
   await page.getByRole("button", { name: "Новая статья" }).click();
 
-  const createDialog = page.getByRole("dialog", { name: "Новая статья" });
-  await createDialog.getByLabel("Заголовок").fill("Как подготовиться к массажу");
-  await createDialog.getByLabel("Slug").fill("prepare-for-massage");
-  await createDialog.getByLabel("Категория").fill("Советы");
-  await createDialog.getByLabel("Статус").selectOption("Черновик");
-  await createDialog.getByLabel("Автор").fill("Natali");
-  await createDialog.getByLabel("Дата публикации").fill("2026-07-20");
-  await createDialog.getByLabel("Локали").fill("ru, bg");
-  await createDialog.getByLabel("SEO title").fill("Как подготовиться к массажу в Бургасе");
-  await createDialog.getByLabel("Обложка").fill("/media/blog/prepare-for-massage.jpg");
-  await createDialog.getByLabel("Краткое описание").fill("Короткая памятка перед первым визитом.");
-  await createDialog.getByLabel("Текст статьи").fill("Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.");
-  await createDialog.getByLabel("Теги").fill("подготовка, массаж");
-  await createDialog.getByRole("button", { name: "Сохранить статью" }).click();
+  const createEditor = page.getByRole("form", { name: "Редактор статьи" });
+  await expect(page.getByRole("dialog", { name: "Новая статья" })).toHaveCount(0);
+  await createEditor.getByLabel("Заголовок", { exact: true }).fill("Как подготовиться к массажу");
+  await createEditor.getByLabel("Slug").fill("prepare-for-massage");
+  await createEditor.getByLabel("Категория").fill("Советы");
+  await createEditor.getByLabel("Автор").fill("Natali");
+  await createEditor.getByLabel("Краткое описание").fill("Короткая памятка перед первым визитом.");
+  await createEditor.getByRole("textbox", { name: "Текст статьи" }).fill("Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.");
+  await createEditor.getByRole("button", { exact: true, name: "Сохранить" }).click();
 
-  await expect(createDialog).toHaveCount(0);
+  await expect(createEditor).toHaveCount(0);
   await expect(page.getByRole("table").getByRole("link", { name: "Как подготовиться к массажу" })).toHaveAttribute(
     "href",
-    "/admin?section=blog&role=owner&blog=blog-prepare-for-massage",
+    /^\/admin\?section=blog&role=owner&blog=blog-[0-9a-f-]{36}$/,
   );
 
   const details = page.getByLabel("Детали статьи");
@@ -1116,12 +1141,15 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await expect(details.getByText("Короткая памятка перед первым визитом.")).toBeVisible();
 
   await details.getByRole("button", { name: "Редактировать" }).click();
-  const editDialog = page.getByRole("dialog", { name: "Редактировать статью" });
-  await editDialog.getByLabel("Статус").selectOption("Опубликована");
-  await editDialog.getByLabel("Краткое описание").fill("Обновленная памятка перед визитом.");
-  await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
+  const editEditor = page.getByRole("form", { name: "Редактор статьи" });
+  await editEditor.getByLabel("Статус").selectOption("published");
+  await editEditor.getByLabel("Краткое описание").fill("Обновленная памятка перед визитом.");
+  await editEditor.getByLabel("SEO-заголовок").fill("Как подготовиться к массажу в Бургасе");
+  await editEditor.getByLabel("SEO-описание").fill("Короткая памятка перед первым визитом в массажную студию.");
+  await editEditor.getByLabel("Из медиатеки", { exact: true }).selectOption({ index: 1 });
+  await editEditor.getByRole("button", { exact: true, name: "Сохранить" }).click();
 
-  await expect(editDialog).toHaveCount(0);
+  await expect(editEditor).toHaveCount(0);
   await expect(details.getByText("Опубликована", { exact: true })).toBeVisible();
   await expect(details.getByText("Обновленная памятка перед визитом.")).toBeVisible();
 
@@ -1303,7 +1331,9 @@ test("client filters update the table and profile certificate block", async ({ p
   await table.getByRole("link", { name: "Olena K." }).click();
   await expect(page).toHaveURL(/client=client-359873334411/);
 
-  const certificatesSection = card.getByRole("heading", { name: "Сертификаты" }).locator("..");
+  const certificatesSection = card.locator("section.admin-drawer-section").filter({
+    has: page.getByRole("heading", { name: "Сертификаты", exact: true }),
+  });
   await expect(certificatesSection).toBeVisible();
   await expect(certificatesSection.getByRole("link", { name: "MMN-2407-1023" })).toBeVisible();
   await expect(certificatesSection.getByText("250 €", { exact: true })).toBeVisible();
@@ -1365,4 +1395,23 @@ test("admin mobile layout avoids horizontal overflow", async ({ page }) => {
   );
 
   expect(hasHorizontalOverflow).toBe(false);
+});
+
+test("admin uses the hamburger layout across tablet widths below 1024px", async ({ page }) => {
+  for (const width of [768, 1023]) {
+    await page.setViewportSize({ height: 900, width });
+    await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+
+    const openButton = page.getByRole("button", { name: "Открыть меню админки" });
+    await expect(openButton).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin sections" })).toBeHidden();
+    await openButton.click();
+    await expect(page.getByRole("dialog", { name: "Разделы админки" })).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+  }
 });

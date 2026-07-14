@@ -3,13 +3,19 @@ import Image from "next/image";
 import { CertificateGallery } from "@/components/certificate-gallery";
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
+import type { PublicMediaPlacement } from "@/lib/public-content/types";
+import { resolvePublicMediaPlacement } from "@/lib/media-placement";
 
 type AboutPageViewProps = {
   locale: Locale;
   content: PublicPagesContent["about"];
+  mediaPlacements?: PublicMediaPlacement[];
 };
 
-export function AboutPageView({ content }: AboutPageViewProps) {
+export function AboutPageView({ content, locale, mediaPlacements }: AboutPageViewProps) {
+  const heroMedia = resolvePublicMediaPlacement(mediaPlacements, "about.hero", locale);
+  const portraitMedia = resolvePublicMediaPlacement(mediaPlacements, "about.portrait", locale);
+
   return (
     <main>
       <section className="page-hero about-page-hero section-pad">
@@ -21,10 +27,11 @@ export function AboutPageView({ content }: AboutPageViewProps) {
           </div>
           <div className="about-page-hero-visual" aria-hidden="true">
             <Image
-              src="/media/about/about-hero-premium.webp"
+              src={heroMedia?.url ?? "/media/about/about-hero-premium.webp"}
               alt=""
               fill
               priority
+              unoptimized={Boolean(heroMedia)}
               sizes="(max-width: 980px) 92vw, 38vw"
             />
           </div>
@@ -36,10 +43,11 @@ export function AboutPageView({ content }: AboutPageViewProps) {
           <div className="story-images">
             <div className="story-image-large">
               <Image
-                src="/media/about/natali-portrait.jpg"
+                src={portraitMedia?.url ?? "/media/about/natali-portrait.jpg"}
                 alt={content.imageAlt}
                 fill
                 sizes="(max-width: 840px) 92vw, 42vw"
+                unoptimized={Boolean(portraitMedia)}
               />
             </div>
           </div>
@@ -67,7 +75,7 @@ export function AboutPageView({ content }: AboutPageViewProps) {
             <p>{content.certificates.description}</p>
           </div>
 
-          <CertificateGallery certificates={content.certificates} />
+          <CertificateGallery certificates={content.certificates} locale={locale} mediaPlacements={mediaPlacements} />
         </div>
       </section>
     </main>

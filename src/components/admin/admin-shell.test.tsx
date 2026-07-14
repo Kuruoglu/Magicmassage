@@ -13,7 +13,7 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="dashboard" role="owner" />);
 
     expect(screen.getByRole("heading", { level: 1, name: "Дашборд" })).toBeInTheDocument();
-    expect(screen.getByText("Magic Massage Natali")).toBeInTheDocument();
+    expect(screen.getAllByText("Magic Massage Natali").length).toBeGreaterThan(0);
     expect(screen.getByRole("navigation", { name: "Admin sections" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Клиенты" })).toHaveAttribute(
       "href",
@@ -36,6 +36,7 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="dashboard" role="owner" />);
 
     expect(screen.queryByRole("heading", { name: "Операционная очередь" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Создать запись" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Создать запись/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Выгрузить Stripe/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Пользователи и роли/ })).not.toBeInTheDocument();
@@ -398,7 +399,7 @@ describe("AdminShell", () => {
       />,
     );
 
-    expect(within(screen.getByRole("table")).getByRole("link", { name: "Supabase Studio Photo" })).toHaveAttribute(
+    expect(within(screen.getByLabelText("Галерея медиа")).getByRole("link", { name: /Supabase Studio Photo/ })).toHaveAttribute(
       "href",
       "/admin?section=media&role=owner&media=media-supabase-studio",
     );
@@ -503,6 +504,27 @@ describe("AdminShell", () => {
     expect(within(screen.getByRole("table")).queryByRole("columnheader", { name: "Активность" })).not.toBeInTheDocument();
   });
 
+  it("can open the create-client form when Supabase has no clients yet", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AdminShell
+        activeSection="clients"
+        initialData={{
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    expect(screen.getByText("Клиенты не найдены.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Добавить клиента" }));
+
+    expect(screen.getByRole("dialog", { name: "Новый клиент" })).toBeInTheDocument();
+  });
+
   it("renders mobile client summaries with natural visit labels", () => {
     render(<AdminShell activeSection="clients" role="owner" />);
 
@@ -579,6 +601,24 @@ describe("AdminShell", () => {
     confirmSpy.mockReturnValue(true);
     fireEvent.click(within(card).getByRole("button", { name: "Закрыть" }));
     expect(screen.queryByRole("dialog", { name: "Карточка клиента" })).not.toBeInTheDocument();
+
+    confirmSpy.mockRestore();
+  });
+
+  it("protects an unsaved visit comment with the parent client drawer guard", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    fireEvent.click(within(card).getByRole("button", { name: "Добавить комментарий" }));
+    fireEvent.change(within(card).getByLabelText("Комментарий после визита"), {
+      target: { value: "Несохраненный результат визита." },
+    });
+    fireEvent.click(within(card).getByRole("button", { name: "Закрыть" }));
+
+    expect(confirmSpy).toHaveBeenCalledWith("Есть несохраненные изменения. Закрыть без сохранения?");
+    expect(screen.getByRole("dialog", { name: "Карточка клиента" })).toBeInTheDocument();
 
     confirmSpy.mockRestore();
   });
@@ -918,9 +958,10 @@ describe("AdminShell", () => {
 
     expect(screen.queryByLabelText(drawerLabel)).not.toBeInTheDocument();
 
+    const collection = activeSection === "media" ? screen.getByLabelText("Галерея медиа") : screen.getByRole("table");
     const rowControl = rowHref
-      ? within(screen.getByRole("table")).getByRole("link", { name: rowButton })
-      : within(screen.getByRole("table")).getByRole("button", { name: rowButton });
+      ? within(collection).getByRole("link", { name: activeSection === "media" ? new RegExp(rowButton) : rowButton })
+      : within(collection).getByRole("button", { name: rowButton });
     if (rowHref) {
       expect(rowControl).toHaveAttribute("href", rowHref);
       rowControl.addEventListener("click", (event) => event.preventDefault(), { once: true });
@@ -1106,10 +1147,9 @@ describe("AdminShell", () => {
     fireEvent.change(within(createDialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
     fireEvent.change(within(createDialog).getByLabelText("Длительность"), { target: { value: "75 мин" } });
     fireEvent.change(within(createDialog).getByLabelText("Порядок"), { target: { value: "9" } });
-    fireEvent.change(within(createDialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
     fireEvent.change(within(createDialog).getByLabelText("SEO title"), { target: { value: "Арома массаж в Бургасе" } });
-    fireEvent.change(within(createDialog).getByLabelText("Обложка"), { target: { value: "/media/services/aroma-massage.jpg" } });
-    fireEvent.change(within(createDialog).getByLabelText("Описание"), { target: { value: "Расслабляющая SPA-услуга с ароматическими маслами." } });
+    fireEvent.change(within(createDialog).getByLabelText("URL обложки"), { target: { value: "/media/services/aroma-massage.jpg" } });
+    fireEvent.change(within(createDialog).getByLabelText("Краткое описание"), { target: { value: "Расслабляющая SPA-услуга с ароматическими маслами." } });
     fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить услугу" }));
 
     expect(screen.queryByRole("dialog", { name: "Новая услуга" })).not.toBeInTheDocument();
@@ -1125,15 +1165,17 @@ describe("AdminShell", () => {
 
     fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
 
-    const editDialog = screen.getByRole("dialog", { name: "Редактировать услугу" });
-    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Опубликована" } });
-    fireEvent.change(within(editDialog).getByLabelText("Описание"), { target: { value: "Опубликованное описание услуги для сайта." } });
-    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+    expect(screen.queryByRole("dialog", { name: "Детали услуги" })).not.toBeInTheDocument();
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать: Арома массаж" });
+    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Скрыта" } });
+    fireEvent.change(within(editDialog).getByLabelText("Краткое описание"), { target: { value: "Обновленное описание услуги для сайта." } });
+    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить услугу" }));
 
-    expect(screen.queryByRole("dialog", { name: "Редактировать услугу" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Редактировать: Арома массаж" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("table")).getAllByRole("link", { name: "Арома массаж" })).toHaveLength(1);
-    expect(within(details).getByText("Опубликована")).toBeInTheDocument();
-    expect(within(details).getByText("Опубликованное описание услуги для сайта.")).toBeInTheDocument();
+    const updatedDetails = screen.getByRole("dialog", { name: "Детали услуги" });
+    expect(within(updatedDetails).getByText("Скрыта")).toBeInTheDocument();
+    expect(within(updatedDetails).getByText("Обновленное описание услуги для сайта.")).toBeInTheDocument();
   });
 
   it("posts saved massage services when the admin shell is backed by Supabase", async () => {
@@ -1170,10 +1212,9 @@ describe("AdminShell", () => {
     fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
     fireEvent.change(within(dialog).getByLabelText("Длительность"), { target: { value: "75 мин" } });
     fireEvent.change(within(dialog).getByLabelText("Порядок"), { target: { value: "9" } });
-    fireEvent.change(within(dialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
     fireEvent.change(within(dialog).getByLabelText("SEO title"), { target: { value: "Арома массаж в Бургасе" } });
-    fireEvent.change(within(dialog).getByLabelText("Обложка"), { target: { value: "/media/services/aroma-massage.jpg" } });
-    fireEvent.change(within(dialog).getByLabelText("Описание"), { target: { value: "SPA-услуга с ароматическими маслами." } });
+    fireEvent.change(within(dialog).getByLabelText("URL обложки"), { target: { value: "/media/services/aroma-massage.jpg" } });
+    fireEvent.change(within(dialog).getByLabelText("Краткое описание"), { target: { value: "SPA-услуга с ароматическими маслами." } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить услугу" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -1185,7 +1226,7 @@ describe("AdminShell", () => {
         category: "SPA",
         coverImage: "/media/services/aroma-massage.jpg",
         duration: "75 мин",
-        locales: ["ru", "bg"],
+        locales: ["bg"],
         name: "Арома массаж",
         order: 9,
         seoTitle: "Арома массаж в Бургасе",
@@ -1197,7 +1238,7 @@ describe("AdminShell", () => {
     });
   });
 
-  it("keeps price variants attached when a service slug changes", () => {
+  it("keeps price variants attached when a service is edited", () => {
     render(<AdminShell activeSection="services" role="owner" />);
 
     const serviceLink = within(screen.getByRole("table")).getByRole("link", { name: "Классический массаж" });
@@ -1209,12 +1250,16 @@ describe("AdminShell", () => {
 
     fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
 
-    const editDialog = screen.getByRole("dialog", { name: "Редактировать услугу" });
-    fireEvent.change(within(editDialog).getByLabelText("Slug"), { target: { value: "classic-massage-updated" } });
-    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать: Классический массаж" });
+    expect(within(editDialog).getByRole("textbox", { name: /Slug/ })).toHaveAttribute("readonly");
+    expect(within(editDialog).getByRole("textbox", { name: /Slug/ })).toHaveValue("classic-massage");
+    fireEvent.change(within(editDialog).getByLabelText("Категория"), { target: { value: "Классика" } });
+    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
+    fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить услугу" }));
 
-    expect(within(details).getByText("classic-massage-updated")).toBeInTheDocument();
-    expect(within(details).getByText("70 €")).toBeInTheDocument();
+    const updatedDetails = screen.getByLabelText("Детали услуги");
+    expect(within(updatedDetails).getByText("classic-massage")).toBeInTheDocument();
+    expect(within(updatedDetails).getByText("70 €")).toBeInTheDocument();
   });
 
   it("filters service rows by publication status", () => {
@@ -1352,25 +1397,31 @@ describe("AdminShell", () => {
     expect(within(screen.getByRole("dialog", { name: "Детали цены" })).getByRole("heading", { name: "Классический массаж · 60 мин" })).toBeInTheDocument();
   });
 
-  it("uploads and edits a media asset from the media workspace", () => {
+  it("uploads and edits a media asset from the media workspace", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      height: 1100,
+      mimeType: "image/webp",
+      publicUrl: "/media/services/relaxing-massage.jpg",
+      size: 419840,
+      width: 1600,
+    }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
     render(<AdminShell activeSection="media" role="owner" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Загрузить медиа" }));
 
     const createDialog = screen.getByRole("dialog", { name: "Новое медиа" });
+    await user.upload(within(createDialog).getByLabelText(/^Файл/), new File(["image"], "aroma-cover.webp", { type: "image/webp" }));
     fireEvent.change(within(createDialog).getByLabelText("Название"), { target: { value: "Арома обложка" } });
-    fireEvent.change(within(createDialog).getByLabelText("URL"), { target: { value: "/media/services/relaxing-massage.jpg" } });
-    fireEvent.change(within(createDialog).getByLabelText("Папка"), { target: { value: "services" } });
-    fireEvent.change(within(createDialog).getByLabelText("Тип"), { target: { value: "Фото" } });
-    fireEvent.change(within(createDialog).getByLabelText("Статус"), { target: { value: "Готово" } });
-    fireEvent.change(within(createDialog).getByLabelText("Alt-текст"), { target: { value: "Арома массаж в кабинете Magic Massage Natali" } });
-    fireEvent.change(within(createDialog).getByLabelText("Использование"), { target: { value: "Услуга: Арома массаж, Hero сайта" } });
-    fireEvent.change(within(createDialog).getByLabelText("Размер файла"), { target: { value: "410 KB" } });
-    fireEvent.change(within(createDialog).getByLabelText("Разрешение"), { target: { value: "1600x1100" } });
-    fireEvent.click(within(createDialog).getByRole("button", { name: "Сохранить медиа" }));
+    fireEvent.change(within(createDialog).getByLabelText("Alt-текст или описание документа"), { target: { value: "Арома массаж в кабинете Magic Massage Natali" } });
+    fireEvent.change(within(createDialog).getByLabelText("Права на публикацию"), { target: { value: "granted" } });
+    fireEvent.click(within(createDialog).getByRole("button", { name: "Загрузить" }));
 
-    expect(screen.queryByRole("dialog", { name: "Новое медиа" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("link", { name: "Арома обложка" })).toHaveAttribute(
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Новое медиа" })).not.toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(within(screen.getByLabelText("Галерея медиа")).getByRole("link", { name: /Арома обложка/ })).toHaveAttribute(
       "href",
       `/admin?section=media&role=owner&media=${encodeURIComponent("media-арома-обложка")}`,
     );
@@ -1378,7 +1429,7 @@ describe("AdminShell", () => {
     const details = screen.getByLabelText("Детали медиа");
     expect(within(details).getByRole("heading", { name: "Арома обложка" })).toBeInTheDocument();
     expect(within(details).getByText("/media/services/relaxing-massage.jpg")).toBeInTheDocument();
-    expect(within(details).getByText("Услуга: Арома массаж")).toBeInTheDocument();
+    expect(within(details).getByText("Файл пока не привязан к страницам.")).toBeInTheDocument();
 
     fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
 
@@ -1387,19 +1438,30 @@ describe("AdminShell", () => {
     fireEvent.change(within(editDialog).getByLabelText("Alt-текст"), { target: { value: "Нужно уточнить alt перед публикацией" } });
     fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
 
-    expect(screen.queryByRole("dialog", { name: "Редактировать медиа" })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Редактировать медиа" })).not.toBeInTheDocument(),
+    );
     expect(within(details).getByText("Требует alt")).toBeInTheDocument();
-    expect(within(details).getByText("Нужно уточнить alt перед публикацией")).toBeInTheDocument();
+    expect(within(details).getAllByText("Нужно уточнить alt перед публикацией").length).toBeGreaterThan(0);
   });
 
   it("posts saved media assets when the admin shell is backed by Supabase", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      void input;
       void init;
+      if (String(input) === "/api/admin/media") {
+        return new Response(JSON.stringify({
+          height: 1100,
+          mimeType: "image/webp",
+          publicUrl: "/media/services/aroma-massage.jpg",
+          size: 419840,
+          width: 1600,
+        }), { status: 201 });
+      }
 
       return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
     });
     vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
 
     render(
       <AdminShell
@@ -1420,24 +1482,17 @@ describe("AdminShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Загрузить медиа" }));
 
     const dialog = screen.getByRole("dialog", { name: "Новое медиа" });
+    await user.upload(within(dialog).getByLabelText(/^Файл/), new File(["image"], "aroma-cover.webp", { type: "image/webp" }));
     fireEvent.change(within(dialog).getByLabelText("Название"), { target: { value: "Арома обложка" } });
-    fireEvent.change(within(dialog).getByLabelText("URL"), { target: { value: "/media/services/aroma-massage.jpg" } });
-    fireEvent.change(within(dialog).getByLabelText("Папка"), { target: { value: "services" } });
-    fireEvent.change(within(dialog).getByLabelText("Тип"), { target: { value: "Фото" } });
-    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Готово" } });
-    fireEvent.change(within(dialog).getByLabelText("Alt-текст"), {
+    fireEvent.change(within(dialog).getByLabelText("Alt-текст или описание документа"), {
       target: { value: "Арома массаж в кабинете Magic Massage Natali" },
     });
-    fireEvent.change(within(dialog).getByLabelText("Использование"), {
-      target: { value: "Услуга: Арома массаж, Hero сайта" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Размер файла"), { target: { value: "410 KB" } });
-    fireEvent.change(within(dialog).getByLabelText("Разрешение"), { target: { value: "1600x1100" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить медиа" }));
+    fireEvent.change(within(dialog).getByLabelText("Права на публикацию"), { target: { value: "granted" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Загрузить" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
-    const [url, requestInit] = fetchMock.mock.calls[0];
+    const [url, requestInit] = fetchMock.mock.calls[1];
     expect(url).toBe("/api/admin/records");
     expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
       record: {
@@ -1446,11 +1501,12 @@ describe("AdminShell", () => {
         folder: "services",
         id: "media-арома-обложка",
         name: "Арома обложка",
-        size: "410 KB",
+        publicationConsent: "granted",
+        size: "419840 B",
         status: "Готово",
         type: "Фото",
         url: "/media/services/aroma-massage.jpg",
-        usage: ["Услуга: Арома массаж", "Hero сайта"],
+        usage: [],
       },
       type: "media",
     });
@@ -1459,28 +1515,28 @@ describe("AdminShell", () => {
   it("filters media rows by type and missing alt state", () => {
     render(<AdminShell activeSection="media" role="owner" />);
 
-    const table = screen.getByRole("table");
-    expect(within(table).getByRole("link", { name: "Классический массаж" })).toBeInTheDocument();
+    const gallery = screen.getByLabelText("Галерея медиа");
+    expect(within(gallery).getByRole("link", { name: /Классический массаж/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Документы" }));
 
     expect(screen.getByRole("button", { name: "Документы" })).toHaveAttribute("aria-pressed", "true");
-    const certificateMediaLink = within(table).getByRole("link", { name: "Сертификат Natali" });
+    const certificateMediaLink = within(gallery).getByRole("link", { name: /Сертификат Natali/ });
     expect(certificateMediaLink).toBeInTheDocument();
-    expect(within(table).queryByRole("link", { name: "Классический массаж" })).not.toBeInTheDocument();
+    expect(within(gallery).queryByRole("link", { name: /Классический массаж/ })).not.toBeInTheDocument();
     certificateMediaLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
     fireEvent.click(certificateMediaLink);
     expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("heading", { name: "Сертификат Natali" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Требует alt" }));
 
-    const needsAltMediaLink = within(table).getByRole("link", { name: "Фото кабинета" });
+    const needsAltMediaLink = within(gallery).getByRole("link", { name: /Фото кабинета/ });
     expect(needsAltMediaLink).toBeInTheDocument();
-    expect(within(table).queryByRole("link", { name: "Сертификат Natali" })).not.toBeInTheDocument();
+    expect(within(gallery).queryByRole("link", { name: /Сертификат Natali/ })).not.toBeInTheDocument();
     needsAltMediaLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
     fireEvent.click(needsAltMediaLink);
     expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("heading", { name: "Фото кабинета" })).toBeInTheDocument();
-    expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByRole("img", { name: "Фото кабинета" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "Детали медиа" })).getByText("Требует alt")).toBeInTheDocument();
   });
 
   it("shows quick contact actions in the selected client card", () => {
@@ -1717,6 +1773,7 @@ describe("AdminShell", () => {
     fireEvent.change(within(dialog).getByLabelText("Следующий визит"), { target: { value: "Не назначен" } });
     fireEvent.change(within(dialog).getByLabelText("Визиты"), { target: { value: "0" } });
     fireEvent.change(within(dialog).getByLabelText("Сумма"), { target: { value: "0 €" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Добавить заметку" }));
     fireEvent.change(within(dialog).getByLabelText("Заметка клиента"), { target: { value: "Новая клиентка, предпочитает дневные слоты." } });
     fireEvent.change(within(dialog).getByLabelText("Теги"), { target: { value: "BG, new" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
@@ -1817,6 +1874,8 @@ describe("AdminShell", () => {
     expect(within(dialog).getByRole("group", { name: "Контакты клиента" })).toBeInTheDocument();
     expect(within(dialog).getByRole("group", { name: "Профиль клиента" })).toBeInTheDocument();
     expect(within(dialog).getByRole("group", { name: "Заметки и теги" })).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Заметка клиента")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Добавить заметку" })).toBeInTheDocument();
     expect(within(dialog).getByText("Имя и телефон нужны для записи и связи с клиентом.")).toBeInTheDocument();
     expect(within(dialog).getByText("Статус выбирается вручную и не скрывает клиента из базы.")).toBeInTheDocument();
 
@@ -1832,6 +1891,7 @@ describe("AdminShell", () => {
   });
 
   it("keeps the create client form open when the phone matches an existing client", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<AdminShell activeSection="clients" role="owner" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Добавить клиента" }));
@@ -1842,12 +1902,18 @@ describe("AdminShell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить клиента" }));
 
     expect(within(dialog).getByRole("alert")).toHaveTextContent("Клиент с таким телефоном уже есть: Olena K.");
-    expect(within(dialog).getByRole("link", { name: "Открыть карточку существующего клиента" })).toHaveAttribute(
+    const existingClientLink = within(dialog).getByRole("link", { name: "Открыть карточку существующего клиента" });
+    expect(existingClientLink).toHaveAttribute(
       "href",
       "/admin?section=clients&role=owner&client=client-359873334411",
     );
+    fireEvent.click(existingClientLink);
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("dialog", { name: "Новый клиент" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Карточка клиента" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("table")).queryByRole("link", { name: "Новая Olena" })).not.toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 
   it("allows a new client with the same name when the phone is different", () => {
@@ -1967,7 +2033,7 @@ describe("AdminShell", () => {
     const details = screen.getByRole("dialog", { name: "Детали выбранной записи" });
     expect(within(details).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
     expect(within(details).getByText("Deep tissue massage")).toBeInTheDocument();
-    expect(within(details).getByText("15:00")).toBeInTheDocument();
+    expect(within(details).getByText(/15:00/)).toBeInTheDocument();
   });
 
   it("links from a calendar appointment to the matching client card", async () => {
@@ -2007,8 +2073,8 @@ describe("AdminShell", () => {
 
     await user.click(screen.getByRole("button", { name: "Месяц" }));
 
-    expect(screen.getByRole("heading", { name: "Июль 2026" })).toBeInTheDocument();
-    const monthGrid = screen.getByRole("grid", { name: "Месяц Июль 2026" });
+    expect(screen.getByRole("heading", { name: /Июль 2026/ })).toBeInTheDocument();
+    const monthGrid = screen.getByRole("grid", { name: /Месяц Июль 2026/ });
     expect(monthGrid).toBeInTheDocument();
     expect(within(monthGrid).queryByText("Классический массаж")).not.toBeInTheDocument();
     expect(within(monthGrid).getByText("2 записи")).toBeInTheDocument();
@@ -2031,14 +2097,14 @@ describe("AdminShell", () => {
 
     await user.click(screen.getByRole("button", { name: "Неделя" }));
 
-    const weekGrid = screen.getByRole("grid", { name: "Неделя 6-12 июля" });
-    expect(screen.getByRole("heading", { name: "Неделя 6-12 июля" })).toBeInTheDocument();
-    expect(within(weekGrid).getByText("6 июл")).toBeInTheDocument();
-    expect(within(weekGrid).getByText("10 июл")).toBeInTheDocument();
+    const weekGrid = screen.getByLabelText(/Неделя 6 июл.*12 июл/);
+    expect(screen.getByRole("heading", { name: /6 июл.*12 июл/ })).toBeInTheDocument();
+    expect(within(weekGrid).getByText(/6 июл/)).toBeInTheDocument();
+    expect(within(weekGrid).getByText(/10 июл/)).toBeInTheDocument();
     expect(within(weekGrid).getByText("Анна Петрова")).toBeInTheDocument();
     expect(within(weekGrid).getByText("SPA процедура")).toBeInTheDocument();
-    expect(within(weekGrid).getByText("2 зап.").closest(".admin-week-day-stats")).toBeInTheDocument();
-    expect(within(weekGrid).getByText("Анна Петрова").closest(".admin-week-appointment-main")).toBeInTheDocument();
+    expect(weekGrid.querySelector(".admin-week-time-columns")).toBeInTheDocument();
+    expect(within(weekGrid).getByText("Анна Петрова").closest(".admin-timed-appointment")).toBeInTheDocument();
   });
 
   it("shows an empty state when a month day has no appointments", async () => {
@@ -2061,8 +2127,9 @@ describe("AdminShell", () => {
     render(<AdminShell activeSection="calendar" role="owner" />);
 
     expect(screen.getByRole("heading", { name: "6 июля" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Таймлайн дня")).toHaveClass("admin-day-timeline");
-    expect(screen.getAllByText("Буфер после сеанса: 30 минут")).toHaveLength(2);
+    const daySchedule = screen.getByLabelText("Расписание 6 июля");
+    expect(daySchedule.parentElement).toHaveClass("admin-day-time-grid");
+    expect(within(screen.getByLabelText("Сводка дня 6 июля")).getByText("30 минут")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Olena K./ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Список" }));
@@ -2071,7 +2138,7 @@ describe("AdminShell", () => {
     expect(screen.getByLabelText("Лента всех записей")).toHaveClass("admin-appointment-feed");
     expect(screen.getByText("Всего записей")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Olena K./ })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Таймлайн дня")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Расписание 6 июля")).not.toBeInTheDocument();
   });
 
   it("opens the calendar on the selected date from the date query", () => {
@@ -2110,13 +2177,13 @@ describe("AdminShell", () => {
   it("opens a quick action panel from the primary action", async () => {
     const user = userEvent.setup();
 
-    render(<AdminShell activeSection="dashboard" role="owner" />);
+    render(<AdminShell activeSection="finances" role="owner" />);
 
-    await user.click(screen.getByRole("button", { name: "Создать запись" }));
+    await user.click(screen.getByRole("button", { name: "Выгрузить отчет" }));
 
     const dialog = screen.getByRole("dialog", { name: "Быстрое действие" });
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByDisplayValue("Создать запись")).toBeInTheDocument();
+    expect(within(dialog).getByDisplayValue("Выгрузить отчет")).toBeInTheDocument();
   });
 
   it("creates a calendar appointment from the primary action", async () => {
@@ -2170,7 +2237,7 @@ describe("AdminShell", () => {
     expect(screen.getByRole("heading", { name: "12 июля" })).toBeInTheDocument();
     expect(within(details).getByRole("heading", { name: "Ирина Тестова" })).toBeInTheDocument();
     expect(within(details).getByText("SPA процедура")).toBeInTheDocument();
-    expect(within(details).getByText("11:15")).toBeInTheDocument();
+    expect(within(details).getByText(/11:15/)).toBeInTheDocument();
   });
 
   it("opens primary appointment creation with an empty client after a prefilled dialog was closed", async () => {
@@ -2272,7 +2339,7 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("dialog", { name: "Редактировать запись" })).not.toBeInTheDocument();
     expect(within(details).getByRole("heading", { name: "Olena K." })).toBeInTheDocument();
     expect(within(details).getByText("13 июля")).toBeInTheDocument();
-    expect(within(details).getByText("16:45")).toBeInTheDocument();
+    expect(within(details).getByText(/16:45 · 60 мин/)).toBeInTheDocument();
     expect(within(details).getByText("Ожидает")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /15:00Olena K./ })).not.toBeInTheDocument();
   });
@@ -2437,7 +2504,7 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Активен")).toBeInTheDocument();
   });
 
-  it("creates and edits a blog article from the blog workspace", async () => {
+  it("opens the full-page blog editor and edits an existing article", async () => {
     const user = userEvent.setup();
 
     render(<AdminShell activeSection="blog" role="owner" />);
@@ -2451,50 +2518,34 @@ describe("AdminShell", () => {
 
     await user.click(screen.getByRole("button", { name: "Новая статья" }));
 
-    const createDialog = screen.getByRole("dialog", { name: "Новая статья" });
-    fireEvent.change(within(createDialog).getByLabelText("Заголовок"), { target: { value: "Как подготовиться к массажу" } });
-    fireEvent.change(within(createDialog).getByLabelText("Slug"), { target: { value: "prepare-for-massage" } });
-    fireEvent.change(within(createDialog).getByLabelText("Категория"), { target: { value: "Советы" } });
-    fireEvent.change(within(createDialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
-    fireEvent.change(within(createDialog).getByLabelText("Автор"), { target: { value: "Natali" } });
-    fireEvent.change(within(createDialog).getByLabelText("Дата публикации"), { target: { value: "2026-07-20" } });
-    fireEvent.change(within(createDialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
-    fireEvent.change(within(createDialog).getByLabelText("SEO title"), {
-      target: { value: "Как подготовиться к массажу в Бургасе" },
-    });
-    fireEvent.change(within(createDialog).getByLabelText("Обложка"), { target: { value: "/media/blog/prepare-for-massage.jpg" } });
-    fireEvent.change(within(createDialog).getByLabelText("Краткое описание"), {
-      target: { value: "Короткая памятка перед первым визитом." },
-    });
-    fireEvent.change(within(createDialog).getByLabelText("Текст статьи"), {
-      target: { value: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду." },
-    });
-    fireEvent.change(within(createDialog).getByLabelText("Теги"), { target: { value: "подготовка, массаж" } });
-    await user.click(within(createDialog).getByRole("button", { name: "Сохранить статью" }));
+    const createEditor = screen.getByRole("form", { name: "Редактор статьи" });
+    expect(createEditor).toHaveClass("admin-blog-editor-page");
+    expect(within(createEditor).getByRole("heading", { name: "Новая статья" })).toBeInTheDocument();
+    await user.click(within(createEditor).getByRole("button", { name: "Отмена" }));
 
-    expect(screen.queryByRole("dialog", { name: "Новая статья" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("table")).getByRole("link", { name: "Как подготовиться к массажу" })).toHaveAttribute(
-      "href",
-      "/admin?section=blog&role=owner&blog=blog-prepare-for-massage",
-    );
-
+    expect(screen.queryByRole("form", { name: "Редактор статьи" })).not.toBeInTheDocument();
     const details = screen.getByLabelText("Детали статьи");
-    expect(within(details).getByRole("heading", { name: "Как подготовиться к массажу" })).toBeInTheDocument();
-    expect(within(details).getByText("prepare-for-massage")).toBeInTheDocument();
-    expect(within(details).getByText("Короткая памятка перед первым визитом.")).toBeInTheDocument();
+    expect(within(details).getByRole("heading", { name: "Подготовка к первому массажу" })).toBeInTheDocument();
 
     await user.click(within(details).getByRole("button", { name: "Редактировать" }));
 
-    const editDialog = screen.getByRole("dialog", { name: "Редактировать статью" });
-    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Опубликована" } });
-    fireEvent.change(within(editDialog).getByLabelText("Краткое описание"), {
+    const editEditor = screen.getByRole("form", { name: "Редактор статьи" });
+    expect(within(editEditor).getByRole("textbox", { name: "Текст статьи" })).toHaveTextContent(
+      "Короткая памятка помогает клиенту подготовиться к первому визиту, прийти вовремя и заранее выбрать комфортную одежду.",
+    );
+    fireEvent.change(within(editEditor).getByLabelText("Статус"), { target: { value: "review" } });
+    fireEvent.change(within(editEditor).getByLabelText("Краткое описание"), {
       target: { value: "Обновленная памятка перед визитом." },
     });
-    await user.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
+    fireEvent.change(within(editEditor).getByLabelText("SEO-описание"), {
+      target: { value: "Отдельное SEO-описание после редактирования." },
+    });
+    await user.click(within(editEditor).getByRole("button", { name: "Сохранить" }));
 
-    expect(screen.queryByRole("dialog", { name: "Редактировать статью" })).not.toBeInTheDocument();
-    expect(within(details).getByText("Опубликована")).toBeInTheDocument();
-    expect(within(details).getByText("Обновленная памятка перед визитом.")).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Редактор статьи" })).not.toBeInTheDocument();
+    const updatedDetails = screen.getByRole("dialog", { name: "Детали статьи" });
+    expect(within(updatedDetails).getByText("На проверке")).toBeInTheDocument();
+    expect(within(updatedDetails).getByText("Обновленная памятка перед визитом.")).toBeInTheDocument();
   });
 
   it("posts saved blog posts when the admin shell is backed by Supabase", async () => {
@@ -2511,6 +2562,25 @@ describe("AdminShell", () => {
       <AdminShell
         activeSection="blog"
         initialData={{
+          blogPosts: [
+            {
+              author: "Natali",
+              body: "Исходный текст статьи.",
+              category: "Советы",
+              coverImage: "/media/blog/first-massage-preparation.jpg",
+              excerpt: "Исходный анонс.",
+              id: "blog-first-massage-preparation",
+              locales: ["bg"],
+              publishedAt: "2026-07-05",
+              seoDescription: "Исходное SEO-описание.",
+              seoTitle: "Подготовка к первому массажу в Бургасе",
+              slug: "first-massage-preparation",
+              status: "Черновик",
+              tags: ["подготовка"],
+              title: "Подготовка к первому массажу",
+              updatedAt: "2026-07-07",
+            },
+          ],
           financeRows: [],
           records: {
             appointments: [],
@@ -2523,28 +2593,18 @@ describe("AdminShell", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Новая статья" }));
+    const postLink = within(screen.getByRole("table")).getByRole("link", { name: "Подготовка к первому массажу" });
+    postLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(postLink);
+    await user.click(within(screen.getByRole("dialog", { name: "Детали статьи" })).getByRole("button", { name: "Редактировать" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Новая статья" });
-    fireEvent.change(within(dialog).getByLabelText("Заголовок"), { target: { value: "Как подготовиться к массажу" } });
-    fireEvent.change(within(dialog).getByLabelText("Slug"), { target: { value: "prepare-for-massage" } });
-    fireEvent.change(within(dialog).getByLabelText("Категория"), { target: { value: "Советы" } });
-    fireEvent.change(within(dialog).getByLabelText("Статус"), { target: { value: "Черновик" } });
-    fireEvent.change(within(dialog).getByLabelText("Автор"), { target: { value: "Natali" } });
-    fireEvent.change(within(dialog).getByLabelText("Дата публикации"), { target: { value: "2026-07-20" } });
-    fireEvent.change(within(dialog).getByLabelText("Локали"), { target: { value: "ru, bg" } });
-    fireEvent.change(within(dialog).getByLabelText("SEO title"), {
-      target: { value: "Как подготовиться к массажу в Бургасе" },
+    const editor = screen.getByRole("form", { name: "Редактор статьи" });
+    fireEvent.change(within(editor).getByLabelText("SEO-описание"), {
+      target: { value: "Обновленное SEO-описание." },
     });
-    fireEvent.change(within(dialog).getByLabelText("Обложка"), { target: { value: "/media/blog/prepare-for-massage.jpg" } });
-    fireEvent.change(within(dialog).getByLabelText("Краткое описание"), {
-      target: { value: "Короткая памятка перед первым визитом." },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Текст статьи"), {
-      target: { value: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду." },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Теги"), { target: { value: "подготовка, массаж" } });
-    await user.click(within(dialog).getByRole("button", { name: "Сохранить статью" }));
+    fireEvent.change(within(editor).getByLabelText("Краткое описание"), { target: { value: "Обновленный анонс." } });
+    expect(within(editor).getByRole("button", { name: "Сохранить" })).toBeEnabled();
+    fireEvent.submit(editor);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
@@ -2553,22 +2613,59 @@ describe("AdminShell", () => {
     expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
       record: {
         author: "Natali",
-        body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
+        body: expect.stringContaining("Исходный текст статьи."),
         category: "Советы",
-        coverImage: "/media/blog/prepare-for-massage.jpg",
-        excerpt: "Короткая памятка перед первым визитом.",
-        id: "blog-prepare-for-massage",
-        locales: ["ru", "bg"],
-        publishedAt: "2026-07-20",
-        seoTitle: "Как подготовиться к массажу в Бургасе",
-        slug: "prepare-for-massage",
+        coverImage: "/media/blog/first-massage-preparation.jpg",
+        excerpt: "Обновленный анонс.",
+        id: "blog-first-massage-preparation",
+        locales: ["bg"],
+        seoDescription: "Обновленное SEO-описание.",
+        seoTitle: "Подготовка к первому массажу в Бургасе",
+        slug: "first-massage-preparation",
         status: "Черновик",
-        tags: ["подготовка", "массаж"],
-        title: "Как подготовиться к массажу",
+        tags: ["подготовка"],
+        title: "Подготовка к первому массажу",
       },
       type: "blogPost",
     });
   });
+
+  it("keeps one stable record identity while autosaving a new draft slug", async () => {
+    const fetchMock = vi.fn(async (...args: [RequestInfo | URL, RequestInit?]) => {
+      void args;
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts: [],
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Новая статья" }));
+    const editor = screen.getByRole("form", { name: "Редактор статьи" });
+    fireEvent.change(within(editor).getByLabelText("Заголовок"), { target: { value: "Рабочий черновик" } });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    const firstPayload = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(firstPayload.record.id).toMatch(/^blog-[0-9a-f-]{36}$/);
+    expect(firstPayload.record.slug).toBe(`draft-${firstPayload.record.id.replace(/^blog-/, "")}`);
+
+    fireEvent.change(within(editor).getByLabelText("Slug"), { target: { value: "working-draft" } });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 3000 });
+
+    const secondPayload = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body));
+    expect(secondPayload.record.id).toBe(firstPayload.record.id);
+    expect(secondPayload.record.slug).toBe("working-draft");
+  }, 10_000);
 
   it("filters blog posts by status and global search", async () => {
     const user = userEvent.setup();
@@ -2704,6 +2801,40 @@ describe("AdminShell", () => {
     });
   });
 
+  it("restores settings when Supabase rejects the mutation", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ message: "Settings write failed.", mode: "supabase", ok: false }), { status: 500 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="settings"
+        initialData={{
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          source: "supabase",
+        }}
+        role="owner"
+        selectedSettingsGroupId="booking"
+      />,
+    );
+
+    const details = screen.getByRole("dialog", { name: "Детали настроек" });
+    expect(within(details).getByText("30 минут")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(within(details).getByText("30 минут")).toBeInTheDocument());
+    expect(within(details).queryByText("45 минут")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("status").some((status) => status.textContent?.includes("Settings write failed."))).toBe(true);
+  });
+
   it("uses saved booking settings for calendar slot availability", async () => {
     const user = userEvent.setup();
     const { rerender } = render(<AdminShell activeSection="settings" role="owner" />);
@@ -2718,7 +2849,7 @@ describe("AdminShell", () => {
     rerender(<AdminShell activeSection="calendar" role="owner" />);
     await user.click(screen.getByRole("button", { name: "Месяц" }));
 
-    const monthGrid = screen.getByRole("grid", { name: "Месяц Июль 2026" });
+    const monthGrid = screen.getByRole("grid", { name: /Месяц Июль 2026/ });
     expect(within(monthGrid).getByRole("button", { name: /6 июля.*2 записи.*3 свободных слота/ })).toBeInTheDocument();
 
     const monthPlan = screen.getByLabelText("План месяца");

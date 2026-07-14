@@ -4,11 +4,14 @@ import Link from "next/link";
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { ServiceCategory } from "@/content/service-catalog";
 import type { Locale } from "@/i18n/config";
+import { resolvePublicMediaPlacement } from "@/lib/media-placement";
+import type { PublicMediaPlacement } from "@/lib/public-content";
 import { getServicePagePath } from "@/navigation/service-routes";
 
 type ServicesPageViewProps = {
   locale: Locale;
   content: PublicPagesContent["services"];
+  mediaPlacements?: PublicMediaPlacement[];
 };
 
 const detailLinkLabels: Record<Locale, string> = {
@@ -20,7 +23,8 @@ const detailLinkLabels: Record<Locale, string> = {
 
 const categoryOrder: ServiceCategory[] = ["massage", "partial", "spa"];
 
-export function ServicesPageView({ locale, content }: ServicesPageViewProps) {
+export function ServicesPageView({ locale, content, mediaPlacements }: ServicesPageViewProps) {
+  const heroMedia = resolvePublicMediaPlacement(mediaPlacements, "services.hero", locale);
   return (
     <main>
       <section className="page-hero services-hero section-pad">
@@ -32,7 +36,7 @@ export function ServicesPageView({ locale, content }: ServicesPageViewProps) {
           </div>
           <div className="services-hero-visual" aria-hidden="true">
             <Image
-              src="/media/hero/services-gift-hero.jpg"
+              src={heroMedia?.url ?? "/media/hero/services-gift-hero.jpg"}
               alt=""
               fill
               priority
@@ -58,6 +62,7 @@ export function ServicesPageView({ locale, content }: ServicesPageViewProps) {
                           src={service.image}
                           alt={service.imageAlt}
                           fill
+                          loading={service.slug === content.items[0]?.slug ? "eager" : "lazy"}
                           sizes="(max-width: 760px) 92vw, 28vw"
                         />
                       </div>

@@ -5,6 +5,7 @@ import { AboutPageView } from "@/components/about-page-view";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { getHomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
+import { getPublicShellRuntime } from "@/content/public-content-runtime";
 import { isSupportedLocale, locales } from "@/i18n/config";
 import { createPublicPageMetadata } from "@/seo/public-page-metadata";
 
@@ -32,10 +33,15 @@ export default async function AboutPage({ params }: AboutPageProps) {
   if (!isSupportedLocale(locale)) {
     notFound();
   }
+  const shellRuntime = await getPublicShellRuntime(locale);
 
   return (
-    <PublicPageShell locale={locale} currentPage="about" content={getHomeContent(locale)}>
-      <AboutPageView locale={locale} content={getPublicPagesContent(locale).about} />
+    <PublicPageShell locale={locale} currentPage="about" content={getHomeContent(locale)} {...shellRuntime}>
+      <AboutPageView
+        locale={locale}
+        content={getPublicPagesContent(locale).about}
+        mediaPlacements={shellRuntime.mediaPlacements}
+      />
     </PublicPageShell>
   );
 }

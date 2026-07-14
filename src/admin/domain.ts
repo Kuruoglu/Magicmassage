@@ -1,14 +1,28 @@
 import type { AdminRoleId, FinanceRow } from "./config";
 
-export type AppointmentStatus = "Подтверждена" | "Ожидает" | "Новая заявка" | "Отменена";
+export type AppointmentStatus =
+  | "Подтверждена"
+  | "Ожидает"
+  | "Новая заявка"
+  | "Отменена"
+  | "Завершена"
+  | "Не пришёл";
 
 export type Appointment = {
+  bufferMinutes?: number;
   id?: string;
   clientId?: string;
   date: string;
+  durationMinutes?: number;
   time: string;
   client: string;
   note: string;
+  overlapOverride?: boolean;
+  overlapOverrideReason?: string;
+  overlapOverriddenAt?: string;
+  overlapOverriddenBy?: string;
+  postVisitComment?: string;
+  postVisitCommentedAt?: string;
   service: string;
   status: AppointmentStatus;
 };
@@ -55,6 +69,24 @@ export type CertificateRecord = {
 
 export type ServiceStatus = "Опубликована" | "Черновик" | "Скрыта";
 
+export const serviceLocales = ["bg", "ru", "ua", "en"] as const;
+export type ServiceLocale = (typeof serviceLocales)[number];
+
+export type ServiceTranslationRecord = {
+  body: string;
+  canonicalUrl: string;
+  locale: ServiceLocale;
+  ogDescription: string;
+  ogImageMediaId: string;
+  ogTitle: string;
+  robotsDirectives: string;
+  seoDescription: string;
+  seoTitle: string;
+  shortDescription: string;
+  status: "draft" | "published";
+  title: string;
+};
+
 export type ServiceRecord = {
   category: string;
   coverImage: string;
@@ -66,6 +98,7 @@ export type ServiceRecord = {
   slug: string;
   status: ServiceStatus;
   summary: string;
+  translations?: Partial<Record<ServiceLocale, ServiceTranslationRecord>>;
 };
 
 export type PriceStatus = "Активна" | "Скрыта";
@@ -84,13 +117,29 @@ export type PriceRecord = {
 export type MediaType = "Фото" | "Документ";
 
 export type MediaStatus = "Готово" | "Требует alt" | "Черновик";
+export type MediaPublicationConsent = "unknown" | "granted" | "not_required" | "denied";
+
+export type MediaPlacementRecord = {
+  id: string;
+  isPublished: boolean;
+  locale: string | null;
+  mediaAssetId: string;
+  pageKey: string;
+  placementKey: string;
+  publishAt?: string | null;
+  slotKey: string;
+  sortOrder: number;
+};
 
 export type MediaRecord = {
   altText: string;
+  altTexts?: Partial<Record<ServiceLocale, string>>;
   dimensions: string;
   folder: string;
   id: string;
   name: string;
+  placements?: MediaPlacementRecord[];
+  publicationConsent?: MediaPublicationConsent;
   size: string;
   status: MediaStatus;
   type: MediaType;
@@ -129,12 +178,21 @@ export type BlogStatus = "Опубликована" | "Черновик" | "За
 export type BlogPostRecord = {
   author: string;
   body: string;
+  canonicalUrl?: string;
   category: string;
+  coverAlt?: string;
   coverImage: string;
+  editorJson?: Record<string, unknown>;
   excerpt: string;
+  hreflang?: Record<string, string>;
   id: string;
   locales: string[];
+  ogDescription?: string;
+  ogTitle?: string;
   publishedAt: string;
+  robotsDirectives?: string;
+  scheduledFor?: string;
+  seoDescription?: string;
   seoTitle: string;
   slug: string;
   status: BlogStatus;
@@ -157,6 +215,7 @@ export type SettingsRecord = {
   defaultLocale: string;
   defaultSeoTitle: string;
   emailSender: string;
+  giftCertificatesEnabled?: boolean;
   googleCalendarId: string;
   googleCalendarMode: CalendarSyncMode;
   reminderTemplate: string;
@@ -220,10 +279,18 @@ export type AdminClientDatabaseRow = {
 };
 
 export type AdminAppointmentDatabaseRow = {
+  buffer_minutes?: number;
   id: string;
   client_id: string | null;
   client_name_snapshot: string;
+  duration_minutes: number;
   internal_note: string;
+  overlap_override?: boolean;
+  overlap_override_reason?: string;
+  overlap_overridden_at?: string | null;
+  overlap_overridden_by?: string | null;
+  post_visit_comment: string;
+  post_visit_commented_at: string | null;
   service_name: string;
   starts_at: string;
   starts_on: string;
@@ -249,6 +316,7 @@ export type AdminCertificateDatabaseRow = {
 export type AdminServiceDatabaseRow = {
   category: string;
   cover_image_url: string;
+  cover_media_id?: string | null;
   display_order: number;
   duration_label: string;
   locale_codes: string[];
@@ -257,6 +325,22 @@ export type AdminServiceDatabaseRow = {
   slug: string;
   status: string;
   summary: string;
+};
+
+export type AdminServiceTranslationDatabaseRow = {
+  body: string;
+  canonical_url: string;
+  locale: ServiceLocale;
+  og_description: string;
+  og_image_media_id: string | null;
+  og_title: string;
+  robots_directives: string;
+  seo_description: string;
+  seo_title: string;
+  service_slug: string;
+  short_description: string;
+  status: "draft" | "published";
+  title: string;
 };
 
 export type AdminPriceDatabaseRow = {
@@ -273,16 +357,30 @@ export type AdminPriceDatabaseRow = {
 
 export type AdminMediaDatabaseRow = {
   alt_text: string;
+  alt_text_localized?: Partial<Record<ServiceLocale, string>>;
   dimensions: string;
   file_size_label: string;
   folder: string;
   id: string;
   media_type: string;
   name: string;
+  publication_consent_status: string;
   status: string;
   uploaded_on: string;
   url: string;
   usage_contexts: string[];
+};
+
+export type AdminMediaPlacementDatabaseRow = {
+  id: string;
+  is_published: boolean;
+  locale: string | null;
+  media_asset_id: string;
+  page_key: string;
+  placement_key: string;
+  publish_at?: string | null;
+  slot_key: string;
+  sort_order: number;
 };
 
 export type AdminContactChannelDatabaseRow = {
@@ -310,12 +408,26 @@ export type AdminContactSettingsDatabaseRow = {
 export type AdminBlogPostDatabaseRow = {
   author: string;
   body: string;
+  canonical_url?: string;
   category: string;
+  cover_alt_text?: string;
   cover_image_url: string;
+  cover_media_id?: string | null;
+  editor_json?: Record<string, unknown>;
   excerpt: string;
   id: string;
+  hreflang?: Record<string, string>;
   locale_codes: string[];
+  locale?: string | null;
+  meta_description?: string;
+  og_description?: string;
+  og_image_media_id?: string | null;
+  og_title?: string;
+  published_at?: string | null;
   published_on: string | null;
+  robots_directives?: string;
+  sanitized_html?: string;
+  scheduled_for?: string | null;
   seo_title: string;
   slug: string;
   status: string;
@@ -336,6 +448,7 @@ export type AdminSiteSettingsDatabaseRow = {
   email_sender: string;
   google_calendar_id: string;
   google_calendar_mode: string;
+  gift_certificates_enabled: boolean;
   id: "site";
   reminder_template: string;
   roles_policy: string;
@@ -541,8 +654,11 @@ export function buildAdminDatabaseSeed(records: AdminDomainRecords): AdminDataba
     appointments: records.appointments.map((appointment) => ({
       client_id: appointment.clientId ?? null,
       client_name_snapshot: appointment.client,
+      duration_minutes: appointment.durationMinutes ?? 60,
       id: appointment.id ?? `${appointment.date}-${appointment.time}-${appointment.client}`,
       internal_note: appointment.note,
+      post_visit_comment: appointment.postVisitComment ?? "",
+      post_visit_commented_at: appointment.postVisitCommentedAt ?? null,
       service_name: appointment.service,
       starts_at: appointment.time,
       starts_on: appointment.date,

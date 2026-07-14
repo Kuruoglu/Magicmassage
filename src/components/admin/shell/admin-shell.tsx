@@ -1,8 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   calculateFinanceSummary,
@@ -23,9 +30,9 @@ import {
 } from "@/admin/demo-data";
 import type { AdminShellInitialData } from "@/admin/data-source";
 import type { AdminUserActionInput, AdminUserActionResult } from "@/admin/admin-user-actions";
-import type { AdminPersistInput } from "@/admin/persistence";
+import type { AdminAuditAction, AdminPersistInput } from "@/admin/persistence";
 import { businessFacts, businessMapUrls } from "@/config/business";
-import { matchesSearch, isValidEmail, parseClientTags, parseCommaList } from "@/components/admin/lib/filters";
+import { matchesSearch, isValidEmail, parseCommaList } from "@/components/admin/lib/filters";
 import { formatCurrency, isPositiveInteger, statusClass } from "@/components/admin/lib/formatters";
 import {
   AdminDrawer,
@@ -47,15 +54,48 @@ import {
   mediaDetailHref,
   phoneHref,
   priceDetailHref,
-  serviceDetailHref,
   settingsDetailHref,
   userDetailHref,
   type SettingsGroupId,
 } from "@/components/admin/lib/links";
-import { getAdminAuthorizationHeader, signOutAdminBrowserSession } from "@/lib/supabase/browser";
 import {
-  appointmentBelongsToClient,
-  buildClientIdFromPhone,
+  CalendarAppointmentCancelDialog,
+  CalendarAppointmentDialog,
+  CalendarWorkspace,
+  classifyAppointmentAgainstSchedule,
+  createCalendarWorkingSchedule,
+  formatCalendarDay,
+  getSofiaIsoDate,
+  hasAppointmentOverlap,
+  isIsoDate,
+  sortAppointments,
+  type CalendarAppointmentFocus,
+  type CalendarAppointmentSaveResult,
+} from "@/components/admin/calendar";
+import { getAdminAuthorizationHeader, signOutAdminBrowserSession } from "@/lib/supabase/browser";
+import { AdminMobileHeader, AdminMobileNavigation } from "@/components/admin/mobile";
+import {
+  MediaDetail,
+  MediaGrid,
+  MediaPlacementEditor,
+  MediaUploader,
+  type MediaUploadRequest,
+} from "@/components/admin/media";
+import { ServiceEditor, ServiceList } from "@/components/admin/services";
+import {
+  ClientContacts,
+  ClientDetail,
+  ClientForm,
+  ClientNotes,
+  ClientVisitHistory,
+} from "@/components/admin/clients";
+import {
+  BlogArticleEditor,
+  createEmptyBlogArticle,
+  type BlogArticleDraft,
+  type BlogStatus as BlogEditorStatus,
+} from "@/components/admin/blog";
+import {
   certificateBelongsToClient,
   createAdminDemoRecords,
   findAppointmentClient,
@@ -63,7 +103,6 @@ import {
   findClientAppointments,
   findClientByIdentity,
   findClientCertificates,
-  findUniqueClientByName,
   matchesClientIdentity,
   normalizeClientPhone,
   normalizeSearch,
@@ -71,7 +110,6 @@ import {
   type AdminUserRecord,
   type AdminUserStatus,
   type Appointment,
-  type AppointmentStatus,
   type BlogPostRecord,
   type BlogStatus,
   type CalendarSyncMode,
@@ -84,6 +122,8 @@ import {
   type ContactSettingsRecord,
   type ContactStatus,
   type MediaRecord,
+  type MediaPlacementRecord,
+  type MediaPublicationConsent,
   type MediaStatus,
   type MediaType,
   type PriceRecord,
@@ -113,11 +153,6 @@ export type AdminShellProps = {
   selectedAdminUserId?: string;
 };
 
-type CalendarAppointmentFocus = {
-  appointmentKey: string;
-  date: string;
-  routeDate?: string;
-};
 type ClientFeedFilterId = "all" | "visits" | "certificates" | "notes";
 type ClientNextAction = {
   badgeClassName: string;
@@ -141,18 +176,6 @@ type CertificateFormState = {
   status: CertificateStatus;
   stripeId: string;
 };
-type ServiceFormState = {
-  category: string;
-  coverImage: string;
-  duration: string;
-  locales: string;
-  name: string;
-  order: string;
-  seoTitle: string;
-  slug: string;
-  status: ServiceStatus;
-  summary: string;
-};
 type PriceFormState = {
   durationMinutes: string;
   note: string;
@@ -167,6 +190,7 @@ type MediaFormState = {
   dimensions: string;
   folder: string;
   name: string;
+  publicationConsent: MediaPublicationConsent;
   size: string;
   status: MediaStatus;
   type: MediaType;
@@ -182,20 +206,6 @@ type ContactChannelFormState = {
   usage: string;
   value: string;
 };
-type BlogPostFormState = {
-  author: string;
-  body: string;
-  category: string;
-  coverImage: string;
-  excerpt: string;
-  locales: string;
-  publishedAt: string;
-  seoTitle: string;
-  slug: string;
-  status: BlogStatus;
-  tags: string;
-  title: string;
-};
 type SettingsFormState = {
   auditLogRetentionDays: string;
   bookingBufferMinutes: string;
@@ -208,6 +218,7 @@ type SettingsFormState = {
   emailSender: string;
   googleCalendarId: string;
   googleCalendarMode: CalendarSyncMode;
+  giftCertificatesEnabled: boolean;
   reminderTemplate: string;
   rolesPolicy: string;
   stripeMode: StripeMode;
@@ -224,8 +235,6 @@ type AdminUserFormState = {
   status: AdminUserStatus;
   twoFactor: boolean;
 };
-type CalendarMode = "day" | "week" | "month" | "list";
-
 const groupedNavigation = ["Операции", "Контент", "Финансы", "Система"] as const;
 const clientFilterOptions = [
   { id: "all", label: "Все" },
@@ -245,8 +254,6 @@ const clientLanguageOptions = [
   { label: "UA", value: "ua" },
   { label: "EN", value: "en" },
 ] as const;
-const clientContactOptions = ["Телефон", "Telegram", "Viber", "Email"] as const;
-const clientStatusOptions = ["Новый клиент", "Активный клиент", "Пауза"] as const;
 const adminUserStatusOptions: AdminUserStatus[] = ["Активен", "Приглашен", "Пауза", "Заблокирован"];
 const adminUserFilterOptions = [
   { id: "all", label: "Все" },
@@ -289,30 +296,12 @@ const adminRolePermissionSummary: Record<AdminRoleId, { items: string[]; scope: 
     scope: "Read-only доступ для проверки контента и операций.",
   },
 };
-type ClientFormState = {
-  email: string;
-  language: string;
-  name: string;
-  next: string;
-  note: string;
-  phone: string;
-  preferredContact: string;
-  status: string;
-  tags: string;
-  telegram: string;
-  totalSpend: string;
-  visits: string;
-};
-const appointmentServiceOptions = ["Классический массаж", "Лимфодренажный массаж", "Deep tissue massage", "SPA процедура"] as const;
-const appointmentStatusOptions: AppointmentStatus[] = ["Новая заявка", "Ожидает", "Подтверждена", "Отменена"];
 const certificateStatusOptions: CertificateStatus[] = ["Оплачено", "Отправлен", "Ожидает PDF", "Погашен"];
-const serviceStatusOptions: ServiceStatus[] = ["Опубликована", "Черновик", "Скрыта"];
 const priceStatusOptions: PriceStatus[] = ["Активна", "Скрыта"];
 const mediaTypeOptions: MediaType[] = ["Фото", "Документ"];
 const mediaStatusOptions: MediaStatus[] = ["Готово", "Требует alt", "Черновик"];
 const contactChannelTypeOptions: ContactChannelType[] = ["Телефон", "Email", "Мессенджер", "Соцсеть", "Карта", "Бронирование"];
 const contactStatusOptions: ContactStatus[] = ["Активен", "Черновик", "Скрыт"];
-const blogStatusOptions: BlogStatus[] = ["Опубликована", "Черновик", "Запланирована", "На проверке"];
 const calendarSyncModeOptions: CalendarSyncMode[] = ["Отключена", "Внутренний календарь главный", "Односторонняя", "Двусторонняя позже"];
 const stripeModeOptions: StripeMode[] = ["Тестовый", "Live после подтверждения"];
 const settingsGroups: Array<{ id: SettingsGroupId; status: string; summary: string; title: string }> = [
@@ -353,24 +342,6 @@ const settingsGroups: Array<{ id: SettingsGroupId; status: string; summary: stri
     title: "Роли и аудит",
   },
 ];
-const calendarModes: Array<{ id: CalendarMode; label: string }> = [
-  { id: "day", label: "День" },
-  { id: "week", label: "Неделя" },
-  { id: "month", label: "Месяц" },
-  { id: "list", label: "Список" },
-];
-const calendarMonthLabel = "Июль 2026";
-const calendarWeekdayLabels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const calendarWeekLabel = "Неделя 6-12 июля";
-const calendarMonthDays = Array.from({ length: 31 }, (_, index) => {
-  const day = index + 1;
-
-  return {
-    date: `2026-07-${String(day).padStart(2, "0")}`,
-    day,
-  };
-});
-const calendarLeadingBlankDays = 2;
 const initialServiceRows: ServiceRecord[] = [
   {
     category: "Массаж",
@@ -448,6 +419,7 @@ const initialMediaRows: MediaRecord[] = [
     folder: "services",
     id: "media-classic-cover",
     name: "Классический массаж",
+    publicationConsent: "not_required",
     size: "368 KB",
     status: "Готово",
     type: "Фото",
@@ -461,6 +433,7 @@ const initialMediaRows: MediaRecord[] = [
     folder: "gallery",
     id: "media-studio-room",
     name: "Фото кабинета",
+    publicationConsent: "not_required",
     size: "512 KB",
     status: "Требует alt",
     type: "Фото",
@@ -474,6 +447,7 @@ const initialMediaRows: MediaRecord[] = [
     folder: "certificates",
     id: "media-certificate-natali",
     name: "Сертификат Natali",
+    publicationConsent: "not_required",
     size: "246 KB",
     status: "Готово",
     type: "Документ",
@@ -610,6 +584,7 @@ const initialSettingsRecord: SettingsRecord = {
   emailSender: businessFacts.email,
   googleCalendarId: "",
   googleCalendarMode: "Внутренний календарь главный",
+  giftCertificatesEnabled: true,
   reminderTemplate: "Напоминание за 24 часа до записи после запуска email-провайдера.",
   rolesPolicy: "Владелец управляет настройками; администратор работает без критических системных действий.",
   stripeMode: "Тестовый",
@@ -775,23 +750,6 @@ function buildInitialAdminUsers(initialData?: AdminShellInitialData): AdminUserR
   }));
 }
 
-function buildClientFormState(client?: ClientRecord): ClientFormState {
-  return {
-    email: client?.email ?? "",
-    language: client?.language ?? "ru",
-    name: client?.name ?? "",
-    next: client?.next ?? "",
-    note: client?.note ?? "",
-    phone: client?.phone ?? "",
-    preferredContact: client?.preferredContact ?? "Телефон",
-    status: client?.status ?? "Новый клиент",
-    tags: client?.tags.join(", ") ?? "",
-    telegram: client?.telegram ?? "",
-    totalSpend: client?.totalSpend ?? "0 €",
-    visits: String(client?.visits ?? 0),
-  };
-}
-
 function buildAdminUserFormState(user?: AdminUserRecord): AdminUserFormState {
   return {
     accessNote: user?.accessNote ?? "",
@@ -846,21 +804,6 @@ function buildClientCertificateDraft(client: ClientRecord, certificates: Certifi
   };
 }
 
-function buildServiceFormState(service?: ServiceRecord): ServiceFormState {
-  return {
-    category: service?.category ?? "Массаж",
-    coverImage: service?.coverImage ?? "",
-    duration: service?.duration ?? "60 мин",
-    locales: service?.locales.join(", ") ?? "bg, ru, ua, en",
-    name: service?.name ?? "",
-    order: String(service?.order ?? initialServiceRows.length + 1),
-    seoTitle: service?.seoTitle ?? "",
-    slug: service?.slug ?? "",
-    status: service?.status ?? "Черновик",
-    summary: service?.summary ?? "",
-  };
-}
-
 function buildPriceFormState(services: ServiceRecord[], price?: PriceRecord): PriceFormState {
   return {
     durationMinutes: price ? String(price.durationMinutes) : "",
@@ -879,6 +822,7 @@ function buildMediaFormState(media?: MediaRecord): MediaFormState {
     dimensions: media?.dimensions ?? "",
     folder: media?.folder ?? "services",
     name: media?.name ?? "",
+    publicationConsent: media?.publicationConsent ?? "unknown",
     size: media?.size ?? "",
     status: media?.status ?? "Черновик",
     type: media?.type ?? "Фото",
@@ -903,20 +847,83 @@ function buildContactSettingsFormState(settings: ContactSettingsRecord): Contact
   return { ...settings };
 }
 
-function buildBlogPostFormState(post?: BlogPostRecord): BlogPostFormState {
+const blogEditorStatusByStatus: Record<BlogStatus, BlogEditorStatus> = {
+  "На проверке": "review",
+  Запланирована: "scheduled",
+  Опубликована: "published",
+  Черновик: "draft",
+};
+
+const blogStatusByEditorStatus: Record<BlogEditorStatus, BlogStatus> = {
+  draft: "Черновик",
+  published: "Опубликована",
+  review: "На проверке",
+  scheduled: "Запланирована",
+};
+
+function blogPostToEditorDraft(post?: BlogPostRecord): BlogArticleDraft {
+  if (!post) return createEmptyBlogArticle("bg");
+
   return {
-    author: post?.author ?? "Natali",
-    body: post?.body ?? "",
-    category: post?.category ?? "",
-    coverImage: post?.coverImage ?? "",
-    excerpt: post?.excerpt ?? "",
-    locales: post?.locales.join(", ") ?? "ru, bg, ua, en",
-    publishedAt: post?.publishedAt ?? "2026-07-07",
-    seoTitle: post?.seoTitle ?? "",
-    slug: post?.slug ?? "",
-    status: post?.status ?? "Черновик",
-    tags: post?.tags.join(", ") ?? "",
-    title: post?.title ?? "",
+    author: post.author,
+    canonicalUrl: post.canonicalUrl ?? `/${post.locales[0] ?? "bg"}/blog/${post.slug}`,
+    category: post.category,
+    content: post.body.startsWith("<") ? post.body : `<p>${post.body}</p>`,
+    editorJson: post.editorJson ?? {},
+    coverAlt: post.coverAlt ?? post.title,
+    coverUrl: post.coverImage,
+    excerpt: post.excerpt,
+    hreflang: post.hreflang ?? {},
+    locale: (post.locales[0] as BlogArticleDraft["locale"] | undefined) ?? "bg",
+    ogDescription: post.ogDescription ?? post.excerpt,
+    ogTitle: post.ogTitle ?? post.seoTitle,
+    publishedAt: post.publishedAt,
+    robotsDirectives: post.robotsDirectives ?? (post.status === "Опубликована" ? "index,follow" : "noindex,nofollow"),
+    scheduledAt: post.status === "Запланирована" ? post.scheduledFor ?? "" : "",
+    seoDescription: post.seoDescription ?? post.excerpt,
+    seoTitle: post.seoTitle,
+    slug: post.slug,
+    status: blogEditorStatusByStatus[post.status],
+    tags: [...post.tags],
+    title: post.title,
+    updatedAt: post.updatedAt,
+  };
+}
+
+function editorDraftToBlogPost(
+  draft: BlogArticleDraft,
+  original?: BlogPostRecord,
+  draftRecordId?: string,
+): BlogPostRecord {
+  const id = original?.id ?? draftRecordId ?? `blog-${crypto.randomUUID()}`;
+  const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft.slug)
+    ? draft.slug
+    : `draft-${id.replace(/^blog-/, "").toLowerCase()}`;
+
+  return {
+    author: draft.author,
+    body: draft.content,
+    canonicalUrl: draft.canonicalUrl,
+    category: draft.category,
+    coverAlt: draft.coverAlt,
+    coverImage: draft.coverUrl,
+    editorJson: draft.editorJson,
+    excerpt: draft.excerpt,
+    hreflang: draft.hreflang,
+    id,
+    locales: [draft.locale],
+    ogDescription: draft.ogDescription,
+    ogTitle: draft.ogTitle,
+    publishedAt: draft.scheduledAt.slice(0, 10) || draft.publishedAt || original?.publishedAt || getSofiaIsoDate(),
+    robotsDirectives: draft.robotsDirectives,
+    scheduledFor: draft.status === "scheduled" ? draft.scheduledAt : undefined,
+    seoDescription: draft.seoDescription,
+    seoTitle: draft.seoTitle,
+    slug,
+    status: blogStatusByEditorStatus[draft.status],
+    tags: [...draft.tags],
+    title: draft.title,
+    updatedAt: getSofiaIsoDate(),
   };
 }
 
@@ -933,6 +940,7 @@ function buildSettingsFormState(settings: SettingsRecord): SettingsFormState {
     emailSender: settings.emailSender,
     googleCalendarId: settings.googleCalendarId,
     googleCalendarMode: settings.googleCalendarMode,
+    giftCertificatesEnabled: settings.giftCertificatesEnabled !== false,
     reminderTemplate: settings.reminderTemplate,
     rolesPolicy: settings.rolesPolicy,
     stripeMode: settings.stripeMode,
@@ -994,14 +1002,6 @@ function createContactChannelId(name: string, value: string) {
   return `contact-${base || "channel"}`;
 }
 
-function createBlogPostId(title: string, slug: string) {
-  const base = normalizeSearch(slug || title)
-    .replace(/[^a-z0-9а-яё]+/giu, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return `blog-${base || "post"}`;
-}
-
 function createAdminUserId(name: string, email: string) {
   const base = normalizeSearch(email || name)
     .replace(/@/g, "-")
@@ -1013,38 +1013,6 @@ function createAdminUserId(name: string, email: string) {
 
 function isSupabaseAuthUserId(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function findClientPhoneDuplicate(clients: ClientRecord[], phone: string, originalClientIdentity?: string) {
-  const candidatePhone = normalizeClientPhone(phone);
-
-  if (!candidatePhone) {
-    return undefined;
-  }
-
-  return clients.find((client) => {
-    if (matchesClientIdentity(client, originalClientIdentity)) {
-      return false;
-    }
-
-    return normalizeClientPhone(client.phone) === candidatePhone;
-  });
-}
-
-function findClientNameMatch(clients: ClientRecord[], name: string, originalClientIdentity?: string) {
-  const candidateName = normalizeSearch(name);
-
-  if (!candidateName) {
-    return undefined;
-  }
-
-  return clients.find((client) => {
-    if (matchesClientIdentity(client, originalClientIdentity)) {
-      return false;
-    }
-
-    return normalizeSearch(client.name) === candidateName;
-  });
 }
 
 function findServiceBySlug(services: ServiceRecord[], slug: string) {
@@ -1186,90 +1154,8 @@ function buildClientNextAction(
   };
 }
 
-function sortAppointments(appointments: Appointment[]) {
-  return [...appointments].sort((first, second) =>
-    `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
-  );
-}
-
 function buildInitialCalendarAppointments(records: AdminDomainRecords) {
   return records.appointments;
-}
-
-function calendarHeadingLabel(mode: CalendarMode, selectedDate: string) {
-  if (mode === "month") {
-    return calendarMonthLabel;
-  }
-
-  if (mode === "week") {
-    return calendarWeekLabel;
-  }
-
-  if (mode === "list") {
-    return "Список записей";
-  }
-
-  return formatCalendarDay(selectedDate);
-}
-
-function formatCalendarDay(date: string) {
-  return `${Number(date.slice(-2))} июля`;
-}
-
-function formatCalendarShortDay(date: string) {
-  return `${Number(date.slice(-2))} июл`;
-}
-
-function isCalendarMonthDate(date: string | undefined): date is string {
-  return Boolean(date && calendarMonthDays.some((day) => day.date === date));
-}
-
-function appointmentCountLabel(count: number) {
-  if (count === 1) {
-    return "1 запись";
-  }
-
-  if (count > 1 && count < 5) {
-    return `${count} записи`;
-  }
-
-  return `${count} записей`;
-}
-
-function compactAppointmentCountLabel(count: number) {
-  return `${count} зап.`;
-}
-
-function freeSlotCount(appointmentCount: number, dailySlotCapacity: number) {
-  return Math.max(0, dailySlotCapacity - appointmentCount);
-}
-
-function freeSlotLabel(count: number) {
-  if (count === 1) {
-    return "1 свободный слот";
-  }
-
-  if (count > 1 && count < 5) {
-    return `${count} свободных слота`;
-  }
-
-  return `${count} свободных слотов`;
-}
-
-function compactFreeSlotLabel(count: number) {
-  return `${count} св.`;
-}
-
-function slotCountLabel(count: number) {
-  if (count === 1) {
-    return "1 слот";
-  }
-
-  if (count > 1 && count < 5) {
-    return `${count} слота`;
-  }
-
-  return `${count} слотов`;
 }
 
 function paymentCountLabel(count: number) {
@@ -1381,271 +1267,6 @@ function QuickActionDialog({
             Отмена
           </button>
         </div>
-      </section>
-    </div>
-  );
-}
-
-function ClientFormDialog({
-  clients,
-  initialClient,
-  onClose,
-  onSave,
-  role,
-}: {
-  clients: ClientRecord[];
-  initialClient?: ClientRecord;
-  onClose: () => void;
-  onSave: (client: ClientRecord, originalClientIdentity?: string) => void;
-  role: AdminRoleId;
-}) {
-  const [form, setForm] = useState<ClientFormState>(() => buildClientFormState(initialClient));
-  const [error, setError] = useState("");
-  const [duplicateClient, setDuplicateClient] = useState<ClientRecord | undefined>();
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const phoneInputRef = useRef<HTMLInputElement>(null);
-  const isEditing = Boolean(initialClient);
-  const hasNameError = Boolean(error && !form.name.trim());
-  const hasPhoneError = Boolean(error && !form.phone.trim());
-  const originalClientIdentity = initialClient?.id ?? initialClient?.phone ?? initialClient?.name;
-  const matchingNameClient = findClientNameMatch(clients, form.name, originalClientIdentity);
-
-  function describedBy(...ids: Array<string | false>) {
-    const value = ids.filter(Boolean).join(" ");
-
-    return value || undefined;
-  }
-
-  function updateForm<Field extends keyof ClientFormState>(field: Field, value: ClientFormState[Field]) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setError("");
-    setDuplicateClient(undefined);
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const name = form.name.trim();
-    const phone = form.phone.trim();
-
-    if (!name || !phone) {
-      setError("Укажите имя и телефон клиента.");
-      if (!name) {
-        nameInputRef.current?.focus();
-      } else {
-        phoneInputRef.current?.focus();
-      }
-      return;
-    }
-
-    const matchingClient = findClientPhoneDuplicate(clients, phone, originalClientIdentity);
-
-    if (matchingClient) {
-      setDuplicateClient(matchingClient);
-      setError(`Клиент с таким телефоном уже есть: ${matchingClient.name}.`);
-      phoneInputRef.current?.focus();
-      return;
-    }
-
-    const visits = Number.parseInt(form.visits, 10);
-
-    onSave(
-      {
-        email: form.email.trim(),
-        history: initialClient?.history.map((visit) => ({ ...visit })) ?? [],
-        id: initialClient?.id ?? buildClientIdFromPhone(phone),
-        language: form.language,
-        name,
-        next: form.next.trim() || "Не назначен",
-        note: form.note.trim(),
-        phone,
-        preferredContact: form.preferredContact,
-        status: form.status,
-        tags: parseClientTags(form.tags),
-        telegram: form.telegram.trim(),
-        totalSpend: form.totalSpend.trim() || "0 €",
-        visits: Number.isFinite(visits) ? Math.max(visits, 0) : 0,
-      },
-      originalClientIdentity,
-    );
-  }
-
-  return (
-    <div className="admin-action-backdrop">
-      <section aria-labelledby="client-action-title" aria-modal="true" className="admin-action-dialog admin-client-form-dialog" role="dialog">
-        <div className="admin-panel-head">
-          <div>
-            <span className="admin-kicker">Клиенты</span>
-            <h2 id="client-action-title">{isEditing ? "Редактировать клиента" : "Новый клиент"}</h2>
-          </div>
-          <button className="admin-icon-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
-        </div>
-
-        <form noValidate onSubmit={handleSubmit}>
-          <div className="admin-action-body admin-client-form-layout">
-            {error ? (
-              <p className="admin-form-alert admin-form-alert-wide" role="alert">
-                {error}
-                {duplicateClient ? (
-                  <>
-                    {" "}
-                    <Link href={clientProfileHref(duplicateClient.id, role)} onClick={onClose}>
-                      Открыть карточку существующего клиента
-                    </Link>
-                  </>
-                ) : null}
-              </p>
-            ) : null}
-            {matchingNameClient && !duplicateClient ? (
-              <p className="admin-form-warning admin-form-alert-wide" role="status">
-                Имя уже есть в базе: {matchingNameClient.name}. Если телефон другой, можно сохранить нового клиента.
-              </p>
-            ) : null}
-
-            <fieldset className="admin-form-section">
-              <legend>Контакты клиента</legend>
-              <p className="admin-form-helper" id="client-contact-helper">
-                Имя и телефон нужны для записи и связи с клиентом.
-              </p>
-              <div className="admin-client-form-grid">
-                <div className="admin-field">
-                  <label htmlFor="client-name-input">Имя</label>
-                  <input
-                    aria-describedby={describedBy("client-contact-helper", hasNameError && "client-name-error")}
-                    aria-invalid={hasNameError ? "true" : undefined}
-                    autoComplete="name"
-                    id="client-name-input"
-                    onChange={(event) => updateForm("name", event.target.value)}
-                    ref={nameInputRef}
-                    required
-                    type="text"
-                    value={form.name}
-                  />
-                  {hasNameError ? (
-                    <span className="admin-field-error" id="client-name-error">
-                      Укажите имя клиента.
-                    </span>
-                  ) : null}
-                </div>
-                <div className="admin-field">
-                  <label htmlFor="client-phone-input">Телефон</label>
-                  <input
-                    aria-describedby={describedBy("client-contact-helper", hasPhoneError && "client-phone-error")}
-                    aria-invalid={hasPhoneError ? "true" : undefined}
-                    autoComplete="tel"
-                    id="client-phone-input"
-                    onChange={(event) => updateForm("phone", event.target.value)}
-                    ref={phoneInputRef}
-                    required
-                    type="tel"
-                    value={form.phone}
-                  />
-                  {hasPhoneError ? (
-                    <span className="admin-field-error" id="client-phone-error">
-                      Укажите телефон клиента.
-                    </span>
-                  ) : null}
-                </div>
-                <label>
-                  Email
-                  <input
-                    autoComplete="email"
-                    onChange={(event) => updateForm("email", event.target.value)}
-                    type="email"
-                    value={form.email}
-                  />
-                </label>
-                <label>
-                  Telegram
-                  <input
-                    autoComplete="url"
-                    onChange={(event) => updateForm("telegram", event.target.value)}
-                    type="url"
-                    value={form.telegram}
-                  />
-                </label>
-                <label>
-                  Язык
-                  <select onChange={(event) => updateForm("language", event.target.value)} value={form.language}>
-                    {clientLanguageOptions.map((language) => (
-                      <option key={language.value} value={language.value}>
-                        {language.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Канал связи
-                  <select onChange={(event) => updateForm("preferredContact", event.target.value)} value={form.preferredContact}>
-                    {clientContactOptions.map((contact) => (
-                      <option key={contact} value={contact}>
-                        {contact}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </fieldset>
-
-            <fieldset className="admin-form-section">
-              <legend>Профиль клиента</legend>
-              <p className="admin-form-helper" id="client-status-helper">
-                Статус выбирается вручную и не скрывает клиента из базы.
-              </p>
-              <div className="admin-client-form-grid">
-                <label>
-                  Статус
-                  <select
-                    aria-describedby="client-status-helper"
-                    onChange={(event) => updateForm("status", event.target.value)}
-                    value={form.status}
-                  >
-                    {clientStatusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Следующий визит
-                  <input onChange={(event) => updateForm("next", event.target.value)} type="text" value={form.next} />
-                </label>
-                <label>
-                  Визиты
-                  <input min="0" onChange={(event) => updateForm("visits", event.target.value)} type="number" value={form.visits} />
-                </label>
-                <label>
-                  Сумма
-                  <input onChange={(event) => updateForm("totalSpend", event.target.value)} type="text" value={form.totalSpend} />
-                </label>
-              </div>
-            </fieldset>
-
-            <fieldset className="admin-form-section">
-              <legend>Заметки и теги</legend>
-              <div className="admin-client-form-grid">
-                <label className="admin-form-wide">
-                  Заметка клиента
-                  <textarea onChange={(event) => updateForm("note", event.target.value)} rows={4} value={form.note} />
-                </label>
-                <label className="admin-form-wide">
-                  Теги
-                  <input onChange={(event) => updateForm("tags", event.target.value)} type="text" value={form.tags} />
-                </label>
-              </div>
-            </fieldset>
-          </div>
-
-          <div className="admin-action-footer">
-            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить клиента"}</button>
-            <button className="admin-secondary-button" onClick={onClose} type="button">
-              Отмена
-            </button>
-          </div>
-        </form>
       </section>
     </div>
   );
@@ -1944,144 +1565,6 @@ function CertificateFormDialog({
   );
 }
 
-function ServiceFormDialog({
-  initialService,
-  onClose,
-  onSave,
-}: {
-  initialService?: ServiceRecord;
-  onClose: () => void;
-  onSave: (service: ServiceRecord, originalSlug?: string) => void;
-}) {
-  const [form, setForm] = useState<ServiceFormState>(() => buildServiceFormState(initialService));
-  const [error, setError] = useState("");
-  const isEditing = Boolean(initialService);
-
-  function updateForm<Field extends keyof ServiceFormState>(field: Field, value: ServiceFormState[Field]) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setError("");
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const name = form.name.trim();
-    const slug = form.slug.trim();
-
-    if (!name || !slug) {
-      setError("Укажите название и slug услуги.");
-      return;
-    }
-
-    onSave(
-      {
-        category: form.category.trim() || "Массаж",
-        coverImage: form.coverImage.trim(),
-        duration: form.duration.trim() || "60 мин",
-        locales: parseCommaList(form.locales),
-        name,
-        order: Number.parseInt(form.order, 10) || 1,
-        seoTitle: form.seoTitle.trim() || name,
-        slug,
-        status: form.status,
-        summary: form.summary.trim(),
-      },
-      initialService?.slug,
-    );
-  }
-
-  return (
-    <div className="admin-action-backdrop">
-      <section aria-labelledby="service-action-title" aria-modal="true" className="admin-action-dialog admin-service-form-dialog" role="dialog">
-        <div className="admin-panel-head">
-          <div>
-            <span className="admin-kicker">Виды массажа</span>
-            <h2 id="service-action-title">{isEditing ? "Редактировать услугу" : "Новая услуга"}</h2>
-          </div>
-          <button className="admin-icon-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
-        </div>
-
-        <form noValidate onSubmit={handleSubmit}>
-          <div className="admin-action-body admin-content-form-grid">
-            <label>
-              Название
-              <input
-                aria-invalid={error && !form.name.trim() ? "true" : undefined}
-                onChange={(event) => updateForm("name", event.target.value)}
-                required
-                type="text"
-                value={form.name}
-              />
-            </label>
-            <label>
-              Slug
-              <input
-                aria-invalid={error && !form.slug.trim() ? "true" : undefined}
-                onChange={(event) => updateForm("slug", event.target.value)}
-                required
-                type="text"
-                value={form.slug}
-              />
-            </label>
-            {error ? (
-              <p className="admin-form-alert admin-form-alert-wide" role="alert">
-                {error}
-              </p>
-            ) : null}
-            <label>
-              Категория
-              <input onChange={(event) => updateForm("category", event.target.value)} type="text" value={form.category} />
-            </label>
-            <label>
-              Статус
-              <select onChange={(event) => updateForm("status", event.target.value as ServiceStatus)} value={form.status}>
-                {serviceStatusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Длительность
-              <input onChange={(event) => updateForm("duration", event.target.value)} type="text" value={form.duration} />
-            </label>
-            <label>
-              Порядок
-              <input onChange={(event) => updateForm("order", event.target.value)} type="number" value={form.order} />
-            </label>
-            <label>
-              Локали
-              <input onChange={(event) => updateForm("locales", event.target.value)} type="text" value={form.locales} />
-            </label>
-            <label>
-              SEO title
-              <input onChange={(event) => updateForm("seoTitle", event.target.value)} type="text" value={form.seoTitle} />
-            </label>
-            <label className="admin-form-wide">
-              Обложка
-              <input onChange={(event) => updateForm("coverImage", event.target.value)} type="text" value={form.coverImage} />
-            </label>
-            <label className="admin-form-wide">
-              Описание
-              <textarea onChange={(event) => updateForm("summary", event.target.value)} rows={4} value={form.summary} />
-            </label>
-          </div>
-
-          <div className="admin-action-footer">
-            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить услугу"}</button>
-            <button className="admin-secondary-button" onClick={onClose} type="button">
-              Отмена
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
-}
-
 function PriceFormDialog({
   initialPrice,
   onClose,
@@ -2209,10 +1692,13 @@ function MediaFormDialog({
 }: {
   initialMedia?: MediaRecord;
   onClose: () => void;
-  onSave: (media: MediaRecord, originalId?: string) => void;
+  onSave: (media: MediaRecord, originalId?: string, cleanupPath?: string) => Promise<void>;
 }) {
   const [form, setForm] = useState<MediaFormState>(() => buildMediaFormState(initialMedia));
   const [error, setError] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File>();
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState("");
   const isEditing = Boolean(initialMedia);
 
   function updateForm<Field extends keyof MediaFormState>(field: Field, value: MediaFormState[Field]) {
@@ -2220,32 +1706,134 @@ function MediaFormDialog({
     setError("");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function uploadSelectedFile() {
+    if (!selectedFile) return { url: form.url.trim() };
+
+    setIsUploading(true);
+    setUploadNotice("Загрузка файла...");
+
+    try {
+      const payload = new FormData();
+      payload.set("file", selectedFile);
+      payload.set("folder", form.folder);
+      const authorization = await getAdminAuthorizationHeader();
+      const response = await fetch("/api/admin/media", {
+        body: payload,
+        headers: authorization ? { Authorization: authorization } : undefined,
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string; mimeType?: string; path?: string; publicUrl?: string; size?: number }
+        | null;
+
+      if (!response.ok || !result?.publicUrl) {
+        setError(result?.error ?? "Не удалось загрузить файл.");
+        setUploadNotice("");
+        return { url: "" };
+      }
+
+      updateForm("url", result.publicUrl);
+      updateForm("size", `${result.size ?? selectedFile.size} B`);
+      updateForm("type", result.mimeType === "application/pdf" ? "Документ" : "Фото");
+      setUploadNotice("Файл загружен. Сохраните карточку медиа.");
+      return { cleanupPath: result.path, url: result.publicUrl };
+    } catch {
+      setError("Не удалось загрузить файл.");
+      setUploadNotice("");
+      return { url: "" };
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function uploadNewMedia(request: MediaUploadRequest) {
+    const payload = new FormData();
+    payload.set("file", request.file);
+    payload.set("folder", request.folder);
+    const authorization = await getAdminAuthorizationHeader();
+    const response = await fetch("/api/admin/media", {
+      body: payload,
+      headers: authorization ? { Authorization: authorization } : undefined,
+      method: "POST",
+    });
+    const result = (await response.json().catch(() => null)) as
+      | { error?: string; height?: number; mimeType?: string; path?: string; publicUrl?: string; size?: number; width?: number }
+      | null;
+
+    if (!response.ok || !result?.publicUrl) {
+      throw new Error(result?.error ?? "Не удалось загрузить файл.");
+    }
+
+    await onSave({
+      altText: request.altText,
+      dimensions: result.width && result.height ? `${result.width}x${result.height}` : "",
+      folder: request.folder,
+      id: createMediaId(request.name, result.publicUrl),
+      name: request.name,
+      publicationConsent: request.publicationConsent,
+      size: `${result.size ?? request.file.size} B`,
+      status: "Готово",
+      type: result.mimeType === "application/pdf" ? "Документ" : request.type,
+      uploadedAt: new Date().toISOString().slice(0, 10),
+      url: result.publicUrl,
+      usage: [],
+    }, undefined, result.path);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const name = form.name.trim();
-    const url = form.url.trim();
+    const upload = selectedFile ? await uploadSelectedFile() : { url: form.url.trim() };
+    const url = upload.url;
 
     if (!name || !url) {
       setError("Укажите название и URL медиа.");
       return;
     }
 
-    onSave(
-      {
+    try {
+      await onSave(
+        {
         altText: form.altText.trim(),
+        altTexts: initialMedia?.altTexts,
         dimensions: form.dimensions.trim(),
         folder: form.folder.trim() || "media",
         id: initialMedia?.id ?? createMediaId(name, url),
         name,
+        placements: initialMedia?.placements,
+        publicationConsent: form.publicationConsent,
         size: form.size.trim(),
         status: form.status,
         type: form.type,
         uploadedAt: form.uploadedAt,
         url,
         usage: parseCommaList(form.usage),
-      },
-      initialMedia?.id,
+        },
+        initialMedia?.id,
+        upload.cleanupPath,
+      );
+    } catch (saveFailure) {
+      setError(saveFailure instanceof Error ? saveFailure.message : "Не удалось сохранить медиа.");
+    }
+  }
+
+  if (!initialMedia) {
+    return (
+      <div className="admin-action-backdrop">
+        <section aria-labelledby="media-action-title" aria-modal="true" className="admin-action-dialog admin-media-form-dialog" role="dialog">
+          <div className="admin-panel-head">
+            <div>
+              <span className="admin-kicker">Медиа</span>
+              <h2 id="media-action-title">Новое медиа</h2>
+            </div>
+            <button className="admin-icon-button" onClick={onClose} type="button">Закрыть</button>
+          </div>
+          <div className="admin-action-body">
+            <MediaUploader maxFileSizeBytes={10 * 1024 * 1024} onCancel={onClose} onUpload={uploadNewMedia} />
+          </div>
+        </section>
+      </div>
     );
   }
 
@@ -2276,11 +1864,33 @@ function MediaFormDialog({
             </label>
             <label>
               Папка
-              <input onChange={(event) => updateForm("folder", event.target.value)} type="text" value={form.folder} />
+              <select onChange={(event) => updateForm("folder", event.target.value)} value={form.folder}>
+                {["services", "blog", "certificates", "gallery", "media"].map((folder) => (
+                  <option key={folder} value={folder}>
+                    {folder}
+                  </option>
+                ))}
+              </select>
             </label>
             {error ? (
               <p className="admin-form-alert admin-form-alert-wide" role="alert">
                 {error}
+              </p>
+            ) : null}
+            <label className="admin-form-wide">
+              Файл до 10 MB
+              <input
+                accept="image/jpeg,image/png,image/webp,image/avif,application/pdf"
+                onChange={(event) => {
+                  setSelectedFile(event.target.files?.[0]);
+                  setError("");
+                }}
+                type="file"
+              />
+            </label>
+            {uploadNotice ? (
+              <p className="admin-export-notice admin-form-alert-wide" role="status">
+                {uploadNotice}
               </p>
             ) : null}
             <label className="admin-form-wide">
@@ -2314,6 +1924,18 @@ function MediaFormDialog({
               </select>
             </label>
             <label>
+              Разрешение на публикацию
+              <select
+                onChange={(event) => updateForm("publicationConsent", event.target.value as MediaPublicationConsent)}
+                value={form.publicationConsent}
+              >
+                <option value="unknown">Не проверено</option>
+                <option value="granted">Разрешено</option>
+                <option value="not_required">Не требуется</option>
+                <option value="denied">Запрещено</option>
+              </select>
+            </label>
+            <label>
               Размер файла
               <input onChange={(event) => updateForm("size", event.target.value)} type="text" value={form.size} />
             </label>
@@ -2336,7 +1958,9 @@ function MediaFormDialog({
           </div>
 
           <div className="admin-action-footer">
-            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить медиа"}</button>
+            <button disabled={isUploading} type="submit">
+              {isUploading ? "Загрузка..." : isEditing ? "Сохранить изменения" : "Загрузить и сохранить"}
+            </button>
             <button className="admin-secondary-button" onClick={onClose} type="button">
               Отмена
             </button>
@@ -2595,156 +2219,6 @@ function ContactChannelDialog({
   );
 }
 
-function BlogPostDialog({
-  initialPost,
-  onClose,
-  onSave,
-}: {
-  initialPost?: BlogPostRecord;
-  onClose: () => void;
-  onSave: (post: BlogPostRecord, originalId?: string) => void;
-}) {
-  const [form, setForm] = useState<BlogPostFormState>(() => buildBlogPostFormState(initialPost));
-  const [error, setError] = useState("");
-  const isEditing = Boolean(initialPost);
-
-  function updateForm<Field extends keyof BlogPostFormState>(field: Field, value: BlogPostFormState[Field]) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setError("");
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const title = form.title.trim();
-    const slug = form.slug.trim();
-
-    if (!title || !slug) {
-      setError("Укажите заголовок и slug статьи.");
-      return;
-    }
-
-    onSave(
-      {
-        author: form.author.trim() || "Natali",
-        body: form.body.trim(),
-        category: form.category.trim() || "Общее",
-        coverImage: form.coverImage.trim(),
-        excerpt: form.excerpt.trim(),
-        id: initialPost?.id ?? createBlogPostId(title, slug),
-        locales: parseCommaList(form.locales),
-        publishedAt: form.publishedAt,
-        seoTitle: form.seoTitle.trim() || title,
-        slug,
-        status: form.status,
-        tags: parseCommaList(form.tags),
-        title,
-        updatedAt: "2026-07-07",
-      },
-      initialPost?.id,
-    );
-  }
-
-  return (
-    <div className="admin-action-backdrop">
-      <section aria-labelledby="blog-action-title" aria-modal="true" className="admin-action-dialog admin-service-form-dialog" role="dialog">
-        <div className="admin-panel-head">
-          <div>
-            <span className="admin-kicker">Блог</span>
-            <h2 id="blog-action-title">{isEditing ? "Редактировать статью" : "Новая статья"}</h2>
-          </div>
-          <button className="admin-icon-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
-        </div>
-
-        <form noValidate onSubmit={handleSubmit}>
-          <div className="admin-action-body admin-content-form-grid">
-            <label>
-              Заголовок
-              <input
-                aria-invalid={error && !form.title.trim() ? "true" : undefined}
-                onChange={(event) => updateForm("title", event.target.value)}
-                required
-                type="text"
-                value={form.title}
-              />
-            </label>
-            <label>
-              Slug
-              <input
-                aria-invalid={error && !form.slug.trim() ? "true" : undefined}
-                onChange={(event) => updateForm("slug", event.target.value)}
-                required
-                type="text"
-                value={form.slug}
-              />
-            </label>
-            {error ? (
-              <p className="admin-form-alert admin-form-alert-wide" role="alert">
-                {error}
-              </p>
-            ) : null}
-            <label>
-              Категория
-              <input onChange={(event) => updateForm("category", event.target.value)} type="text" value={form.category} />
-            </label>
-            <label>
-              Статус
-              <select onChange={(event) => updateForm("status", event.target.value as BlogStatus)} value={form.status}>
-                {blogStatusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Автор
-              <input onChange={(event) => updateForm("author", event.target.value)} type="text" value={form.author} />
-            </label>
-            <label>
-              Дата публикации
-              <input onChange={(event) => updateForm("publishedAt", event.target.value)} type="date" value={form.publishedAt} />
-            </label>
-            <label>
-              Локали
-              <input onChange={(event) => updateForm("locales", event.target.value)} type="text" value={form.locales} />
-            </label>
-            <label>
-              SEO title
-              <input onChange={(event) => updateForm("seoTitle", event.target.value)} type="text" value={form.seoTitle} />
-            </label>
-            <label className="admin-form-wide">
-              Обложка
-              <input onChange={(event) => updateForm("coverImage", event.target.value)} type="text" value={form.coverImage} />
-            </label>
-            <label className="admin-form-wide">
-              Краткое описание
-              <textarea onChange={(event) => updateForm("excerpt", event.target.value)} rows={3} value={form.excerpt} />
-            </label>
-            <label className="admin-form-wide">
-              Текст статьи
-              <textarea onChange={(event) => updateForm("body", event.target.value)} rows={5} value={form.body} />
-            </label>
-            <label className="admin-form-wide">
-              Теги
-              <input onChange={(event) => updateForm("tags", event.target.value)} type="text" value={form.tags} />
-            </label>
-          </div>
-
-          <div className="admin-action-footer">
-            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить статью"}</button>
-            <button className="admin-secondary-button" onClick={onClose} type="button">
-              Отмена
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
-}
-
 function SettingsDialog({
   onClose,
   onSave,
@@ -2796,11 +2270,12 @@ function SettingsDialog({
       emailSender: form.emailSender.trim(),
       googleCalendarId: form.googleCalendarId.trim(),
       googleCalendarMode: form.googleCalendarMode,
+      giftCertificatesEnabled: form.giftCertificatesEnabled,
       reminderTemplate: form.reminderTemplate.trim(),
       rolesPolicy: form.rolesPolicy.trim(),
       stripeMode: form.stripeMode,
       timezone: form.timezone.trim(),
-      updatedAt: "2026-07-07",
+      updatedAt: getSofiaIsoDate(),
       workingDays: form.workingDays.trim(),
       workingHours: form.workingHours.trim(),
     });
@@ -2920,6 +2395,14 @@ function SettingsDialog({
                 ))}
               </select>
             </label>
+            <label className="admin-checkbox-label admin-form-wide">
+              <input
+                checked={form.giftCertificatesEnabled}
+                onChange={(event) => updateForm("giftCertificatesEnabled", event.target.checked)}
+                type="checkbox"
+              />
+              Показывать подарочные сертификаты на публичном сайте
+            </label>
             <label>
               Email отправителя
               <input onChange={(event) => updateForm("emailSender", event.target.value)} type="email" value={form.emailSender} />
@@ -3002,241 +2485,6 @@ function DangerousSettingsDialog({ onClose, onConfirm }: { onClose: () => void; 
           </button>
           <button className="admin-secondary-button" onClick={onClose} type="button">
             Отмена
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function CalendarAppointmentDialog({
-  clients,
-  initialAppointment,
-  onClose,
-  onSave,
-  prefillClient,
-  prefillClientName,
-  prefillDate,
-}: {
-  clients: ClientRecord[];
-  initialAppointment?: Appointment;
-  onClose: () => void;
-  onSave: (appointment: Appointment) => void;
-  prefillClient?: ClientRecord;
-  prefillClientName?: string;
-  prefillDate?: string;
-}) {
-  const [form, setForm] = useState<Appointment>({
-    client: initialAppointment?.client ?? prefillClient?.name ?? prefillClientName ?? "",
-    clientId: initialAppointment?.clientId ?? prefillClient?.id,
-    date: initialAppointment?.date ?? prefillDate ?? "2026-07-06",
-    id: initialAppointment?.id,
-    note: initialAppointment?.note ?? "",
-    service: initialAppointment?.service ?? appointmentServiceOptions[0],
-    status: initialAppointment?.status ?? "Новая заявка",
-    time: initialAppointment?.time ?? "14:00",
-  });
-  const [error, setError] = useState("");
-  const isEditing = Boolean(initialAppointment);
-  const normalizedClientQuery = normalizeSearch(form.client);
-  const clientSuggestions =
-    normalizedClientQuery.length > 0
-      ? clients
-          .filter(
-            (client) =>
-              normalizeSearch(client.name).includes(normalizedClientQuery) ||
-              normalizeSearch(client.phone).includes(normalizedClientQuery) ||
-              normalizeSearch(client.email).includes(normalizedClientQuery),
-          )
-          .filter((client) => normalizeSearch(client.name) !== normalizedClientQuery)
-          .sort((first, second) => first.name.localeCompare(second.name, "ru"))
-          .slice(0, 4)
-      : [];
-
-  function updateForm<Field extends keyof Appointment>(field: Field, value: Appointment[Field]) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setError("");
-  }
-
-  function updateClientInput(value: string) {
-    const linkedClient = findClientByIdentity(clients, value) ?? findUniqueClientByName(clients, value);
-
-    setForm((current) => ({ ...current, client: value, clientId: linkedClient?.id }));
-    setError("");
-  }
-
-  function selectClient(client: ClientRecord) {
-    setForm((current) => ({ ...current, client: client.name, clientId: client.id }));
-    setError("");
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const client = form.client.trim();
-
-    if (!client || !form.date || !form.time) {
-      setError("Укажите клиента, дату и время.");
-      return;
-    }
-
-    const linkedClient = findClientByIdentity(clients, form.clientId) ?? findUniqueClientByName(clients, client);
-
-    onSave({ ...form, client, clientId: linkedClient?.id, note: form.note.trim() });
-    onClose();
-  }
-
-  return (
-    <div className="admin-action-backdrop">
-      <section aria-labelledby="calendar-action-title" aria-modal="true" className="admin-action-dialog" role="dialog">
-        <div className="admin-panel-head">
-          <div>
-            <span className="admin-kicker">Календарь</span>
-            <h2 id="calendar-action-title">{isEditing ? "Редактировать запись" : "Новая запись"}</h2>
-          </div>
-          <button className="admin-icon-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
-        </div>
-
-        <form noValidate onSubmit={handleSubmit}>
-          <div className="admin-action-body">
-            <label>
-              Клиент
-              <input
-                aria-invalid={error && !form.client.trim() ? "true" : undefined}
-                autoComplete="name"
-                onChange={(event) => updateClientInput(event.target.value)}
-                required
-                type="text"
-                value={form.client}
-              />
-            </label>
-            {clientSuggestions.length > 0 ? (
-              <div aria-label="Найденные клиенты" className="admin-client-suggestions" role="listbox">
-                {clientSuggestions.map((client) => (
-                  <button
-                    aria-selected="false"
-                    key={client.id}
-                    onClick={() => selectClient(client)}
-                    role="option"
-                    type="button"
-                  >
-                    <span>{client.name}</span>
-                    <small>
-                      {client.phone} · {client.language.toUpperCase()}
-                    </small>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {error ? (
-              <p className="admin-form-alert" role="alert">
-                {error}
-              </p>
-            ) : null}
-            <label>
-              Услуга
-              <select onChange={(event) => updateForm("service", event.target.value)} value={form.service}>
-                {appointmentServiceOptions.map((service) => (
-                  <option key={service} value={service}>
-                    {service}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Дата
-              <input
-                aria-invalid={error && !form.date ? "true" : undefined}
-                onChange={(event) => updateForm("date", event.target.value)}
-                required
-                type="date"
-                value={form.date}
-              />
-            </label>
-            <label>
-              Время
-              <input
-                aria-invalid={error && !form.time ? "true" : undefined}
-                onChange={(event) => updateForm("time", event.target.value)}
-                required
-                type="time"
-                value={form.time}
-              />
-            </label>
-            <label>
-              Статус
-              <select
-                onChange={(event) => updateForm("status", event.target.value as AppointmentStatus)}
-                value={form.status}
-              >
-                {appointmentStatusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Комментарий к записи
-              <textarea
-                onChange={(event) => updateForm("note", event.target.value)}
-                rows={3}
-                value={form.note}
-              />
-            </label>
-          </div>
-
-          <div className="admin-action-footer">
-            <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить запись"}</button>
-            <button className="admin-secondary-button" onClick={onClose} type="button">
-              Отмена
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
-}
-
-function CalendarAppointmentCancelDialog({
-  appointment,
-  onClose,
-  onConfirm,
-}: {
-  appointment: Appointment;
-  onClose: () => void;
-  onConfirm: (appointment: Appointment) => void;
-}) {
-  return (
-    <div className="admin-action-backdrop">
-      <section aria-labelledby="calendar-cancel-title" aria-modal="true" className="admin-action-dialog" role="dialog">
-        <div className="admin-panel-head">
-          <div>
-            <span className="admin-kicker">Календарь</span>
-            <h2 id="calendar-cancel-title">Отменить запись</h2>
-          </div>
-          <button className="admin-icon-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
-        </div>
-
-        <p className="admin-confirm-copy">
-          Запись клиента <strong>{appointment.client}</strong> на {formatCalendarDay(appointment.date)} в{" "}
-          <strong>{appointment.time}</strong> будет отмечена как отмененная. История останется в календаре.
-        </p>
-        <div className="admin-confirm-summary" aria-label="Запись для отмены">
-          <span>{appointment.service}</span>
-          <span className={statusClass(appointment.status)}>{appointment.status}</span>
-        </div>
-
-        <div className="admin-action-footer">
-          <button className="admin-danger-action" onClick={() => onConfirm(appointment)} type="button">
-            Подтвердить отмену
-          </button>
-          <button className="admin-secondary-button" onClick={onClose} type="button">
-            Оставить запись
           </button>
         </div>
       </section>
@@ -3363,6 +2611,7 @@ function ClientDetailCard({
   onClose,
   onEditClient,
   onIssueCertificate,
+  onSaveAppointment,
   onSaveNote,
   role,
 }: {
@@ -3373,6 +2622,7 @@ function ClientDetailCard({
   onClose: () => void;
   onEditClient: (client: ClientRecord) => void;
   onIssueCertificate: (client: ClientRecord) => void;
+  onSaveAppointment: (appointment: Appointment) => Promise<CalendarAppointmentSaveResult>;
   onSaveNote: (clientId: string, note: string) => void;
   role: AdminRoleId;
 }) {
@@ -3380,6 +2630,8 @@ function ClientDetailCard({
   const [activeFeedFilter, setActiveFeedFilter] = useState<ClientFeedFilterId>("all");
   const [draftNote, setDraftNote] = useState(client.note);
   const [saveNotice, setSaveNotice] = useState("");
+  const [editingVisitKey, setEditingVisitKey] = useState("");
+  const [isVisitCommentDirty, setIsVisitCommentDirty] = useState(false);
   const clientInitials = client.name
     .split(/\s+/)
     .map((part) => part[0])
@@ -3420,18 +2672,13 @@ function ClientDetailCard({
   }
 
   return (
-    <AdminDrawer
-      ariaLabel="Карточка клиента"
-      className="admin-client-card"
-      hasUnsavedChanges={isEditingNote && draftNote.trim() !== client.note.trim()}
+    <ClientDetail
+      client={client}
+      hasUnsavedChanges={
+        (isEditingNote && draftNote.trim() !== client.note.trim()) || isVisitCommentDirty
+      }
       onClose={onClose}
     >
-      <AdminDrawerHeader kicker="Карточка клиента" onClose={onClose} title={client.name} titleId="admin-client-card-title">
-        <p>
-          {client.language.toUpperCase()} · {client.status}
-        </p>
-      </AdminDrawerHeader>
-      <AdminDrawerBody>
         <AdminDrawerSection title="Профиль и статус">
           <div className="admin-client-profile-head">
             <span className="admin-client-avatar" aria-hidden="true">
@@ -3446,20 +2693,7 @@ function ClientDetailCard({
         </AdminDrawerSection>
 
         <AdminDrawerSection title="Контактные данные">
-          <dl className="admin-client-contact-list">
-            <div>
-              <dt>Телефон</dt>
-              <dd className="admin-tabular">{client.phone || "Не указан"}</dd>
-            </div>
-            <div>
-              <dt>Email</dt>
-              <dd>{client.email || "Не указан"}</dd>
-            </div>
-            <div>
-              <dt>Канал связи</dt>
-              <dd>{client.preferredContact || "Не указан"}</dd>
-            </div>
-          </dl>
+          <ClientContacts client={client} />
         </AdminDrawerSection>
 
         <AdminDrawerSection title="Быстрые действия">
@@ -3508,7 +2742,7 @@ function ClientDetailCard({
           </div>
         </AdminDrawerSection>
 
-      <section className="admin-client-section admin-client-next-action" aria-label="Следующее действие клиента">
+      <AdminDrawerSection ariaLabel="Следующее действие клиента" className="admin-client-next-action">
         <div className="admin-client-next-action-copy">
           <span className="admin-feed-type">{nextClientAction.typeLabel}</span>
           <h3>{nextClientAction.title}</h3>
@@ -3522,9 +2756,9 @@ function ClientDetailCard({
         >
           {nextClientAction.ctaLabel}
         </Link>
-      </section>
+      </AdminDrawerSection>
 
-      <section className="admin-client-section admin-client-work-profile" aria-label="Рабочий профиль клиента">
+      <AdminDrawerSection ariaLabel="Рабочий профиль клиента" className="admin-client-work-profile">
         <div className="admin-client-section-head">
           <h3>Рабочий профиль</h3>
           <span className={statusClass(client.status)}>{client.status}</span>
@@ -3571,9 +2805,9 @@ function ClientDetailCard({
             Все сертификаты клиента
           </Link>
         </div>
-      </section>
+      </AdminDrawerSection>
 
-      <section className="admin-client-section admin-client-activity-feed" aria-label="Рабочая лента клиента">
+      <AdminDrawerSection ariaLabel="Рабочая лента клиента" className="admin-client-activity-feed">
         <div className="admin-client-section-head">
           <h3>Рабочая лента</h3>
           <div className="admin-client-feed-filters" aria-label="Фильтры рабочей ленты клиента">
@@ -3601,6 +2835,7 @@ function ClientDetailCard({
                       <div>
                         <strong>{visit.service}</strong>
                         <span>{visit.date}</span>
+                        {linkedAppointment?.postVisitComment ? <small>{linkedAppointment.postVisitComment}</small> : null}
                       </div>
                       <span className={statusClass(visit.status)}>{visit.status}</span>
                       {linkedAppointment ? (
@@ -3654,9 +2889,9 @@ function ClientDetailCard({
         ) : (
           <p>В этом фильтре пока нет записей.</p>
         )}
-      </section>
+      </AdminDrawerSection>
 
-      <section className="admin-client-section admin-client-next-appointment" aria-label="Ближайшая запись клиента">
+      <AdminDrawerSection ariaLabel="Ближайшая запись клиента" className="admin-client-next-appointment">
         <div className="admin-client-section-head">
           <h3>Ближайшая запись</h3>
           {nextAppointment ? <span className={statusClass(nextAppointment.status)}>{nextAppointment.status}</span> : null}
@@ -3677,40 +2912,24 @@ function ClientDetailCard({
         ) : (
           <p>В календаре пока нет записи для этого клиента.</p>
         )}
-      </section>
+      </AdminDrawerSection>
 
-      <section className="admin-client-section">
-        <h3>История визитов</h3>
-        <ol className="admin-client-history">
-          {client.history.map((visit) => {
-                  const linkedAppointment = findClientVisitAppointment(visit, appointments);
+      <AdminDrawerSection title="История визитов">
+        <ClientVisitHistory
+          clientId={client.id}
+          editingVisitKey={editingVisitKey}
+          items={client.history.map((visit) => ({
+            appointment: findClientVisitAppointment(visit, appointments),
+            visit,
+          }))}
+          onCommentDirtyChange={setIsVisitCommentDirty}
+          onEditVisit={setEditingVisitKey}
+          onSaveComment={onSaveAppointment}
+          role={role}
+        />
+      </AdminDrawerSection>
 
-            return (
-              <li key={`${visit.date}-${visit.service}`}>
-                <div>
-                  <strong>{visit.service}</strong>
-                  <span>{visit.date}</span>
-                </div>
-                <span className="admin-client-history-actions">
-                  <span className={statusClass(visit.status)}>{visit.status}</span>
-                  {linkedAppointment ? (
-                    <Link
-                      aria-label={`Открыть запись ${visit.date}`}
-                      className="admin-client-inline-link"
-                      href={calendarAppointmentHref(linkedAppointment, role, client.id)}
-                    >
-                      Открыть запись
-                    </Link>
-                  ) : null}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
-
-      <section className="admin-client-section">
-        <h3>Сертификаты</h3>
+      <AdminDrawerSection title="Сертификаты">
         {certificates.length > 0 ? (
           <ul className="admin-client-certificates">
             {certificates.map((certificate) => (
@@ -3733,51 +2952,28 @@ function ClientDetailCard({
         ) : (
           <p>Сертификатов пока нет.</p>
         )}
-      </section>
+      </AdminDrawerSection>
 
-      <section className="admin-client-section">
-        <div className="admin-client-section-head">
-          <h3>Заметки</h3>
-          {isEditingNote ? null : (
-            <button className="admin-outline-action" onClick={startNoteEdit} type="button">
-              Редактировать заметку
-            </button>
-          )}
-        </div>
-        {isEditingNote ? (
-          <form className="admin-client-note-form" onSubmit={handleNoteSubmit}>
-            <label htmlFor="admin-client-note-editor">Заметка клиента</label>
-            <textarea
-              id="admin-client-note-editor"
-              onChange={(event) => setDraftNote(event.target.value)}
-              rows={5}
-              value={draftNote}
-            />
-            <div className="admin-client-note-actions">
-              <button className="admin-text-action" type="submit">
-                Сохранить заметку
-              </button>
-              <button className="admin-outline-action" onClick={cancelNoteEdit} type="button">
-                Отмена
-              </button>
-            </div>
-          </form>
-        ) : (
-          <p>{client.note || "Заметка пока пустая."}</p>
-        )}
-        {saveNotice ? (
-          <p className="admin-client-save-notice" role="status">
-            {saveNotice}
-          </p>
-        ) : null}
+      <AdminDrawerSection>
+        <ClientNotes
+          draftNote={draftNote}
+          isEditing={isEditingNote}
+          note={client.note}
+          onCancel={cancelNoteEdit}
+          onChange={setDraftNote}
+          onEdit={startNoteEdit}
+          onSubmit={handleNoteSubmit}
+          saveNotice={saveNotice}
+        />
+      </AdminDrawerSection>
+      <AdminDrawerSection title="Теги">
         <div className="admin-client-tags" aria-label="Теги клиента">
           {client.tags.map((tag) => (
             <span key={tag}>{tag}</span>
           ))}
         </div>
-      </section>
-      </AdminDrawerBody>
-    </AdminDrawer>
+      </AdminDrawerSection>
+    </ClientDetail>
   );
 }
 
@@ -3789,6 +2985,7 @@ function ClientsWorkspace({
   onCalendarCreateIntent,
   onCloseClientCreate,
   onSaveCertificate,
+  onSaveAppointment,
   onSaveClient,
   onSaveClientNote,
   query,
@@ -3802,6 +2999,11 @@ function ClientsWorkspace({
   onCalendarCreateIntent: () => void;
   onCloseClientCreate: () => void;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
+  onSaveAppointment: (
+    appointment: Appointment,
+    action?: AdminAuditAction,
+    originalAppointment?: Appointment,
+  ) => Promise<CalendarAppointmentSaveResult>;
   onSaveClient: (client: ClientRecord, originalClientIdentity?: string) => void;
   onSaveClientNote: (clientIdentity: string, note: string) => void;
   query: string;
@@ -3876,7 +3078,20 @@ function ClientsWorkspace({
   }
 
   if (!selectedClient) {
-    return <EmptyState label="Клиенты не найдены." />;
+    return (
+      <>
+        <EmptyState label="Клиенты не найдены." />
+        {isClientFormOpen ? (
+          <ClientForm
+            clients={clients}
+            key="client-form-new"
+            onClose={closeClientForm}
+            onSave={saveClientForm}
+            role={role}
+          />
+        ) : null}
+      </>
+    );
   }
 
   return (
@@ -3965,21 +3180,22 @@ function ClientsWorkspace({
         <ClientDetailCard
           appointments={selectedClientAppointments}
           certificates={selectedClientCertificates}
-          key={selectedClient.id}
+          key={`client-detail-${selectedClient.id}`}
           client={selectedClient}
           onCalendarCreateIntent={onCalendarCreateIntent}
           onClose={() => setIsClientDrawerOpen(false)}
           onEditClient={openClientEdit}
           onIssueCertificate={openClientCertificateDraft}
+          onSaveAppointment={(appointment) => onSaveAppointment(appointment, "appointment.post_visit_comment")}
           onSaveNote={onSaveClientNote}
           role={role}
         />
       ) : null}
       {isClientFormOpen ? (
-          <ClientFormDialog
+          <ClientForm
             clients={clients}
             initialClient={editingClient}
-            key={editingClient?.id ?? "new-client"}
+            key={editingClient ? `client-form-${editingClient.id}` : "client-form-new"}
             onClose={closeClientForm}
             onSave={saveClientForm}
             role={role}
@@ -3995,96 +3211,6 @@ function ClientsWorkspace({
         />
       ) : null}
     </div>
-  );
-}
-
-function AppointmentDetailDrawer({
-  appointment,
-  appointmentClient,
-  onCancelAppointment,
-  onClose,
-  onEditAppointment,
-  role,
-}: {
-  appointment: Appointment;
-  appointmentClient?: ClientRecord;
-  onCancelAppointment: (appointment: Appointment) => void;
-  onClose: () => void;
-  onEditAppointment: (appointment: Appointment) => void;
-  role: AdminRoleId;
-}) {
-  return (
-    <AdminDrawer ariaLabel="Детали выбранной записи" className="admin-detail-panel admin-appointment-drawer" onClose={onClose}>
-      <AdminDrawerHeader kicker="Детали записи" onClose={onClose} title={appointment.client} titleId="admin-appointment-drawer-title" />
-      <AdminDrawerBody>
-        <AdminDrawerSection title="Запись">
-          <div className="admin-detail-actions">
-            {appointmentClient ? (
-              <Link className="admin-outline-action" href={clientProfileHref(appointmentClient.id, role)}>
-                Открыть клиента
-              </Link>
-            ) : null}
-            <button className="admin-text-action" onClick={() => onEditAppointment(appointment)} type="button">
-              Редактировать
-            </button>
-            {appointment.status === "Отменена" ? null : (
-              <button className="admin-danger-button" onClick={() => onCancelAppointment(appointment)} type="button">
-                Отменить
-              </button>
-            )}
-          </div>
-          <dl className="admin-detail-list">
-            <div>
-              <dt>Дата</dt>
-              <dd>{formatCalendarDay(appointment.date)}</dd>
-            </div>
-            <div>
-              <dt>Услуга</dt>
-              <dd>{appointment.service}</dd>
-            </div>
-            <div>
-              <dt>Статус</dt>
-              <dd>
-                <span className={statusClass(appointment.status)}>{appointment.status}</span>
-              </dd>
-            </div>
-            <div>
-              <dt>Время</dt>
-              <dd>{appointment.time}</dd>
-            </div>
-            <div>
-              <dt>Комментарий</dt>
-              <dd>{appointment.note || "Комментарий к записи пока пуст."}</dd>
-            </div>
-          </dl>
-        </AdminDrawerSection>
-        {appointmentClient ? (
-          <AdminDrawerSection title="Связанные действия">
-            <section className="admin-linked-client-actions" aria-label="Связанные действия клиента">
-              <div className="admin-client-section-head">
-                <h3>Клиентская работа</h3>
-                <span className={statusClass(appointmentClient.status)}>{appointmentClient.status}</span>
-              </div>
-              <p>Быстрые переходы к клиентской работе по этой записи.</p>
-              <div className="admin-client-next-actions">
-                <Link className="admin-client-inline-link" href={clientProfileHref(appointmentClient.id, role)}>
-                  Карточка клиента
-                </Link>
-                <Link className="admin-client-inline-link" href={calendarClientHref(appointmentClient.id, role)}>
-                  Все записи клиента
-                </Link>
-                <Link className="admin-client-inline-link" href={certificateClientHref(appointmentClient.id, role)}>
-                  Все сертификаты клиента
-                </Link>
-                <Link className="admin-client-inline-link" href={calendarCreateHref(appointmentClient.id, role)}>
-                  Записать снова
-                </Link>
-              </div>
-            </section>
-          </AdminDrawerSection>
-        ) : null}
-      </AdminDrawerBody>
-    </AdminDrawer>
   );
 }
 
@@ -4506,6 +3632,7 @@ function ServicesWorkspace({
 
   function openServiceEdit(service: ServiceRecord) {
     onCloseServiceCreate();
+    setIsServiceDrawerOpen(false);
     setEditingService(service);
   }
 
@@ -4529,11 +3656,12 @@ function ServicesWorkspace({
         </div>
         <EmptyState label="Услуги пока не заведены." />
         {isServiceFormOpen ? (
-          <ServiceFormDialog
+          <ServiceEditor
             initialService={editingService}
             key={editingService?.slug ?? "new-service"}
             onClose={closeServiceForm}
             onSave={saveServiceForm}
+            suggestedOrder={services.length + 1}
           />
         ) : null}
       </section>
@@ -4564,36 +3692,13 @@ function ServicesWorkspace({
           </div>
         </div>
 
-        <div className="admin-table-scroll">
-          <table className="admin-data-table">
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th>Slug</th>
-                <th>Категория</th>
-                <th>Длительность</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredServices.map((service) => (
-                <tr aria-selected={isServiceDrawerOpen && service.slug === selectedService.slug} key={service.slug}>
-                  <td>
-                    <Link className="admin-row-action admin-row-link" href={serviceDetailHref(service.slug, role)} onClick={() => openService(service)}>
-                      {service.name}
-                    </Link>
-                  </td>
-                  <td className="admin-tabular">{service.slug}</td>
-                  <td>{service.category}</td>
-                  <td>{service.duration}</td>
-                  <td>
-                    <span className={statusClass(service.status)}>{service.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ServiceList
+          onOpen={openService}
+          onSave={onSaveService}
+          role={role}
+          selectedSlug={isServiceDrawerOpen ? selectedService.slug : undefined}
+          services={filteredServices}
+        />
         {filteredServices.length === 0 ? <EmptyState label="Услуги не найдены." /> : null}
       </section>
 
@@ -4668,11 +3773,12 @@ function ServicesWorkspace({
       ) : null}
 
       {isServiceFormOpen ? (
-        <ServiceFormDialog
+        <ServiceEditor
           initialService={editingService}
           key={editingService?.slug ?? "new-service"}
           onClose={closeServiceForm}
           onSave={saveServiceForm}
+          suggestedOrder={services.length + 1}
         />
       ) : null}
     </div>
@@ -4887,359 +3993,6 @@ function PriceWorkspace({
   );
 }
 
-function CalendarWorkspace({
-  appointments,
-  bookingBufferMinutes,
-  clients,
-  dailySlotCapacity,
-  onCancelAppointment,
-  onCalendarDateChange,
-  onEditAppointment,
-  query,
-  role,
-  selectedAppointmentFocus,
-  selectedCalendarDate,
-  selectedClientName,
-}: {
-  appointments: Appointment[];
-  bookingBufferMinutes: number;
-  clients: ClientRecord[];
-  dailySlotCapacity: number;
-  onCancelAppointment: (appointment: Appointment) => void;
-  onCalendarDateChange: (date: string) => void;
-  onEditAppointment: (appointment: Appointment) => void;
-  query: string;
-  role: AdminRoleId;
-  selectedAppointmentFocus?: CalendarAppointmentFocus;
-  selectedCalendarDate?: string;
-  selectedClientName?: string;
-}) {
-  const selectedClientFilter = findClientByIdentity(clients, selectedClientName);
-  const selectedClientFilterName = selectedClientFilter?.name;
-  const clientScopedAppointments = selectedClientFilterName
-    ? appointments.filter((appointment) => appointmentBelongsToClient(appointment, selectedClientFilter, clients))
-    : appointments;
-  const fallbackAppointment = appointments[0] ?? {
-    client: "Нет записи",
-    date: "2026-07-06",
-    note: "",
-    service: "Не выбрано",
-    status: "Новая заявка" as const,
-    time: "00:00",
-  };
-  const filteredAppointments = clientScopedAppointments.filter((appointment) =>
-    matchesSearch([appointment.date, appointment.time, appointment.client, appointment.service, appointment.status, appointment.note], query),
-  );
-  const initialSelectedDate =
-    selectedAppointmentFocus?.date ??
-    (isCalendarMonthDate(selectedCalendarDate) ? selectedCalendarDate : (sortAppointments(filteredAppointments)[0]?.date ?? "2026-07-06"));
-  const initialSelectedAppointment = selectedAppointmentFocus
-    ? filteredAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentFocus.appointmentKey)
-    : isCalendarMonthDate(selectedCalendarDate)
-      ? filteredAppointments.find((appointment) => appointment.date === initialSelectedDate)
-      : filteredAppointments[0];
-  const [mode, setMode] = useState<CalendarMode>("day");
-  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
-  const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(Boolean(selectedAppointmentFocus));
-  const [selectedKey, setSelectedKey] = useState(
-    () => selectedAppointmentFocus?.appointmentKey ?? appointmentKey(initialSelectedAppointment ?? fallbackAppointment),
-  );
-  const selectedDayAppointments = sortAppointments(filteredAppointments.filter((appointment) => appointment.date === selectedDate));
-  const listAppointments = sortAppointments(filteredAppointments);
-  const visibleAppointments = mode === "day" ? selectedDayAppointments : listAppointments;
-  const appointmentDetailPool = mode === "day" ? selectedDayAppointments : listAppointments;
-  const hasVisibleAppointments = visibleAppointments.length > 0;
-  const selectedAppointment =
-    hasVisibleAppointments
-      ? (appointmentDetailPool.find((appointment) => appointmentKey(appointment) === selectedKey) ??
-        appointmentDetailPool[0] ??
-        fallbackAppointment)
-      : fallbackAppointment;
-  const selectedAppointmentKey = hasVisibleAppointments ? appointmentKey(selectedAppointment) : "";
-  const calendarHeading = calendarHeadingLabel(mode, selectedDate);
-  const selectedAppointmentClient = findAppointmentClient(clients, selectedAppointment);
-  const shouldShowAppointmentDrawer = isAppointmentDrawerOpen && mode !== "month" && hasVisibleAppointments;
-  const weekDays = calendarMonthDays.slice(5, 12);
-  const selectedDayFreeCount = freeSlotCount(selectedDayAppointments.length, dailySlotCapacity);
-  const confirmedListCount = listAppointments.filter((appointment) => appointment.status === "Подтверждена").length;
-  const attentionListCount = listAppointments.filter((appointment) => appointment.status !== "Подтверждена" && appointment.status !== "Отменена").length;
-
-  function switchMode(nextMode: CalendarMode) {
-    setMode(nextMode);
-    setIsAppointmentDrawerOpen(false);
-  }
-
-  function selectAppointment(appointment: Appointment) {
-    onCalendarDateChange(appointment.date);
-    setSelectedDate(appointment.date);
-    setSelectedKey(appointmentKey(appointment));
-    setIsAppointmentDrawerOpen(true);
-  }
-
-  function selectDate(date: string, appointments: Appointment[], nextMode: CalendarMode = mode) {
-    onCalendarDateChange(date);
-    setSelectedDate(date);
-    setMode(nextMode);
-    setIsAppointmentDrawerOpen(false);
-
-    if (appointments[0]) {
-      setSelectedKey(appointmentKey(appointments[0]));
-    } else {
-      setSelectedKey("");
-    }
-  }
-
-  return (
-    <div className="admin-split-view admin-calendar-workspace">
-      <section className="admin-panel admin-calendar-panel" aria-labelledby="calendar-heading">
-        <div className="admin-panel-head">
-          <h2 id="calendar-heading">{calendarHeading}</h2>
-          <div className="admin-filter-row" aria-label="Режимы календаря">
-            {calendarModes.map((calendarMode) => (
-              <button
-                aria-pressed={mode === calendarMode.id}
-                key={calendarMode.id}
-                onClick={() => switchMode(calendarMode.id)}
-                type="button"
-              >
-                {calendarMode.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {selectedClientFilterName ? (
-          <div className="admin-route-context" aria-label="Фильтр календаря по клиенту">
-            <div>
-              <strong>Показаны записи клиента {selectedClientFilterName}</strong>
-              <span>Календарь открыт на ближайшей записи клиента, список и месяц тоже считаются только по нему.</span>
-            </div>
-            <div className="admin-route-context-actions">
-              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilter.id, role)}>
-                Открыть карточку клиента
-              </Link>
-              <Link className="admin-client-inline-link" href={adminSectionHref("calendar", role)}>
-                Сбросить фильтр
-              </Link>
-            </div>
-          </div>
-        ) : null}
-
-        {mode === "month" ? (
-          <>
-            <div className="admin-calendar-month-grid" role="grid" aria-label={`Месяц ${calendarMonthLabel}`}>
-              {calendarWeekdayLabels.map((weekday) => (
-                <span className="admin-calendar-weekday" key={weekday} role="columnheader">
-                  {weekday}
-                </span>
-              ))}
-              {Array.from({ length: calendarLeadingBlankDays }, (_, index) => (
-                <span aria-hidden="true" className="admin-calendar-month-cell admin-calendar-month-cell-empty" key={`blank-${index}`} role="gridcell" />
-              ))}
-              {calendarMonthDays.map((day) => {
-                const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
-                const countLabel = appointmentCountLabel(dayAppointments.length);
-                const freeCount = freeSlotCount(dayAppointments.length, dailySlotCapacity);
-                const freeLabel = freeSlotLabel(freeCount);
-                const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
-                const compactFreeLabel = compactFreeSlotLabel(freeCount);
-
-                return (
-                  <span className="admin-calendar-month-cell" key={day.date} role="gridcell">
-                    <button
-                      aria-label={`${day.day} июля, ${countLabel}, ${freeLabel}`}
-                      aria-pressed={selectedDate === day.date}
-                      className="admin-calendar-day-button"
-                      onClick={() => selectDate(day.date, dayAppointments, "day")}
-                      type="button"
-                    >
-                      <strong>{day.day}</strong>
-                      <small>
-                        <span className="admin-month-count-full">{countLabel}</span>
-                        <span className="admin-month-count-compact">{compactCountLabel}</span>
-                        <span className="admin-month-free-full">{freeLabel}</span>
-                        <span className="admin-month-free-compact">{compactFreeLabel}</span>
-                      </small>
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-            <div className="admin-calendar-context-note" aria-label="План месяца">
-              <div>
-                <span className="admin-kicker">План месяца</span>
-                <p>
-                  В ячейках месяца показаны только количество записей и свободные слоты. Нажатие на день открывает дневной режим.
-                </p>
-              </div>
-              <dl className="admin-detail-list">
-                <div>
-                  <dt>Расчет слотов</dt>
-                  <dd>{slotCountLabel(dailySlotCapacity)} в день</dd>
-                </div>
-                <div>
-                  <dt>Буфер между сеансами</dt>
-                  <dd>{bookingBufferMinutes} минут, Настройки → Запись</dd>
-                </div>
-              </dl>
-            </div>
-          </>
-        ) : mode === "week" ? (
-          <div className="admin-calendar-week-grid" role="grid" aria-label={calendarWeekLabel}>
-            {weekDays.map((day) => {
-              const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
-              const countLabel = appointmentCountLabel(dayAppointments.length);
-              const freeCount = freeSlotCount(dayAppointments.length, dailySlotCapacity);
-              const freeLabel = freeSlotLabel(freeCount);
-              const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
-              const compactFreeLabel = compactFreeSlotLabel(freeCount);
-
-              return (
-                <section className="admin-calendar-week-day" key={day.date} role="gridcell">
-                  <button
-                    aria-label={`${formatCalendarShortDay(day.date)}, ${countLabel}, ${freeLabel}`}
-                    className="admin-week-day-head"
-                    onClick={() => selectDate(day.date, dayAppointments, "day")}
-                    type="button"
-                  >
-                    <strong className="admin-week-day-date">{formatCalendarShortDay(day.date)}</strong>
-                    <span className="admin-week-day-stats">
-                      <span>{compactCountLabel}</span>
-                      <span>{compactFreeLabel}</span>
-                    </span>
-                  </button>
-                  <div className="admin-week-appointment-list">
-                    {dayAppointments.length > 0 ? (
-                      dayAppointments.map((appointment) => {
-                        const key = appointmentKey(appointment);
-
-                        return (
-                          <button
-                            aria-pressed={key === selectedAppointmentKey}
-                            className="admin-week-appointment"
-                            key={key}
-                            onClick={() => selectAppointment(appointment)}
-                            type="button"
-                          >
-                            <span className="admin-week-appointment-main">
-                              <time className="admin-tabular">{appointment.time}</time>
-                              <strong>{appointment.client}</strong>
-                            </span>
-                            <span className="admin-week-appointment-service">{appointment.service}</span>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <span className="admin-week-empty">Свободно</span>
-                    )}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        ) : mode === "day" ? (
-          <>
-            <div className="admin-day-summary" aria-label={`Сводка дня ${formatCalendarDay(selectedDate)}`}>
-              <div className="admin-day-summary-card">
-                <span>Записи</span>
-                <strong>{appointmentCountLabel(selectedDayAppointments.length)}</strong>
-              </div>
-              <div className="admin-day-summary-card">
-                <span>Свободно</span>
-                <strong>{freeSlotLabel(selectedDayFreeCount)}</strong>
-              </div>
-              <div className="admin-day-summary-card">
-                <span>Буфер</span>
-                <strong>{bookingBufferMinutes} минут</strong>
-              </div>
-            </div>
-            <div className="admin-day-timeline" aria-label="Таймлайн дня" role="list">
-              {selectedDayAppointments.map((appointment) => {
-                const key = appointmentKey(appointment);
-
-                return (
-                  <div className="admin-day-timeline-row" key={key} role="listitem">
-                    <div className="admin-day-time-rail">
-                      <time className="admin-tabular">{appointment.time}</time>
-                      <span>Буфер после сеанса: {bookingBufferMinutes} минут</span>
-                    </div>
-                    <button
-                      aria-pressed={key === selectedAppointmentKey}
-                      className="admin-day-appointment-card"
-                      onClick={() => selectAppointment(appointment)}
-                      type="button"
-                    >
-                      <span className="admin-day-appointment-head">
-                        <strong>{appointment.client}</strong>
-                        <span className={statusClass(appointment.status)}>{appointment.status}</span>
-                      </span>
-                      <span className="admin-day-appointment-service">{appointment.service}</span>
-                      {appointment.note ? <span className="admin-day-appointment-note">{appointment.note}</span> : null}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="admin-appointment-summary" aria-label="Сводка списка записей">
-              <div className="admin-appointment-summary-card">
-                <span>Всего записей</span>
-                <strong>{listAppointments.length}</strong>
-              </div>
-              <div className="admin-appointment-summary-card">
-                <span>Подтверждены</span>
-                <strong>{confirmedListCount}</strong>
-              </div>
-              <div className="admin-appointment-summary-card">
-                <span>Требуют внимания</span>
-                <strong>{attentionListCount}</strong>
-              </div>
-            </div>
-            <div className="admin-appointment-feed" aria-label="Лента всех записей">
-              {listAppointments.map((appointment) => {
-                const key = appointmentKey(appointment);
-
-                return (
-                  <button
-                    aria-pressed={key === selectedAppointmentKey}
-                    className="admin-calendar-item admin-appointment-feed-item"
-                    key={key}
-                    onClick={() => selectAppointment(appointment)}
-                    type="button"
-                  >
-                    <time className="admin-tabular">{appointment.time}</time>
-                    <span className="admin-appointment-feed-main">
-                      <strong>{appointment.client}</strong>
-                      <small>
-                        {formatCalendarDay(appointment.date)} · {appointment.service}
-                      </small>
-                      {appointment.note ? <small>{appointment.note}</small> : null}
-                    </span>
-                    <span className={statusClass(appointment.status)}>{appointment.status}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-        {mode !== "month" && mode !== "week" && visibleAppointments.length === 0 ? <EmptyState label="Записи не найдены." /> : null}
-      </section>
-
-      {shouldShowAppointmentDrawer ? (
-        <AppointmentDetailDrawer
-          appointment={selectedAppointment}
-          appointmentClient={selectedAppointmentClient}
-          onCancelAppointment={onCancelAppointment}
-          onClose={() => setIsAppointmentDrawerOpen(false)}
-          onEditAppointment={onEditAppointment}
-          role={role}
-        />
-      ) : null}
-    </div>
-  );
-}
-
 function FinanceWorkspace({ financeRows, query }: { financeRows: FinanceRow[]; query: string }) {
   const [exportNotice, setExportNotice] = useState("");
   const [periodStart, setPeriodStart] = useState("2026-07-01");
@@ -5412,7 +4165,7 @@ function MediaWorkspace({
   isMediaCreateOpen: boolean;
   media: MediaRecord[];
   onCloseMediaCreate: () => void;
-  onSaveMedia: (media: MediaRecord, originalId?: string) => void;
+  onSaveMedia: (media: MediaRecord, originalId?: string, cleanupPath?: string) => Promise<void>;
   query: string;
   role: AdminRoleId;
   selectedMediaId?: string;
@@ -5421,7 +4174,10 @@ function MediaWorkspace({
   const [selectedId, setSelectedId] = useState(initialSelectedMedia?.id ?? media[0]?.id ?? "");
   const [isMediaDrawerOpen, setIsMediaDrawerOpen] = useState(Boolean(initialSelectedMedia));
   const [editingMedia, setEditingMedia] = useState<MediaRecord | undefined>();
-  const [filter, setFilter] = useState<"all" | "photo" | "documents" | "needsAlt">("all");
+  const [replacementPlacement, setReplacementPlacement] = useState<MediaPlacementRecord>();
+  const [folderFilter, setFolderFilter] = useState("all");
+  const [filter, setFilter] = useState<"all" | "photo" | "documents" | "needsAlt" | "used" | "unused">("all");
+  const mediaFolders = Array.from(new Set(media.map((item) => item.folder))).sort();
   const filteredMedia = media
     .filter((item) => {
       if (filter === "photo") {
@@ -5436,8 +4192,12 @@ function MediaWorkspace({
         return item.status === "Требует alt";
       }
 
+      if (filter === "used") return (item.placements?.length ?? item.usage.length) > 0;
+      if (filter === "unused") return (item.placements?.length ?? item.usage.length) === 0;
+
       return true;
     })
+    .filter((item) => folderFilter === "all" || item.folder === folderFilter)
     .filter((item) =>
       matchesSearch(
         [item.name, item.url, item.folder, item.type, item.status, item.altText, item.size, item.dimensions, item.usage.join(" ")],
@@ -5467,8 +4227,8 @@ function MediaWorkspace({
     onCloseMediaCreate();
   }
 
-  function saveMediaForm(item: MediaRecord, originalId?: string) {
-    onSaveMedia(item, originalId);
+  async function saveMediaForm(item: MediaRecord, originalId?: string, cleanupPath?: string) {
+    await onSaveMedia(item, originalId, cleanupPath);
     setSelectedId(item.id);
     setIsMediaDrawerOpen(true);
     closeMediaForm();
@@ -5514,40 +4274,28 @@ function MediaWorkspace({
             <button aria-pressed={filter === "needsAlt"} onClick={() => setFilter("needsAlt")} type="button">
               Требует alt
             </button>
+            <button aria-pressed={filter === "used"} onClick={() => setFilter("used")} type="button">
+              Используется
+            </button>
+            <button aria-pressed={filter === "unused"} onClick={() => setFilter("unused")} type="button">
+              Не используется
+            </button>
+            <label className="admin-inline-filter">
+              Папка
+              <select onChange={(event) => setFolderFilter(event.target.value)} value={folderFilter}>
+                <option value="all">Все</option>
+                {mediaFolders.map((folder) => <option key={folder}>{folder}</option>)}
+              </select>
+            </label>
           </div>
         </div>
 
-        <div className="admin-table-scroll">
-          <table className="admin-data-table">
-            <thead>
-              <tr>
-                <th>Файл</th>
-                <th>Папка</th>
-                <th>Тип</th>
-                <th>Статус</th>
-                <th>Использование</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMedia.map((item) => (
-                <tr aria-selected={isMediaDrawerOpen && item.id === selectedMedia.id} key={item.id}>
-                  <td>
-                    <Link className="admin-row-action admin-row-link" href={mediaDetailHref(item.id, role)} onClick={() => openMedia(item)}>
-                      {item.name}
-                    </Link>
-                  </td>
-                  <td>{item.folder}</td>
-                  <td>{item.type}</td>
-                  <td>
-                    <span className={statusClass(item.status)}>{item.status}</span>
-                  </td>
-                  <td>{item.usage[0] ?? "Не используется"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {filteredMedia.length === 0 ? <EmptyState label="Медиа не найдены." /> : null}
+        <MediaGrid
+          assets={filteredMedia}
+          getAssetHref={(item) => mediaDetailHref(item.id, role)}
+          onSelect={openMedia}
+          selectedAssetId={isMediaDrawerOpen ? selectedMedia.id : undefined}
+        />
       </section>
 
       {isMediaDrawerOpen ? (
@@ -5558,77 +4306,25 @@ function MediaWorkspace({
           subtitle={`${selectedMedia.type} · ${selectedMedia.status}`}
           title={selectedMedia.name}
         >
-        <div className="admin-detail-heading">
-          <div className="admin-detail-actions">
-            <button className="admin-text-action" onClick={() => openMediaEdit(selectedMedia)} type="button">
-              Редактировать
-            </button>
-          </div>
-        </div>
-
-        <div className="admin-media-preview">
-          {selectedMedia.type === "Фото" ? (
-            <Image
-              alt={selectedMedia.altText || selectedMedia.name}
-              fill
-              key={selectedMedia.url}
-              priority
-              sizes="340px"
-              src={selectedMedia.url}
-              unoptimized
-            />
-          ) : null}
-          <span>{selectedMedia.type}</span>
-        </div>
-
-        <dl className="admin-detail-list">
-          <div>
-            <dt>URL</dt>
-            <dd>{selectedMedia.url}</dd>
-          </div>
-          <div>
-            <dt>Alt-текст</dt>
-            <dd>{selectedMedia.altText || "Alt-текст нужно заполнить перед публикацией."}</dd>
-          </div>
-          <div>
-            <dt>Статус</dt>
-            <dd>
-              <span className={statusClass(selectedMedia.status)}>{selectedMedia.status}</span>
-            </dd>
-          </div>
-          <div>
-            <dt>Папка</dt>
-            <dd>{selectedMedia.folder}</dd>
-          </div>
-          <div>
-            <dt>Размер</dt>
-            <dd>{selectedMedia.size || "Не указан"}</dd>
-          </div>
-          <div>
-            <dt>Разрешение</dt>
-            <dd>{selectedMedia.dimensions || "Не указано"}</dd>
-          </div>
-          <div>
-            <dt>Загружено</dt>
-            <dd>{selectedMedia.uploadedAt}</dd>
-          </div>
-        </dl>
-
-        <section className="admin-client-section">
-          <h3>Использование</h3>
-          {selectedMedia.usage.length > 0 ? (
-            <ul className="admin-client-history">
-              {selectedMedia.usage.map((usage) => (
-                <li key={usage}>
-                  <span>{usage}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>Файл пока не привязан к страницам.</p>
-          )}
-        </section>
+          <MediaDetail
+            asset={selectedMedia}
+            onEdit={openMediaEdit}
+            onReplacePlacement={(placement) => {
+              setIsMediaDrawerOpen(false);
+              setReplacementPlacement(placement);
+            }}
+            showHeader={false}
+          />
         </AdminDetailDrawer>
+      ) : null}
+
+      {replacementPlacement ? (
+        <MediaPlacementEditor
+          assets={media}
+          onClose={() => setReplacementPlacement(undefined)}
+          onReplaced={() => window.location.reload()}
+          placement={replacementPlacement}
+        />
       ) : null}
 
       {isMediaFormOpen ? (
@@ -5876,6 +4572,7 @@ function ContactsWorkspace({
 function BlogWorkspace({
   blogPosts,
   isBlogCreateOpen,
+  media,
   onCloseBlogCreate,
   onSaveBlogPost,
   query,
@@ -5884,8 +4581,9 @@ function BlogWorkspace({
 }: {
   blogPosts: BlogPostRecord[];
   isBlogCreateOpen: boolean;
+  media: MediaRecord[];
   onCloseBlogCreate: () => void;
-  onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => void;
+  onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => Promise<void>;
   query: string;
   role: AdminRoleId;
   selectedBlogPostId?: string;
@@ -5894,7 +4592,18 @@ function BlogWorkspace({
   const [selectedId, setSelectedId] = useState(initialSelectedBlogPost?.id ?? blogPosts[0]?.id ?? "");
   const [isBlogDrawerOpen, setIsBlogDrawerOpen] = useState(Boolean(initialSelectedBlogPost));
   const [editingPost, setEditingPost] = useState<BlogPostRecord | undefined>();
+  const [editorDraft, setEditorDraft] = useState<BlogArticleDraft>();
+  const newDraftRecordId = useRef<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<"all" | BlogStatus>("all");
+  const blogMediaOptions = media
+    .filter(
+      (item) =>
+        item.type === "Фото" &&
+        item.status === "Готово" &&
+        Boolean(item.altText) &&
+        ["granted", "not_required"].includes(item.publicationConsent ?? "unknown"),
+    )
+    .map((item) => ({ alt: item.altText, label: `${item.name} · ${item.folder}`, url: item.url }));
   const filteredPosts = blogPosts
     .filter((post) => statusFilter === "all" || post.status === statusFilter)
     .filter((post) =>
@@ -5929,19 +4638,53 @@ function BlogWorkspace({
 
   function openPostEdit(post: BlogPostRecord) {
     onCloseBlogCreate();
+    newDraftRecordId.current = undefined;
     setEditingPost(post);
+    setEditorDraft(blogPostToEditorDraft(post));
   }
 
   function closeBlogForm() {
     setEditingPost(undefined);
+    setEditorDraft(undefined);
+    newDraftRecordId.current = undefined;
     onCloseBlogCreate();
   }
 
-  function savePostForm(post: BlogPostRecord, originalId?: string) {
-    onSaveBlogPost(post, originalId);
+  async function savePostForm(post: BlogPostRecord, originalId?: string) {
+    await onSaveBlogPost(post, originalId);
     setSelectedId(post.id);
     setIsBlogDrawerOpen(true);
     closeBlogForm();
+  }
+
+  if (isBlogFormOpen) {
+    const value = editorDraft ?? blogPostToEditorDraft(editingPost);
+    const savedValue = blogPostToEditorDraft(editingPost);
+    const getDraftRecordId = () => {
+      if (!newDraftRecordId.current) newDraftRecordId.current = `blog-${crypto.randomUUID()}`;
+      return newDraftRecordId.current;
+    };
+
+    return (
+      <BlogArticleEditor
+        authorOptions={["Natali"]}
+        categoryOptions={["Советы", "Услуги", "Сертификаты", "Студия"]}
+        mediaOptions={blogMediaOptions}
+        onCancel={({ hasUnsavedChanges }) => {
+          if (hasUnsavedChanges && !window.confirm("Есть несохраненные изменения. Закрыть редактор?")) return;
+          closeBlogForm();
+        }}
+        onChange={setEditorDraft}
+        onAutosave={(draft) =>
+          onSaveBlogPost(editorDraftToBlogPost(draft, editingPost, getDraftRecordId()), editingPost?.id)
+        }
+        onSave={(draft) =>
+          savePostForm(editorDraftToBlogPost(draft, editingPost, getDraftRecordId()), editingPost?.id)
+        }
+        savedValue={savedValue}
+        value={value}
+      />
+    );
   }
 
   if (!selectedPost) {
@@ -5951,14 +4694,6 @@ function BlogWorkspace({
           <h2 id="blog-heading">Контент-план блога</h2>
         </div>
         <EmptyState label="Статьи пока не заведены." />
-        {isBlogFormOpen ? (
-          <BlogPostDialog
-            initialPost={editingPost}
-            key={editingPost?.id ?? "new-blog-post"}
-            onClose={closeBlogForm}
-            onSave={savePostForm}
-          />
-        ) : null}
       </section>
     );
   }
@@ -6103,14 +4838,6 @@ function BlogWorkspace({
         </AdminDetailDrawer>
       ) : null}
 
-      {isBlogFormOpen ? (
-        <BlogPostDialog
-          initialPost={editingPost}
-          key={editingPost?.id ?? "new-blog-post"}
-          onClose={closeBlogForm}
-          onSave={savePostForm}
-        />
-      ) : null}
     </div>
   );
 }
@@ -6302,7 +5029,7 @@ function SettingsWorkspace({
             </div>
             <div>
               <dt>Сертификаты</dt>
-              <dd>Оплата сертификатов через Stripe; услуги массажа без online payment в v1.</dd>
+              <dd>{settings.giftCertificatesEnabled !== false ? "Включены на сайте" : "Скрыты на сайте"}</dd>
             </div>
           </dl>
         ) : null}
@@ -6700,6 +5427,7 @@ function Workspace({
   onCloseSettingsEdit,
   onCloseUserCreate,
   onEditAppointment,
+  onSaveAppointment,
   onOpenSettingsEdit,
   onSaveBlogPost,
   onSaveAdminUser,
@@ -6762,15 +5490,20 @@ function Workspace({
   onCloseSettingsEdit: () => void;
   onCloseUserCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onSaveAppointment: (
+    appointment: Appointment,
+    action?: AdminAuditAction,
+    originalAppointment?: Appointment,
+  ) => Promise<CalendarAppointmentSaveResult>;
   onOpenSettingsEdit: () => void;
   onSaveAdminUser: (user: AdminUserRecord, originalId?: string) => void;
-  onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => void;
+  onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => Promise<void>;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveClient: (client: ClientRecord, originalClientName?: string) => void;
   onSaveClientNote: (clientName: string, note: string) => void;
   onSaveContactChannel: (channel: ContactChannelRecord, originalId?: string) => void;
   onSaveContactSettings: (settings: ContactSettingsRecord) => void;
-  onSaveMedia: (media: MediaRecord, originalId?: string) => void;
+  onSaveMedia: (media: MediaRecord, originalId?: string, cleanupPath?: string) => Promise<void>;
   onSavePrice: (price: PriceRecord, originalId?: string) => void;
   onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
   onSaveSettings: (settings: SettingsRecord) => void;
@@ -6807,6 +5540,7 @@ function Workspace({
         onCalendarCreateIntent={onCalendarCreateIntent}
         onCloseClientCreate={onCloseClientCreate}
         onSaveCertificate={onSaveCertificate}
+        onSaveAppointment={onSaveAppointment}
         onSaveClient={onSaveClient}
         onSaveClientNote={onSaveClientNote}
         query={query}
@@ -6906,6 +5640,7 @@ function Workspace({
         key={selectedBlogPostId ?? "default-blog"}
         onCloseBlogCreate={onCloseBlogCreate}
         onSaveBlogPost={onSaveBlogPost}
+        media={media}
         query={query}
         role={role}
         selectedBlogPostId={selectedBlogPostId}
@@ -6955,11 +5690,13 @@ function Workspace({
         onCancelAppointment={onCancelAppointment}
         onCalendarDateChange={onCalendarDateChange}
         onEditAppointment={onEditAppointment}
+        onSaveAppointment={onSaveAppointment}
         query={query}
         role={role}
         selectedAppointmentFocus={calendarAppointmentFocus}
         selectedCalendarDate={selectedCalendarDate}
         selectedClientName={selectedClientName}
+        siteSettings={settings}
       />
     );
   }
@@ -7011,12 +5748,13 @@ export function AdminShell({
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows(initialData));
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord(initialData));
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers(initialData));
+  const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
   const [persistenceStatus, setPersistenceStatus] = useState("");
   const isSupabaseBacked = initialData?.source === "supabase";
   const selectedRouteAppointment = selectedAppointmentKey
     ? calendarAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentKey)
     : undefined;
-  const selectedCalendarRouteDate = isCalendarMonthDate(selectedCalendarDate)
+  const selectedCalendarRouteDate = selectedCalendarDate && isIsoDate(selectedCalendarDate)
     ? selectedCalendarDate
     : selectedRouteAppointment?.date;
   const routeCalendarAppointmentFocus = selectedRouteAppointment
@@ -7027,7 +5765,7 @@ export function AdminShell({
       }
     : undefined;
   const [calendarSelection, setCalendarSelection] = useState(() => ({
-    date: selectedCalendarRouteDate ?? "2026-07-06",
+    date: selectedCalendarRouteDate ?? getSofiaIsoDate(),
     routeDate: selectedCalendarRouteDate,
   }));
   const [calendarAppointmentFocus, setCalendarAppointmentFocus] = useState<CalendarAppointmentFocus | undefined>();
@@ -7036,7 +5774,7 @@ export function AdminShell({
   const activeCalendarDate =
     calendarSelection.routeDate === selectedCalendarRouteDate
       ? calendarSelection.date
-      : (selectedCalendarRouteDate ?? "2026-07-06");
+      : (selectedCalendarRouteDate ?? getSofiaIsoDate());
   const [isClientCreateOpen, setIsClientCreateOpen] = useState(false);
   const [isCertificateCreateOpen, setIsCertificateCreateOpen] = useState(false);
   const [isServiceCreateOpen, setIsServiceCreateOpen] = useState(false);
@@ -7073,9 +5811,9 @@ export function AdminShell({
     window.location.assign("/admin/login");
   }
 
-  async function persistAdminRecord(input: AdminPersistInput) {
+  async function persistAdminRecord(input: AdminPersistInput): Promise<CalendarAppointmentSaveResult> {
     if (!isSupabaseBacked) {
-      return;
+      return { ok: true };
     }
 
     try {
@@ -7087,13 +5825,17 @@ export function AdminShell({
       const result = (await response.json().catch(() => null)) as { message?: string; ok?: boolean } | null;
 
       if (!response.ok || result?.ok === false) {
-        setPersistenceStatus(result?.message ?? "Изменение сохранено локально, но Supabase не подтвердил запись.");
-        return;
+        const message = result?.message ?? "Supabase не подтвердил изменение. Исходные данные восстановлены.";
+        setPersistenceStatus(message);
+        return { message, ok: false };
       }
 
       setPersistenceStatus("Изменение сохранено в Supabase.");
+      return { ok: true };
     } catch {
-      setPersistenceStatus("Изменение сохранено локально, но Supabase недоступен.");
+      const message = "Supabase недоступен. Исходные данные восстановлены.";
+      setPersistenceStatus(message);
+      return { message, ok: false };
     }
   }
 
@@ -7127,22 +5869,66 @@ export function AdminShell({
     }
   }
 
-  function persistAppointmentRecord(appointment: Appointment) {
+  async function persistAppointmentRecord(
+    appointment: Appointment,
+    action: AdminAuditAction,
+    originalAppointment: Appointment = appointment,
+  ): Promise<CalendarAppointmentSaveResult> {
     if (!appointment.clientId) {
       if (isSupabaseBacked) {
-        setPersistenceStatus("Запись сохранена локально: выберите клиента из базы для сохранения в Supabase.");
+        const message = "Запись не сохранена: выберите клиента из базы для сохранения в Supabase.";
+        setPersistenceStatus(message);
+        return { message, ok: false };
       }
 
-      return;
+      return { ok: true };
     }
 
-    void persistAdminRecord({ record: appointment, type: "appointment" });
+    const appointmentTime = {
+      date: appointment.date,
+      duration: appointment.durationMinutes ?? 60,
+      start: appointment.time,
+    };
+    const overlap = hasAppointmentOverlap(
+      appointmentTime,
+      calendarAppointments
+        .filter(
+          (candidate) =>
+            appointmentKey(candidate) !== appointmentKey(originalAppointment) && candidate.status !== "Отменена",
+        )
+        .map((candidate) => ({
+          date: candidate.date,
+          duration: candidate.durationMinutes ?? 60,
+          start: candidate.time,
+        })),
+    );
+    const scheduleClassification = classifyAppointmentAgainstSchedule(
+      appointmentTime,
+      createCalendarWorkingSchedule(settings),
+    );
+
+    const result = await persistAdminRecord({
+      audit: {
+        action,
+        outsideWorkingHours: scheduleClassification.outsideWorkingHours,
+        overlapOverride: overlap,
+      },
+      record: appointment,
+      type: "appointment",
+    });
+
+    return result.ok
+      ? result
+      : {
+          message: "Не удалось сохранить изменение записи. Исходное значение восстановлено.",
+          ok: false,
+        };
   }
 
   function handleAppointmentCreate(appointment: Appointment) {
     const createdAppointment = {
       ...appointment,
-      id: `custom-${calendarAppointments.length + 1}`,
+      id: `custom-${crypto.randomUUID()}`,
     };
 
     setCalendarAppointments((current) => sortAppointments([...current, createdAppointment]));
@@ -7150,11 +5936,11 @@ export function AdminShell({
     return createdAppointment;
   }
 
-  function handleAppointmentUpdate(appointment: Appointment) {
+  function handleAppointmentUpdate(appointment: Appointment, originalKey = appointmentKey(appointment)) {
     setCalendarAppointments((current) =>
       sortAppointments(
         current.map((currentAppointment) =>
-          appointmentKey(currentAppointment) === appointmentKey(appointment) ? appointment : currentAppointment,
+          appointmentKey(currentAppointment) === originalKey ? appointment : currentAppointment,
         ),
       ),
     );
@@ -7382,11 +6168,12 @@ export function AdminShell({
     setCancellingAppointment(undefined);
   }
 
-  function saveCalendarAppointment(appointment: Appointment) {
+  async function saveCalendarAppointment(appointment: Appointment): Promise<CalendarAppointmentSaveResult> {
     let persistedAppointment = appointment;
+    const previousAppointment = editingAppointment;
 
-    if (editingAppointment) {
-      handleAppointmentUpdate(appointment);
+    if (previousAppointment) {
+      handleAppointmentUpdate(appointment, appointmentKey(previousAppointment));
     } else {
       const createdAppointment = handleAppointmentCreate(appointment);
       persistedAppointment = createdAppointment;
@@ -7398,32 +6185,79 @@ export function AdminShell({
       });
     }
 
-    persistAppointmentRecord(persistedAppointment);
-    closeActionDialog();
+    const result = await persistAppointmentRecord(
+      persistedAppointment,
+      previousAppointment ? "appointment.update" : "appointment.create",
+      previousAppointment ?? persistedAppointment,
+    );
+
+    if (!result.ok) {
+      if (previousAppointment) {
+        handleAppointmentUpdate(previousAppointment, appointmentKey(persistedAppointment));
+      } else {
+        setCalendarAppointments((current) =>
+          current.filter((candidate) => appointmentKey(candidate) !== appointmentKey(persistedAppointment)),
+        );
+      }
+    }
+
+    return result;
   }
 
-  function cancelCalendarAppointment(appointment: Appointment) {
+  async function saveCalendarAppointmentInline(
+    appointment: Appointment,
+    action: AdminAuditAction = "appointment.update",
+    originalAppointment?: Appointment,
+  ): Promise<CalendarAppointmentSaveResult> {
+    const previousAppointment =
+      originalAppointment ??
+      calendarAppointments.find((candidate) => appointmentKey(candidate) === appointmentKey(appointment));
+    handleAppointmentUpdate(appointment, appointmentKey(previousAppointment ?? appointment));
+    const result = await persistAppointmentRecord(appointment, action, previousAppointment ?? appointment);
+
+    if (!result.ok && previousAppointment) {
+      handleAppointmentUpdate(previousAppointment, appointmentKey(appointment));
+    }
+
+    return result;
+  }
+
+  async function cancelCalendarAppointment(appointment: Appointment): Promise<CalendarAppointmentSaveResult> {
     const cancelledAppointment = { ...appointment, status: "Отменена" as const };
     handleAppointmentUpdate(cancelledAppointment);
-    persistAppointmentRecord(cancelledAppointment);
-    closeCancelDialog();
+    const result = await persistAppointmentRecord(cancelledAppointment, "appointment.cancel", appointment);
+
+    if (!result.ok) {
+      handleAppointmentUpdate(appointment, appointmentKey(cancelledAppointment));
+    }
+
+    return result;
   }
 
   function saveClientNote(clientIdentity: string, note: string) {
+    const previousClients = clients;
     const updatedClient = clients.find((client) => matchesClientIdentity(client, clientIdentity));
     setClients((current) =>
       current.map((client) => (matchesClientIdentity(client, clientIdentity) ? { ...client, note } : client)),
     );
 
     if (updatedClient) {
-      void persistAdminRecord({ record: { ...updatedClient, note }, type: "client" });
+      void persistAdminRecord({ record: { ...updatedClient, note }, type: "client" }).then((result) => {
+        if (!result.ok) setClients(previousClients);
+      });
     }
   }
 
   function saveClientRecord(client: ClientRecord, originalClientIdentity?: string) {
+    const previousClients = clients;
     setClients((current) => {
+      const uniqueCurrent = [...new Map(current.map((currentClient) => [currentClient.id, currentClient])).values()];
       const nextPhone = normalizeClientPhone(client.phone);
-      const existingIndex = current.findIndex((currentClient) => {
+      const existingIndex = uniqueCurrent.findIndex((currentClient) => {
+        if (currentClient.id === client.id) {
+          return true;
+        }
+
         if (originalClientIdentity) {
           return matchesClientIdentity(currentClient, originalClientIdentity);
         }
@@ -7432,15 +6266,18 @@ export function AdminShell({
       });
 
       if (existingIndex === -1) {
-        return [...current, client];
+        return [...uniqueCurrent, client];
       }
 
-      return current.map((currentClient, index) => (index === existingIndex ? client : currentClient));
+      return uniqueCurrent.map((currentClient, index) => (index === existingIndex ? client : currentClient));
     });
-    void persistAdminRecord({ record: client, type: "client" });
+    void persistAdminRecord({ record: client, type: "client" }).then((result) => {
+      if (!result.ok) setClients(previousClients);
+    });
   }
 
   function saveCertificateRecord(certificate: CertificateRecord, originalCode?: string) {
+    const previousCertificates = certificates;
     setCertificates((current) => {
       const originalKey = originalCode ? normalizeSearch(originalCode) : "";
       const nextKey = normalizeSearch(certificate.code);
@@ -7458,10 +6295,13 @@ export function AdminShell({
 
       return current.map((currentCertificate, index) => (index === existingIndex ? certificate : currentCertificate));
     });
-    void persistAdminRecord({ record: certificate, type: "certificate" });
+    void persistAdminRecord({ record: certificate, type: "certificate" }).then((result) => {
+      if (!result.ok) setCertificates(previousCertificates);
+    });
   }
 
   function updateCertificateStatus(certificateCode: string, status: CertificateStatus, historyEntry: string) {
+    const previousCertificates = certificates;
     const updatedCertificate = certificates.find((certificate) => normalizeSearch(certificate.code) === normalizeSearch(certificateCode));
 
     setCertificates((current) =>
@@ -7484,11 +6324,15 @@ export function AdminShell({
           status,
         },
         type: "certificate",
+      }).then((result) => {
+        if (!result.ok) setCertificates(previousCertificates);
       });
     }
   }
 
   function saveServiceRecord(service: ServiceRecord, originalSlug?: string) {
+    const previousPrices = prices;
+    const previousServices = services;
     if (originalSlug && normalizeSearch(originalSlug) !== normalizeSearch(service.slug)) {
       setPrices((current) =>
         current.map((price) =>
@@ -7514,10 +6358,16 @@ export function AdminShell({
 
       return current.map((currentService, index) => (index === existingIndex ? service : currentService));
     });
-    void persistAdminRecord({ record: service, type: "service" });
+    void persistAdminRecord({ audit: { action: "service.visibility" }, record: service, type: "service" }).then((result) => {
+      if (!result.ok) {
+        setPrices(previousPrices);
+        setServices(previousServices);
+      }
+    });
   }
 
   function savePriceRecord(price: PriceRecord, originalId?: string) {
+    const previousPrices = prices;
     setPrices((current) => {
       const originalKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(price.id);
@@ -7535,10 +6385,23 @@ export function AdminShell({
 
       return current.map((currentPrice, index) => (index === existingIndex ? price : currentPrice));
     });
-    void persistAdminRecord({ record: price, type: "price" });
+    void persistAdminRecord({ record: price, type: "price" }).then((result) => {
+      if (!result.ok) setPrices(previousPrices);
+    });
   }
 
-  function saveMediaRecord(mediaRecord: MediaRecord, originalId?: string) {
+  async function cleanupUploadedMedia(path?: string) {
+    if (!path) return;
+
+    await fetch("/api/admin/media", {
+      body: JSON.stringify({ path }),
+      headers: await getAdminApiHeaders(),
+      method: "DELETE",
+    }).catch(() => undefined);
+  }
+
+  async function saveMediaRecord(mediaRecord: MediaRecord, originalId?: string, cleanupPath?: string) {
+    const previousMedia = media;
     setMedia((current) => {
       const originalKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(mediaRecord.id);
@@ -7556,10 +6419,17 @@ export function AdminShell({
 
       return current.map((currentMedia, index) => (index === existingIndex ? mediaRecord : currentMedia));
     });
-    void persistAdminRecord({ record: mediaRecord, type: "media" });
+    const result = await persistAdminRecord({ audit: { action: "media.asset" }, record: mediaRecord, type: "media" });
+    if (!result.ok) {
+      setMedia(previousMedia);
+      await cleanupUploadedMedia(cleanupPath);
+      throw new Error(result.message);
+    }
   }
 
   function saveContactSettingsRecord(settings: ContactSettingsRecord) {
+    const previousContactChannels = contactChannels;
+    const previousContactSettings = contactSettings;
     const linkedChannelValues = new Map([
       ["contact-phone", settings.phone],
       ["contact-email", settings.email],
@@ -7575,15 +6445,22 @@ export function AdminShell({
     setContactSettings(settings);
     setContactChannels(nextContactChannels);
     setIsContactSettingsOpen(false);
-    void persistAdminRecord({ record: settings, type: "contactSettings" });
-    for (const channel of nextContactChannels) {
-      if (linkedChannelValues.has(channel.id)) {
-        void persistAdminRecord({ record: channel, type: "contactChannel" });
+    void Promise.all([
+      persistAdminRecord({ record: settings, type: "contactSettings" }),
+      ...nextContactChannels
+        .filter((channel) => linkedChannelValues.has(channel.id))
+        .map((channel) => persistAdminRecord({ record: channel, type: "contactChannel" })),
+    ]).then((results) => {
+      if (results.some((result) => !result.ok)) {
+        setContactChannels(previousContactChannels);
+        setContactSettings(previousContactSettings);
+        setPersistenceStatus("Не удалось полностью сохранить контакты. Исходные данные восстановлены.");
       }
-    }
+    });
   }
 
   function saveContactChannelRecord(channel: ContactChannelRecord, originalId?: string) {
+    const previousContactChannels = contactChannels;
     setContactChannels((current) => {
       const originalKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(channel.id);
@@ -7601,10 +6478,13 @@ export function AdminShell({
 
       return current.map((currentChannel, index) => (index === existingIndex ? channel : currentChannel));
     });
-    void persistAdminRecord({ record: channel, type: "contactChannel" });
+    void persistAdminRecord({ record: channel, type: "contactChannel" }).then((result) => {
+      if (!result.ok) setContactChannels(previousContactChannels);
+    });
   }
 
-  function saveBlogPostRecord(post: BlogPostRecord, originalId?: string) {
+  async function saveBlogPostRecord(post: BlogPostRecord, originalId?: string) {
+    const previousBlogPosts = blogPosts;
     setBlogPosts((current) => {
       const originalKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(post.id);
@@ -7622,10 +6502,15 @@ export function AdminShell({
 
       return current.map((currentPost, index) => (index === existingIndex ? post : currentPost));
     });
-    void persistAdminRecord({ record: post, type: "blogPost" });
+    const result = await persistAdminRecord({ audit: { action: "blog.publication" }, record: post, type: "blogPost" });
+    if (!result.ok) {
+      setBlogPosts(previousBlogPosts);
+      throw new Error(result.message);
+    }
   }
 
   function saveAdminUserRecord(user: AdminUserRecord, originalId?: string) {
+    const previousAdminUsers = adminUsers;
     setAdminUsers((current) => {
       const originalKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(user.id);
@@ -7657,7 +6542,12 @@ export function AdminShell({
           role: user.role,
         },
       }).then((result) => {
-        if (!result?.ok || !result.userId || result.userId === draftUserId) {
+        if (isSupabaseBacked && !result?.ok) {
+          setAdminUsers(previousAdminUsers);
+          return;
+        }
+
+        if (!result?.userId || result.userId === draftUserId) {
           return;
         }
 
@@ -7681,18 +6571,44 @@ export function AdminShell({
           role: user.role,
           status: user.status,
         },
+      }).then((result) => {
+        if (isSupabaseBacked && !result?.ok) setAdminUsers(previousAdminUsers);
       });
     }
   }
 
   function saveSettingsRecord(nextSettings: SettingsRecord) {
+    const previousSettings = settings;
     setSettings(nextSettings);
     setIsSettingsEditOpen(false);
-    void persistAdminRecord({ record: nextSettings, type: "settings" });
+    void persistAdminRecord({ audit: { action: "site.gift_certificates" }, record: nextSettings, type: "settings" }).then((result) => {
+      if (!result.ok) setSettings(previousSettings);
+    });
   }
 
   return (
     <div className="admin-shell">
+      <AdminMobileHeader
+        activeModule={activeModule}
+        brandHref={`/admin?role=${role}`}
+        brandLabel="Magic Massage Natali, главная админки"
+        closeMenuLabel="Закрыть меню админки"
+        isNavigationOpen={isMobileNavigationOpen}
+        navigationId="admin-mobile-navigation"
+        onMenuToggle={() => setIsMobileNavigationOpen((current) => !current)}
+        openMenuLabel="Открыть меню админки"
+      />
+      <AdminMobileNavigation
+        activeSection={activeSection}
+        ariaLabel="Разделы админки"
+        closeLabel="Закрыть меню админки"
+        getHref={(section) => `/admin?section=${section}&role=${role}`}
+        heading="Разделы"
+        id="admin-mobile-navigation"
+        isOpen={isMobileNavigationOpen}
+        navigation={navigation}
+        onClose={() => setIsMobileNavigationOpen(false)}
+      />
       <aside className="admin-sidebar">
         <Link className="admin-brand" href={`/admin?role=${role}`} aria-label="Magic Massage Natali admin home">
           <span>MMN</span>
@@ -7752,9 +6668,11 @@ export function AdminShell({
             <h1 id="admin-page-title">{activeModule.title}</h1>
             <p>{activeModule.description}</p>
           </div>
-          <button onClick={openPrimaryAction} type="button">
-            {activeModule.primaryAction}
-          </button>
+          {activeModule.primaryAction ? (
+            <button onClick={openPrimaryAction} type="button">
+              {activeModule.primaryAction}
+            </button>
+          ) : null}
         </section>
 
         {persistenceStatus ? (
@@ -7796,6 +6714,7 @@ export function AdminShell({
           onCloseSettingsEdit={() => setIsSettingsEditOpen(false)}
           onCloseUserCreate={() => setIsUserCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
+          onSaveAppointment={saveCalendarAppointmentInline}
           onOpenSettingsEdit={() => setIsSettingsEditOpen(true)}
           onSaveAdminUser={saveAdminUserRecord}
           onSaveBlogPost={saveBlogPostRecord}
@@ -7829,6 +6748,8 @@ export function AdminShell({
 
         {isCalendarActionDialogOpen ? (
           <CalendarAppointmentDialog
+            appointments={calendarAppointments}
+            bookingBufferMinutes={settings.bookingBufferMinutes}
             clients={clients}
             initialAppointment={editingAppointment}
             key={calendarDialogKey}
@@ -7837,8 +6758,10 @@ export function AdminShell({
             prefillClient={prefilledCalendarClient}
             prefillClientName={shouldPrefillCalendarClient ? selectedClientName : undefined}
             prefillDate={editingAppointment ? undefined : activeCalendarDate}
+            role={role}
+            siteSettings={settings}
           />
-        ) : isActionOpen ? (
+        ) : isActionOpen && activeModule.primaryAction ? (
           <QuickActionDialog
             action={activeModule.primaryAction}
             moduleTitle={activeModule.title}

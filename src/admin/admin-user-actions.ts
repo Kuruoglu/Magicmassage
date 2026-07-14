@@ -182,7 +182,7 @@ export async function runAdminUserAction(
   }
 
   if (!deps?.skipAuthorization) {
-    const authorization = await authorizeSupabaseAdminAccess(client, deps?.actorToken, { allowedRoles: ["owner", "administrator"] });
+    const authorization = await authorizeSupabaseAdminAccess(client, deps?.actorToken, { allowedRoles: ["owner"] });
 
     if (!authorization.ok) {
       return authorization;

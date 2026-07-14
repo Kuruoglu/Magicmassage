@@ -1,0 +1,433 @@
+.gridRegion {
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.card {
+  min-width: 0;
+}
+
+.cardAction,
+.cardStatic {
+  background: #ffffff;
+  border: 1px solid #d9dedb;
+  border-radius: 6px;
+  color: #1d2924;
+  display: grid;
+  grid-template-rows: 132px minmax(92px, auto);
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-decoration: none;
+  width: 100%;
+}
+
+.cardAction {
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.cardAction:hover {
+  border-color: #7b8f85;
+}
+
+.cardAction:focus-visible,
+.pickerCard:focus-within {
+  outline: 3px solid #256d51;
+  outline-offset: 2px;
+}
+
+.cardAction[aria-pressed="true"],
+.cardAction[aria-current="page"] {
+  border-color: #256d51;
+  box-shadow: inset 0 0 0 1px #256d51;
+}
+
+.thumbnail {
+  align-items: center;
+  background: #eef1ef;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.thumbnail img {
+  object-fit: cover;
+}
+
+.documentMark {
+  color: #53615b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.cardCopy {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 11px 12px 12px;
+}
+
+.cardCopy strong,
+.detailHeader h2,
+.placementCopy strong {
+  overflow-wrap: anywhere;
+}
+
+.cardCopy > span,
+.meta,
+.placementCopy span {
+  color: #5b6862;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.cardFooter {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.status {
+  background: #edf2ef;
+  border-radius: 4px;
+  color: #33433b;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 3px 6px;
+}
+
+.status[data-status="Требует alt"],
+.status[data-status="Черновик"] {
+  background: #fff3d6;
+  color: #75530d;
+}
+
+.empty {
+  border: 1px dashed #b9c2bd;
+  color: #5b6862;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+}
+
+.detail {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.detailHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.detailHeader h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.detailHeader p {
+  color: #5b6862;
+  margin: 4px 0 0;
+}
+
+.detailActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.secondaryButton,
+.primaryButton {
+  border-radius: 5px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 8px 13px;
+}
+
+.secondaryButton {
+  background: #ffffff;
+  border: 1px solid #aeb8b3;
+  color: #26342e;
+}
+
+.primaryButton {
+  background: #256d51;
+  border: 1px solid #256d51;
+  color: #ffffff;
+}
+
+.secondaryButton:focus-visible,
+.primaryButton:focus-visible,
+.textButton:focus-visible,
+.uploader input:focus-visible,
+.uploader select:focus-visible,
+.uploader textarea:focus-visible,
+.searchInput:focus-visible {
+  outline: 3px solid #256d51;
+  outline-offset: 2px;
+}
+
+.detailPreview {
+  aspect-ratio: 16 / 10;
+  background: #eef1ef;
+  border: 1px solid #d9dedb;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.detailPreview img {
+  object-fit: contain;
+}
+
+.detailPreview .documentMark {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+}
+
+.detailList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.detailList > div {
+  border-bottom: 1px solid #e3e7e5;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(120px, 0.35fr) minmax(0, 1fr);
+  padding: 10px 0;
+}
+
+.detailList dt {
+  color: #5b6862;
+  font-size: 0.82rem;
+}
+
+.detailList dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.placements h3 {
+  font-size: 1rem;
+  margin: 0 0 10px;
+}
+
+.placementList {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.placementItem {
+  align-items: center;
+  border: 1px solid #d9dedb;
+  border-radius: 5px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.placementCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.textButton {
+  background: transparent;
+  border: 0;
+  color: #155f45;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 700;
+  padding: 6px;
+}
+
+.picker {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.picker legend {
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+.searchLabel {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.searchLabel span {
+  color: #44524b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.searchInput,
+.uploader input,
+.uploader select,
+.uploader textarea {
+  background: #ffffff;
+  border: 1px solid #aeb8b3;
+  border-radius: 5px;
+  color: #1d2924;
+  font: inherit;
+  min-height: 40px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.pickerGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+}
+
+.pickerCard {
+  border: 1px solid #d9dedb;
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  grid-template-rows: 112px auto;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.pickerCard[data-selected="true"] {
+  border-color: #256d51;
+  box-shadow: inset 0 0 0 1px #256d51;
+}
+
+.pickerCard[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.pickerCard input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.pickerCopy {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px 10px;
+}
+
+.pickerCopy span {
+  color: #5b6862;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.uploader {
+  display: grid;
+  gap: 16px;
+}
+
+.uploadGrid {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.uploadField {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.uploadField > span {
+  color: #33413b;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.fieldHint {
+  color: #64716b;
+  font-size: 0.78rem;
+}
+
+.actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.alert {
+  background: #fff0ef;
+  border: 1px solid #e2a6a0;
+  border-radius: 5px;
+  color: #852d25;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+@media (max-width: 560px) {
+  .detailHeader,
+  .placementItem {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .detailList > div,
+  .uploadGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .wide {
+    grid-column: auto;
+  }
+
+  .textButton {
+    align-self: flex-start;
+  }
+}

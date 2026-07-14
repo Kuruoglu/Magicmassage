@@ -102,6 +102,20 @@ test.describe("real admin authentication", () => {
       expect(error, "Supabase rejected the configured admin E2E credentials.").toBeNull();
       expect(data.session?.access_token).toBeTruthy();
 
+      const { error: directWriteError } = await client.from("admin_clients").insert({
+        email: "direct-dml@example.com",
+        full_name: "Direct DML must fail",
+        id: `e2e-direct-dml-${Date.now()}`,
+        locale: "ru",
+        phone: "+359887000099",
+        phone_normalized: "+359887000099",
+      });
+
+      expect(
+        directWriteError,
+        "Authenticated browser sessions must not bypass the server admin records API.",
+      ).not.toBeNull();
+
       const sessionResponse = await fetch(new URL("/api/admin/auth/session", baseURL), {
         headers: {
           Authorization: `Bearer ${data.session!.access_token}`,
@@ -124,10 +138,11 @@ test.describe("real admin authentication", () => {
 
       await context.addCookies([
         {
+          domain: new URL(baseURL!).hostname,
           httpOnly: true,
           name: adminCookieName,
+          path: "/admin",
           sameSite: "Lax",
-          url: new URL("/admin", baseURL).toString(),
           value: decodeURIComponent(cookieMatch![1]),
         },
       ]);

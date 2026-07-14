@@ -3,8 +3,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { persistAdminRecord } from "@/admin/persistence";
+import { runWithAdminRepositoryAuditContext } from "@/admin/repository";
+import { authorizeSupabaseAdminAccess } from "@/lib/supabase/admin";
 
 import { POST } from "./route";
+
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+vi.mock("@/admin/repository", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/admin/repository")>();
+
+  return {
+    ...actual,
+    runWithAdminRepositoryAuditContext: vi.fn(
+      (_context: unknown, operation: () => unknown) => operation(),
+    ),
+  };
+});
 
 const supabaseAdminRouteMock = vi.hoisted(() => ({
   authorizationResult: null as unknown,
@@ -60,6 +75,7 @@ const certificatePayload = {
 } as const;
 
 const servicePayload = {
+  audit: { action: "service.visibility" },
   record: {
     category: "SPA",
     coverImage: "/media/services/aroma-massage.jpg",
@@ -90,6 +106,7 @@ const pricePayload = {
 } as const;
 
 const mediaPayload = {
+  audit: { action: "media.asset" },
   record: {
     altText: "Арома массаж в кабинете Magic Massage Natali",
     dimensions: "1600x1100",
@@ -134,6 +151,7 @@ const contactSettingsPayload = {
 } as const;
 
 const blogPostPayload = {
+  audit: { action: "blog.publication" },
   record: {
     author: "Natali",
     body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
@@ -153,7 +171,30 @@ const blogPostPayload = {
   type: "blogPost",
 } as const;
 
+const overlappingAppointmentPayload = {
+  audit: {
+    action: "appointment.drag",
+    outsideWorkingHours: false,
+    overlapOverride: true,
+  },
+  record: {
+    client: "Irina Test",
+    clientId: "client-1",
+    date: "2026-07-20",
+    durationMinutes: 60,
+    id: "appointment-overlap",
+    note: "",
+    overlapOverride: true,
+    overlapOverrideReason: "Согласовано с обоими клиентами",
+    service: "Deep tissue massage",
+    status: "Подтверждена",
+    time: "14:00",
+  },
+  type: "appointment",
+} as const;
+
 const settingsPayload = {
+  audit: { action: "site.gift_certificates" },
   record: {
     auditLogRetentionDays: 365,
     bookingBufferMinutes: 45,
@@ -176,6 +217,76 @@ const settingsPayload = {
   },
   type: "settings",
 } as const;
+
+type AppointmentRouteClientOptions = {
+  currentRows?: Record<string, unknown>[];
+  scheduleRows?: Record<string, unknown>[];
+  settings?: Record<string, unknown>;
+};
+
+function createAppointmentRouteClient({
+  currentRows = [],
+  scheduleRows = [],
+  settings = {
+    booking_buffer_minutes: 30,
+    timezone: "Europe/Sofia",
+    working_days: "\u041f\u043d-\u0421\u0431",
+    working_hours: "10:00-19:00",
+  },
+}: AppointmentRouteClientOptions = {}) {
+  const insert = vi.fn(async () => ({ error: null }));
+  const from = vi.fn((table: string) => {
+    if (table === "admin_appointments") {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(async (column: string) => ({
+            data: column === "id" ? currentRows : scheduleRows,
+            error: null,
+          })),
+        })),
+      };
+    }
+
+    if (table === "admin_site_settings") {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ data: [settings], error: null })),
+        })),
+      };
+    }
+
+    return { insert };
+  });
+
+  return { client: { from }, from, insert };
+}
+
+function createPublishedServicePayload() {
+  const translations = Object.fromEntries(["bg", "ru", "ua", "en"].map((locale) => [locale, {
+    body: `${locale} full description`,
+    canonicalUrl: `/${locale}/services/aroma-massage`,
+    locale,
+    ogDescription: `${locale} social description`,
+    ogImageMediaId: "",
+    ogTitle: `${locale} social title`,
+    robotsDirectives: "index,follow",
+    seoDescription: `${locale} SEO description`,
+    seoTitle: `${locale} SEO title`,
+    shortDescription: `${locale} short description`,
+    status: "published",
+    title: `${locale} title`,
+  }]));
+
+  return {
+    ...servicePayload,
+    record: {
+      ...servicePayload.record,
+      locales: ["bg", "ru", "ua", "en"],
+      status: "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430",
+      translations,
+    },
+  };
+}
 
 vi.mock("@/admin/persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/admin/persistence")>();
@@ -247,6 +358,78 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
     expect(persistAdminRecord).toHaveBeenCalledWith(servicePayload);
+  });
+
+  it("requires a publication-ready photo cover for published content", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    supabaseAdminRouteMock.client = {
+      from: vi.fn((table: string) => {
+        if (table === "admin_media_assets") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(async () => ({
+                data: [{
+                  alt_text: "Treatment protocol",
+                  media_type: "document",
+                  publication_consent_status: "not_required",
+                  status: "ready",
+                }],
+                error: null,
+              })),
+            })),
+          };
+        }
+
+        return { insert };
+      }),
+    };
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(createPublishedServicePayload()),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Published content requires a ready, consented photo from the media library with alt text.",
+    });
+    expect(persistAdminRecord).not.toHaveBeenCalled();
+  });
+
+  it("persists published content when its media-library cover is publication-ready", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    supabaseAdminRouteMock.client = {
+      from: vi.fn((table: string) => {
+        if (table === "admin_media_assets") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(async () => ({
+                data: [{
+                  alt_text: "Aroma massage room",
+                  media_type: "photo",
+                  publication_consent_status: "granted",
+                  status: "ready",
+                }],
+                error: null,
+              })),
+            })),
+          };
+        }
+
+        return { insert };
+      }),
+    };
+    const payload = createPublishedServicePayload();
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(payload);
   });
 
   it("persists valid price payloads", async () => {
@@ -343,10 +526,312 @@ describe("admin records persistence API route", () => {
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
-      message: "admin_clients: permission denied",
+      message: "Не удалось сохранить изменения. Повторите попытку.",
       mode: "supabase",
       ok: false,
     });
+  });
+
+  it("uses the documented operation-only specialist and owner-only settings matrix", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    supabaseAdminRouteMock.client = { from: vi.fn(() => ({ insert })) };
+
+    await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(clientPayload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }),
+    );
+    expect(authorizeSupabaseAdminAccess).toHaveBeenLastCalledWith(expect.anything(), "token", {
+      allowedRoles: ["owner", "administrator"],
+    });
+
+    await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(settingsPayload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }),
+    );
+    expect(authorizeSupabaseAdminAccess).toHaveBeenLastCalledWith(expect.anything(), "token", {
+      allowedRoles: ["owner"],
+    });
+  });
+
+  it("delegates authenticated mutations to the repository transaction without a second audit write", async () => {
+    const from = vi.fn();
+    supabaseAdminRouteMock.client = { from };
+
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(clientPayload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(from).not.toHaveBeenCalled();
+    expect(persistAdminRecord).toHaveBeenCalledWith(clientPayload);
+  });
+
+  it("returns failure when the atomic record-and-audit transaction fails", async () => {
+    supabaseAdminRouteMock.client = { from: vi.fn() };
+    vi.mocked(persistAdminRecord).mockResolvedValueOnce({
+      message: "Unable to persist admin record.",
+      mode: "supabase",
+      ok: false,
+    });
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(clientPayload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      message: "Не удалось сохранить изменения. Повторите попытку.",
+      mode: "supabase",
+      ok: false,
+    });
+  });
+
+  it("derives the domain audit action from the record type", async () => {
+    supabaseAdminRouteMock.client = { from: vi.fn() };
+
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(mediaPayload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(runWithAdminRepositoryAuditContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "media.asset",
+        metadata: { role: "administrator" },
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it("requires an explicit overlap audit context", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify({
+          ...overlappingAppointmentPayload,
+          audit: { ...overlappingAppointmentPayload.audit, overlapOverride: false },
+        }),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(persistAdminRecord).not.toHaveBeenCalled();
+  });
+
+  it("allows only owner and administrator roles to authorize overlaps and records the actor", async () => {
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        id: "appointment-overlap",
+        post_visit_comment: "",
+        starts_at: "14:00:00",
+        starts_on: "2026-07-20",
+        status: "confirmed",
+      }],
+      scheduleRows: [{
+        buffer_minutes: 30,
+        duration_minutes: 60,
+        id: "appointment-existing",
+        starts_at: "14:30:00",
+        status: "confirmed",
+      }],
+    });
+    supabaseAdminRouteMock.client = client;
+    supabaseAdminRouteMock.authorizationResult = {
+      mode: "supabase",
+      ok: true,
+      role: "specialist",
+      userId: "22222222-2222-4222-8222-222222222222",
+    };
+
+    const deniedResponse = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(overlappingAppointmentPayload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }),
+    );
+    expect(deniedResponse.status).toBe(403);
+    expect(persistAdminRecord).not.toHaveBeenCalled();
+
+    supabaseAdminRouteMock.authorizationResult = {
+      mode: "supabase",
+      ok: true,
+      role: "administrator",
+      userId: "11111111-1111-4111-8111-111111111111",
+    };
+    const allowedResponse = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(overlappingAppointmentPayload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }),
+    );
+
+    expect(allowedResponse.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith({
+      ...overlappingAppointmentPayload,
+      audit: {
+        ...overlappingAppointmentPayload.audit,
+        action: "appointment.update",
+      },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        bufferMinutes: 30,
+        overlapOverriddenBy: "11111111-1111-4111-8111-111111111111",
+      },
+    });
+    expect(runWithAdminRepositoryAuditContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        action: "appointment.update",
+        metadata: {
+          outsideWorkingHours: false,
+          overlapOverride: true,
+          role: "administrator",
+        },
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it("classifies saved working hours and stores the server-side booking buffer", async () => {
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.update", outsideWorkingHours: true, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        overlapOverride: false,
+        overlapOverrideReason: "",
+        time: "09:00",
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        id: payload.record.id,
+        post_visit_comment: "",
+        starts_at: "09:00:00",
+        starts_on: payload.record.date,
+        status: "confirmed",
+      }],
+      settings: {
+        booking_buffer_minutes: 45,
+        timezone: "Europe/Sofia",
+        working_days: "\u041f\u043d-\u0421\u0431",
+        working_hours: "08:00-17:00",
+      },
+    });
+    supabaseAdminRouteMock.client = client;
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith({
+      ...payload,
+      audit: { ...payload.audit, outsideWorkingHours: false },
+      record: { ...payload.record, bufferMinutes: 45 },
+    });
+  });
+
+  it("classifies Sunday as outside the saved weekly schedule", async () => {
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.update", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        date: "2026-07-19",
+        overlapOverride: false,
+        overlapOverrideReason: "",
+        time: "12:00",
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        id: payload.record.id,
+        post_visit_comment: "",
+        starts_at: "12:00:00",
+        starts_on: payload.record.date,
+        status: "confirmed",
+      }],
+      settings: {
+        booking_buffer_minutes: 30,
+        timezone: "Europe/Sofia",
+        working_days: "\u041f\u043d-\u0421\u0431",
+        working_hours: "08:00-20:00",
+      },
+    });
+    supabaseAdminRouteMock.client = client;
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
+      audit: expect.objectContaining({ outsideWorkingHours: true }),
+    }));
+  });
+
+  it("rejects a changed post-visit comment for a future non-completed DB appointment", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-14T10:00:00Z"));
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.post_visit_comment", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        overlapOverride: false,
+        overlapOverrideReason: "",
+        postVisitComment: "Too early",
+        postVisitCommentedAt: "2026-07-14T10:00:00Z",
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        id: payload.record.id,
+        post_visit_comment: "Previous comment",
+        starts_at: "14:00:00",
+        starts_on: "2026-07-20",
+        status: "confirmed",
+      }],
+    });
+    supabaseAdminRouteMock.client = client;
+
+    try {
+      const response = await POST(new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(payload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }));
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error: "Post-visit comments cannot be changed before a future appointment is completed.",
+      });
+      expect(persistAdminRecord).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("requires an authorized admin when the Supabase secret client is configured", async () => {

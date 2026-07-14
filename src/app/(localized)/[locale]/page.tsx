@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { HomePageView } from "@/components/home-page-view";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { getHomeContent } from "@/content/home";
+import { getPublicShellRuntime } from "@/content/public-content-runtime";
 import { isSupportedLocale, locales } from "@/i18n/config";
 import { createPublicPageMetadata } from "@/seo/public-page-metadata";
 
@@ -33,10 +34,16 @@ export default async function LocalePage({ params }: LocalePageProps) {
   }
 
   const content = getHomeContent(locale);
+  const shellRuntime = await getPublicShellRuntime(locale);
 
   return (
-    <PublicPageShell locale={locale} currentPage="home" content={content}>
-      <HomePageView locale={locale} content={content} />
+    <PublicPageShell locale={locale} currentPage="home" content={content} {...shellRuntime}>
+      <HomePageView
+        locale={locale}
+        content={content}
+        mediaPlacements={shellRuntime.mediaPlacements}
+        services={shellRuntime.services}
+      />
     </PublicPageShell>
   );
 }

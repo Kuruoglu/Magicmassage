@@ -18,7 +18,7 @@ export type AdminModule = {
   id: AdminSectionId;
   title: string;
   group: "Операции" | "Контент" | "Финансы" | "Система";
-  primaryAction: string;
+  primaryAction?: string;
   description: string;
 };
 
@@ -48,7 +48,6 @@ export const adminModules: AdminModule[] = [
     id: "dashboard",
     title: "Дашборд",
     group: "Операции",
-    primaryAction: "Создать запись",
     description: "Операционный обзор записей, заявок, ближайших визитов и сертификатов.",
   },
   {

@@ -6,9 +6,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { CertificateContent, PublicPagesContent } from "@/content/public-pages";
+import type { Locale } from "@/i18n/config";
+import type { PublicMediaPlacement } from "@/lib/public-content/types";
+import { resolvePublicMediaPlacement } from "@/lib/media-placement";
 
 type CertificateGalleryProps = {
   certificates: PublicPagesContent["about"]["certificates"];
+  locale: Locale;
+  mediaPlacements?: PublicMediaPlacement[];
 };
 
 type CertificateAspectStyle = CSSProperties & {
@@ -21,6 +26,7 @@ type CertificateCardProps = {
   index: number;
   onOpen: (index: number) => void;
   openLabel: string;
+  resolvedImageUrl?: string;
 };
 
 function getAspectStyle(certificate: CertificateContent): CertificateAspectStyle {
@@ -35,6 +41,7 @@ function CertificateCard({
   index,
   onOpen,
   openLabel,
+  resolvedImageUrl,
 }: CertificateCardProps) {
   const aspectStyle = getAspectStyle(certificate);
   const isFeatured = className === "certificate-card-feature";
@@ -49,7 +56,7 @@ function CertificateCard({
       >
         <span className="certificate-media" style={aspectStyle}>
           <Image
-            src={certificate.image.src}
+            src={resolvedImageUrl ?? certificate.image.src}
             alt={certificate.alt}
             width={certificate.image.width}
             height={certificate.image.height}
@@ -59,6 +66,7 @@ function CertificateCard({
                 ? "(max-width: 980px) 92vw, 58vw"
                 : "(max-width: 720px) 92vw, (max-width: 1180px) 44vw, 22vw"
             }
+            unoptimized={Boolean(resolvedImageUrl)}
           />
         </span>
         <span className="certificate-caption">{certificate.caption}</span>
@@ -67,13 +75,21 @@ function CertificateCard({
   );
 }
 
-export function CertificateGallery({ certificates }: CertificateGalleryProps) {
+function certificatePlacementKey(source: string) {
+  const fileName = source.split("/").pop() ?? source;
+  const stem = fileName.replace(/\.[^.]+$/, "").replace(/[^a-z0-9-]+/gi, "-").toLowerCase();
+  return `about.certificate.${stem}`;
+}
+
+export function CertificateGallery({ certificates, locale, mediaPlacements }: CertificateGalleryProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const activeCertificate =
     activeIndex === null ? null : certificates.items[activeIndex] ?? null;
   const activePosition = activeIndex === null ? 1 : activeIndex + 1;
   const portalRoot = typeof document === "undefined" ? null : document.body;
+  const imageUrlFor = (certificate: CertificateContent) =>
+    resolvePublicMediaPlacement(mediaPlacements, certificatePlacementKey(certificate.image.src), locale)?.url;
 
   const galleryGroups = useMemo(() => {
     const [featuredCertificate, ...supportingCertificates] = certificates.items;
@@ -166,12 +182,13 @@ export function CertificateGallery({ certificates }: CertificateGalleryProps) {
           style={getAspectStyle(activeCertificate)}
         >
           <Image
-            src={activeCertificate.image.src}
+            src={imageUrlFor(activeCertificate) ?? activeCertificate.image.src}
             alt={activeCertificate.alt}
             width={activeCertificate.image.width}
             height={activeCertificate.image.height}
             loading="eager"
             sizes="(max-width: 720px) 94vw, 86vw"
+            unoptimized={Boolean(imageUrlFor(activeCertificate))}
           />
         </div>
 
@@ -208,6 +225,7 @@ export function CertificateGallery({ certificates }: CertificateGalleryProps) {
             index={0}
             onOpen={setActiveIndex}
             openLabel={certificates.openLabel}
+            resolvedImageUrl={imageUrlFor(galleryGroups.featuredCertificate)}
           />
           <div className="certificates-side-stack">
             {galleryGroups.sideCertificates.map((certificate, offset) => (
@@ -217,6 +235,7 @@ export function CertificateGallery({ certificates }: CertificateGalleryProps) {
                 index={offset + 1}
                 onOpen={setActiveIndex}
                 openLabel={certificates.openLabel}
+                resolvedImageUrl={imageUrlFor(certificate)}
               />
             ))}
           </div>
@@ -230,6 +249,7 @@ export function CertificateGallery({ certificates }: CertificateGalleryProps) {
               index={offset + 3}
               onOpen={setActiveIndex}
               openLabel={certificates.openLabel}
+              resolvedImageUrl={imageUrlFor(certificate)}
             />
           ))}
         </div>

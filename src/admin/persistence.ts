@@ -10,10 +10,52 @@ import type {
   ServiceRecord,
   SettingsRecord,
 } from "./domain";
+import { serviceLocales, type ServiceLocale, type ServiceTranslationRecord } from "./domain";
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
+import { getArticleText, sanitizeArticleHtml } from "@/components/admin/blog/article-safety";
 
-export type AdminPersistInput =
+const appointmentStatuses = new Set([
+  "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0430",
+  "\u041e\u0436\u0438\u0434\u0430\u0435\u0442",
+  "\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430",
+  "\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u0430",
+  "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+  "\u041d\u0435 \u043f\u0440\u0438\u0448\u0451\u043b",
+]);
+const blogStatuses = new Set([
+  "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430",
+  "\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a",
+  "\u0417\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430",
+  "\u041d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435",
+]);
+const publishedStatus = "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430";
+const scheduledStatus = "\u0417\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430";
+const serviceStatuses = new Set([
+  publishedStatus,
+  "\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a",
+  "\u0421\u043a\u0440\u044b\u0442\u0430",
+]);
+
+export type AdminAuditAction =
+  | "appointment.cancel"
+  | "appointment.create"
+  | "appointment.drag"
+  | "appointment.post_visit_comment"
+  | "appointment.resize"
+  | "appointment.update"
+  | "blog.publication"
+  | "media.asset"
+  | "service.visibility"
+  | "site.gift_certificates";
+
+export type AdminAuditContext = {
+  action: AdminAuditAction;
+  outsideWorkingHours?: boolean;
+  overlapOverride?: boolean;
+};
+
+type AdminPersistRecordInput =
   | {
       record: Appointment;
       type: "appointment";
@@ -54,6 +96,10 @@ export type AdminPersistInput =
       record: SettingsRecord;
       type: "settings";
     };
+
+export type AdminPersistInput = AdminPersistRecordInput & {
+  audit?: AdminAuditContext;
+};
 
 export type AdminPersistResult =
   | {
@@ -112,6 +158,64 @@ function hasArray(value: Record<string, unknown>, key: string) {
   return Array.isArray(value[key]);
 }
 
+function isOptionalString(value: unknown) {
+  return value === undefined || typeof value === "string";
+}
+
+function isNonBlankString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isIsoDate(value: unknown) {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+
+  return date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() === Number(match[2]) - 1 &&
+    date.getUTCDate() === Number(match[3]);
+}
+
+function isOptionalIsoDate(value: unknown) {
+  return value === undefined || value === "" || isIsoDate(value);
+}
+
+function isOptionalLocalDateTime(value: unknown) {
+  if (value === undefined || value === "") return true;
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+
+  return Boolean(match && isIsoDate(match[1]));
+}
+
+function isOptionalIsoTimestamp(value: unknown) {
+  return value === undefined || value === "" ||
+    (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value)));
+}
+
+function isTime(value: unknown) {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function isSlug(value: unknown) {
+  return typeof value === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+}
+
+function isPublicLocaleArray(value: unknown): value is ServiceLocale[] {
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    new Set(value).size === value.length &&
+    value.every((locale) => serviceLocales.includes(locale as ServiceLocale));
+}
+
+function isOptionalStringRecord(value: unknown) {
+  return (
+    value === undefined ||
+    (isObjectRecord(value) && Object.values(value).every((item) => typeof item === "string"))
+  );
+}
+
 function isEmail(value: unknown) {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
@@ -156,7 +260,7 @@ function isClientRecordShape(record: Record<string, unknown>) {
       "totalSpend",
       "visits",
     ]) &&
-    isEmail(record.email) &&
+    (record.email === "" || isEmail(record.email)) &&
     hasArray(record, "history") &&
     hasString(record, "id") &&
     hasString(record, "language") &&
@@ -174,15 +278,57 @@ function isClientRecordShape(record: Record<string, unknown>) {
 }
 
 function isAppointmentRecordShape(record: Record<string, unknown>) {
+  const bufferMinutes = record.bufferMinutes;
+  const durationMinutes = record.durationMinutes;
+  const postVisitComment = record.postVisitComment;
+  const postVisitCommentedAt = record.postVisitCommentedAt;
+  const overlapOverride = record.overlapOverride;
+
   return (
-    hasOnlyKeys(record, ["client", "clientId", "date", "id", "note", "service", "status", "time"]) &&
+    hasOnlyKeys(record, [
+      "client",
+      "clientId",
+      "bufferMinutes",
+      "date",
+      "durationMinutes",
+      "id",
+      "note",
+      "overlapOverride",
+      "overlapOverrideReason",
+      "overlapOverriddenAt",
+      "overlapOverriddenBy",
+      "postVisitComment",
+      "postVisitCommentedAt",
+      "service",
+      "status",
+      "time",
+    ]) &&
     hasString(record, "client") &&
     hasString(record, "clientId") &&
     hasString(record, "date") &&
+    isIsoDate(record.date) &&
+    (bufferMinutes === undefined ||
+      (typeof bufferMinutes === "number" &&
+        Number.isInteger(bufferMinutes) &&
+        bufferMinutes >= 0 &&
+        bufferMinutes <= 24 * 60)) &&
+    (durationMinutes === undefined ||
+      (typeof durationMinutes === "number" &&
+        Number.isInteger(durationMinutes) &&
+        durationMinutes > 0 &&
+        durationMinutes <= 24 * 60)) &&
     hasString(record, "note") &&
+    (overlapOverride === undefined || typeof overlapOverride === "boolean") &&
+    isOptionalString(record.overlapOverrideReason) &&
+    isOptionalIsoTimestamp(record.overlapOverriddenAt) &&
+    isOptionalString(record.overlapOverriddenBy) &&
+    (overlapOverride !== true || Boolean((record.overlapOverrideReason as string | undefined)?.trim())) &&
+    (postVisitComment === undefined || typeof postVisitComment === "string") &&
+    isOptionalIsoTimestamp(postVisitCommentedAt) &&
     hasString(record, "service") &&
-    hasString(record, "status") &&
-    hasString(record, "time")
+    typeof record.status === "string" &&
+    appointmentStatuses.has(record.status) &&
+    isTime(record.time)
   );
 }
 
@@ -219,44 +365,147 @@ function isCertificateRecordShape(record: Record<string, unknown>) {
   );
 }
 
-function isServiceRecordShape(record: Record<string, unknown>) {
+function isServiceTranslationShape(value: unknown, locale: ServiceLocale): value is ServiceTranslationRecord {
+  if (!isObjectRecord(value)) return false;
+
   return (
-    hasOnlyKeys(record, ["category", "coverImage", "duration", "locales", "name", "order", "seoTitle", "slug", "status", "summary"]) &&
+    hasOnlyKeys(value, [
+      "body",
+      "canonicalUrl",
+      "locale",
+      "ogDescription",
+      "ogImageMediaId",
+      "ogTitle",
+      "robotsDirectives",
+      "seoDescription",
+      "seoTitle",
+      "shortDescription",
+      "status",
+      "title",
+    ]) &&
+    value.locale === locale &&
+    (value.status === "draft" || value.status === "published") &&
+    [
+      "body",
+      "canonicalUrl",
+      "ogDescription",
+      "ogImageMediaId",
+      "ogTitle",
+      "robotsDirectives",
+      "seoDescription",
+      "seoTitle",
+      "shortDescription",
+      "title",
+    ].every((key) => hasString(value, key))
+  );
+}
+
+function isServiceTranslationsShape(value: unknown) {
+  if (value === undefined) return true;
+  if (!isObjectRecord(value) || !hasOnlyKeys(value, serviceLocales)) return false;
+
+  return Object.entries(value).every(
+    ([locale, translation]) =>
+      serviceLocales.includes(locale as ServiceLocale) &&
+      isServiceTranslationShape(translation, locale as ServiceLocale),
+  );
+}
+
+function isServiceRecordShape(record: Record<string, unknown>) {
+  const hasValidShape =
+    hasOnlyKeys(record, [
+      "category",
+      "coverImage",
+      "duration",
+      "locales",
+      "name",
+      "order",
+      "seoTitle",
+      "slug",
+      "status",
+      "summary",
+      "translations",
+    ]) &&
     hasString(record, "category") &&
     isHttpUrlOrPath(record.coverImage) &&
     hasString(record, "duration") &&
-    hasStringArray(record, "locales") &&
+    isPublicLocaleArray(record.locales) &&
     hasString(record, "name") &&
     hasNumber(record, "order") &&
     hasString(record, "seoTitle") &&
-    hasString(record, "slug") &&
-    hasString(record, "status") &&
-    hasString(record, "summary")
+    isSlug(record.slug) &&
+    typeof record.status === "string" &&
+    serviceStatuses.has(record.status) &&
+    hasString(record, "summary") &&
+    isServiceTranslationsShape(record.translations);
+
+  if (!hasValidShape || record.status !== publishedStatus) return hasValidShape;
+  if (!isObjectRecord(record.translations)) return false;
+  const locales = record.locales as ServiceLocale[];
+  const translations = record.translations as Partial<Record<ServiceLocale, ServiceTranslationRecord>>;
+
+  return (
+    serviceLocales.every((locale) => locales.includes(locale)) &&
+    serviceLocales.every((locale) => {
+      const translation = translations[locale];
+
+      return isObjectRecord(translation) &&
+        translation.status === "published" &&
+        [
+          translation.title,
+          translation.shortDescription,
+          translation.body,
+          translation.seoTitle,
+          translation.seoDescription,
+          translation.robotsDirectives,
+        ].every(isNonBlankString);
+    }) &&
+    [record.category, record.coverImage, record.duration, record.name, record.seoTitle, record.summary]
+      .every(isNonBlankString)
   );
 }
 
 function isPriceRecordShape(record: Record<string, unknown>) {
   return (
     hasOnlyKeys(record, ["durationMinutes", "id", "note", "order", "priceEur", "serviceSlug", "status", "updatedAt"]) &&
-    hasNumber(record, "durationMinutes") &&
+    Number.isInteger(record.durationMinutes) &&
+    (record.durationMinutes as number) > 0 &&
+    (record.durationMinutes as number) <= 24 * 60 &&
     hasString(record, "id") &&
     hasString(record, "note") &&
     hasNumber(record, "order") &&
     hasNumber(record, "priceEur") &&
     hasString(record, "serviceSlug") &&
     hasString(record, "status") &&
-    hasString(record, "updatedAt")
+    isIsoDate(record.updatedAt)
   );
 }
 
 function isMediaRecordShape(record: Record<string, unknown>) {
   return (
-    hasOnlyKeys(record, ["altText", "dimensions", "folder", "id", "name", "size", "status", "type", "uploadedAt", "url", "usage"]) &&
+    hasOnlyKeys(record, [
+      "altText",
+      "altTexts",
+      "dimensions",
+      "folder",
+      "id",
+      "name",
+      "publicationConsent",
+      "size",
+      "status",
+      "type",
+      "uploadedAt",
+      "url",
+      "usage",
+    ]) &&
     hasString(record, "altText") &&
+    isOptionalStringRecord(record.altTexts) &&
     hasString(record, "dimensions") &&
     hasString(record, "folder") &&
     hasString(record, "id") &&
     hasString(record, "name") &&
+    (record.publicationConsent === undefined ||
+      ["unknown", "granted", "not_required", "denied"].includes(String(record.publicationConsent))) &&
     hasString(record, "size") &&
     hasString(record, "status") &&
     hasString(record, "type") &&
@@ -294,16 +543,27 @@ function isContactSettingsRecordShape(record: Record<string, unknown>) {
 }
 
 function isBlogPostRecordShape(record: Record<string, unknown>) {
-  return (
+  const hasDraftCover =
+    (record.status === "Черновик" || record.status === "На проверке") && record.coverImage === "";
+  const hasValidShape =
     hasOnlyKeys(record, [
       "author",
       "body",
+      "canonicalUrl",
       "category",
+      "coverAlt",
       "coverImage",
+      "editorJson",
       "excerpt",
+      "hreflang",
       "id",
       "locales",
+      "ogDescription",
+      "ogTitle",
       "publishedAt",
+      "robotsDirectives",
+      "scheduledFor",
+      "seoDescription",
       "seoTitle",
       "slug",
       "status",
@@ -313,18 +573,47 @@ function isBlogPostRecordShape(record: Record<string, unknown>) {
     ]) &&
     hasString(record, "author") &&
     hasString(record, "body") &&
+    isOptionalString(record.canonicalUrl) &&
     hasString(record, "category") &&
-    isHttpUrlOrPath(record.coverImage) &&
+    isOptionalString(record.coverAlt) &&
+    (hasDraftCover || isHttpUrlOrPath(record.coverImage)) &&
+    (record.editorJson === undefined || isObjectRecord(record.editorJson)) &&
     hasString(record, "excerpt") &&
+    isOptionalStringRecord(record.hreflang) &&
     hasString(record, "id") &&
-    hasStringArray(record, "locales") &&
-    hasString(record, "publishedAt") &&
+    isPublicLocaleArray(record.locales) &&
+    isOptionalString(record.ogDescription) &&
+    isOptionalString(record.ogTitle) &&
+    isOptionalIsoDate(record.publishedAt) &&
+    isOptionalString(record.robotsDirectives) &&
+    isOptionalLocalDateTime(record.scheduledFor) &&
+    isOptionalString(record.seoDescription) &&
     hasString(record, "seoTitle") &&
-    hasString(record, "slug") &&
-    hasString(record, "status") &&
+    isSlug(record.slug) &&
+    typeof record.status === "string" &&
+    blogStatuses.has(record.status) &&
     hasStringArray(record, "tags") &&
     hasString(record, "title") &&
-    hasString(record, "updatedAt")
+    isIsoDate(record.updatedAt);
+
+  if (!hasValidShape || (record.status !== publishedStatus && record.status !== scheduledStatus)) {
+    return hasValidShape;
+  }
+
+  return (
+    [
+      record.author,
+      record.category,
+      record.coverAlt,
+      record.coverImage,
+      record.seoDescription,
+      record.seoTitle,
+      record.title,
+    ].every(isNonBlankString) &&
+    getArticleText(String(record.body)).length > 0 &&
+    (record.status !== publishedStatus || isIsoDate(record.publishedAt)) &&
+    (record.status !== scheduledStatus ||
+      (typeof record.scheduledFor === "string" && isOptionalLocalDateTime(record.scheduledFor) && record.scheduledFor.length > 0))
   );
 }
 
@@ -342,6 +631,7 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
       "emailSender",
       "googleCalendarId",
       "googleCalendarMode",
+      "giftCertificatesEnabled",
       "reminderTemplate",
       "rolesPolicy",
       "stripeMode",
@@ -361,6 +651,7 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     isEmail(record.emailSender) &&
     hasString(record, "googleCalendarId") &&
     hasString(record, "googleCalendarMode") &&
+    (record.giftCertificatesEnabled === undefined || typeof record.giftCertificatesEnabled === "boolean") &&
     hasString(record, "reminderTemplate") &&
     hasString(record, "rolesPolicy") &&
     hasString(record, "stripeMode") &&
@@ -371,12 +662,51 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
   );
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unable to persist admin record.";
+const auditActionsByType: Record<AdminPersistInput["type"], readonly AdminAuditAction[]> = {
+  appointment: [
+    "appointment.cancel",
+    "appointment.create",
+    "appointment.drag",
+    "appointment.post_visit_comment",
+    "appointment.resize",
+    "appointment.update",
+  ],
+  blogPost: ["blog.publication"],
+  certificate: [],
+  client: [],
+  contactChannel: [],
+  contactSettings: [],
+  media: ["media.asset"],
+  price: [],
+  service: ["service.visibility"],
+  settings: ["site.gift_certificates"],
+};
+
+function isAdminAuditContext(value: unknown, type: AdminPersistInput["type"]) {
+  if (value === undefined) return auditActionsByType[type].length === 0;
+  if (!isObjectRecord(value) || !hasOnlyKeys(value, ["action", "outsideWorkingHours", "overlapOverride"])) {
+    return false;
+  }
+
+  return (
+    typeof value.action === "string" &&
+    auditActionsByType[type].includes(value.action as AdminAuditAction) &&
+    (value.outsideWorkingHours === undefined || typeof value.outsideWorkingHours === "boolean") &&
+    (value.overlapOverride === undefined || typeof value.overlapOverride === "boolean") &&
+    (type === "appointment" ||
+      (value.outsideWorkingHours === undefined && value.overlapOverride === undefined))
+  );
 }
 
 export function isAdminPersistInput(input: unknown): input is AdminPersistInput {
-  if (!isObjectRecord(input) || !isObjectRecord(input.record)) {
+  if (
+    !isObjectRecord(input) ||
+    !hasOnlyKeys(input, ["audit", "record", "type"]) ||
+    !isObjectRecord(input.record) ||
+    typeof input.type !== "string" ||
+    !(input.type in auditActionsByType) ||
+    !isAdminAuditContext(input.audit, input.type as AdminPersistInput["type"])
+  ) {
     return false;
   }
 
@@ -447,7 +777,7 @@ export async function persistAdminRecord(
     if (input.type === "client") {
       await repository.saveClient(input.record);
     } else if (input.type === "blogPost") {
-      await repository.saveBlogPost(input.record);
+      await repository.saveBlogPost({ ...input.record, body: sanitizeArticleHtml(input.record.body) });
     } else if (input.type === "certificate") {
       await repository.saveCertificate(input.record);
     } else if (input.type === "contactChannel") {
@@ -471,8 +801,10 @@ export async function persistAdminRecord(
       ok: true,
     };
   } catch (error) {
+    console.error("Unable to persist admin record", error);
+
     return {
-      message: errorMessage(error),
+      message: "Unable to persist admin record.",
       mode: "supabase",
       ok: false,
     };

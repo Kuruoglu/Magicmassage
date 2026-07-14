@@ -230,6 +230,18 @@ describe("admin persistence", () => {
     ).toBe(false);
   });
 
+  it("accepts a new client without an optional email address", () => {
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...clientRecord,
+          email: "",
+        },
+        type: "client",
+      }),
+    ).toBe(true);
+  });
+
   it("keeps writes in demo mode when Supabase is not configured", async () => {
     const result = await persistAdminRecord(
       { record: clientRecord, type: "client" },
@@ -460,7 +472,7 @@ describe("admin persistence", () => {
     );
 
     expect(result).toEqual({
-      message: "admin_appointments: permission denied",
+      message: "Unable to persist admin record.",
       mode: "supabase",
       ok: false,
     });
@@ -468,20 +480,117 @@ describe("admin persistence", () => {
 
   it("validates API persistence payloads by type and record shape", () => {
     expect(isAdminPersistInput({ record: clientRecord, type: "client" })).toBe(true);
-    expect(isAdminPersistInput({ record: appointmentRecord, type: "appointment" })).toBe(true);
+    expect(isAdminPersistInput({ audit: { action: "appointment.update" }, record: appointmentRecord, type: "appointment" })).toBe(true);
     expect(isAdminPersistInput({ record: certificateRecord, type: "certificate" })).toBe(true);
-    expect(isAdminPersistInput({ record: serviceRecord, type: "service" })).toBe(true);
+    expect(isAdminPersistInput({ audit: { action: "service.visibility" }, record: serviceRecord, type: "service" })).toBe(true);
     expect(isAdminPersistInput({ record: priceRecord, type: "price" })).toBe(true);
-    expect(isAdminPersistInput({ record: mediaRecord, type: "media" })).toBe(true);
+    expect(isAdminPersistInput({ audit: { action: "media.asset" }, record: mediaRecord, type: "media" })).toBe(true);
     expect(isAdminPersistInput({ record: contactChannelRecord, type: "contactChannel" })).toBe(true);
     expect(isAdminPersistInput({ record: contactSettingsRecord, type: "contactSettings" })).toBe(true);
-    expect(isAdminPersistInput({ record: blogPostRecord, type: "blogPost" })).toBe(true);
-    expect(isAdminPersistInput({ record: settingsRecord, type: "settings" })).toBe(true);
+    expect(isAdminPersistInput({ audit: { action: "blog.publication" }, record: blogPostRecord, type: "blogPost" })).toBe(true);
+    expect(isAdminPersistInput({ audit: { action: "site.gift_certificates" }, record: settingsRecord, type: "settings" })).toBe(true);
     expect(isAdminPersistInput({ record: null, type: "client" })).toBe(false);
     expect(isAdminPersistInput({ record: clientRecord, type: "certificate" })).toBe(false);
     expect(isAdminPersistInput({ record: serviceRecord, type: "price" })).toBe(false);
     expect(isAdminPersistInput({ record: mediaRecord, type: "contactSettings" })).toBe(false);
     expect(isAdminPersistInput({ record: blogPostRecord, type: "settings" })).toBe(false);
     expect(isAdminPersistInput({ record: settingsRecord, type: "blogPost" })).toBe(false);
+    expect(
+      isAdminPersistInput({
+        audit: { action: "appointment.drag", outsideWorkingHours: true, overlapOverride: false },
+        record: appointmentRecord,
+        type: "appointment",
+      }),
+    ).toBe(true);
+    expect(
+      isAdminPersistInput({ audit: { action: "blog.publication" }, record: serviceRecord, type: "service" }),
+    ).toBe(false);
+    expect(isAdminPersistInput({ record: clientRecord, type: "client", unexpected: true })).toBe(false);
+  });
+
+  it("rejects invalid appointment enums, dates, times, durations, and buffers", () => {
+    const input = { audit: { action: "appointment.update" }, record: appointmentRecord, type: "appointment" };
+
+    expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, date: "2026-02-30" } })).toBe(false);
+    expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, time: "25:00" } })).toBe(false);
+    expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, durationMinutes: 0 } })).toBe(false);
+    expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, bufferMinutes: -1 } })).toBe(false);
+    expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, postVisitCommentedAt: "not-a-date" } })).toBe(false);
+    expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, status: "unknown" } })).toBe(false);
+    expect(isAdminPersistInput({ record: { ...priceRecord, durationMinutes: 60.5 }, type: "price" })).toBe(false);
+  });
+
+  it("requires complete localized content and SEO fields before publishing a service", () => {
+    const translations = Object.fromEntries(["bg", "ru", "ua", "en"].map((locale) => [locale, {
+      body: `${locale} full description`,
+      canonicalUrl: `/${locale}/services/aroma-massage`,
+      locale,
+      ogDescription: `${locale} social description`,
+      ogImageMediaId: "",
+      ogTitle: `${locale} social title`,
+      robotsDirectives: "index,follow",
+      seoDescription: `${locale} SEO description`,
+      seoTitle: `${locale} SEO title`,
+      shortDescription: `${locale} short description`,
+      status: "published",
+      title: `${locale} title`,
+    }]));
+    const published = {
+      ...serviceRecord,
+      locales: ["bg", "ru", "ua", "en"],
+      status: "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430",
+      translations,
+    };
+
+    expect(isAdminPersistInput({ audit: { action: "service.visibility" }, record: published, type: "service" })).toBe(true);
+    expect(isAdminPersistInput({
+      audit: { action: "service.visibility" },
+      record: {
+        ...published,
+        translations: { ...translations, ru: { ...translations.ru, seoDescription: "" } },
+      },
+      type: "service",
+    })).toBe(false);
+    expect(isAdminPersistInput({
+      audit: { action: "service.visibility" },
+      record: { ...published, status: "unknown" },
+      type: "service",
+    })).toBe(false);
+  });
+
+  it("requires semantic content, SEO, dates, and known status before publishing a blog post", () => {
+    const published = {
+      ...blogPostRecord,
+      coverAlt: "Massage preparation guide cover",
+      locales: ["ru"],
+      seoDescription: "Preparation advice for a massage visit.",
+      status: "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430",
+    };
+
+    expect(isAdminPersistInput({ audit: { action: "blog.publication" }, record: published, type: "blogPost" })).toBe(true);
+    expect(isAdminPersistInput({
+      audit: { action: "blog.publication" },
+      record: { ...published, body: "<p> </p>" },
+      type: "blogPost",
+    })).toBe(false);
+    expect(isAdminPersistInput({
+      audit: { action: "blog.publication" },
+      record: { ...published, seoDescription: "" },
+      type: "blogPost",
+    })).toBe(false);
+    expect(isAdminPersistInput({
+      audit: { action: "blog.publication" },
+      record: { ...published, status: "unknown" },
+      type: "blogPost",
+    })).toBe(false);
+    expect(isAdminPersistInput({
+      audit: { action: "blog.publication" },
+      record: {
+        ...published,
+        scheduledFor: "",
+        status: "\u0417\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430",
+      },
+      type: "blogPost",
+    })).toBe(false);
   });
 });

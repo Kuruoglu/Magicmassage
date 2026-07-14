@@ -5,6 +5,7 @@ import { PublicPageShell } from "@/components/public-page-shell";
 import { ServicesPageView } from "@/components/services-page-view";
 import { getHomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
+import { getPublicShellRuntime, getRuntimeServices } from "@/content/public-content-runtime";
 import { isSupportedLocale, locales } from "@/i18n/config";
 import { createPublicPageMetadata } from "@/seo/public-page-metadata";
 
@@ -33,9 +34,16 @@ export default async function ServicesPage({ params }: ServicesPageProps) {
     notFound();
   }
 
+  const [services, shellRuntime] = await Promise.all([getRuntimeServices(locale), getPublicShellRuntime(locale)]);
+  const content = getPublicPagesContent(locale).services;
+
   return (
-    <PublicPageShell locale={locale} currentPage="services" content={getHomeContent(locale)}>
-      <ServicesPageView locale={locale} content={getPublicPagesContent(locale).services} />
+    <PublicPageShell locale={locale} currentPage="services" content={getHomeContent(locale)} {...shellRuntime}>
+      <ServicesPageView
+        locale={locale}
+        content={{ ...content, items: services }}
+        mediaPlacements={shellRuntime.mediaPlacements}
+      />
     </PublicPageShell>
   );
 }

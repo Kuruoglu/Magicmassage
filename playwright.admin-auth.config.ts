@@ -5,10 +5,9 @@ loadEnvConfig(process.cwd());
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "**/admin-auth.spec.ts",
-  timeout: 30_000,
+  timeout: 60_000,
   expect: {
-    timeout: 5_000,
+    timeout: 10_000,
   },
   use: {
     baseURL: "http://127.0.0.1:3101",
@@ -18,6 +17,13 @@ export default defineConfig({
   projects: [
     {
       name: "admin-auth-chromium",
+      testMatch: "**/admin-auth.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      grep: /@persistent/,
+      name: "prompt-persistence-chromium",
+      testMatch: "**/prompt-completion.spec.ts",
       use: { ...devices["Desktop Chrome"] },
     },
   ],

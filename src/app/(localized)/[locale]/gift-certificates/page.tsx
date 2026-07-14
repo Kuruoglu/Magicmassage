@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { GiftCertificatesPageView } from "@/components/gift-certificates-page-view";
 import { getGiftCertificatesPageContent } from "@/content/gift-certificates-page";
 import { getHomeContent } from "@/content/home";
+import { getPublicShellRuntime } from "@/content/public-content-runtime";
 import { isSupportedLocale, locales } from "@/i18n/config";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { createPublicPageMetadata } from "@/seo/public-page-metadata";
@@ -34,16 +35,20 @@ export default async function GiftCertificatesPage({ params }: GiftCertificatesP
   if (!isSupportedLocale(locale)) {
     notFound();
   }
+  const shellRuntime = await getPublicShellRuntime(locale);
+  if (!shellRuntime.giftCertificatesEnabled) notFound();
 
   return (
     <PublicPageShell
       locale={locale}
       currentPage="giftCertificates"
       content={getHomeContent(locale)}
+      {...shellRuntime}
     >
       <GiftCertificatesPageView
         locale={locale}
         content={getGiftCertificatesPageContent(locale)}
+        mediaPlacements={shellRuntime.mediaPlacements}
         stripePublishableKey={process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? null}
       />
     </PublicPageShell>

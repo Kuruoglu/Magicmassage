@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createGiftCertificatePaymentSession } from "@/gift-certificates/payment-session";
 import { getStripeClient } from "@/gift-certificates/stripe-client";
 import type { GiftCertificatePaymentSession } from "@/gift-certificates/payment-session";
+import { getRuntimeGiftCertificatesEnabled } from "@/content/public-content-runtime";
 
 const rateLimitWindowMs = 60_000;
 const rateLimitMaxRequests = 12;
@@ -91,6 +92,10 @@ export function clearGiftCertificatePaymentIntentGuardsForTests() {
 
 export async function POST(request: Request) {
   try {
+    if (!(await getRuntimeGiftCertificatesEnabled())) {
+      return jsonError(404);
+    }
+
     if (!isAllowedOrigin(request)) {
       return jsonError(403);
     }

@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { resolveAdminRole, type FinanceRow, type FinanceSummary } from "./config";
 import { normalizeClientPhone, parseEuroAmountToCents } from "./domain";
 import type {
@@ -9,9 +11,11 @@ import type {
   AdminContactSettingsDatabaseRow,
   AdminDomainRecords,
   AdminMediaDatabaseRow,
+  AdminMediaPlacementDatabaseRow,
   AdminPriceDatabaseRow,
   AdminProfileDatabaseRow,
   AdminServiceDatabaseRow,
+  AdminServiceTranslationDatabaseRow,
   AdminSiteSettingsDatabaseRow,
   AdminUserRecord,
   AdminUserStatus,
@@ -28,11 +32,15 @@ import type {
   ContactSettingsRecord,
   ContactStatus,
   MediaRecord,
+  MediaPlacementRecord,
+  MediaPublicationConsent,
   MediaStatus,
   MediaType,
   PriceRecord,
   PriceStatus,
+  ServiceLocale,
   ServiceRecord,
+  ServiceTranslationRecord,
   ServiceStatus,
   SettingsRecord,
   StripeMode,
@@ -51,6 +59,21 @@ type SupabaseMutationResult = {
   error: SupabaseError | null;
 };
 
+export type AdminRepositoryAuditContext = {
+  action?: string;
+  actorUserId: string;
+  metadata: Record<string, unknown>;
+};
+
+const adminRepositoryAuditContext = new AsyncLocalStorage<AdminRepositoryAuditContext>();
+
+export function runWithAdminRepositoryAuditContext<T>(
+  context: AdminRepositoryAuditContext,
+  operation: () => T,
+) {
+  return adminRepositoryAuditContext.run(context, operation);
+}
+
 type AdminSupabaseSelectQuery<T> = PromiseLike<SupabaseQueryResult<T>> & {
   eq(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   gte(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
@@ -66,6 +89,7 @@ type AdminSupabaseTable<T> = {
 
 export type AdminSupabaseClient = {
   from(table: string): AdminSupabaseTable<unknown>;
+  rpc(functionName: string, parameters: Record<string, unknown>): PromiseLike<SupabaseMutationResult>;
 };
 
 export type AdminStripeSaleDatabaseRow = {
@@ -107,16 +131,16 @@ export type AdminRepository = {
   loadDomainRecords(): Promise<AdminDomainRecords>;
   loadSettings(): Promise<SettingsRecord | undefined>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
-  saveAppointment(appointment: Appointment): Promise<void>;
-  saveBlogPost(post: BlogPostRecord): Promise<void>;
-  saveCertificate(certificate: CertificateRecord): Promise<void>;
-  saveClient(client: ClientRecord): Promise<void>;
-  saveContactChannel(channel: ContactChannelRecord): Promise<void>;
-  saveContactSettings(settings: ContactSettingsRecord): Promise<void>;
-  saveMedia(media: MediaRecord): Promise<void>;
-  savePrice(price: PriceRecord): Promise<void>;
-  saveService(service: ServiceRecord): Promise<void>;
-  saveSettings(settings: SettingsRecord): Promise<void>;
+  saveAppointment(appointment: Appointment, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveBlogPost(post: BlogPostRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveCertificate(certificate: CertificateRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveClient(client: ClientRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveContactChannel(channel: ContactChannelRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveContactSettings(settings: ContactSettingsRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveMedia(media: MediaRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  savePrice(price: PriceRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveService(service: ServiceRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveSettings(settings: SettingsRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
 };
 
 const clientColumns = [
@@ -138,9 +162,17 @@ const clientColumns = [
 
 const appointmentColumns = [
   "id",
+  "buffer_minutes",
   "client_id",
   "client_name_snapshot",
+  "duration_minutes",
   "internal_note",
+  "overlap_override",
+  "overlap_override_reason",
+  "overlap_overridden_at",
+  "overlap_overridden_by",
+  "post_visit_comment",
+  "post_visit_commented_at",
   "service_name",
   "starts_at",
   "starts_on",
@@ -177,6 +209,7 @@ const stripeSaleColumns = [
 const serviceColumns = [
   "category",
   "cover_image_url",
+  "cover_media_id",
   "display_order",
   "duration_label",
   "locale_codes",
@@ -185,6 +218,22 @@ const serviceColumns = [
   "slug",
   "status",
   "summary",
+].join(", ");
+
+const serviceTranslationColumns = [
+  "body",
+  "canonical_url",
+  "locale",
+  "og_description",
+  "og_image_media_id",
+  "og_title",
+  "robots_directives",
+  "seo_description",
+  "seo_title",
+  "service_slug",
+  "short_description",
+  "status",
+  "title",
 ].join(", ");
 
 const priceColumns = [
@@ -201,16 +250,30 @@ const priceColumns = [
 
 const mediaColumns = [
   "alt_text",
+  "alt_text_localized",
   "dimensions",
   "file_size_label",
   "folder",
   "id",
   "media_type",
   "name",
+  "publication_consent_status",
   "status",
   "uploaded_on",
   "url",
   "usage_contexts",
+].join(", ");
+
+const mediaPlacementColumns = [
+  "id",
+  "is_published",
+  "locale",
+  "media_asset_id",
+  "page_key",
+  "placement_key",
+  "publish_at",
+  "slot_key",
+  "sort_order",
 ].join(", ");
 
 const contactChannelColumns = [
@@ -250,11 +313,25 @@ const blogPostColumns = [
   "id",
   "author",
   "body",
+  "canonical_url",
   "category",
+  "cover_alt_text",
   "cover_image_url",
+  "cover_media_id",
+  "editor_json",
   "excerpt",
+  "hreflang",
   "locale_codes",
+  "locale",
+  "meta_description",
+  "og_description",
+  "og_image_media_id",
+  "og_title",
+  "published_at",
   "published_on",
+  "robots_directives",
+  "sanitized_html",
+  "scheduled_for",
   "seo_title",
   "slug",
   "status",
@@ -276,6 +353,7 @@ const siteSettingsColumns = [
   "email_sender",
   "google_calendar_id",
   "google_calendar_mode",
+  "gift_certificates_enabled",
   "reminder_template",
   "roles_policy",
   "stripe_mode",
@@ -438,10 +516,14 @@ const adminUserStatusByDatabase: Record<string, AdminUserStatus> = {
 
 const appointmentStatusByDatabase: Record<string, AppointmentStatus> = {
   cancelled: "Отменена",
+  completed: "Завершена",
   confirmed: "Подтверждена",
+  no_show: "Не пришёл",
   pending: "Ожидает",
   request: "Новая заявка",
   "Новая заявка": "Новая заявка",
+  Завершена: "Завершена",
+  "Не пришёл": "Не пришёл",
   Ожидает: "Ожидает",
   Отменена: "Отменена",
   Подтверждена: "Подтверждена",
@@ -449,7 +531,9 @@ const appointmentStatusByDatabase: Record<string, AppointmentStatus> = {
 
 const databaseAppointmentStatusByStatus = new Map<AppointmentStatus, string>([
   [appointmentStatusByDatabase.cancelled, "cancelled"],
+  [appointmentStatusByDatabase.completed, "completed"],
   [appointmentStatusByDatabase.confirmed, "confirmed"],
+  [appointmentStatusByDatabase.no_show, "no_show"],
   [appointmentStatusByDatabase.pending, "pending"],
   [appointmentStatusByDatabase.request, "request"],
 ]);
@@ -644,11 +728,19 @@ function mapClientRecordToRow(client: ClientRecord): AdminClientDatabaseRow {
 
 function mapAppointmentRow(row: AdminAppointmentDatabaseRow): Appointment {
   return {
+    bufferMinutes: row.buffer_minutes ?? 15,
     client: row.client_name_snapshot,
     clientId: row.client_id ?? undefined,
     date: row.starts_on,
+    durationMinutes: row.duration_minutes,
     id: row.id,
     note: row.internal_note,
+    overlapOverride: row.overlap_override,
+    overlapOverrideReason: row.overlap_override_reason,
+    overlapOverriddenAt: row.overlap_overridden_at ?? undefined,
+    overlapOverriddenBy: row.overlap_overridden_by ?? undefined,
+    postVisitComment: row.post_visit_comment,
+    postVisitCommentedAt: row.post_visit_commented_at ?? undefined,
     service: row.service_name,
     status: mapAppointmentStatus(row.status),
     time: normalizeTime(row.starts_at),
@@ -661,10 +753,18 @@ function mapAppointmentRecordToRow(appointment: Appointment): AdminAppointmentDa
   }
 
   return {
+    buffer_minutes: appointment.bufferMinutes ?? 15,
     client_id: appointment.clientId,
     client_name_snapshot: appointment.client,
+    duration_minutes: appointment.durationMinutes ?? 60,
     id: appointment.id ?? `${appointment.date}-${appointment.time}-${appointment.clientId}`,
     internal_note: appointment.note,
+    overlap_override: appointment.overlapOverride ?? false,
+    overlap_override_reason: appointment.overlapOverrideReason ?? "",
+    overlap_overridden_at: appointment.overlapOverriddenAt ?? null,
+    overlap_overridden_by: appointment.overlapOverriddenBy ?? null,
+    post_visit_comment: appointment.postVisitComment ?? "",
+    post_visit_commented_at: appointment.postVisitCommentedAt ?? null,
     service_name: appointment.service,
     starts_at: appointment.time,
     starts_on: appointment.date,
@@ -707,7 +807,54 @@ function mapCertificateRecordToRow(certificate: CertificateRecord): AdminCertifi
   };
 }
 
-function mapServiceRow(row: AdminServiceDatabaseRow): ServiceRecord {
+function mapServiceTranslationRow(row: AdminServiceTranslationDatabaseRow): ServiceTranslationRecord {
+  return {
+    body: row.body,
+    canonicalUrl: row.canonical_url,
+    locale: row.locale,
+    ogDescription: row.og_description,
+    ogImageMediaId: row.og_image_media_id ?? "",
+    ogTitle: row.og_title,
+    robotsDirectives: row.robots_directives,
+    seoDescription: row.seo_description,
+    seoTitle: row.seo_title,
+    shortDescription: row.short_description,
+    status: row.status,
+    title: row.title,
+  };
+}
+
+function mapServiceTranslationRecordToRow(
+  serviceSlug: string,
+  translation: ServiceTranslationRecord,
+): AdminServiceTranslationDatabaseRow {
+  return {
+    body: translation.body,
+    canonical_url: translation.canonicalUrl,
+    locale: translation.locale,
+    og_description: translation.ogDescription,
+    og_image_media_id: translation.ogImageMediaId || null,
+    og_title: translation.ogTitle,
+    robots_directives: translation.robotsDirectives || "index,follow",
+    seo_description: translation.seoDescription,
+    seo_title: translation.seoTitle,
+    service_slug: serviceSlug,
+    short_description: translation.shortDescription,
+    status: translation.status,
+    title: translation.title,
+  };
+}
+
+function mapServiceRow(
+  row: AdminServiceDatabaseRow,
+  translationRows: AdminServiceTranslationDatabaseRow[] = [],
+): ServiceRecord {
+  const translations = Object.fromEntries(
+    translationRows
+      .filter((translation) => translation.service_slug === row.slug)
+      .map((translation) => [translation.locale, mapServiceTranslationRow(translation)]),
+  ) as ServiceRecord["translations"];
+
   return {
     category: row.category,
     coverImage: row.cover_image_url,
@@ -719,13 +866,15 @@ function mapServiceRow(row: AdminServiceDatabaseRow): ServiceRecord {
     slug: row.slug,
     status: mapServiceStatus(row.status),
     summary: row.summary,
+    translations,
   };
 }
 
-function mapServiceRecordToRow(service: ServiceRecord): AdminServiceDatabaseRow {
+function mapServiceRecordToRow(service: ServiceRecord, coverMediaId: string | null = null): AdminServiceDatabaseRow {
   return {
     category: service.category,
     cover_image_url: service.coverImage,
+    cover_media_id: coverMediaId,
     display_order: service.order,
     duration_label: service.duration,
     locale_codes: [...service.locales],
@@ -764,31 +913,65 @@ function mapPriceRecordToRow(price: PriceRecord): AdminPriceDatabaseRow {
   };
 }
 
-function mapMediaRow(row: AdminMediaDatabaseRow): MediaRecord {
+function mapMediaPlacementRow(row: AdminMediaPlacementDatabaseRow): MediaPlacementRecord {
+  return {
+    id: row.id,
+    isPublished: row.is_published,
+    locale: row.locale,
+    mediaAssetId: row.media_asset_id,
+    pageKey: row.page_key,
+    placementKey: row.placement_key,
+    publishAt: row.publish_at ?? null,
+    slotKey: row.slot_key,
+    sortOrder: row.sort_order,
+  };
+}
+
+function mapMediaRow(
+  row: AdminMediaDatabaseRow,
+  placementRows: AdminMediaPlacementDatabaseRow[] = [],
+): MediaRecord {
+  const placements = placementRows
+    .filter((placement) => placement.media_asset_id === row.id)
+    .map(mapMediaPlacementRow);
+
   return {
     altText: row.alt_text,
+    ...(row.alt_text_localized && Object.keys(row.alt_text_localized).length > 0
+      ? { altTexts: { ...row.alt_text_localized } }
+      : {}),
     dimensions: row.dimensions,
     folder: row.folder,
     id: row.id,
     name: row.name,
+    placements,
+    publicationConsent: (["unknown", "granted", "not_required", "denied"] as const).includes(
+      row.publication_consent_status as MediaPublicationConsent,
+    )
+      ? (row.publication_consent_status as MediaPublicationConsent)
+      : "unknown",
     size: row.file_size_label,
     status: mapMediaStatus(row.status),
     type: mapMediaType(row.media_type),
     uploadedAt: row.uploaded_on,
     url: row.url,
-    usage: [...row.usage_contexts],
+    usage: placements.length > 0
+      ? placements.map((placement) => `${placement.placementKey}${placement.locale ? ` · ${placement.locale.toUpperCase()}` : ""}`)
+      : [...row.usage_contexts],
   };
 }
 
 function mapMediaRecordToRow(media: MediaRecord): AdminMediaDatabaseRow {
   return {
     alt_text: media.altText,
+    ...(media.altTexts ? { alt_text_localized: { ...media.altTexts } } : {}),
     dimensions: media.dimensions,
     file_size_label: media.size,
     folder: media.folder,
     id: media.id,
     media_type: mapMediaTypeToDatabase(media.type),
     name: media.name,
+    publication_consent_status: media.publicationConsent ?? "unknown",
     status: mapMediaStatusToDatabase(media.status),
     uploaded_on: media.uploadedAt,
     url: media.url,
@@ -850,13 +1033,22 @@ function mapContactSettingsRecordToRow(settings: ContactSettingsRecord): AdminCo
 function mapBlogPostRow(row: AdminBlogPostDatabaseRow): BlogPostRecord {
   return {
     author: row.author,
-    body: row.body,
+    body: row.sanitized_html || row.body,
+    canonicalUrl: row.canonical_url,
     category: row.category,
+    coverAlt: row.cover_alt_text || row.title,
     coverImage: row.cover_image_url,
+    editorJson: row.editor_json ?? {},
     excerpt: row.excerpt,
+    hreflang: row.hreflang ?? {},
     id: row.id,
-    locales: [...row.locale_codes],
+    locales: row.locale ? [row.locale] : [...row.locale_codes],
+    ogDescription: row.og_description,
+    ogTitle: row.og_title,
     publishedAt: row.published_on ?? "",
+    robotsDirectives: row.robots_directives,
+    scheduledFor: row.scheduled_for ? sofiaUtcDateTimeToLocal(row.scheduled_for) : undefined,
+    seoDescription: row.meta_description,
     seoTitle: row.seo_title,
     slug: row.slug,
     status: mapBlogStatus(row.status),
@@ -866,16 +1058,85 @@ function mapBlogPostRow(row: AdminBlogPostDatabaseRow): BlogPostRecord {
   };
 }
 
-function mapBlogPostRecordToRow(post: BlogPostRecord): AdminBlogPostDatabaseRow {
+const sofiaDateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  day: "2-digit",
+  hour: "2-digit",
+  hour12: false,
+  minute: "2-digit",
+  month: "2-digit",
+  timeZone: "Europe/Sofia",
+  year: "numeric",
+});
+
+export function sofiaUtcDateTimeToLocal(value: string) {
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return undefined;
+
+  const parts = Object.fromEntries(
+    sofiaDateTimeFormatter.formatToParts(instant).map((part) => [part.type, part.value]),
+  );
+
+  return `${parts.year}-${parts.month}-${parts.day}T${String(Number(parts.hour) % 24).padStart(2, "0")}:${parts.minute}`;
+}
+
+export function sofiaLocalDateTimeToIso(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const desiredUtc = Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+  );
+  let instant = desiredUtc;
+
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const parts = Object.fromEntries(
+      sofiaDateTimeFormatter.formatToParts(new Date(instant)).map((part) => [part.type, part.value]),
+    );
+    const observedUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour) % 24,
+      Number(parts.minute),
+    );
+    instant += desiredUtc - observedUtc;
+  }
+
+  const isoValue = new Date(instant).toISOString();
+
+  return sofiaUtcDateTimeToLocal(isoValue) === value ? isoValue : null;
+}
+
+function mapBlogPostRecordToRow(post: BlogPostRecord, mediaAssetId: string | null = null): AdminBlogPostDatabaseRow {
   return {
     author: post.author,
     body: post.body,
+    canonical_url: post.canonicalUrl || `/${post.locales[0] ?? "bg"}/blog/${post.slug}`,
     category: post.category,
+    cover_alt_text: post.coverAlt || post.title,
     cover_image_url: post.coverImage,
+    cover_media_id: mediaAssetId,
+    editor_json: post.editorJson ?? { html: post.body, type: "html", version: 1 },
     excerpt: post.excerpt,
     id: post.id,
+    hreflang: post.hreflang ?? {},
     locale_codes: [...post.locales],
+    locale: post.locales[0] ?? "bg",
+    meta_description: post.seoDescription || post.excerpt,
+    og_description: post.ogDescription || post.excerpt,
+    og_image_media_id: mediaAssetId,
+    og_title: post.ogTitle || post.seoTitle || post.title,
+    published_at: post.status === "Опубликована" && post.publishedAt ? `${post.publishedAt}T00:00:00Z` : null,
     published_on: post.publishedAt.trim() || null,
+    robots_directives: post.robotsDirectives || (post.status === "Опубликована" ? "index,follow" : "noindex,nofollow"),
+    sanitized_html: post.body,
+    scheduled_for: post.status === "Запланирована" && post.scheduledFor
+      ? sofiaLocalDateTimeToIso(post.scheduledFor)
+      : null,
     seo_title: post.seoTitle,
     slug: post.slug,
     status: mapBlogStatusToDatabase(post.status),
@@ -898,6 +1159,7 @@ function mapSettingsRow(row: AdminSiteSettingsDatabaseRow): SettingsRecord {
     emailSender: row.email_sender,
     googleCalendarId: row.google_calendar_id,
     googleCalendarMode: mapCalendarSyncMode(row.google_calendar_mode),
+    giftCertificatesEnabled: row.gift_certificates_enabled,
     reminderTemplate: row.reminder_template,
     rolesPolicy: row.roles_policy,
     stripeMode: mapStripeMode(row.stripe_mode),
@@ -921,6 +1183,7 @@ function mapSettingsRecordToRow(settings: SettingsRecord): AdminSiteSettingsData
     email_sender: settings.emailSender,
     google_calendar_id: settings.googleCalendarId,
     google_calendar_mode: mapCalendarSyncModeToDatabase(settings.googleCalendarMode),
+    gift_certificates_enabled: settings.giftCertificatesEnabled !== false,
     id: "site",
     reminder_template: settings.reminderTemplate,
     roles_policy: settings.rolesPolicy,
@@ -1002,16 +1265,15 @@ async function insertRow(client: AdminSupabaseClient, table: string, values: unk
   }
 }
 
-async function upsertRow(
+async function callRpc(
   client: AdminSupabaseClient,
-  table: string,
-  values: unknown,
-  options?: { onConflict?: string },
+  functionName: string,
+  parameters: Record<string, unknown>,
 ) {
-  const { error } = await client.from(table).upsert(values, options);
+  const { error } = await client.rpc(functionName, parameters);
 
   if (error) {
-    throw new Error(`${table}: ${error.message}`);
+    throw new Error(`${functionName}: ${error.message}`);
   }
 }
 
@@ -1052,8 +1314,14 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     const rows = await selectRows<AdminServiceDatabaseRow>(client, "admin_services", serviceColumns, (query) =>
       query.order("display_order", { ascending: true }),
     );
+    const translationRows = await selectRows<AdminServiceTranslationDatabaseRow>(
+      client,
+      "admin_service_translations",
+      serviceTranslationColumns,
+      (query) => query.order("locale", { ascending: true }),
+    );
 
-    return rows.map(mapServiceRow);
+    return rows.map((row) => mapServiceRow(row, translationRows));
   }
 
   async function listPrices() {
@@ -1068,8 +1336,14 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     const rows = await selectRows<AdminMediaDatabaseRow>(client, "admin_media_assets", mediaColumns, (query) =>
       query.order("uploaded_on", { ascending: false }),
     );
+    const placementRows = await selectRows<AdminMediaPlacementDatabaseRow>(
+      client,
+      "admin_media_placements",
+      mediaPlacementColumns,
+      (query) => query.order("sort_order", { ascending: true }),
+    );
 
-    return rows.map(mapMediaRow);
+    return rows.map((row) => mapMediaRow(row, placementRows));
   }
 
   async function listContactChannels() {
@@ -1141,44 +1415,146 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     });
   }
 
-  async function saveClient(clientRecord: ClientRecord) {
-    await upsertRow(client, "admin_clients", mapClientRecordToRow(clientRecord), { onConflict: "id" });
+  async function saveRecordWithAudit(
+    recordType: "appointment" | "certificate" | "client" | "contactChannel" | "contactSettings" | "media" | "price" | "settings",
+    record: object,
+    auditContext?: AdminRepositoryAuditContext,
+  ) {
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_save_record_with_audit: verified actor is required");
+    }
+    const defaultActionByRecordType: Record<typeof recordType, string> = {
+      appointment: "appointment.update",
+      certificate: "record.certificate.upsert",
+      client: "record.client.upsert",
+      contactChannel: "record.contactChannel.upsert",
+      contactSettings: "record.contactSettings.upsert",
+      media: "media.asset",
+      price: "record.price.upsert",
+      settings: "site.gift_certificates",
+    };
+
+    await callRpc(client, "admin_save_record_with_audit", {
+      p_action: verifiedAuditContext.action ?? defaultActionByRecordType[recordType],
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_audit_metadata: verifiedAuditContext.metadata,
+      p_record: record,
+      p_record_type: recordType,
+    });
   }
 
-  async function saveAppointment(appointment: Appointment) {
-    await upsertRow(client, "admin_appointments", mapAppointmentRecordToRow(appointment), { onConflict: "id" });
+  async function saveClient(clientRecord: ClientRecord, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("client", mapClientRecordToRow(clientRecord), auditContext);
   }
 
-  async function saveCertificate(certificate: CertificateRecord) {
-    await upsertRow(client, "admin_certificates", mapCertificateRecordToRow(certificate), { onConflict: "code" });
+  async function saveAppointment(appointment: Appointment, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("appointment", mapAppointmentRecordToRow(appointment), auditContext);
   }
 
-  async function saveService(service: ServiceRecord) {
-    await upsertRow(client, "admin_services", mapServiceRecordToRow(service), { onConflict: "slug" });
+  async function saveCertificate(certificate: CertificateRecord, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("certificate", mapCertificateRecordToRow(certificate), auditContext);
   }
 
-  async function savePrice(price: PriceRecord) {
-    await upsertRow(client, "admin_price_variants", mapPriceRecordToRow(price), { onConflict: "id" });
+  async function saveService(service: ServiceRecord, auditContext?: AdminRepositoryAuditContext) {
+    const mediaRows = service.coverImage
+      ? await selectRows<{ id: string }>(client, "admin_media_assets", "id", (query) => query.eq("url", service.coverImage))
+      : [];
+    const coverMediaId = mediaRows[0]?.id ?? null;
+
+    if (service.status === "Опубликована" && !coverMediaId) {
+      throw new Error("admin_services: published cover must reference a media-library asset");
+    }
+
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_save_service_aggregate: verified actor is required");
+    }
+
+    const translations = Object.values(service.translations ?? {})
+      .filter((translation): translation is ServiceTranslationRecord => Boolean(translation))
+      .map((translation) => mapServiceTranslationRecordToRow(service.slug, translation));
+    const placements = coverMediaId
+      ? Object.keys(service.translations ?? {}).map((locale) => ({
+          caption_localized: { [locale]: service.translations?.[locale as ServiceLocale]?.title ?? service.name },
+          is_published: service.status === "Опубликована",
+          locale,
+          media_asset_id: coverMediaId,
+          page_key: `service:${service.slug}`,
+          placement_key: `service:${service.slug}:cover`,
+          publish_at: null,
+          slot_key: "cover",
+          sort_order: 0,
+        }))
+      : [];
+    await callRpc(client, "admin_save_service_aggregate", {
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_audit_metadata: verifiedAuditContext.metadata,
+      p_placements: placements,
+      p_service: mapServiceRecordToRow(service, coverMediaId),
+      p_translations: translations,
+    });
   }
 
-  async function saveMedia(media: MediaRecord) {
-    await upsertRow(client, "admin_media_assets", mapMediaRecordToRow(media), { onConflict: "id" });
+  async function savePrice(price: PriceRecord, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("price", mapPriceRecordToRow(price), auditContext);
   }
 
-  async function saveContactChannel(channel: ContactChannelRecord) {
-    await upsertRow(client, "admin_contact_channels", mapContactChannelRecordToRow(channel), { onConflict: "id" });
+  async function saveMedia(media: MediaRecord, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("media", mapMediaRecordToRow(media), auditContext);
   }
 
-  async function saveContactSettings(settings: ContactSettingsRecord) {
-    await upsertRow(client, "admin_contact_settings", mapContactSettingsRecordToRow(settings), { onConflict: "id" });
+  async function saveContactChannel(channel: ContactChannelRecord, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("contactChannel", mapContactChannelRecordToRow(channel), auditContext);
   }
 
-  async function saveBlogPost(post: BlogPostRecord) {
-    await upsertRow(client, "admin_blog_posts", mapBlogPostRecordToRow(post), { onConflict: "id" });
+  async function saveContactSettings(settings: ContactSettingsRecord, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("contactSettings", mapContactSettingsRecordToRow(settings), auditContext);
   }
 
-  async function saveSettings(settings: SettingsRecord) {
-    await upsertRow(client, "admin_site_settings", mapSettingsRecordToRow(settings), { onConflict: "id" });
+  async function saveBlogPost(post: BlogPostRecord, auditContext?: AdminRepositoryAuditContext) {
+    const mediaRows = post.coverImage
+      ? await selectRows<{ id: string }>(client, "admin_media_assets", "id", (query) => query.eq("url", post.coverImage))
+      : [];
+    const mediaAssetId = mediaRows[0]?.id ?? null;
+    const postRow = mapBlogPostRecordToRow(post, mediaAssetId);
+
+    if ((post.status === "Опубликована" || post.status === "Запланирована") && !mediaAssetId) {
+      throw new Error("admin_blog_posts: publication cover must reference a media-library asset");
+    }
+    if (post.status === "Запланирована" && !postRow.scheduled_for) {
+      throw new Error("admin_blog_posts: scheduled time must be a valid Europe/Sofia local time");
+    }
+
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_save_blog_post_aggregate: verified actor is required");
+    }
+
+    const locale = post.locales[0] ?? "bg";
+    const placement = mediaAssetId
+      ? {
+          caption_localized: { [locale]: post.title },
+          is_published: post.status === "Опубликована" || post.status === "Запланирована",
+          locale,
+          media_asset_id: mediaAssetId,
+          page_key: `blog:${post.id}`,
+          placement_key: `blog:${post.id}:cover`,
+          publish_at: postRow.scheduled_for,
+          slot_key: "cover",
+          sort_order: 0,
+        }
+      : null;
+    await callRpc(client, "admin_save_blog_post_aggregate", {
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_audit_metadata: verifiedAuditContext.metadata,
+      p_placement: placement,
+      p_post: postRow,
+    });
+  }
+
+  async function saveSettings(settings: SettingsRecord, auditContext?: AdminRepositoryAuditContext) {
+    await saveRecordWithAudit("settings", mapSettingsRecordToRow(settings), auditContext);
   }
 
   return {

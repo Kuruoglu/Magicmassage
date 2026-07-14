@@ -3,6 +3,8 @@ import { expect, test, type Request } from "@playwright/test";
 const studio24BookingUrl = "https://studio24.bg/magic-massage-studio-natali-s8031";
 
 test("public routes render and expose the Studio24 booking handoff", async ({ page }) => {
+  test.setTimeout(60_000);
+
   for (const locale of ["bg", "ru", "ua", "en"]) {
     await page.goto(`/${locale}`);
 

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { LegalPageView } from "@/components/legal-page-view";
 import { getHomeContent } from "@/content/home";
 import { getLegalPageContent } from "@/content/legal-pages";
+import { getPublicShellRuntime } from "@/content/public-content-runtime";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { isSupportedLocale, locales } from "@/i18n/config";
 import { createPublicPageMetadata } from "@/seo/public-page-metadata";
@@ -32,9 +33,10 @@ export default async function PrivacyPage({ params }: PrivacyPageProps) {
   if (!isSupportedLocale(locale)) {
     notFound();
   }
+  const shellRuntime = await getPublicShellRuntime(locale);
 
   return (
-    <PublicPageShell locale={locale} currentPage="privacy" content={getHomeContent(locale)}>
+    <PublicPageShell locale={locale} currentPage="privacy" content={getHomeContent(locale)} {...shellRuntime}>
       <LegalPageView content={getLegalPageContent(locale, "privacy")} />
     </PublicPageShell>
   );

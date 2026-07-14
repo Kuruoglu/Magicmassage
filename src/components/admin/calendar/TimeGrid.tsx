@@ -1,0 +1,219 @@
+import { useEffect, useRef, type CSSProperties, type DragEvent, type ReactNode } from "react";
+
+import type { Appointment } from "@/admin/domain";
+import { appointmentKey } from "@/components/admin/lib/links";
+
+import {
+  CALENDAR_DAY_END,
+  CALENDAR_DAY_START,
+  CALENDAR_HOUR_HEIGHT,
+  CALENDAR_HOUR_LABELS,
+  CALENDAR_INITIAL_SCROLL_TIME,
+} from "./constants";
+import { MIN_APPOINTMENT_DURATION_MINUTES, timeToMinutes, timeToPosition } from "./time";
+
+export type AppointmentOverlapLayout = {
+  column: number;
+  columnCount: number;
+  leftPercentage: number;
+  widthPercentage: number;
+};
+
+export type LaidOutAppointment = {
+  appointment: Appointment;
+  layout: AppointmentOverlapLayout;
+};
+
+type LayoutCandidate = {
+  appointment: Appointment;
+  column: number;
+  end: number;
+  key: string;
+  start: number;
+};
+
+function percentage(part: number, total: number) {
+  return Number(((part / total) * 100).toFixed(6));
+}
+
+function assignColumns(group: LayoutCandidate[]): LaidOutAppointment[] {
+  const columnEnds: number[] = [];
+
+  for (const candidate of group) {
+    const availableColumn = columnEnds.findIndex((end) => end <= candidate.start);
+    candidate.column = availableColumn === -1 ? columnEnds.length : availableColumn;
+    columnEnds[candidate.column] = candidate.end;
+  }
+
+  const columnCount = Math.max(1, columnEnds.length);
+
+  return group.map((candidate) => ({
+    appointment: candidate.appointment,
+    layout: {
+      column: candidate.column,
+      columnCount,
+      leftPercentage: percentage(candidate.column, columnCount),
+      widthPercentage: percentage(1, columnCount),
+    },
+  }));
+}
+
+export function layoutDayAppointments(appointments: Appointment[]): LaidOutAppointment[] {
+  const candidates = appointments
+    .map<LayoutCandidate>((appointment) => {
+      const start = timeToMinutes(appointment.time);
+
+      return {
+        appointment,
+        column: 0,
+        end: start + Math.max(MIN_APPOINTMENT_DURATION_MINUTES, appointment.durationMinutes ?? 60),
+        key: appointmentKey(appointment),
+        start,
+      };
+    })
+    .sort((left, right) => {
+      if (left.start !== right.start) return left.start - right.start;
+      if (left.end !== right.end) return right.end - left.end;
+      if (left.key === right.key) return 0;
+      return left.key < right.key ? -1 : 1;
+    });
+  const laidOutAppointments: LaidOutAppointment[] = [];
+
+  for (let groupStart = 0; groupStart < candidates.length; ) {
+    let groupEnd = candidates[groupStart].end;
+    let groupEndIndex = groupStart + 1;
+
+    while (groupEndIndex < candidates.length && candidates[groupEndIndex].start < groupEnd) {
+      groupEnd = Math.max(groupEnd, candidates[groupEndIndex].end);
+      groupEndIndex += 1;
+    }
+
+    laidOutAppointments.push(...assignColumns(candidates.slice(groupStart, groupEndIndex)));
+    groupStart = groupEndIndex;
+  }
+
+  return laidOutAppointments;
+}
+
+export type TimeGridDay = {
+  appointments: Appointment[];
+  ariaLabel: string;
+  className?: string;
+  date: string;
+};
+
+type TimeGridProps = {
+  days: TimeGridDay[];
+  mode: "day" | "week";
+  onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
+  renderAppointment: (
+    appointment: Appointment,
+    compact: boolean,
+    layout?: AppointmentOverlapLayout,
+  ) => ReactNode;
+};
+
+function TimeAxis() {
+  return (
+    <div className="admin-calendar-time-axis" aria-hidden="true">
+      {CALENDAR_HOUR_LABELS.map((hour) => (
+        <time key={hour} style={{ top: `${timeToPosition(hour, CALENDAR_DAY_START, CALENDAR_HOUR_HEIGHT)}px` }}>
+          {hour}
+        </time>
+      ))}
+    </div>
+  );
+}
+
+function TimeColumn({
+  compact,
+  day,
+  onDropAppointment,
+  renderAppointment,
+}: {
+  compact: boolean;
+  day: TimeGridDay;
+  onDropAppointment: TimeGridProps["onDropAppointment"];
+  renderAppointment: TimeGridProps["renderAppointment"];
+}) {
+  const laidOutAppointments = layoutDayAppointments(day.appointments);
+
+  return (
+    <section
+      aria-label={day.ariaLabel}
+      className={["admin-calendar-time-column", day.className].filter(Boolean).join(" ")}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => onDropAppointment(event, day.date)}
+      role="list"
+    >
+      <div className="admin-calendar-hour-lines" aria-hidden="true">
+        {CALENDAR_HOUR_LABELS.map((hour) => (
+          <span
+            key={hour}
+            style={{ top: `${timeToPosition(hour, CALENDAR_DAY_START, CALENDAR_HOUR_HEIGHT)}px` }}
+          />
+        ))}
+      </div>
+      {laidOutAppointments.map(({ appointment, layout }) => renderAppointment(appointment, compact, layout))}
+    </section>
+  );
+}
+
+export function TimeGrid({ days, mode, onDropAppointment, renderAppointment }: TimeGridProps) {
+  const dayScrollRef = useRef<HTMLDivElement>(null);
+  const selectedDay = days[0]?.date;
+  const calendarGridHeight =
+    ((timeToMinutes(CALENDAR_DAY_END) - timeToMinutes(CALENDAR_DAY_START)) / 60) * CALENDAR_HOUR_HEIGHT;
+  const gridHeightStyle = {
+    "--admin-calendar-grid-height": `${calendarGridHeight}px`,
+  } as CSSProperties;
+
+  useEffect(() => {
+    if (mode === "day" && dayScrollRef.current) {
+      dayScrollRef.current.scrollTop = timeToPosition(
+        CALENDAR_INITIAL_SCROLL_TIME,
+        CALENDAR_DAY_START,
+        CALENDAR_HOUR_HEIGHT,
+      );
+    }
+  }, [mode, selectedDay]);
+
+  if (mode === "week") {
+    return (
+      <div className="admin-week-grid-body" style={gridHeightStyle}>
+        <TimeAxis />
+        <div className="admin-week-time-columns">
+          {days.map((day) => (
+            <TimeColumn
+              compact
+              day={day}
+              key={day.date}
+              onDropAppointment={onDropAppointment}
+              renderAppointment={renderAppointment}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const day = days[0];
+
+  return (
+    <div
+      className="admin-calendar-time-grid admin-day-time-grid"
+      ref={dayScrollRef}
+      style={{ ...gridHeightStyle, maxHeight: "min(70vh, 860px)" }}
+    >
+      <TimeAxis />
+      {day ? (
+        <TimeColumn
+          compact={false}
+          day={day}
+          onDropAppointment={onDropAppointment}
+          renderAppointment={renderAppointment}
+        />
+      ) : null}
+    </div>
+  );
+}

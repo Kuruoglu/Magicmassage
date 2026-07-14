@@ -5,6 +5,7 @@ import { ContactsPageView } from "@/components/contacts-page-view";
 import { PublicPageShell } from "@/components/public-page-shell";
 import { getHomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
+import { getPublicShellRuntime } from "@/content/public-content-runtime";
 import { isSupportedLocale, locales } from "@/i18n/config";
 import { createPublicPageMetadata } from "@/seo/public-page-metadata";
 
@@ -32,10 +33,15 @@ export default async function ContactsPage({ params }: ContactsPageProps) {
   if (!isSupportedLocale(locale)) {
     notFound();
   }
+  const shellRuntime = await getPublicShellRuntime(locale);
 
   return (
-    <PublicPageShell locale={locale} currentPage="contacts" content={getHomeContent(locale)}>
-      <ContactsPageView locale={locale} content={getPublicPagesContent(locale).contacts} />
+    <PublicPageShell locale={locale} currentPage="contacts" content={getHomeContent(locale)} {...shellRuntime}>
+      <ContactsPageView
+        locale={locale}
+        content={getPublicPagesContent(locale).contacts}
+        mediaPlacements={shellRuntime.mediaPlacements}
+      />
     </PublicPageShell>
   );
 }

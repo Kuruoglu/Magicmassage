@@ -33,6 +33,12 @@ export async function POST(request: Request) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
+  response.headers.append(
+    "Set-Cookie",
+    `${adminAccessTokenCookieName}=${encodeURIComponent(token ?? "")}; Path=/api/media/admin; Max-Age=3600; HttpOnly; SameSite=Lax${
+      process.env.NODE_ENV === "production" ? "; Secure" : ""
+    }`,
+  );
 
   return response;
 }

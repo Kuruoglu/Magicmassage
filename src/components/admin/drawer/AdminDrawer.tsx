@@ -20,7 +20,7 @@ type AdminDrawerProps = {
   onClose: () => void;
 };
 
-const AdminDrawerCloseContext = createContext<(() => void) | undefined>(undefined);
+const AdminDrawerCloseContext = createContext<(() => boolean) | undefined>(undefined);
 let openDrawerCount = 0;
 
 export function useAdminDrawerClose() {
@@ -50,10 +50,11 @@ export function AdminDrawer({
 
   function requestClose() {
     if (hasUnsavedChanges && !window.confirm(closeConfirmationMessage)) {
-      return;
+      return false;
     }
 
     onClose();
+    return true;
   }
 
   function handleBackdropClick(event: ReactMouseEvent<HTMLDivElement>) {

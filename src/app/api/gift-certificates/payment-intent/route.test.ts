@@ -6,6 +6,12 @@ import { createGiftCertificatePaymentSession } from "@/gift-certificates/payment
 
 import { clearGiftCertificatePaymentIntentGuardsForTests, POST } from "./route";
 
+const giftFeatureMock = vi.hoisted(() => ({ enabled: true }));
+
+vi.mock("@/content/public-content-runtime", () => ({
+  getRuntimeGiftCertificatesEnabled: vi.fn(async () => giftFeatureMock.enabled),
+}));
+
 vi.mock("@/gift-certificates/payment-session", () => ({
   createGiftCertificatePaymentSession: vi.fn(async () => ({
     mode: "demo",
@@ -19,7 +25,22 @@ vi.mock("@/gift-certificates/payment-session", () => ({
 describe("gift certificate payment-intent API route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    giftFeatureMock.enabled = true;
     clearGiftCertificatePaymentIntentGuardsForTests();
+  });
+
+  it("does not create a payment when gift certificates are disabled", async () => {
+    giftFeatureMock.enabled = false;
+
+    const response = await POST(
+      new Request("https://example.com/api/gift-certificates/payment-intent", {
+        body: JSON.stringify({ locale: "en" }),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    expect(createGiftCertificatePaymentSession).not.toHaveBeenCalled();
   });
 
   it("returns the created payment session without exposing Stripe secrets", async () => {

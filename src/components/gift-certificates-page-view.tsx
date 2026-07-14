@@ -2,19 +2,25 @@ import Image from "next/image";
 
 import type { GiftCertificatesPageContent } from "@/content/gift-certificates-page";
 import type { Locale } from "@/i18n/config";
+import type { PublicMediaPlacement } from "@/lib/public-content/types";
+import { resolvePublicMediaPlacement } from "@/lib/media-placement";
 import { GiftCertificateForm } from "./gift-certificate-form";
 
 type GiftCertificatesPageViewProps = {
   locale: Locale;
   content: GiftCertificatesPageContent;
   stripePublishableKey: string | null;
+  mediaPlacements?: PublicMediaPlacement[];
 };
 
 export function GiftCertificatesPageView({
   locale,
   content,
+  mediaPlacements,
   stripePublishableKey,
 }: GiftCertificatesPageViewProps) {
+  const heroMedia = resolvePublicMediaPlacement(mediaPlacements, "gift-certificates.hero", locale);
+
   return (
     <main>
       <section className="page-hero gift-hero section-pad">
@@ -26,10 +32,11 @@ export function GiftCertificatesPageView({
           </div>
           <div className="gift-hero-visual" aria-hidden="true">
             <Image
-              src="/media/gift-certificates/gift-certificate-hero-bow.webp"
+              src={heroMedia?.url ?? "/media/gift-certificates/gift-certificate-hero-bow.webp"}
               alt=""
               fill
               priority
+              unoptimized={Boolean(heroMedia)}
               sizes="(max-width: 720px) 86vw, 38vw"
             />
           </div>

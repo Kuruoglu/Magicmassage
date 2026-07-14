@@ -8,15 +8,19 @@ import {
 } from "@/config/messengers";
 import type { PublicPagesContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
+import { resolvePublicMediaPlacement } from "@/lib/media-placement";
+import type { PublicMediaPlacement } from "@/lib/public-content";
 import { ConsentGatedMap } from "./consent-gated-map";
 import { MessengerIcon } from "./messenger-icon";
 
 type ContactsPageViewProps = {
   locale: Locale;
   content: PublicPagesContent["contacts"];
+  mediaPlacements?: PublicMediaPlacement[];
 };
 
-export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
+export function ContactsPageView({ locale, content, mediaPlacements }: ContactsPageViewProps) {
+  const logoMedia = resolvePublicMediaPlacement(mediaPlacements, "global.logo", locale);
   return (
     <main>
       <section className="page-hero contact-hero section-pad">
@@ -33,10 +37,10 @@ export function ContactsPageView({ locale, content }: ContactsPageViewProps) {
           >
             <div className="contact-hero-logo-coin-inner">
               <span className="contact-hero-logo-coin-face contact-hero-logo-coin-front">
-                <Image src="/media/logo.png" alt="" width={260} height={260} priority />
+                <Image src={logoMedia?.url ?? "/media/logo.png"} alt="" width={260} height={260} priority />
               </span>
               <span className="contact-hero-logo-coin-face contact-hero-logo-coin-back">
-                <Image src="/media/logo.png" alt="" width={260} height={260} priority />
+                <Image src={logoMedia?.url ?? "/media/logo.png"} alt="" width={260} height={260} priority />
               </span>
             </div>
           </div>

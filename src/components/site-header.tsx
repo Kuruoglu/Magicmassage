@@ -7,7 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { externalBookingLinkProps } from "@/config/booking";
 import { externalMessengerLinkProps, messengerLinks } from "@/config/messengers";
 import type { HomeContent } from "@/content/home";
-import { getPublicPagesContent } from "@/content/public-pages";
+import { getPublicPagesContent, type ServiceContent } from "@/content/public-pages";
 import { locales, type Locale } from "@/i18n/config";
 import {
   getLocaleSwitchPath,
@@ -15,6 +15,8 @@ import {
   type PublicPageKey,
 } from "@/navigation/public-routes";
 import { getServicePagePath } from "@/navigation/service-routes";
+import type { PublicMediaPlacement } from "@/lib/public-content/types";
+import { resolvePublicMediaPlacement } from "@/lib/media-placement";
 import { MessengerIcon } from "./messenger-icon";
 
 const localeLabels: Record<Locale, string> = {
@@ -26,28 +28,44 @@ const localeLabels: Record<Locale, string> = {
 
 type SiteHeaderProps = {
   locale: Locale;
-  currentPage: PublicPageKey;
+  currentPage?: PublicPageKey;
   content: HomeContent;
+  giftCertificatesEnabled?: boolean;
   localePaths?: Partial<Record<Locale, string>>;
+  mediaPlacements?: PublicMediaPlacement[];
+  services?: ServiceContent[];
 };
 
-export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHeaderProps) {
+export function SiteHeader({
+  locale,
+  currentPage,
+  content,
+  giftCertificatesEnabled = true,
+  localePaths,
+  mediaPlacements,
+  services: runtimeServices,
+}: SiteHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<"services" | "language" | null>(null);
   const mobileMenuId = useId();
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLElement>(null);
   const menuCloseRef = useRef<HTMLButtonElement>(null);
-  const links: Array<{ page: PublicPageKey; label: string }> = [
+  const navigationLinks: Array<{ page: PublicPageKey; label: string }> = [
     { page: "home", label: content.navigation.home },
     { page: "services", label: content.navigation.services },
     { page: "giftCertificates", label: content.navigation.giftCertificates },
     { page: "about", label: content.navigation.about },
     { page: "contacts", label: content.navigation.contacts },
   ];
-  const services = getPublicPagesContent(locale).services.items;
+  const links = navigationLinks.filter(
+    (link) => giftCertificatesEnabled || link.page !== "giftCertificates",
+  );
+  const services = runtimeServices ?? getPublicPagesContent(locale).services.items;
+  const logoMedia = resolvePublicMediaPlacement(mediaPlacements, "global.logo", locale);
   const localePathFor = (item: Locale) =>
-    localePaths?.[item] ?? getLocaleSwitchPath(item, currentPage);
+    localePaths?.[item] ??
+    (currentPage ? getLocaleSwitchPath(item, currentPage) : getPublicPagePath(item, "home"));
   const closeMenu = useCallback(() => {
     setIsMenuOpen(false);
   }, []);
@@ -119,7 +137,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
           href={getPublicPagePath(locale, "home")}
           aria-label={content.brand}
         >
-          <Image src="/media/logo.png" alt="" width={58} height={58} priority />
+          <Image src={logoMedia?.url ?? "/media/logo.png"} alt="" width={58} height={58} priority unoptimized={Boolean(logoMedia)} />
           <span>
             <strong>Magic Massage</strong>
             <small>Natali</small>
@@ -221,7 +239,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
       <div
         className={isMenuOpen ? "mobile-menu-backdrop is-open" : "mobile-menu-backdrop"}
         aria-hidden="true"
-        onClick={closeMenu}
+        onClick={closeMenuAndRestoreFocus}
       />
       <aside
         ref={mobileMenuRef}
@@ -238,7 +256,7 @@ export function SiteHeader({ locale, currentPage, content, localePaths }: SiteHe
             aria-label={content.brand}
             onClick={closeMenu}
           >
-            <Image src="/media/logo.png" alt="" width={58} height={58} priority />
+            <Image src={logoMedia?.url ?? "/media/logo.png"} alt="" width={58} height={58} priority unoptimized={Boolean(logoMedia)} />
             <span>
               <strong>Magic Massage</strong>
               <small>Natali</small>

@@ -3,12 +3,17 @@ import Link from "next/link";
 
 import { externalBookingLinkProps } from "@/config/booking";
 import type { HomeContent } from "@/content/home";
+import type { ServiceContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
+import type { PublicMediaPlacement } from "@/lib/public-content/types";
+import { resolvePublicMediaPlacement } from "@/lib/media-placement";
 import { createLocalBusinessJsonLd } from "@/seo/local-business-json-ld";
 
 type HomePageViewProps = {
   locale: Locale;
   content: HomeContent;
+  services?: ServiceContent[];
+  mediaPlacements?: PublicMediaPlacement[];
 };
 
 function TrustIcon({ type }: { type: HomeContent["trust"][number]["icon"] }) {
@@ -42,9 +47,13 @@ function TrustIcon({ type }: { type: HomeContent["trust"][number]["icon"] }) {
   );
 }
 
-export function HomePageView({ locale, content }: HomePageViewProps) {
+export function HomePageView({ locale, content, mediaPlacements, services = content.services.items }: HomePageViewProps) {
   const base = `/${locale}`;
   const localBusinessJsonLd = createLocalBusinessJsonLd(locale, content);
+  const heroMedia = resolvePublicMediaPlacement(mediaPlacements, "home.hero", locale);
+  const practitionerMedia = resolvePublicMediaPlacement(mediaPlacements, "home.practitioner", locale);
+  const aboutPrimaryMedia = resolvePublicMediaPlacement(mediaPlacements, "home.about.primary", locale);
+  const aboutSecondaryMedia = resolvePublicMediaPlacement(mediaPlacements, "home.about.secondary", locale);
 
   return (
     <>
@@ -58,11 +67,12 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
         <section className="hero hero-with-background" data-testid="home-hero">
           <Image
             className="hero-background"
-            src="/media/hero/hero-massage-session.jpg"
+            src={heroMedia?.url ?? "/media/hero/hero-massage-session.jpg"}
             alt=""
             fill
             sizes="100vw"
             priority
+            unoptimized={Boolean(heroMedia)}
           />
           <div className="hero-shade" aria-hidden="true" />
           <div className="hero-content section-pad">
@@ -83,11 +93,12 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
             <div className="hero-visual" aria-hidden="true">
               <div className="hero-frame">
                 <Image
-                  src="/media/about/natali-at-work.jpg"
+                  src={practitionerMedia?.url ?? "/media/about/natali-at-work.jpg"}
                   alt=""
                   fill
                   sizes="(max-width: 980px) 80vw, 34vw"
                   priority
+                  unoptimized={Boolean(practitionerMedia)}
                 />
               </div>
               <div className="hero-floating-card hero-floating-card-top">
@@ -130,7 +141,7 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
           </div>
 
           <div className="service-grid">
-            {content.services.items.map((service, index) => (
+            {services.slice(0, 3).map((service, index) => (
               <article className={`service-card service-card-${index + 1}`} key={service.title}>
                 <div className="service-image">
                   <Image
@@ -163,18 +174,20 @@ export function HomePageView({ locale, content }: HomePageViewProps) {
           <div className="about-collage">
             <div className="about-image-large">
               <Image
-                src="/media/about/natali-at-work.jpg"
+                src={aboutPrimaryMedia?.url ?? "/media/about/natali-at-work.jpg"}
                 alt=""
                 fill
                 sizes="(max-width: 800px) 90vw, 38vw"
+                unoptimized={Boolean(aboutPrimaryMedia)}
               />
             </div>
             <div className="about-image-small">
               <Image
-                src="/media/services/deep-tissue-massage.jpg"
+                src={aboutSecondaryMedia?.url ?? "/media/services/deep-tissue-massage.jpg"}
                 alt=""
                 fill
                 sizes="(max-width: 800px) 46vw, 19vw"
+                unoptimized={Boolean(aboutSecondaryMedia)}
               />
             </div>
           </div>

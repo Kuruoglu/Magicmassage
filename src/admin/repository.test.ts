@@ -10,7 +10,12 @@ import type {
   ServiceRecord,
   SettingsRecord,
 } from "./domain";
-import { createAdminSupabaseRepository, type AdminFinanceExportLogInput } from "./repository";
+import {
+  createAdminSupabaseRepository,
+  sofiaLocalDateTimeToIso,
+  sofiaUtcDateTimeToLocal,
+  type AdminFinanceExportLogInput,
+} from "./repository";
 
 type QueryFilter = {
   column: string;
@@ -19,12 +24,14 @@ type QueryFilter = {
 };
 
 type QueryOperation = {
-  action: "insert" | "select" | "upsert";
+  action: "insert" | "rpc" | "select" | "upsert";
   columns?: string;
-  filters: QueryFilter[];
+  filters?: QueryFilter[];
+  functionName?: string;
   options?: unknown;
   order?: { ascending: boolean; column: string };
-  table: string;
+  parameters?: Record<string, unknown>;
+  table?: string;
   values?: unknown;
 };
 
@@ -100,6 +107,11 @@ class FakeSupabaseClient {
         return Promise.resolve({ data: null, error: this.errorsByTable[table] ?? null });
       },
     };
+  }
+
+  rpc(functionName: string, parameters: Record<string, unknown>) {
+    this.operations.push({ action: "rpc", functionName, parameters });
+    return Promise.resolve({ data: null, error: this.errorsByTable[functionName] ?? null });
   }
 }
 
@@ -216,11 +228,13 @@ const blogPostRecord: BlogPostRecord = {
   author: "Natali",
   body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
   category: "Советы",
+  coverAlt: "Светлый массажный кабинет",
   coverImage: "/media/blog/prepare-for-massage.jpg",
   excerpt: "Короткая памятка перед первым визитом.",
   id: "blog-prepare-for-massage",
   locales: ["ru", "bg"],
   publishedAt: "2026-07-20",
+  seoDescription: "SEO-памятка перед первым визитом в студию.",
   seoTitle: "Как подготовиться к массажу в Бургасе",
   slug: "prepare-for-massage",
   status: "Черновик",
@@ -274,6 +288,40 @@ const stripeRows = [
     stripe_fee_cents: 860,
   },
 ];
+
+const repositoryAuditContext = {
+  actorUserId: "11111111-1111-4111-8111-111111111111",
+  metadata: { role: "administrator" },
+};
+
+function expectAtomicRecordRpc(
+  client: FakeSupabaseClient,
+  recordType: string,
+  record: Record<string, unknown>,
+) {
+  const actionByRecordType: Record<string, string> = {
+    appointment: "appointment.update",
+    certificate: "record.certificate.upsert",
+    client: "record.client.upsert",
+    contactChannel: "record.contactChannel.upsert",
+    contactSettings: "record.contactSettings.upsert",
+    media: "media.asset",
+    price: "record.price.upsert",
+    settings: "site.gift_certificates",
+  };
+
+  expect(client.operations[0]).toEqual({
+    action: "rpc",
+    functionName: "admin_save_record_with_audit",
+    parameters: {
+      p_action: actionByRecordType[recordType],
+      p_actor_user_id: repositoryAuditContext.actorUserId,
+      p_audit_metadata: repositoryAuditContext.metadata,
+      p_record: record,
+      p_record_type: recordType,
+    },
+  });
+}
 
 describe("admin Supabase repository", () => {
   it("loads admin profiles for the users workspace", async () => {
@@ -335,6 +383,7 @@ describe("admin Supabase repository", () => {
         slug: "supabase-massage",
         status: "Опубликована",
         summary: "Loaded service summary.",
+        translations: {},
       },
     ]);
     expect(client.operations[0]).toMatchObject({
@@ -410,6 +459,8 @@ describe("admin Supabase repository", () => {
         folder: "services",
         id: "media-supabase-studio",
         name: "Supabase Studio Photo",
+        placements: [],
+        publicationConsent: "unknown",
         size: "420 KB",
         status: "Готово",
         type: "Фото",
@@ -501,7 +552,9 @@ describe("admin Supabase repository", () => {
           excerpt: "Loaded excerpt.",
           id: "blog-supabase",
           locale_codes: ["ru", "bg"],
+          meta_description: "Loaded SEO description.",
           published_on: null,
+          scheduled_for: "2026-07-20T07:30:00.000Z",
           seo_title: "Supabase Blog SEO",
           slug: "supabase-blog",
           status: "scheduled",
@@ -519,12 +572,21 @@ describe("admin Supabase repository", () => {
       {
         author: "Supabase Natali",
         body: "Loaded blog body.",
+        canonicalUrl: undefined,
         category: "Supabase",
+        coverAlt: "Supabase Blog",
         coverImage: "/media/blog/supabase.jpg",
+        editorJson: {},
         excerpt: "Loaded excerpt.",
+        hreflang: {},
         id: "blog-supabase",
         locales: ["ru", "bg"],
+        ogDescription: undefined,
+        ogTitle: undefined,
         publishedAt: "",
+        robotsDirectives: undefined,
+        scheduledFor: "2026-07-20T10:30",
+        seoDescription: "Loaded SEO description.",
         seoTitle: "Supabase Blog SEO",
         slug: "supabase-blog",
         status: "Запланирована",
@@ -537,6 +599,14 @@ describe("admin Supabase repository", () => {
       order: { ascending: false, column: "published_on" },
       table: "admin_blog_posts",
     });
+  });
+
+  it.each([
+    ["summer DST", "2026-07-20T07:30:00.000Z", "2026-07-20T10:30"],
+    ["winter standard time", "2026-01-20T08:30:00.000Z", "2026-01-20T10:30"],
+  ])("round trips Sofia publication time during %s", (_label, utcValue, localValue) => {
+    expect(sofiaUtcDateTimeToLocal(utcValue)).toBe(localValue);
+    expect(sofiaLocalDateTimeToIso(localValue)).toBe(utcValue);
   });
 
   it("loads the single site settings row from Supabase", async () => {
@@ -727,14 +797,9 @@ describe("admin Supabase repository", () => {
       telegram: "https://t.me/irina_demo",
       totalSpend: "0 EUR",
       visits: 0,
-    });
+    }, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_clients",
-      values: {
+    expectAtomicRecordRpc(client, "client", {
         email: "irina@example.com",
         full_name: "Irina Test",
         id: "client-359887771122",
@@ -749,7 +814,6 @@ describe("admin Supabase repository", () => {
         telegram_url: "https://t.me/irina_demo",
         total_spend_label: "0 EUR",
         visit_count: 0,
-      },
     });
   });
 
@@ -766,23 +830,25 @@ describe("admin Supabase repository", () => {
       service: "Deep tissue massage",
       status: "Подтверждена",
       time: "15:00",
-    });
+    }, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_appointments",
-      values: {
+    expectAtomicRecordRpc(client, "appointment", {
+        buffer_minutes: 15,
         client_id: "client-359873334411",
         client_name_snapshot: "Olena K.",
+        duration_minutes: 60,
         id: "appointment-1",
         internal_note: "Check neck and shoulders before session.",
+        overlap_overridden_at: null,
+        overlap_overridden_by: null,
+        overlap_override: false,
+        overlap_override_reason: "",
+        post_visit_comment: "",
+        post_visit_commented_at: null,
         service_name: "Deep tissue massage",
         starts_at: "15:00",
         starts_on: "2026-07-08",
         status: "confirmed",
-      },
     });
   });
 
@@ -822,14 +888,9 @@ describe("admin Supabase repository", () => {
       recipient: "Self",
       status: "Отправлен",
       stripeId: "manual",
-    });
+    }, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "code" },
-      table: "admin_certificates",
-      values: {
+    expectAtomicRecordRpc(client, "certificate", {
         amount_cents: 9500,
         buyer_name: "Olena K.",
         client_id: "client-359873334411",
@@ -843,24 +904,63 @@ describe("admin Supabase repository", () => {
         recipient_name: "Self",
         status: "sent",
         stripe_payment_intent_id: "manual",
-      },
     });
   });
 
-  it("upserts massage services by slug for admin content edits", async () => {
+  it("saves the service aggregate through one transactional RPC", async () => {
     const client = new FakeSupabaseClient();
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.saveService(serviceRecord);
+    await repository.saveService(serviceRecord, repositoryAuditContext);
 
     expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "slug" },
-      table: "admin_services",
-      values: {
+      action: "select",
+      columns: "id",
+      filters: [{ column: "url", operator: "eq", value: "/media/services/aroma-massage.jpg" }],
+      order: undefined,
+      table: "admin_media_assets",
+    });
+    expect(client.operations[1]).toEqual({
+      action: "rpc",
+      functionName: "admin_save_service_aggregate",
+      parameters: {
+        p_actor_user_id: repositoryAuditContext.actorUserId,
+        p_audit_metadata: repositoryAuditContext.metadata,
+        p_placements: [],
+        p_service: {
+          category: "SPA",
+          cover_image_url: "/media/services/aroma-massage.jpg",
+          cover_media_id: null,
+          display_order: 9,
+          duration_label: "75 мин",
+          locale_codes: ["ru", "bg"],
+          name: "Арома массаж",
+          seo_title: "Арома массаж в Бургасе",
+          slug: "aroma-massage",
+          status: "draft",
+          summary: "SPA-услуга с ароматическими маслами.",
+        },
+        p_translations: [],
+      },
+    });
+    expect(client.operations.filter((operation) => operation.action !== "select")).toHaveLength(1);
+  });
+
+  it("passes verified actor metadata into the atomic service RPC", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveService(serviceRecord, repositoryAuditContext);
+
+    expect(client.operations[1]).toMatchObject({
+      action: "rpc",
+      parameters: {
+        p_actor_user_id: "11111111-1111-4111-8111-111111111111",
+        p_audit_metadata: { role: "administrator" },
+        p_service: {
         category: "SPA",
         cover_image_url: "/media/services/aroma-massage.jpg",
+        cover_media_id: null,
         display_order: 9,
         duration_label: "75 мин",
         locale_codes: ["ru", "bg"],
@@ -870,21 +970,35 @@ describe("admin Supabase repository", () => {
         status: "draft",
         summary: "SPA-услуга с ароматическими маслами.",
       },
+      },
     });
+  });
+
+  it("refuses aggregate writes without verified actor context", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.saveService(serviceRecord)).rejects.toThrow("verified actor is required");
+    expect(client.operations.some((operation) => operation.action === "rpc")).toBe(false);
+  });
+
+  it("rejects a published service before the RPC when its cover is not in the media library", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.saveService({ ...serviceRecord, status: "Опубликована" })).rejects.toThrow(
+      "published cover must reference a media-library asset",
+    );
+    expect(client.operations.some((operation) => operation.action === "rpc")).toBe(false);
   });
 
   it("upserts price variants by id with EUR cents", async () => {
     const client = new FakeSupabaseClient();
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.savePrice(priceRecord);
+    await repository.savePrice(priceRecord, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_price_variants",
-      values: {
+    expectAtomicRecordRpc(client, "price", {
         currency: "EUR",
         display_order: 4,
         duration_minutes: 90,
@@ -894,7 +1008,6 @@ describe("admin Supabase repository", () => {
         service_slug: "aroma-massage",
         status: "active",
         updated_on: "2026-07-09",
-      },
     });
   });
 
@@ -902,14 +1015,9 @@ describe("admin Supabase repository", () => {
     const client = new FakeSupabaseClient();
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.saveMedia(mediaRecord);
+    await repository.saveMedia(mediaRecord, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_media_assets",
-      values: {
+    expectAtomicRecordRpc(client, "media", {
         alt_text: "Арома массаж в кабинете Magic Massage Natali",
         dimensions: "1600x1100",
         file_size_label: "410 KB",
@@ -917,11 +1025,11 @@ describe("admin Supabase repository", () => {
         id: "media-aroma-cover",
         media_type: "photo",
         name: "Арома обложка",
+        publication_consent_status: "unknown",
         status: "ready",
         uploaded_on: "2026-07-09",
         url: "/media/services/aroma-massage.jpg",
         usage_contexts: ["Услуга: Арома массаж", "Hero сайта"],
-      },
     });
   });
 
@@ -929,14 +1037,9 @@ describe("admin Supabase repository", () => {
     const client = new FakeSupabaseClient();
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.saveContactChannel(contactChannelRecord);
+    await repository.saveContactChannel(contactChannelRecord, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_contact_channels",
-      values: {
+    expectAtomicRecordRpc(client, "contactChannel", {
         channel_type: "messenger",
         id: "contact-viber",
         internal_note: "Быстрая связь после подтверждения номера клиента.",
@@ -944,7 +1047,6 @@ describe("admin Supabase repository", () => {
         status: "active",
         usage_contexts: ["Контакты", "Быстрая связь"],
         value: "viber://chat?number=359887771122",
-      },
     });
   });
 
@@ -952,14 +1054,9 @@ describe("admin Supabase repository", () => {
     const client = new FakeSupabaseClient();
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.saveContactSettings(contactSettingsRecord);
+    await repository.saveContactSettings(contactSettingsRecord, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_contact_settings",
-      values: {
+    expectAtomicRecordRpc(client, "contactSettings", {
         address: "ул. Места 49, Бургас, Болгария",
         booking_url: "https://studio24.bg/magic-massage-natali",
         business_name: "Magic Massage Natali",
@@ -969,51 +1066,104 @@ describe("admin Supabase repository", () => {
         phone: "+359 87 333 4411",
         seo_area: "Burgas, Bulgaria",
         working_hours: "Пн-Сб 10:00-19:00",
-      },
     });
   });
 
-  it("upserts blog posts by id for admin blog edits", async () => {
-    const client = new FakeSupabaseClient();
+  it("saves the blog aggregate through one transactional RPC", async () => {
+    const client = new FakeSupabaseClient({ admin_media_assets: [{ id: "media-blog-cover" }] });
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.saveBlogPost(blogPostRecord);
+    await repository.saveBlogPost(blogPostRecord, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_blog_posts",
-      values: {
-        author: "Natali",
-        body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
-        category: "Советы",
-        cover_image_url: "/media/blog/prepare-for-massage.jpg",
-        excerpt: "Короткая памятка перед первым визитом.",
-        id: "blog-prepare-for-massage",
-        locale_codes: ["ru", "bg"],
-        published_on: "2026-07-20",
-        seo_title: "Как подготовиться к массажу в Бургасе",
-        slug: "prepare-for-massage",
-        status: "draft",
-        tag_labels: ["подготовка", "массаж"],
-        title: "Как подготовиться к массажу",
-        updated_on: "2026-07-09",
+    expect(client.operations[0]).toMatchObject({
+      action: "select",
+      table: "admin_media_assets",
+    });
+    expect(client.operations[1]).toMatchObject({
+      action: "rpc",
+      functionName: "admin_save_blog_post_aggregate",
+      parameters: {
+        p_actor_user_id: repositoryAuditContext.actorUserId,
+        p_audit_metadata: repositoryAuditContext.metadata,
+        p_placement: {
+          is_published: false,
+          locale: "ru",
+          media_asset_id: "media-blog-cover",
+          page_key: "blog:blog-prepare-for-massage",
+          placement_key: "blog:blog-prepare-for-massage:cover",
+          publish_at: null,
+          slot_key: "cover",
+        },
+        p_post: {
+          author: "Natali",
+          body: "Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.",
+          cover_media_id: "media-blog-cover",
+          id: "blog-prepare-for-massage",
+          scheduled_for: null,
+          status: "draft",
+        },
       },
     });
+    expect(client.operations.filter((operation) => operation.action !== "select")).toHaveLength(1);
   });
 
   it("stores unscheduled blog posts with a null publication date", async () => {
     const client = new FakeSupabaseClient();
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.saveBlogPost({ ...blogPostRecord, publishedAt: "", status: "Черновик" });
+    await repository.saveBlogPost(
+      { ...blogPostRecord, publishedAt: "", status: "Черновик" },
+      repositoryAuditContext,
+    );
 
-    expect(client.operations[0]).toMatchObject({
-      table: "admin_blog_posts",
-      values: {
-        published_on: null,
-        status: "draft",
+    expect(client.operations[1]).toMatchObject({
+      action: "rpc",
+      parameters: {
+        p_placement: null,
+        p_post: {
+          published_on: null,
+          status: "draft",
+        },
+      },
+    });
+  });
+
+  it("rejects scheduled blog publication before the RPC when its cover is not in the media library", async () => {
+    const client = new FakeSupabaseClient();
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.saveBlogPost({
+      ...blogPostRecord,
+      scheduledFor: "2026-07-20T10:30",
+      status: "Запланирована",
+    })).rejects.toThrow("publication cover must reference a media-library asset");
+    expect(client.operations.some((operation) => operation.action === "rpc")).toBe(false);
+  });
+
+  it("stores the exact scheduled Sofia time and delays the cover placement", async () => {
+    const client = new FakeSupabaseClient({ admin_media_assets: [{ id: "media-blog-cover" }] });
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.saveBlogPost(
+      {
+        ...blogPostRecord,
+        scheduledFor: "2026-07-20T10:30",
+        status: "Запланирована",
+      },
+      repositoryAuditContext,
+    );
+
+    expect(client.operations[1]).toMatchObject({
+      action: "rpc",
+      parameters: {
+        p_placement: {
+          is_published: true,
+          publish_at: "2026-07-20T07:30:00.000Z",
+        },
+        p_post: {
+          scheduled_for: "2026-07-20T07:30:00.000Z",
+          status: "scheduled",
+        },
       },
     });
   });
@@ -1022,14 +1172,9 @@ describe("admin Supabase repository", () => {
     const client = new FakeSupabaseClient();
     const repository = createAdminSupabaseRepository(client);
 
-    await repository.saveSettings(settingsRecord);
+    await repository.saveSettings(settingsRecord, repositoryAuditContext);
 
-    expect(client.operations[0]).toEqual({
-      action: "upsert",
-      filters: [],
-      options: { onConflict: "id" },
-      table: "admin_site_settings",
-      values: {
+    expectAtomicRecordRpc(client, "settings", {
         audit_log_retention_days: 365,
         booking_buffer_minutes: 45,
         business_name: "Magic Massage Natali",
@@ -1039,6 +1184,7 @@ describe("admin Supabase repository", () => {
         default_locale: "ru",
         default_seo_title: "Magic Massage Natali Burgas",
         email_sender: "info@magicmassage.bg",
+        gift_certificates_enabled: true,
         google_calendar_id: "natali@example.com",
         google_calendar_mode: "one_way",
         id: "site",
@@ -1049,7 +1195,6 @@ describe("admin Supabase repository", () => {
         updated_on: "2026-07-09",
         working_days: "Пн-Сб",
         working_hours: "10:00-19:00",
-      },
     });
   });
 

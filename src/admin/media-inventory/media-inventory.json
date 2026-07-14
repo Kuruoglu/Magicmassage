@@ -1,0 +1,1270 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "media_b6fff9c1d6e537f59016",
+      "url": "/media/about/about-hero-premium.webp",
+      "repoPath": "public/media/about/about-hero-premium.webp",
+      "fileName": "about-hero-premium.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 45746,
+      "width": 1800,
+      "height": 851,
+      "folder": "media/about",
+      "inferredType": "hero",
+      "tags": [
+        "about",
+        "hero",
+        "premium"
+      ],
+      "alt": "About hero premium",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 69,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/about-page-view.tsx",
+          "line": 30,
+          "placement": "component"
+        }
+      ]
+    },
+    {
+      "id": "media_5ed16be228394f0cba2a",
+      "url": "/media/about/certificates/01-chiromassage-face.webp",
+      "repoPath": "public/media/about/certificates/01-chiromassage-face.webp",
+      "fileName": "01-chiromassage-face.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 52668,
+      "width": 995,
+      "height": 707,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "certificate",
+        "certificates",
+        "chiromassage",
+        "face"
+      ],
+      "alt": "Chiromassage face",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 105,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_b824599b63f0e68de75f",
+      "url": "/media/about/certificates/02-charm-device.webp",
+      "repoPath": "public/media/about/certificates/02-charm-device.webp",
+      "fileName": "02-charm-device.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 74092,
+      "width": 916,
+      "height": 670,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "certificate",
+        "certificates",
+        "charm",
+        "device"
+      ],
+      "alt": "Charm device",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 141,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_fda1a15224a101017ccd",
+      "url": "/media/about/certificates/03-lymphatic-partner-plus.webp",
+      "repoPath": "public/media/about/certificates/03-lymphatic-partner-plus.webp",
+      "fileName": "03-lymphatic-partner-plus.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 71738,
+      "width": 962,
+      "height": 717,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "certificate",
+        "certificates",
+        "lymphatic",
+        "partner",
+        "plus"
+      ],
+      "alt": "Lymphatic partner plus",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 111,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_45b2d15ccb5c1fdab9b8",
+      "url": "/media/about/certificates/04-massage-therapist.webp",
+      "repoPath": "public/media/about/certificates/04-massage-therapist.webp",
+      "fileName": "04-massage-therapist.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 73410,
+      "width": 981,
+      "height": 708,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "certificate",
+        "certificates",
+        "massage",
+        "therapist"
+      ],
+      "alt": "Massage therapist",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/components/admin/shell/admin-shell.tsx",
+          "line": 455,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 117,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_00c7f0072d073081dff6",
+      "url": "/media/about/certificates/05-professional-training-bg.webp",
+      "repoPath": "public/media/about/certificates/05-professional-training-bg.webp",
+      "fileName": "05-professional-training-bg.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 95808,
+      "width": 710,
+      "height": 980,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "bg",
+        "certificate",
+        "certificates",
+        "professional",
+        "training"
+      ],
+      "alt": "Professional training bg",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 129,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_8792c502118819e94f0e",
+      "url": "/media/about/certificates/06-kinesiology-taping.webp",
+      "repoPath": "public/media/about/certificates/06-kinesiology-taping.webp",
+      "fileName": "06-kinesiology-taping.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 64228,
+      "width": 706,
+      "height": 978,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "certificate",
+        "certificates",
+        "kinesiology",
+        "taping"
+      ],
+      "alt": "Kinesiology taping",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 135,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_a720e148f3f267f6af52",
+      "url": "/media/about/certificates/07-thai-massage.webp",
+      "repoPath": "public/media/about/certificates/07-thai-massage.webp",
+      "fileName": "07-thai-massage.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 96046,
+      "width": 726,
+      "height": 979,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "certificate",
+        "certificates",
+        "massage",
+        "thai"
+      ],
+      "alt": "Thai massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 123,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_82a3c399c86f70ce1007",
+      "url": "/media/about/certificates/09-body-chiromassage.webp",
+      "repoPath": "public/media/about/certificates/09-body-chiromassage.webp",
+      "fileName": "09-body-chiromassage.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 84758,
+      "width": 979,
+      "height": 718,
+      "folder": "media/about/certificates",
+      "inferredType": "certificate",
+      "tags": [
+        "about",
+        "body",
+        "certificate",
+        "certificates",
+        "chiromassage"
+      ],
+      "alt": "Body chiromassage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/public-pages.ts",
+          "line": 99,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_d084e79b5aea50f4f10f",
+      "url": "/media/about/natali-at-work.jpg",
+      "repoPath": "public/media/about/natali-at-work.jpg",
+      "fileName": "natali-at-work.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 568198,
+      "width": 1600,
+      "height": 2400,
+      "folder": "media/about",
+      "inferredType": "about",
+      "tags": [
+        "about",
+        "at",
+        "natali",
+        "work"
+      ],
+      "alt": "Natali at work",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 60,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/home-page-view.tsx",
+          "line": 96,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/home-page-view.tsx",
+          "line": 177,
+          "placement": "component"
+        }
+      ]
+    },
+    {
+      "id": "media_3f952328b45897a40f56",
+      "url": "/media/about/natali-portrait.jpg",
+      "repoPath": "public/media/about/natali-portrait.jpg",
+      "fileName": "natali-portrait.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 66957,
+      "width": 960,
+      "height": 1280,
+      "folder": "media/about",
+      "inferredType": "portrait",
+      "tags": [
+        "about",
+        "natali",
+        "portrait"
+      ],
+      "alt": "Natali portrait",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 72,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/about-page-view.tsx",
+          "line": 46,
+          "placement": "component"
+        }
+      ]
+    },
+    {
+      "id": "media_eb6d2ae74e4a3a2eb876",
+      "url": "/media/gallery/studio-treatment-room.jpg",
+      "repoPath": "public/media/gallery/studio-treatment-room.jpg",
+      "fileName": "studio-treatment-room.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 199204,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/gallery",
+      "inferredType": "gallery",
+      "tags": [
+        "gallery",
+        "room",
+        "studio",
+        "treatment"
+      ],
+      "alt": "Studio treatment room",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/components/admin/shell/admin-shell.tsx",
+          "line": 441,
+          "placement": "component"
+        }
+      ]
+    },
+    {
+      "id": "media_70fc487c69c15813230d",
+      "url": "/media/gift-certificates/gift-certificate-hero-bow.webp",
+      "repoPath": "public/media/gift-certificates/gift-certificate-hero-bow.webp",
+      "fileName": "gift-certificate-hero-bow.webp",
+      "extension": ".webp",
+      "mimeType": "image/webp",
+      "byteSize": 31190,
+      "width": 1200,
+      "height": 675,
+      "folder": "media/gift-certificates",
+      "inferredType": "gift-certificate",
+      "tags": [
+        "bow",
+        "certificate",
+        "certificates",
+        "gift",
+        "gift-certificate",
+        "hero"
+      ],
+      "alt": "Gift certificate hero bow",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 78,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/gift-certificates-page-view.tsx",
+          "line": 35,
+          "placement": "component"
+        }
+      ]
+    },
+    {
+      "id": "media_aa1750557814b9917ef3",
+      "url": "/media/hero/hero-massage-session.jpg",
+      "repoPath": "public/media/hero/hero-massage-session.jpg",
+      "fileName": "hero-massage-session.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 312604,
+      "width": 2200,
+      "height": 1467,
+      "folder": "media/hero",
+      "inferredType": "hero",
+      "tags": [
+        "hero",
+        "massage",
+        "session"
+      ],
+      "alt": "Hero massage session",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 57,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 84,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/home-page-view.tsx",
+          "line": 70,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/public-blog/BlogIndexView.tsx",
+          "line": 28,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/seo/local-business-json-ld.ts",
+          "line": 24,
+          "placement": "seo"
+        },
+        {
+          "sourcePath": "src/seo/public-page-metadata.ts",
+          "line": 194,
+          "placement": "seo"
+        }
+      ]
+    },
+    {
+      "id": "media_40d431161c689fe98a54",
+      "url": "/media/hero/services-gift-hero.jpg",
+      "repoPath": "public/media/hero/services-gift-hero.jpg",
+      "fileName": "services-gift-hero.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 88031,
+      "width": 1672,
+      "height": 941,
+      "folder": "media/hero",
+      "inferredType": "hero",
+      "tags": [
+        "gift",
+        "hero",
+        "services"
+      ],
+      "alt": "Services gift hero",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 81,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/services-page-view.tsx",
+          "line": 39,
+          "placement": "component"
+        }
+      ]
+    },
+    {
+      "id": "media_4fcef5d259b97c947736",
+      "url": "/media/logo.png",
+      "repoPath": "public/media/logo.png",
+      "fileName": "logo.png",
+      "extension": ".png",
+      "mimeType": "image/png",
+      "byteSize": 537332,
+      "width": 947,
+      "height": 952,
+      "folder": "media",
+      "inferredType": "logo",
+      "tags": [
+        "logo"
+      ],
+      "alt": "Magic Massage Natali logo",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 87,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/contacts-page-view.tsx",
+          "line": 40,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/contacts-page-view.tsx",
+          "line": 43,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/site-header.tsx",
+          "line": 140,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/site-header.tsx",
+          "line": 259,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/content/public-content-runtime.ts",
+          "line": 28,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_85773586077fb7152c42",
+      "url": "/media/services/anti-cellulite-massage.jpg",
+      "repoPath": "public/media/services/anti-cellulite-massage.jpg",
+      "fileName": "anti-cellulite-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 212008,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "anti",
+        "cellulite",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Anti cellulite massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 92,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_761da061a7b82d78270e",
+      "url": "/media/services/anti-stress-massage.jpg",
+      "repoPath": "public/media/services/anti-stress-massage.jpg",
+      "fileName": "anti-stress-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 239100,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "anti",
+        "massage",
+        "service",
+        "services",
+        "stress"
+      ],
+      "alt": "Anti stress massage",
+      "consent": "not_required",
+      "placements": []
+    },
+    {
+      "id": "media_084be2cdb3008b18dd6f",
+      "url": "/media/services/back-massage.jpg",
+      "repoPath": "public/media/services/back-massage.jpg",
+      "fileName": "back-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 63338,
+      "width": 790,
+      "height": 663,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "back",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Back massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 228,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_82366425bcfee1af56c6",
+      "url": "/media/services/belly-massage.jpg",
+      "repoPath": "public/media/services/belly-massage.jpg",
+      "fileName": "belly-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 75182,
+      "width": 853,
+      "height": 1280,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "belly",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Belly massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 143,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_41833d27e8352b5dcd23",
+      "url": "/media/services/bms-apparatus-massage.jpg",
+      "repoPath": "public/media/services/bms-apparatus-massage.jpg",
+      "fileName": "bms-apparatus-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 287161,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "apparatus",
+        "bms",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Bms apparatus massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 194,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_d3e99614fc35f71503f0",
+      "url": "/media/services/body-wrap.jpg",
+      "repoPath": "public/media/services/body-wrap.jpg",
+      "fileName": "body-wrap.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 196455,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "body",
+        "service",
+        "services",
+        "wrap"
+      ],
+      "alt": "Body wrap",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 347,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_92144110285d1bc09398",
+      "url": "/media/services/chiropractic-massage.jpg",
+      "repoPath": "public/media/services/chiropractic-massage.jpg",
+      "fileName": "chiropractic-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 237621,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "chiropractic",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Chiropractic massage",
+      "consent": "not_required",
+      "placements": []
+    },
+    {
+      "id": "media_7e1022c00aa2b0fbc1de",
+      "url": "/media/services/classic-massage.jpg",
+      "repoPath": "public/media/services/classic-massage.jpg",
+      "fileName": "classic-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 72478,
+      "width": 1280,
+      "height": 853,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "classic",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Classic massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/components/admin/shell/admin-shell.tsx",
+          "line": 348,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/admin/shell/admin-shell.tsx",
+          "line": 427,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 41,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_ad5af6fe6c6a5dcd3704",
+      "url": "/media/services/cupping-therapy.jpg",
+      "repoPath": "public/media/services/cupping-therapy.jpg",
+      "fileName": "cupping-therapy.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 67137,
+      "width": 1280,
+      "height": 853,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "cupping",
+        "service",
+        "services",
+        "therapy"
+      ],
+      "alt": "Cupping therapy",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 211,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_5414520660a2b1fec10e",
+      "url": "/media/services/deep-tissue-massage.jpg",
+      "repoPath": "public/media/services/deep-tissue-massage.jpg",
+      "fileName": "deep-tissue-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 220804,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "deep",
+        "massage",
+        "service",
+        "services",
+        "tissue"
+      ],
+      "alt": "Deep tissue massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "scripts/content/import-public-content.ts",
+          "line": 66,
+          "placement": "script"
+        },
+        {
+          "sourcePath": "src/components/admin/shell/admin-shell.tsx",
+          "line": 372,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/home-page-view.tsx",
+          "line": 186,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 58,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_837e34bf81ce02cac493",
+      "url": "/media/services/face-massage.jpg",
+      "repoPath": "public/media/services/face-massage.jpg",
+      "fileName": "face-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 182250,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "face",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Face massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 177,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_9e37f58ce2e98e5036fc",
+      "url": "/media/services/head-massage.jpg",
+      "repoPath": "public/media/services/head-massage.jpg",
+      "fileName": "head-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 160319,
+      "width": 1400,
+      "height": 1400,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "head",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Head massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 262,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_93763fba13da6a94d6f3",
+      "url": "/media/services/hot-stone-therapy.jpg",
+      "repoPath": "public/media/services/hot-stone-therapy.jpg",
+      "fileName": "hot-stone-therapy.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 184061,
+      "width": 1400,
+      "height": 1575,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "hot",
+        "service",
+        "services",
+        "stone",
+        "therapy"
+      ],
+      "alt": "Hot stone therapy",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 313,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_67bdb2fe18ed1170758f",
+      "url": "/media/services/legs-massage.jpg",
+      "repoPath": "public/media/services/legs-massage.jpg",
+      "fileName": "legs-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 194551,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "legs",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Legs massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 296,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_4ccd1c810b1e21e85be2",
+      "url": "/media/services/lymphatic-drainage-massage.jpg",
+      "repoPath": "public/media/services/lymphatic-drainage-massage.jpg",
+      "fileName": "lymphatic-drainage-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 206001,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "drainage",
+        "lymphatic",
+        "massage",
+        "service",
+        "services"
+      ],
+      "alt": "Lymphatic drainage massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/components/admin/shell/admin-shell.tsx",
+          "line": 360,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/components/admin/shell/admin-shell.tsx",
+          "line": 546,
+          "placement": "component"
+        },
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 75,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_838bcf69238ddc62caff",
+      "url": "/media/services/modeling-massage.jpg",
+      "repoPath": "public/media/services/modeling-massage.jpg",
+      "fileName": "modeling-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 215416,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "massage",
+        "modeling",
+        "service",
+        "services"
+      ],
+      "alt": "Modeling massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 279,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_080580d603e0904cf4a9",
+      "url": "/media/services/neck-shoulders-massage.jpg",
+      "repoPath": "public/media/services/neck-shoulders-massage.jpg",
+      "fileName": "neck-shoulders-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 182250,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "massage",
+        "neck",
+        "service",
+        "services",
+        "shoulders"
+      ],
+      "alt": "Neck shoulders massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 245,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_441aabf656a0760ee21b",
+      "url": "/media/services/partial-massage.jpg",
+      "repoPath": "public/media/services/partial-massage.jpg",
+      "fileName": "partial-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 289764,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "massage",
+        "partial",
+        "service",
+        "services"
+      ],
+      "alt": "Partial massage",
+      "consent": "not_required",
+      "placements": []
+    },
+    {
+      "id": "media_70e0c2d753b2597c648e",
+      "url": "/media/services/phytosauna.jpg",
+      "repoPath": "public/media/services/phytosauna.jpg",
+      "fileName": "phytosauna.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 199204,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "phytosauna",
+        "service",
+        "services"
+      ],
+      "alt": "Phytosauna",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 330,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_05c5c6484d046e36a8ba",
+      "url": "/media/services/reflexology.jpg",
+      "repoPath": "public/media/services/reflexology.jpg",
+      "fileName": "reflexology.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 195158,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "reflexology",
+        "service",
+        "services"
+      ],
+      "alt": "Reflexology",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 160,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_47c3660700fc9280d1d8",
+      "url": "/media/services/relaxing-massage.jpg",
+      "repoPath": "public/media/services/relaxing-massage.jpg",
+      "fileName": "relaxing-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 183406,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "massage",
+        "relaxing",
+        "service",
+        "services"
+      ],
+      "alt": "Relaxing massage",
+      "consent": "not_required",
+      "placements": []
+    },
+    {
+      "id": "media_0f250813c6e7614289f4",
+      "url": "/media/services/relaxing-neck-massage.jpg",
+      "repoPath": "public/media/services/relaxing-neck-massage.jpg",
+      "fileName": "relaxing-neck-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 137394,
+      "width": 1400,
+      "height": 933,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "massage",
+        "neck",
+        "relaxing",
+        "service",
+        "services"
+      ],
+      "alt": "Relaxing neck massage",
+      "consent": "not_required",
+      "placements": []
+    },
+    {
+      "id": "media_3ea2113f1d979c06743b",
+      "url": "/media/services/smart-therapy.jpg",
+      "repoPath": "public/media/services/smart-therapy.jpg",
+      "fileName": "smart-therapy.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 287044,
+      "width": 1400,
+      "height": 2100,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "service",
+        "services",
+        "smart",
+        "therapy"
+      ],
+      "alt": "Smart therapy",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 126,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_d631b1952a14908131a5",
+      "url": "/media/services/spa-procedures.jpg",
+      "repoPath": "public/media/services/spa-procedures.jpg",
+      "fileName": "spa-procedures.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 235469,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "procedures",
+        "service",
+        "services",
+        "spa"
+      ],
+      "alt": "Spa procedures",
+      "consent": "not_required",
+      "placements": []
+    },
+    {
+      "id": "media_496bc4986da92a124561",
+      "url": "/media/services/thai-massage.jpg",
+      "repoPath": "public/media/services/thai-massage.jpg",
+      "fileName": "thai-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 239212,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "massage",
+        "service",
+        "services",
+        "thai"
+      ],
+      "alt": "Thai massage",
+      "consent": "not_required",
+      "placements": [
+        {
+          "sourcePath": "src/content/service-catalog.ts",
+          "line": 109,
+          "placement": "content"
+        }
+      ]
+    },
+    {
+      "id": "media_4bc512a41036733a694f",
+      "url": "/media/services/therapeutic-massage.jpg",
+      "repoPath": "public/media/services/therapeutic-massage.jpg",
+      "fileName": "therapeutic-massage.jpg",
+      "extension": ".jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 235688,
+      "width": 1600,
+      "height": 1800,
+      "folder": "media/services",
+      "inferredType": "service",
+      "tags": [
+        "massage",
+        "service",
+        "services",
+        "therapeutic"
+      ],
+      "alt": "Therapeutic massage",
+      "consent": "not_required",
+      "placements": []
+    }
+  ]
+}

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootRedirectLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="bg-BG" className={fontVariables}>
+    <html lang="bg-BG" className={fontVariables} data-scroll-behavior="smooth">
       <body>{children}</body>
     </html>
   );

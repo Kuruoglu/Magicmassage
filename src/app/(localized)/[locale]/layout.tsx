@@ -29,7 +29,7 @@ export default async function LocalizedLayout({ children, params }: LocalizedLay
   }
 
   return (
-    <html lang={getHtmlLanguage(locale)} className={fontVariables}>
+    <html lang={getHtmlLanguage(locale)} className={fontVariables} data-scroll-behavior="smooth">
       <body>{children}</body>
     </html>
   );
