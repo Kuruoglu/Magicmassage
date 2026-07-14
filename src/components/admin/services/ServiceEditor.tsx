@@ -202,18 +202,19 @@ export function ServiceEditor({ initialService, onClose, onSave, suggestedOrder 
       hasUnsavedChanges={isDirty}
       onClose={onClose}
     >
-      <AdminDrawerHeader
-        kicker="Виды массажа"
-        onClose={onClose}
-        title={initialService ? `Редактировать: ${initialService.name}` : "Новая услуга"}
-        titleId="service-editor-title"
-      >
-        <p>Основные параметры и локализованный контент публичной страницы.</p>
-      </AdminDrawerHeader>
-      <form noValidate onSubmit={handleSubmit}>
+      <form className="admin-drawer-form" noValidate onSubmit={handleSubmit}>
+        <AdminDrawerHeader
+          kicker="Виды массажа"
+          onClose={onClose}
+          title={initialService ? `Редактировать: ${initialService.name}` : "Новая услуга"}
+          titleId="service-editor-title"
+        >
+          <p>Основные параметры и локализованный контент публичной страницы.</p>
+        </AdminDrawerHeader>
         <AdminDrawerBody>
-          <AdminDrawerSection title="Публикация">
-            <div className="admin-content-form-grid">
+          <div className="admin-action-body">
+            <AdminDrawerSection title="Публикация">
+              <div className="admin-content-form-grid">
               <label>
                 Slug
                 <input
@@ -248,24 +249,24 @@ export function ServiceEditor({ initialService, onClose, onSave, suggestedOrder 
                 URL обложки
                 <input onChange={(event) => updateBase("coverImage", event.target.value)} type="text" value={form.coverImage} />
               </label>
-            </div>
-          </AdminDrawerSection>
+              </div>
+            </AdminDrawerSection>
 
-          <AdminDrawerSection title="Локализованный контент">
-            <div aria-label="Локаль услуги" className="admin-filter-row" role="tablist">
-              {serviceLocales.map((locale) => (
-                <button
-                  aria-selected={activeLocale === locale}
-                  key={locale}
-                  onClick={() => setActiveLocale(locale)}
-                  role="tab"
-                  type="button"
-                >
-                  {locale.toUpperCase()} · {localeLabels[locale]}
-                </button>
-              ))}
-            </div>
-            <div className="admin-content-form-grid" role="tabpanel">
+            <AdminDrawerSection title="Локализованный контент">
+              <div aria-label="Локаль услуги" className="admin-filter-row" role="tablist">
+                {serviceLocales.map((locale) => (
+                  <button
+                    aria-selected={activeLocale === locale}
+                    key={locale}
+                    onClick={() => setActiveLocale(locale)}
+                    role="tab"
+                    type="button"
+                  >
+                    {locale.toUpperCase()} · {localeLabels[locale]}
+                  </button>
+                ))}
+              </div>
+              <div className="admin-content-form-grid" role="tabpanel">
               <label className="admin-form-wide">
                 Название
                 <input onChange={(event) => updateTranslation("title", event.target.value)} type="text" value={translation.title} />
@@ -310,9 +311,10 @@ export function ServiceEditor({ initialService, onClose, onSave, suggestedOrder 
                 ID Open Graph изображения
                 <input onChange={(event) => updateTranslation("ogImageMediaId", event.target.value)} type="text" value={translation.ogImageMediaId} />
               </label>
-            </div>
-          </AdminDrawerSection>
-          {error ? <p className="admin-form-alert" role="alert">{error}</p> : null}
+              </div>
+            </AdminDrawerSection>
+            {error ? <p className="admin-form-alert" role="alert">{error}</p> : null}
+          </div>
         </AdminDrawerBody>
         <AdminDrawerFooter>
           <button type="submit">Сохранить услугу</button>

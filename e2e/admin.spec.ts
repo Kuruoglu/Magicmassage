@@ -901,6 +901,44 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
   await expect(details.getByText("Погашен после записи клиента.")).toBeVisible();
 });
 
+test("service controls and the new-service drawer keep their responsive layout", async ({ page }) => {
+  await page.goto("/admin?section=services", { waitUntil: "networkidle" });
+
+  const visibilityCheckbox = page.getByRole("table").getByRole("checkbox").first();
+  const visibilityLabel = visibilityCheckbox.locator("xpath=..").locator("span");
+  const checkboxBox = await visibilityCheckbox.boundingBox();
+  const labelBox = await visibilityLabel.boundingBox();
+
+  expect(checkboxBox).not.toBeNull();
+  expect(labelBox).not.toBeNull();
+  expect(Math.abs(checkboxBox!.y + checkboxBox!.height / 2 - (labelBox!.y + labelBox!.height / 2))).toBeLessThanOrEqual(1);
+  expect(labelBox!.x - (checkboxBox!.x + checkboxBox!.width)).toBe(12);
+
+  await page.getByRole("button", { name: "Добавить услугу" }).click();
+  const createDialog = page.getByRole("dialog", { name: "Новая услуга" });
+  const publicationGrid = createDialog.locator(".admin-content-form-grid").first();
+
+  await expect(createDialog.locator("form")).toHaveCSS("display", "grid");
+  await expect(publicationGrid).toHaveCSS("display", "grid");
+  await expect(createDialog.getByLabel("Slug")).toHaveCSS("min-height", "42px");
+  await expect(createDialog.getByLabel("Slug")).toHaveCSS("border-radius", "8px");
+  expect(
+    await publicationGrid.evaluate((element) =>
+      getComputedStyle(element).gridTemplateColumns.split(/\s+/).filter(Boolean).length,
+    ),
+  ).toBe(2);
+
+  await page.setViewportSize({ height: 844, width: 390 });
+  expect(
+    await publicationGrid.evaluate((element) =>
+      getComputedStyle(element).gridTemplateColumns.split(/\s+/).filter(Boolean).length,
+    ),
+  ).toBe(1);
+  const drawerBox = await createDialog.boundingBox();
+  expect(drawerBox).not.toBeNull();
+  expect(drawerBox!.width).toBeLessThanOrEqual(390);
+});
+
 test("services workspace can create and edit a massage service", async ({ page }) => {
   await page.goto("/admin?section=services", { waitUntil: "networkidle" });
 

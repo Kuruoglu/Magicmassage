@@ -1141,6 +1141,8 @@ describe("AdminShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Добавить услугу" }));
 
     const createDialog = screen.getByRole("dialog", { name: "Новая услуга" });
+    expect(createDialog.querySelector("form")).toHaveClass("admin-drawer-form");
+    expect(createDialog.querySelector(".admin-action-body")).toBeInTheDocument();
     fireEvent.change(within(createDialog).getByLabelText("Название"), { target: { value: "Арома массаж" } });
     fireEvent.change(within(createDialog).getByLabelText("Slug"), { target: { value: "aroma-massage" } });
     fireEvent.change(within(createDialog).getByLabelText("Категория"), { target: { value: "SPA" } });

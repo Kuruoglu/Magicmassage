@@ -34,6 +34,7 @@ import type { AdminAuditAction, AdminPersistInput } from "@/admin/persistence";
 import { businessFacts, businessMapUrls } from "@/config/business";
 import { matchesSearch, isValidEmail, parseCommaList } from "@/components/admin/lib/filters";
 import { formatCurrency, isPositiveInteger, statusClass } from "@/components/admin/lib/formatters";
+import { useTransientStatus } from "@/components/admin/lib/use-transient-status";
 import {
   AdminDrawer,
   AdminDrawerBody,
@@ -5749,7 +5750,7 @@ export function AdminShell({
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord(initialData));
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers(initialData));
   const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
-  const [persistenceStatus, setPersistenceStatus] = useState("");
+  const { message: persistenceStatus, showStatus: showPersistenceStatus } = useTransientStatus(activeSection);
   const isSupabaseBacked = initialData?.source === "supabase";
   const selectedRouteAppointment = selectedAppointmentKey
     ? calendarAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentKey)
@@ -5826,15 +5827,15 @@ export function AdminShell({
 
       if (!response.ok || result?.ok === false) {
         const message = result?.message ?? "Supabase не подтвердил изменение. Исходные данные восстановлены.";
-        setPersistenceStatus(message);
+        showPersistenceStatus(message);
         return { message, ok: false };
       }
 
-      setPersistenceStatus("Изменение сохранено в Supabase.");
+      showPersistenceStatus("Изменение сохранено в Supabase.", { autoDismiss: true });
       return { ok: true };
     } catch {
       const message = "Supabase недоступен. Исходные данные восстановлены.";
-      setPersistenceStatus(message);
+      showPersistenceStatus(message);
       return { message, ok: false };
     }
   }
@@ -5853,18 +5854,19 @@ export function AdminShell({
       const result = (await response.json().catch(() => null)) as AdminUserActionResult | null;
 
       if (!response.ok || result?.ok === false) {
-        setPersistenceStatus(result?.message ?? "Пользователь сохранен локально, но Supabase Auth не подтвердил запись.");
+        showPersistenceStatus(result?.message ?? "Пользователь сохранен локально, но Supabase Auth не подтвердил запись.");
         return result ?? undefined;
       }
 
-      setPersistenceStatus(
+      showPersistenceStatus(
         input.action === "invite"
           ? "Приглашение пользователя отправлено через Supabase Auth."
           : "Роль пользователя сохранена в Supabase.",
+        { autoDismiss: true },
       );
       return result ?? undefined;
     } catch {
-      setPersistenceStatus("Пользователь сохранен локально, но Supabase Auth недоступен.");
+      showPersistenceStatus("Пользователь сохранен локально, но Supabase Auth недоступен.");
       return undefined;
     }
   }
@@ -5877,7 +5879,7 @@ export function AdminShell({
     if (!appointment.clientId) {
       if (isSupabaseBacked) {
         const message = "Запись не сохранена: выберите клиента из базы для сохранения в Supabase.";
-        setPersistenceStatus(message);
+        showPersistenceStatus(message);
         return { message, ok: false };
       }
 
@@ -6454,7 +6456,7 @@ export function AdminShell({
       if (results.some((result) => !result.ok)) {
         setContactChannels(previousContactChannels);
         setContactSettings(previousContactSettings);
-        setPersistenceStatus("Не удалось полностью сохранить контакты. Исходные данные восстановлены.");
+        showPersistenceStatus("Не удалось полностью сохранить контакты. Исходные данные восстановлены.");
       }
     });
   }
