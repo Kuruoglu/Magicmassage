@@ -36,6 +36,17 @@ const activeAppointmentLabels = new Set([
   "\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430",
 ]);
 const completedAppointmentStatuses = new Set(["completed", "no_show"]);
+const publicShellPageSuffixes = [
+  "",
+  "/about",
+  "/blog",
+  "/contacts",
+  "/cookies",
+  "/gift-certificates",
+  "/privacy",
+  "/services",
+  "/terms",
+] as const;
 const cancelledAppointmentStatus = "\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u0430";
 const publishedStatus = "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430";
 const scheduledStatus = "\u0417\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430";
@@ -296,6 +307,19 @@ async function classifyAppointmentOnServer(
 }
 
 function revalidatePublicContent(payload: AdminPersistInput) {
+  if (payload.type === "settings") {
+    for (const locale of publicLocales) {
+      for (const suffix of publicShellPageSuffixes) {
+        revalidatePath(`/${locale}${suffix}`);
+      }
+    }
+
+    revalidatePath("/[locale]/blog/[slug]", "layout");
+    revalidatePath("/[locale]/services/[serviceSlug]", "page");
+    revalidatePath("/sitemap.xml");
+    return;
+  }
+
   for (const locale of publicLocales) {
     if (payload.type === "service") {
       revalidatePath(`/${locale}`);
@@ -304,9 +328,6 @@ function revalidatePublicContent(payload: AdminPersistInput) {
     } else if (payload.type === "blogPost") {
       revalidatePath(`/${locale}/blog`);
       revalidatePath(`/${locale}/blog/${payload.record.slug}`);
-    } else if (payload.type === "settings") {
-      revalidatePath(`/${locale}`, "layout");
-      revalidatePath(`/${locale}/gift-certificates`);
     } else if (payload.type === "media") {
       revalidatePath(`/${locale}`, "layout");
     }

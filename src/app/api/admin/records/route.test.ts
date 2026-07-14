@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { persistAdminRecord } from "@/admin/persistence";
 import { runWithAdminRepositoryAuditContext } from "@/admin/repository";
 import { authorizeSupabaseAdminAccess } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
 
 import { POST } from "./route";
 
@@ -508,6 +509,46 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
     expect(persistAdminRecord).toHaveBeenCalledWith(settingsPayload);
+    const suffixes = [
+      "",
+      "/about",
+      "/blog",
+      "/contacts",
+      "/cookies",
+      "/gift-certificates",
+      "/privacy",
+      "/services",
+      "/terms",
+    ];
+
+    for (const locale of ["bg", "ru", "ua", "en"]) {
+      for (const suffix of suffixes) {
+        expect(revalidatePath).toHaveBeenCalledWith(`/${locale}${suffix}`);
+      }
+    }
+
+    expect(revalidatePath).toHaveBeenCalledWith("/[locale]/blog/[slug]", "layout");
+    expect(revalidatePath).toHaveBeenCalledWith("/[locale]/services/[serviceSlug]", "page");
+    expect(revalidatePath).toHaveBeenCalledWith("/sitemap.xml");
+    expect(revalidatePath).toHaveBeenCalledTimes(39);
+  });
+
+  it("does not revalidate public pages when settings persistence fails", async () => {
+    vi.mocked(persistAdminRecord).mockResolvedValueOnce({
+      message: "admin_site_settings: permission denied",
+      mode: "supabase",
+      ok: false,
+    });
+
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(settingsPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("returns server errors for Supabase write failures", async () => {
