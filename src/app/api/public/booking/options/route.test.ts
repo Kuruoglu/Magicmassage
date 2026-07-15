@@ -24,9 +24,9 @@ vi.mock("@/booking/service", async (importOriginal) => {
       enabled: true,
       holdMinutes: 5,
       horizonDays: 60,
-      minLeadMinutes: 240,
+      minLeadMinutes: 30,
       services: [],
-      slotStepMinutes: 15,
+      slotStepMinutes: 30,
       timezone: "Europe/Sofia",
     })),
     restorePublicBookingConfirmation: vi.fn(async () => null),
@@ -92,14 +92,14 @@ describe("public booking options route", () => {
       enabled: true,
       holdMinutes: 5,
       horizonDays: 60,
-      minLeadMinutes: 240,
+      minLeadMinutes: 30,
       services: [{
         category: "massage",
         slug: "classic-massage",
         title: "Classic massage",
         variants: [{ currency: "EUR", durationMinutes: 60, id: "price-60", priceCents: 7000 }],
       }],
-      slotStepMinutes: 15,
+      slotStepMinutes: 30,
       timezone: "Europe/Sofia",
     });
 

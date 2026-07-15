@@ -147,63 +147,123 @@ function DateCalendar({
   selectedDate: string | null;
 }) {
   const copy = getPublicBookingCopy(locale);
+  const monthTitleId = useId();
   const months = useMemo(() => {
     const grouped = new Map<string, BookingAvailabilityDate[]>();
     for (const date of dates) {
       const key = date.date.slice(0, 7);
       grouped.set(key, [...(grouped.get(key) ?? []), date]);
     }
-    return [...grouped.entries()];
+    return [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right));
   }, [dates]);
+  const initialMonthIndex = Math.max(
+    0,
+    months.findIndex(([month]) => month === selectedDate?.slice(0, 7)),
+  );
+  const selectedMonth = selectedDate?.slice(0, 7);
+  const [calendarView, setCalendarView] = useState({
+    selectedMonth,
+    visibleMonthIndex: initialMonthIndex,
+  });
+
+  if (calendarView.selectedMonth !== selectedMonth) {
+    const selectedMonthIndex = months.findIndex(([month]) => month === selectedMonth);
+    setCalendarView({
+      selectedMonth,
+      visibleMonthIndex: selectedMonthIndex >= 0
+        ? selectedMonthIndex
+        : calendarView.visibleMonthIndex,
+    });
+  }
+  const visibleMonthIndex = calendarView.visibleMonthIndex;
   const weekdayFormatter = new Intl.DateTimeFormat(localeTags[locale], { weekday: "narrow" });
   const weekdays = Array.from({ length: 7 }, (_, index) =>
     weekdayFormatter.format(new Date(2026, 0, 5 + index)),
   );
+  const visibleMonth = months[visibleMonthIndex];
+
+  if (!visibleMonth) return null;
+
+  const [month, monthDates] = visibleMonth;
+  const firstDate = parseDate(`${month}-01`);
+  const firstVisibleDate = parseDate(monthDates[0].date);
+  const offset = (firstVisibleDate.getDay() + 6) % 7;
+  const monthFormatter = new Intl.DateTimeFormat(localeTags[locale], {
+    month: "long",
+    year: "numeric",
+  });
+  const monthTitle = monthFormatter.format(firstDate);
+  const previousMonthTitle = visibleMonthIndex > 0
+    ? monthFormatter.format(parseDate(`${months[visibleMonthIndex - 1][0]}-01`))
+    : null;
+  const nextMonthTitle = visibleMonthIndex < months.length - 1
+    ? monthFormatter.format(parseDate(`${months[visibleMonthIndex + 1][0]}-01`))
+    : null;
 
   return (
     <div className={styles.calendars}>
-      {months.map(([month, monthDates]) => {
-        const firstDate = parseDate(`${month}-01`);
-        const firstVisibleDate = parseDate(monthDates[0].date);
-        const offset = (firstVisibleDate.getDay() + 6) % 7;
-        const monthTitle = new Intl.DateTimeFormat(localeTags[locale], {
-          month: "long",
-          year: "numeric",
-        }).format(firstDate);
+      <section className={styles.calendarMonth} aria-labelledby={monthTitleId}>
+        <div
+          aria-label={copy.monthNavigation}
+          className={styles.calendarMonthHeader}
+          role="group"
+        >
+          <button
+            aria-label={previousMonthTitle ? `${copy.previousMonth}: ${previousMonthTitle}` : copy.previousMonth}
+            className={styles.monthNavigationButton}
+            disabled={visibleMonthIndex === 0}
+            onClick={() => setCalendarView((current) => ({
+              ...current,
+              visibleMonthIndex: Math.max(0, current.visibleMonthIndex - 1),
+            }))}
+            title={copy.previousMonth}
+            type="button"
+          >
+            <span aria-hidden="true">←</span>
+          </button>
+          <h3 aria-atomic="true" aria-live="polite" id={monthTitleId}>{monthTitle}</h3>
+          <button
+            aria-label={nextMonthTitle ? `${copy.nextMonth}: ${nextMonthTitle}` : copy.nextMonth}
+            className={styles.monthNavigationButton}
+            disabled={visibleMonthIndex === months.length - 1}
+            onClick={() => setCalendarView((current) => ({
+              ...current,
+              visibleMonthIndex: Math.min(months.length - 1, current.visibleMonthIndex + 1),
+            }))}
+            title={copy.nextMonth}
+            type="button"
+          >
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+        <div className={styles.weekdays} aria-hidden="true">
+          {weekdays.map((weekday, index) => <span key={`${weekday}-${index}`}>{weekday}</span>)}
+        </div>
+        <div className={styles.daysGrid}>
+          {Array.from({ length: offset }, (_, index) => (
+            <span className={styles.emptyDay} key={`empty-${index}`} aria-hidden="true" />
+          ))}
+          {monthDates.map((date) => {
+            const disabled = date.availability === "unavailable";
+            const status = copy.availability[date.availability];
 
-        return (
-          <section className={styles.calendarMonth} key={month} aria-label={monthTitle}>
-            <h3>{monthTitle}</h3>
-            <div className={styles.weekdays} aria-hidden="true">
-              {weekdays.map((weekday, index) => <span key={`${weekday}-${index}`}>{weekday}</span>)}
-            </div>
-            <div className={styles.daysGrid}>
-              {Array.from({ length: offset }, (_, index) => (
-                <span className={styles.emptyDay} key={`empty-${index}`} aria-hidden="true" />
-              ))}
-              {monthDates.map((date) => {
-                const disabled = date.availability === "unavailable";
-                const status = copy.availability[date.availability];
-
-                return (
-                  <button
-                    className={`${styles.dayButton} ${styles[date.availability]}`}
-                    type="button"
-                    key={date.date}
-                    disabled={disabled}
-                    aria-label={`${formatDate(locale, date.date, "full")}, ${status}`}
-                    aria-pressed={date.date === selectedDate}
-                    onClick={() => onSelect(date.date)}
-                  >
-                    <strong>{parseDate(date.date).getDate()}</strong>
-                    <span>{status}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+            return (
+              <button
+                className={`${styles.dayButton} ${styles[date.availability]}`}
+                type="button"
+                key={date.date}
+                disabled={disabled}
+                aria-label={`${formatDate(locale, date.date, "full")}, ${status}`}
+                aria-pressed={date.date === selectedDate}
+                onClick={() => onSelect(date.date)}
+              >
+                <strong>{parseDate(date.date).getDate()}</strong>
+                <span>{status}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
@@ -845,11 +905,18 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
                 </div>
               ) : null}
               {availabilityState === "ready" ? (
-                <DateCalendar dates={availabilityDates} locale={locale} onSelect={selectDate} selectedDate={selectedDate} />
+                <DateCalendar
+                  dates={availabilityDates}
+                  locale={locale}
+                  onSelect={selectDate}
+                  selectedDate={selectedDate}
+                />
               ) : null}
 
               <section className={styles.timesSection} aria-labelledby="booking-times-title">
-                <h3 id="booking-times-title">{copy.timesTitle}</h3>
+                <h3 id="booking-times-title">
+                  {selectedDate ? `${copy.timesTitle}: ${formatDate(locale, selectedDate)}` : copy.timesTitle}
+                </h3>
                 {!selectedDate ? <p>{copy.chooseDate}</p> : null}
                 {selectedDate && selectedAvailabilityDate?.slots.length === 0 ? <p>{copy.noTimes}</p> : null}
                 {selectedDate && selectedAvailabilityDate?.slots.length ? (

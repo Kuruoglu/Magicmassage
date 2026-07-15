@@ -26,7 +26,8 @@ admin/CRM platform:
   Natali may create any number of manual admin appointments, including a ninth
   or tenth appointment; the public cap never blocks an authorized admin write.
 - Booking buffers are owner-configurable as 15 or 30 minutes and are snapshotted
-  on each appointment. Public starts use a 15-minute grid.
+  on each appointment. Public starts use a 30-minute grid with a 30-minute
+  same-day lead time.
 - Natali can add full-day or timed personal blocks in the admin calendar. Blocks,
   appointments, active holds, working hours, lead time, and the public daily cap
   all participate in public availability.

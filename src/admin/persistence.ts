@@ -700,9 +700,8 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     Number(record.bookingHorizonDays) >= 1 &&
     Number(record.bookingHorizonDays) <= 365 &&
     hasNumber(record, "bookingMinLeadMinutes") &&
-    Number(record.bookingMinLeadMinutes) >= 0 &&
-    Number(record.bookingMinLeadMinutes) <= 10080 &&
-    record.bookingSlotStepMinutes === 15 &&
+    record.bookingMinLeadMinutes === 30 &&
+    record.bookingSlotStepMinutes === 30 &&
     hasString(record, "businessName") &&
     hasString(record, "cookiePrivacyMode") &&
     record.currency === "EUR" &&

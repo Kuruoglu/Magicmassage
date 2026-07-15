@@ -13,7 +13,7 @@ vi.mock("@/booking/service", async (importOriginal) => {
     ...actual,
     consumePublicBookingRateLimit: vi.fn(async () => true),
     getPublicBookingAvailability: vi.fn(async () => ({
-      days: [{ capReached: false, date: "2026-08-01", slots: ["10:00", "10:15"] }],
+      days: [{ capReached: false, date: "2026-08-01", slots: ["10:00", "10:30"] }],
       enabled: true,
       from: "2026-08-01",
       priceVariantId: "price-60",
@@ -35,7 +35,7 @@ describe("public booking availability route", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      days: [{ capReached: false, date: "2026-08-01", slots: ["10:00", "10:15"] }],
+      days: [{ capReached: false, date: "2026-08-01", slots: ["10:00", "10:30"] }],
     });
     expect(getPublicBookingAvailability).toHaveBeenCalledWith({
       days: 7,

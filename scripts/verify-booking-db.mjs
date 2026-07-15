@@ -230,12 +230,14 @@ try {
 
   const settingsResult = await supabase
     .from("admin_site_settings")
-    .select("public_booking_daily_limit, public_booking_enabled")
+    .select("booking_min_lead_minutes, booking_slot_step_minutes, public_booking_daily_limit, public_booking_enabled")
     .eq("id", "site")
     .single();
   if (settingsResult.error) throw settingsResult.error;
   assert(settingsResult.data.public_booking_enabled, "Public booking must be enabled for the DB smoke.");
   assert(settingsResult.data.public_booking_daily_limit === 8, "Public booking daily limit must be 8.");
+  assert(settingsResult.data.booking_slot_step_minutes === 30, "Public booking slot step must be 30 minutes.");
+  assert(settingsResult.data.booking_min_lead_minutes === 30, "Public booking same-day lead must be 30 minutes.");
 
   const { data: availability, error: availabilityError } = await supabase.rpc(
     "public_booking_get_availability",
@@ -246,7 +248,19 @@ try {
     (day) => Array.isArray(day.slots) && day.slots.length >= 2,
   ) ?? [];
   assert(candidates.length >= 2, "Two dates with at least two free slots are required for the DB smoke.");
+  const halfHourGridEnforced = availability.days.every((day) =>
+    day.slots.every((slot) => Number(slot.slice(3, 5)) % 30 === 0),
+  );
   const [capacityDay, versionDay] = candidates;
+
+  const offGridHold = await createHold({
+    date: capacityDay.date,
+    priceVariantId,
+    sessionKeyHash: opaqueHash(sessionHashes),
+    time: addMinutes(capacityDay.slots[0], 15),
+    tokenHash: opaqueHash(tokenHashes),
+  });
+  const offGridStartRejected = errorMatches(offGridHold.error, "slot_unavailable");
 
   const userResult = await supabase.auth.admin.createUser({
     email: `booking-db-${runId}@example.com`,
@@ -668,6 +682,7 @@ try {
     bookingSnapshotsPreserved,
     concurrentSlotSerialized,
     crmPreserved,
+    halfHourGridEnforced,
     holdBlocksManualOverlap,
     holdCountsTowardCap,
     heldQuoteReturned,
@@ -676,6 +691,7 @@ try {
     manualAppointmentsBeforeConfirmation,
     obsoleteConfirmRpcRemoved,
     obsoleteHoldRpcRemoved,
+    offGridStartRejected,
     personalBlockRemovesSlot,
     parallelSessionRestoresSerialized: parallelSessionRestoresSerialized
       && parallelSessionVersionsStable,

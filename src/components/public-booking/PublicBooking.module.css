@@ -326,12 +326,57 @@
   gap: 34px;
 }
 
-.calendarMonth h3,
+.calendarMonthHeader h3,
 .timesSection h3 {
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0;
   margin-bottom: 14px;
+}
+
+.calendarMonthHeader {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  margin-bottom: 14px;
+}
+
+.calendarMonthHeader h3 {
+  margin: 0;
+  text-align: center;
+}
+
+.monthNavigationButton {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d8d1dc;
+  border-radius: 6px;
+  color: #513566;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 1.3rem;
+  height: 44px;
+  justify-content: center;
+  padding: 0;
+  width: 44px;
+}
+
+.monthNavigationButton:hover:not(:disabled) {
+  background: #f5f0f8;
+  border-color: #8c69a5;
+}
+
+.monthNavigationButton:focus-visible {
+  outline: 3px solid rgba(122, 78, 151, 0.28);
+  outline-offset: 2px;
+}
+
+.monthNavigationButton:disabled {
+  background: #f1eef3;
+  color: #aaa3ae;
+  cursor: not-allowed;
 }
 
 .weekdays,
@@ -788,6 +833,11 @@
 }
 
 @media (max-width: 620px) {
+  .weekdays,
+  .daysGrid {
+    gap: 4px;
+  }
+
   .pageHeader h1,
   .successPanel h1,
   .unavailablePanel h1 {

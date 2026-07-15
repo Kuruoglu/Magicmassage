@@ -49,7 +49,7 @@ function isSlotTime(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const match = timePattern.exec(value);
 
-  return Boolean(match) && Number(match?.[2]) % 15 === 0;
+  return Boolean(match) && Number(match?.[2]) % 30 === 0;
 }
 
 function normalizedOptionalString(value: unknown) {

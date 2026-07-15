@@ -20,6 +20,16 @@ function sofiaToday() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function monthDistance(from: string, to: string) {
+  const [fromYear, fromMonth] = from.split("-").map(Number);
+  const [toYear, toMonth] = to.split("-").map(Number);
+  return (toYear - fromYear) * 12 + toMonth - fromMonth;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 test("public booking restores and confirms a session hold", async ({ context, page }) => {
   const supabaseUrl = configuredValue("NEXT_PUBLIC_SUPABASE_URL");
   const secretKey = configuredValue("SUPABASE_SECRET_KEY");
@@ -34,16 +44,22 @@ test("public booking restores and confirms a session hold", async ({ context, pa
   const priceVariantId = options.data?.services?.[0]?.variants?.[0]?.id;
   test.skip(!options.data?.enabled || typeof priceVariantId !== "string", "Public booking is intentionally unavailable.");
 
+  const today = sofiaToday();
   const availability = await serviceClient.rpc("public_booking_get_availability", {
     p_days: 31,
-    p_from: sofiaToday(),
+    p_from: today,
     p_price_variant_id: priceVariantId,
   });
   if (availability.error) throw availability.error;
-  test.skip(
-    !availability.data?.days?.some((day: { slots?: unknown[] }) => Array.isArray(day.slots) && day.slots.length > 0),
-    "The configured real booking calendar has no free slot in the next 31 days.",
+  const targetDay = availability.data?.days?.find(
+    (day: { date?: unknown; slots?: unknown[] }) => typeof day.date === "string"
+      && day.date > today
+      && Array.isArray(day.slots)
+      && day.slots.length > 0,
   );
+  test.skip(!targetDay, "The configured real booking calendar has no free future slot in the next 31 days.");
+  if (!targetDay || typeof targetDay.date !== "string") return;
+  const targetDate = targetDay.date;
 
   const testClientName = `Playwright Booking Client ${randomUUID()}`;
   let testPhoneNormalized = "";
@@ -66,8 +82,25 @@ test("public booking restores and confirms a session hold", async ({ context, pa
     await page.getByRole("radio").first().check();
     await page.getByRole("button", { name: "Continue" }).click();
 
-    // Avoid today's moving lead-time boundary while the real browser test is running.
-    const availableDate = page.locator('button[aria-label*="Available"]:not([disabled])').last();
+    await page.setViewportSize({ width: 320, height: 740 });
+    const calendarHasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(calendarHasHorizontalOverflow).toBe(false);
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    for (let offset = monthDistance(sofiaToday().slice(0, 7), targetDate.slice(0, 7)); offset > 0; offset -= 1) {
+      await page.getByRole("button", { name: /^Next month:/ }).click();
+    }
+    const formattedTargetDate = new Intl.DateTimeFormat("en-GB", {
+      day: "numeric",
+      month: "long",
+      weekday: "long",
+      year: "numeric",
+    }).format(new Date(`${targetDate}T12:00:00`));
+    const availableDate = page.getByRole("button", {
+      name: new RegExp(`^${escapeRegExp(formattedTargetDate)}, (Available|Limited)$`),
+    });
     await expect(availableDate).toBeVisible();
     await availableDate.click();
 

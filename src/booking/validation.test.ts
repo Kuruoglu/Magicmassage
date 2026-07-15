@@ -15,11 +15,13 @@ describe("public booking validation", () => {
         new URL("https://example.com/api/public/booking/availability?priceVariantId=price-60&from=2026-08-01&days=7"),
       ),
     ).toEqual({ days: 7, from: "2026-08-01", priceVariantId: "price-60" });
-    expect(parseCreateHoldPayload({ date: "2026-08-01", priceVariantId: "price-60", time: "10:15" })).toEqual({
+    expect(parseCreateHoldPayload({ date: "2026-08-01", priceVariantId: "price-60", time: "10:30" })).toEqual({
       date: "2026-08-01",
       priceVariantId: "price-60",
-      time: "10:15",
+      time: "10:30",
     });
+    expect(parseCreateHoldPayload({ date: "2026-08-01", priceVariantId: "price-60", time: "10:15" })).toBeNull();
+    expect(parseCreateHoldPayload({ date: "2026-08-01", priceVariantId: "price-60", time: "10:45" })).toBeNull();
   });
 
   it("restores confirmations only when the review URL requests it", () => {

@@ -93,6 +93,18 @@ const confirmationRestoreIndexMigrationPath = join(
   "migrations",
   "20260715240000_public_booking_confirmation_restore_index.sql",
 );
+const halfHourGridMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260715250000_public_booking_half_hour_grid.sql",
+);
+const expireQuarterHourHoldsMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260715260000_expire_quarter_hour_booking_holds.sql",
+);
 
 function migrationSql() {
   return readFileSync(migrationPath, "utf8");
@@ -356,6 +368,38 @@ describe("public booking migration", () => {
 
     expect(sql).toContain("(session_key_hash, confirmed_at desc)");
     expect(sql).toContain("where status = 'confirmed' and session_key_hash is not null");
+  });
+
+  it("enforces half-hour public starts and a short same-day lead", () => {
+    const sql = readFileSync(halfHourGridMigrationPath, "utf8");
+    const slotFunction = sql.slice(
+      sql.indexOf("create or replace function public.public_booking_slot_in_schedule"),
+      sql.indexOf("create or replace function public.admin_save_booking_settings_with_audit"),
+    );
+    const settingsFunction = sql.slice(
+      sql.indexOf("create or replace function public.admin_save_booking_settings_with_audit"),
+    );
+
+    expect(sql).toContain("alter column booking_slot_step_minutes set default 30");
+    expect(sql).toContain("alter column booking_min_lead_minutes set default 30");
+    expect(sql).toContain("booking_slot_step_minutes = 30");
+    expect(sql).toContain("booking_min_lead_minutes = 30");
+    expect(sql).toContain("check (booking_slot_step_minutes = 30)");
+    expect(sql).toContain("check (booking_min_lead_minutes = 30)");
+    expect(slotFunction).toContain("p_slot_step_minutes = 30");
+    expect(slotFunction).toContain("start_minutes % p_slot_step_minutes = 0");
+    expect(settingsFunction).toContain("(p_settings ->> 'booking_slot_step_minutes')::integer <> 30");
+    expect(settingsFunction).toContain("(p_settings ->> 'booking_min_lead_minutes')::integer <> 30");
+    expect(settingsFunction).toContain("grant execute on function public.admin_save_booking_settings_with_audit");
+  });
+
+  it("expires pre-migration quarter-hour holds instead of restoring an unconfirmable selection", () => {
+    const sql = readFileSync(expireQuarterHourHoldsMigrationPath, "utf8");
+
+    expect(sql).toContain("update public.public_booking_holds");
+    expect(sql).toContain("set status = 'expired'");
+    expect(sql).toContain("where status = 'active'");
+    expect(sql).toContain("extract(minute from starts_at)::integer % 30 <> 0");
   });
 
   it("removes the obsolete confirmation overload before adding contact preference", () => {

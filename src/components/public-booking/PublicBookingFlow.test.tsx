@@ -184,6 +184,53 @@ describe("PublicBookingFlow", () => {
     expect(Array.from(firstVisibleDate.parentElement?.children ?? []).indexOf(firstVisibleDate)).toBe(3);
   });
 
+  it("shows one month at a time and navigates between available months", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/public/booking/options")) return jsonResponse(options);
+      if (url.startsWith("/api/public/booking/availability")) {
+        return jsonResponse({
+          ...availability,
+          days: [
+            { date: "2026-07-20", capReached: false, slots: ["10:00"] },
+            { date: "2026-08-03", capReached: false, slots: ["10:30"] },
+          ],
+        });
+      }
+      return jsonResponse({}, 404);
+    }));
+    const user = userEvent.setup();
+
+    render(<PublicBookingFlow locale="en" initialServiceSlug="classic-massage" />);
+    await user.click(await screen.findByRole("radio", { name: /60 min/i }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("heading", { name: "July 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /20 July 2026/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /3 August 2026/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous month" })).toBeDisabled();
+
+    const selectedDateButton = screen.getByRole("button", { name: /20 July 2026/i });
+    await user.click(selectedDateButton);
+    const selectedUrl = window.location.href;
+    expect(selectedDateButton).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "Available times: 20 July 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "10:00" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next month: August 2026" }));
+
+    expect(screen.getByRole("heading", { name: "August 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /3 August 2026/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /20 July 2026/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "10:00" })).toBeInTheDocument();
+    expect(window.location.href).toBe(selectedUrl);
+    expect(screen.getByRole("button", { name: "Next month" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous month: July 2026" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Previous month: July 2026" }));
+    expect(screen.getByRole("button", { name: /20 July 2026/i })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("keeps the selected date and returns to time choice after a 409 hold conflict", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
