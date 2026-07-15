@@ -58,8 +58,10 @@ function addMinutes(time, minutes) {
 }
 
 function appointmentRecord({
+  bufferMinutes = 0,
   clientId,
   date,
+  durationMinutes = 30,
   id,
   note = "Booking DB smoke",
   status = "confirmed",
@@ -67,10 +69,10 @@ function appointmentRecord({
   version = null,
 }) {
   return {
-    buffer_minutes: 0,
+    buffer_minutes: bufferMinutes,
     client_id: clientId,
     client_name_snapshot: "Booking DB Smoke",
-    duration_minutes: 30,
+    duration_minutes: durationMinutes,
     id,
     internal_note: note,
     overlap_override: false,
@@ -446,6 +448,7 @@ try {
   const versionAppointmentId = `appointment-booking-db-version-${runId}`;
   appointmentIds.add(versionAppointmentId);
   const baseVersionRecord = appointmentRecord({
+    bufferMinutes: 30,
     clientId,
     date: versionDay.date,
     id: versionAppointmentId,
@@ -478,6 +481,66 @@ try {
   }, "appointment.update");
   const staleAppointmentVersionRejected = currentAppointment.data.version === 2
     && errorMatches(staleAppointment.error, "appointment_concurrent_update");
+
+  const adjacentAppointmentId = `appointment-booking-db-adjacent-${runId}`;
+  appointmentIds.add(adjacentAppointmentId);
+  const adjacentAppointment = await saveAppointment(appointmentRecord({
+    bufferMinutes: 30,
+    clientId,
+    date: versionDay.date,
+    id: adjacentAppointmentId,
+    time: "06:30",
+  }));
+  const manualBackToBackAllowed = !adjacentAppointment.error;
+
+  const actualOverlapAppointmentId = `appointment-booking-db-actual-overlap-${runId}`;
+  appointmentIds.add(actualOverlapAppointmentId);
+  const actualOverlapAppointment = await saveAppointment(appointmentRecord({
+    bufferMinutes: 30,
+    clientId,
+    date: versionDay.date,
+    id: actualOverlapAppointmentId,
+    time: "06:15",
+  }));
+  const manualActualOverlapRejected = errorMatches(
+    actualOverlapAppointment.error,
+    "appointment_overlap_conflict",
+  );
+
+  const bufferedManualTime = versionDay.slots.find((time) =>
+    versionDay.slots.includes(addMinutes(time, 30))
+  );
+  assert(bufferedManualTime, "Two consecutive public slots are required for the buffer smoke.");
+  const manualBuffersStillBlockPublicHolds = [];
+  for (const bufferMinutes of [15, 30]) {
+    const bufferedAppointmentId = `appointment-booking-db-buffer-${bufferMinutes}-${runId}`;
+    appointmentIds.add(bufferedAppointmentId);
+    const bufferedAppointment = await saveAppointment(appointmentRecord({
+      bufferMinutes,
+      clientId,
+      date: versionDay.date,
+      id: bufferedAppointmentId,
+      time: bufferedManualTime,
+    }));
+    if (bufferedAppointment.error) throw bufferedAppointment.error;
+
+    const publicHoldInsideBuffer = await createHold({
+      date: versionDay.date,
+      priceVariantId,
+      sessionKeyHash: opaqueHash(sessionHashes),
+      time: addMinutes(bufferedManualTime, 30),
+      tokenHash: opaqueHash(tokenHashes),
+    });
+    manualBuffersStillBlockPublicHolds.push(
+      errorMatches(publicHoldInsideBuffer.error, "slot_unavailable"),
+    );
+
+    const removedBufferedAppointment = await supabase
+      .from("admin_appointments")
+      .delete()
+      .eq("id", bufferedAppointmentId);
+    if (removedBufferedAppointment.error) throw removedBufferedAppointment.error;
+  }
 
   const blockStart = versionDay.slots[0];
   const blockEnd = addMinutes(blockStart, 30);
@@ -689,6 +752,9 @@ try {
     idempotentReferenceStable,
     inactiveSessionReleased,
     manualAppointmentsBeforeConfirmation,
+    manualActualOverlapRejected,
+    manualBackToBackAllowed,
+    manualBuffersStillBlockPublicHolds: manualBuffersStillBlockPublicHolds.every(Boolean),
     obsoleteConfirmRpcRemoved,
     obsoleteHoldRpcRemoved,
     offGridStartRejected,

@@ -105,6 +105,12 @@ const expireQuarterHourHoldsMigrationPath = join(
   "migrations",
   "20260715260000_expire_quarter_hour_booking_holds.sql",
 );
+const backToBackAdminAppointmentsMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260715270000_allow_back_to_back_admin_appointments.sql",
+);
 
 function migrationSql() {
   return readFileSync(migrationPath, "utf8");
@@ -400,6 +406,18 @@ describe("public booking migration", () => {
     expect(sql).toContain("set status = 'expired'");
     expect(sql).toContain("where status = 'active'");
     expect(sql).toContain("extract(minute from starts_at)::integer % 30 <> 0");
+  });
+
+  it("keeps public booking buffers while allowing back-to-back admin appointments", () => {
+    const sql = readFileSync(backToBackAdminAppointmentsMigrationPath, "utf8");
+    const publicBookingSql = readFileSync(publicBookingHardeningMigrationPath, "utf8");
+
+    expect(sql).toContain("drop constraint if exists admin_appointments_active_schedule_excl");
+    expect(sql).toContain("make_interval(mins => duration_minutes)");
+    expect(sql).not.toContain("duration_minutes + buffer_minutes");
+    expect(sql).toContain("and not overlap_override");
+    expect(publicBookingSql).toContain("variant.duration_minutes + settings.booking_buffer_minutes");
+    expect(publicBookingSql).toContain("appointment.duration_minutes + appointment.buffer_minutes");
   });
 
   it("removes the obsolete confirmation overload before adding contact preference", () => {

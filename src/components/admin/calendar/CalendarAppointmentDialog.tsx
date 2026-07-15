@@ -126,7 +126,6 @@ export function CalendarAppointmentDialog({
     }
 
     const candidate = {
-      bufferMinutes: form.bufferMinutes ?? bookingBufferMinutes,
       date: form.date,
       duration: form.durationMinutes ?? 60,
       start: form.time,
@@ -140,7 +139,6 @@ export function CalendarAppointmentDialog({
             isSchedulingBlockingStatus(appointment.status),
         )
         .map((appointment) => ({
-          bufferMinutes: appointment.bufferMinutes ?? bookingBufferMinutes,
           date: appointment.date,
           duration: appointment.durationMinutes ?? 60,
           start: appointment.time,
@@ -151,7 +149,7 @@ export function CalendarAppointmentDialog({
       ...classifyAppointmentAgainstSchedule(candidate, workingSchedule),
       overlap,
     };
-  }, [appointments, bookingBufferMinutes, form, workingSchedule]);
+  }, [appointments, form, workingSchedule]);
   const conflictingAppointment = useMemo(() => {
     if (!isIsoDate(form.date) || !/^\d{2}:\d{2}$/.test(form.time)) {
       return undefined;
@@ -165,20 +163,18 @@ export function CalendarAppointmentDialog({
         isSchedulingBlockingStatus(appointment.status) &&
         appointmentsOverlap(
           {
-            bufferMinutes: bookingBufferMinutes,
             date: form.date,
             duration: form.durationMinutes ?? 60,
             start: form.time,
           },
           {
-            bufferMinutes: appointment.bufferMinutes ?? bookingBufferMinutes,
             date: appointment.date,
             duration: appointment.durationMinutes ?? 60,
             start: appointment.time,
           },
         ),
     );
-  }, [appointments, bookingBufferMinutes, form]);
+  }, [appointments, form]);
   const canOverrideOverlap = role === "owner" || role === "administrator";
   const normalizedClientQuery = normalizeSearch(form.client);
   const clientSuggestions =

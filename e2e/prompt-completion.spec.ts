@@ -299,7 +299,20 @@ test("7. drags a day-view appointment to a different time", async ({ page }) => 
   await expect(schedule.getByRole("button", { name: /10:00.*Анна Петрова/ })).toHaveCount(0);
 });
 
-test("7a. styles an overlapping move as a usable conflict panel", async ({ page }) => {
+test("7a. allows an appointment to end when the next appointment begins", async ({ page }) => {
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
+
+  const schedule = page.getByLabel("Расписание 6 июля");
+  const appointment = schedule.getByRole("listitem").filter({ hasText: "Анна Петрова" });
+
+  await dragAppointmentTo(appointment, schedule, 11, 30);
+
+  await expect(page.getByRole("region", { name: "Изменение пересекается с другой записью" })).toHaveCount(0);
+  await expect(schedule.getByRole("button", { name: /11:30.*Анна Петрова/ })).toBeVisible();
+  await expect(schedule.getByRole("button", { name: /12:30.*Мария Иванова/ })).toBeVisible();
+});
+
+test("7b. styles an overlapping move as a usable conflict panel", async ({ page }) => {
   await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
 
   const schedule = page.getByLabel("Расписание 6 июля");

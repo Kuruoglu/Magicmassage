@@ -4,7 +4,6 @@ import { clampDuration, timeToMinutes } from "./time";
 import type { AppointmentStatus } from "@/admin/domain";
 
 export type CalendarAppointmentTime = {
-  bufferMinutes?: number;
   date: string;
   duration: number;
   start: string;
@@ -27,7 +26,7 @@ function appointmentInterval(appointment: CalendarAppointmentTime) {
 
   const start = timeToMinutes(appointment.start);
   return {
-    end: start + clampDuration(appointment.duration) + Math.max(appointment.bufferMinutes ?? 0, 0),
+    end: start + clampDuration(appointment.duration),
     start,
   };
 }

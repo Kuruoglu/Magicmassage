@@ -767,6 +767,54 @@ describe("admin records persistence API route", () => {
     );
   });
 
+  it("allows a manual appointment to end exactly when the next appointment begins", async () => {
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.drag", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        overlapOverride: false,
+        overlapOverrideReason: "",
+        time: "09:30",
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        id: payload.record.id,
+        post_visit_comment: "",
+        starts_at: "09:00:00",
+        starts_on: payload.record.date,
+        status: "confirmed",
+      }],
+      scheduleRows: [{
+        buffer_minutes: 30,
+        duration_minutes: 60,
+        id: "appointment-next",
+        starts_at: "10:30:00",
+        status: "confirmed",
+      }],
+      settings: {
+        booking_buffer_minutes: 30,
+        timezone: "Europe/Sofia",
+        working_days: "Пн-Сб",
+        working_hours: "08:00-20:00",
+      },
+    });
+    supabaseAdminRouteMock.client = client;
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith({
+      ...payload,
+      record: { ...payload.record, bufferMinutes: 30 },
+    });
+  });
+
   it("classifies saved working hours and stores the server-side booking buffer", async () => {
     const payload = {
       ...overlappingAppointmentPayload,

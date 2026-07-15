@@ -78,7 +78,6 @@ const weekdayByToken: Record<string, number> = {
 };
 
 type AppointmentScheduleRow = {
-  buffer_minutes: number;
   duration_minutes: number;
   id: string;
   starts_at: string;
@@ -261,7 +260,7 @@ async function classifyAppointmentOnServer(
   const [appointmentsResult, blocksResult, currentAppointmentResult, settingsResult] = await Promise.all([
     client
       .from("admin_appointments")
-      .select("buffer_minutes, duration_minutes, id, starts_at, status")
+      .select("duration_minutes, id, starts_at, status")
       .eq("starts_on", payload.record.date),
     client
       .from("admin_calendar_blocks")
@@ -297,8 +296,8 @@ async function classifyAppointmentOnServer(
     if (candidate.id === payload.record.id || !activeAppointmentStatuses.has(candidate.status)) return false;
     const candidateStart = timeToMinutes(candidate.starts_at);
 
-    return start < candidateStart + candidate.duration_minutes + candidate.buffer_minutes &&
-      candidateStart < start + duration + buffer;
+    return start < candidateStart + candidate.duration_minutes &&
+      candidateStart < start + duration;
   });
   const blockConflict = activeAppointmentLabels.has(payload.record.status) && blocks.some((block) => {
     const blockStart = timeToMinutes(block.starts_at);

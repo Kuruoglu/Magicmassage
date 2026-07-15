@@ -448,7 +448,6 @@ export function CalendarWorkspace({
     }
 
     const candidate = {
-      bufferMinutes: appointment.bufferMinutes ?? bookingBufferMinutes,
       date: appointment.date,
       duration: appointment.durationMinutes ?? 60,
       start: appointment.time,
@@ -464,7 +463,6 @@ export function CalendarWorkspace({
               appointmentKey(candidate) !== key && isSchedulingBlockingStatus(candidate.status),
           )
           .map((candidate) => ({
-            bufferMinutes: candidate.bufferMinutes ?? bookingBufferMinutes,
             date: candidate.date,
             duration: candidate.durationMinutes ?? 60,
             start: candidate.time,
@@ -484,13 +482,11 @@ export function CalendarWorkspace({
         isSchedulingBlockingStatus(candidate.status) &&
         appointmentsOverlap(
           {
-            bufferMinutes: appointment.bufferMinutes ?? bookingBufferMinutes,
             date: appointment.date,
             duration: appointment.durationMinutes ?? 60,
             start: appointment.time,
           },
           {
-            bufferMinutes: candidate.bufferMinutes ?? bookingBufferMinutes,
             date: candidate.date,
             duration: candidate.durationMinutes ?? 60,
             start: candidate.time,

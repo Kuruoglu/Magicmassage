@@ -256,7 +256,7 @@ describe("CalendarAppointmentDialog", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("uses the booking buffer and ignores completed appointments for conflicts", () => {
+  it("allows back-to-back appointments and ignores completed appointments for conflicts", () => {
     const { rerender } = render(
       <CalendarAppointmentDialog
         appointments={[conflictingAppointment]}
@@ -273,6 +273,9 @@ describe("CalendarAppointmentDialog", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Новая запись" });
     fireEvent.change(within(dialog).getByLabelText("Время"), { target: { value: "15:30" } });
+    expect(within(dialog).queryByText(/Запись пересекается/)).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText("Время"), { target: { value: "15:00" } });
     expect(within(dialog).getByRole("status")).toHaveTextContent("Запись пересекается с Мария Иванова");
 
     rerender(

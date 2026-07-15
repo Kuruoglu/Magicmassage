@@ -23,19 +23,19 @@ describe("calendar scheduling classification", () => {
     expect(appointmentsOverlap(appointment(), appointment({ date: "2026-07-15", start: "10:30" }))).toBe(false);
   });
 
-  it("includes each appointment buffer in schedule conflicts", () => {
+  it("allows admin appointments to meet at their real duration boundary", () => {
     expect(
       appointmentsOverlap(
-        appointment({ bufferMinutes: 30 }),
-        appointment({ duration: 60, start: "11:15" }),
-      ),
-    ).toBe(true);
-    expect(
-      appointmentsOverlap(
-        appointment({ bufferMinutes: 30 }),
-        appointment({ duration: 60, start: "11:30" }),
+        appointment(),
+        appointment({ duration: 60, start: "11:00" }),
       ),
     ).toBe(false);
+    expect(
+      appointmentsOverlap(
+        appointment(),
+        appointment({ duration: 60, start: "10:45" }),
+      ),
+    ).toBe(true);
   });
 
   it("uses the minimum duration when evaluating short appointments", () => {
