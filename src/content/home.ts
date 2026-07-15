@@ -121,9 +121,9 @@ const content: Record<Locale, HomeContent> = {
     ],
     booking: {
       eyebrow: "Вашето време за почивка",
-      title: "Изберете масаж и изпратете заявка за удобен час",
+      title: "Изберете масаж и запазете свободен час онлайн",
       description:
-        "Натали ще потвърди часа лично. При нужда ще получите предложение за най-близкия свободен час.",
+        "Изберете продължителност, дата и свободен час. След потвърждение записването се създава веднага.",
       action: "Запази час",
     },
     contact: {
@@ -205,9 +205,9 @@ const content: Record<Locale, HomeContent> = {
     ],
     booking: {
       eyebrow: "Ваше время для отдыха",
-      title: "Выберите массаж и отправьте заявку на удобное время",
+      title: "Выберите массаж и забронируйте свободное время онлайн",
       description:
-        "Натали лично подтвердит запись. Если время занято, вы получите ближайший доступный вариант.",
+        "Выберите продолжительность, дату и свободное время. После подтверждения запись создаётся сразу.",
       action: "Записаться",
     },
     contact: {
@@ -289,9 +289,9 @@ const content: Record<Locale, HomeContent> = {
     ],
     booking: {
       eyebrow: "Ваш час для відпочинку",
-      title: "Оберіть масаж і надішліть заявку на зручний час",
+      title: "Оберіть масаж і забронюйте вільний час онлайн",
       description:
-        "Наталі особисто підтвердить запис. Якщо час зайнятий, ви отримаєте найближчий доступний варіант.",
+        "Оберіть тривалість, дату й вільний час. Після підтвердження запис створюється одразу.",
       action: "Записатися",
     },
     contact: {
@@ -373,9 +373,9 @@ const content: Record<Locale, HomeContent> = {
     ],
     booking: {
       eyebrow: "Your time to rest",
-      title: "Choose a massage and send a request for a convenient time",
+      title: "Choose a massage and book an available time online",
       description:
-        "Natali will personally confirm the booking. If the selected time is busy, you will receive the nearest available option.",
+        "Choose a duration, date and available time. Your appointment is created as soon as you confirm.",
       action: "Book now",
     },
     contact: {

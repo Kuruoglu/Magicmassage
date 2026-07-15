@@ -59,6 +59,11 @@ export async function getRuntimeGiftCertificatesEnabled() {
   return result.status === "not_configured" && result.reason === "public_supabase_not_configured";
 }
 
+export async function getRuntimePublicBookingEnabled() {
+  const result = await createConfiguredPublicContentDataLayer().getSiteFeatures();
+  return result.status === "ok" ? result.data.publicBookingEnabled : false;
+}
+
 export async function getPublicShellRuntime(locale: Locale) {
   const dataLayer = createConfiguredPublicContentDataLayer();
   const [servicesResult, featuresResult] = await Promise.all([
@@ -76,8 +81,11 @@ export async function getPublicShellRuntime(locale: Locale) {
   const giftCertificatesEnabled = featuresResult.status === "ok"
     ? featuresResult.data.giftCertificatesEnabled
     : featuresResult.status === "not_configured" && featuresResult.reason === "public_supabase_not_configured";
+  const publicBookingEnabled = featuresResult.status === "ok"
+    ? featuresResult.data.publicBookingEnabled
+    : false;
 
-  return { giftCertificatesEnabled, mediaPlacements, services };
+  return { giftCertificatesEnabled, mediaPlacements, publicBookingEnabled, services };
 }
 
 export async function getRuntimeBlogPosts(locale: Locale): Promise<PublicBlogPostSummary[]> {

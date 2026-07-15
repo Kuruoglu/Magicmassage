@@ -62,6 +62,7 @@ import {
 import {
   CalendarAppointmentCancelDialog,
   CalendarAppointmentDialog,
+  CalendarBlockDialog,
   CalendarWorkspace,
   classifyAppointmentAgainstSchedule,
   createCalendarWorkingSchedule,
@@ -72,6 +73,7 @@ import {
   sortAppointments,
   type CalendarAppointmentFocus,
   type CalendarAppointmentSaveResult,
+  type CalendarBlockSaveResult,
 } from "@/components/admin/calendar";
 import { getAdminAuthorizationHeader, signOutAdminBrowserSession } from "@/lib/supabase/browser";
 import { AdminMobileHeader, AdminMobileNavigation } from "@/components/admin/mobile";
@@ -113,6 +115,7 @@ import {
   type Appointment,
   type BlogPostRecord,
   type BlogStatus,
+  type CalendarBlock,
   type CalendarSyncMode,
   type CertificateRecord,
   type CertificateStatus,
@@ -220,6 +223,8 @@ type SettingsFormState = {
   googleCalendarId: string;
   googleCalendarMode: CalendarSyncMode;
   giftCertificatesEnabled: boolean;
+  publicBookingDailyLimit: string;
+  publicBookingEnabled: boolean;
   reminderTemplate: string;
   rolesPolicy: string;
   stripeMode: StripeMode;
@@ -576,16 +581,22 @@ const initialBlogPostRows: BlogPostRecord[] = [
 const initialSettingsRecord: SettingsRecord = {
   auditLogRetentionDays: 180,
   bookingBufferMinutes: 30,
+  bookingHoldMinutes: 5,
+  bookingHorizonDays: 60,
+  bookingMinLeadMinutes: 240,
+  bookingSlotStepMinutes: 15,
   businessName: businessFacts.name,
   cookiePrivacyMode: "Google Maps только после consent; Stripe только в оплате сертификата.",
   currency: "EUR",
-  dailySlotCapacity: 4,
+  dailySlotCapacity: 8,
   defaultLocale: "bg",
   defaultSeoTitle: "Magic Massage Natali - массаж в Бургасе",
   emailSender: businessFacts.email,
   googleCalendarId: "",
   googleCalendarMode: "Внутренний календарь главный",
   giftCertificatesEnabled: true,
+  publicBookingDailyLimit: 8,
+  publicBookingEnabled: false,
   reminderTemplate: "Напоминание за 24 часа до записи после запуска email-провайдера.",
   rolesPolicy: "Владелец управляет настройками; администратор работает без критических системных действий.",
   stripeMode: "Тестовый",
@@ -666,6 +677,7 @@ const initialAdminUserRows: AdminUserRecord[] = [
 function cloneAdminDomainRecords(records: AdminDomainRecords): AdminDomainRecords {
   return {
     appointments: records.appointments.map((appointment) => ({ ...appointment })),
+    calendarBlocks: (records.calendarBlocks ?? []).map((block) => ({ ...block })),
     certificates: records.certificates.map((certificate) => ({
       ...certificate,
       history: [...certificate.history],
@@ -942,6 +954,8 @@ function buildSettingsFormState(settings: SettingsRecord): SettingsFormState {
     googleCalendarId: settings.googleCalendarId,
     googleCalendarMode: settings.googleCalendarMode,
     giftCertificatesEnabled: settings.giftCertificatesEnabled !== false,
+    publicBookingDailyLimit: String(settings.publicBookingDailyLimit ?? settings.dailySlotCapacity),
+    publicBookingEnabled: settings.publicBookingEnabled ?? false,
     reminderTemplate: settings.reminderTemplate,
     rolesPolicy: settings.rolesPolicy,
     stripeMode: settings.stripeMode,
@@ -1157,6 +1171,10 @@ function buildClientNextAction(
 
 function buildInitialCalendarAppointments(records: AdminDomainRecords) {
   return records.appointments;
+}
+
+function buildInitialCalendarBlocks(records: AdminDomainRecords) {
+  return records.calendarBlocks ?? [];
 }
 
 function paymentCountLabel(count: number) {
@@ -2246,32 +2264,39 @@ function SettingsDialog({
     event.preventDefault();
 
     const bookingBufferMinutes = Number(form.bookingBufferMinutes);
-    const dailySlotCapacity = Number(form.dailySlotCapacity);
+    const publicBookingDailyLimit = Number(form.publicBookingDailyLimit);
     const auditLogRetentionDays = Number(form.auditLogRetentionDays);
 
     if (
       !form.businessName.trim() ||
-      !isPositiveInteger(bookingBufferMinutes) ||
-      !isPositiveInteger(dailySlotCapacity) ||
+      ![15, 30].includes(bookingBufferMinutes) ||
+      !isPositiveInteger(publicBookingDailyLimit) ||
+      publicBookingDailyLimit > 8 ||
       !isPositiveInteger(auditLogRetentionDays)
     ) {
-      setError("Укажите название, буфер записи, слоты и срок хранения audit log.");
+      setError("Укажите название, буфер 15 или 30 минут, публичный лимит до 8 записей и срок хранения audit log.");
       return;
     }
 
     onSave({
       auditLogRetentionDays,
       bookingBufferMinutes,
+      bookingHoldMinutes: settings.bookingHoldMinutes ?? 5,
+      bookingHorizonDays: settings.bookingHorizonDays ?? 60,
+      bookingMinLeadMinutes: settings.bookingMinLeadMinutes ?? 240,
+      bookingSlotStepMinutes: settings.bookingSlotStepMinutes ?? 15,
       businessName: form.businessName.trim(),
       cookiePrivacyMode: form.cookiePrivacyMode.trim(),
       currency: form.currency,
-      dailySlotCapacity,
+      dailySlotCapacity: publicBookingDailyLimit,
       defaultLocale: form.defaultLocale,
       defaultSeoTitle: form.defaultSeoTitle.trim(),
       emailSender: form.emailSender.trim(),
       googleCalendarId: form.googleCalendarId.trim(),
       googleCalendarMode: form.googleCalendarMode,
       giftCertificatesEnabled: form.giftCertificatesEnabled,
+      publicBookingDailyLimit,
+      publicBookingEnabled: form.publicBookingEnabled,
       reminderTemplate: form.reminderTemplate.trim(),
       rolesPolicy: form.rolesPolicy.trim(),
       stripeMode: form.stripeMode,
@@ -2342,29 +2367,46 @@ function SettingsDialog({
               Рабочие часы
               <input onChange={(event) => updateForm("workingHours", event.target.value)} type="text" value={form.workingHours} />
             </label>
+            <fieldset className="admin-settings-choice">
+              <legend>Перерыв между сеансами</legend>
+              <div className="admin-filter-row" aria-label="Перерыв между сеансами">
+                {[15, 30].map((minutes) => (
+                  <button
+                    aria-pressed={form.bookingBufferMinutes === String(minutes)}
+                    key={minutes}
+                    onClick={() => updateForm("bookingBufferMinutes", String(minutes))}
+                    type="button"
+                  >
+                    {minutes} минут
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <label>
-              Перерыв между сеансами
+              Лимит онлайн-записей в день
               <input
-                aria-invalid={error && !isPositiveInteger(Number(form.bookingBufferMinutes)) ? "true" : undefined}
+                aria-invalid={
+                  error &&
+                  (!isPositiveInteger(Number(form.publicBookingDailyLimit)) || Number(form.publicBookingDailyLimit) > 8)
+                    ? "true"
+                    : undefined
+                }
+                max={8}
                 min={1}
-                onChange={(event) => updateForm("bookingBufferMinutes", event.target.value)}
+                onChange={(event) => updateForm("publicBookingDailyLimit", event.target.value)}
                 required
                 step={1}
                 type="number"
-                value={form.bookingBufferMinutes}
+                value={form.publicBookingDailyLimit}
               />
             </label>
-            <label>
-              Слотов в день
+            <label className="admin-checkbox-field">
               <input
-                aria-invalid={error && !isPositiveInteger(Number(form.dailySlotCapacity)) ? "true" : undefined}
-                min={1}
-                onChange={(event) => updateForm("dailySlotCapacity", event.target.value)}
-                required
-                step={1}
-                type="number"
-                value={form.dailySlotCapacity}
+                checked={form.publicBookingEnabled}
+                onChange={(event) => updateForm("publicBookingEnabled", event.target.checked)}
+                type="checkbox"
               />
+              <span>Публичная онлайн-запись включена</span>
             </label>
             <label>
               Google Calendar
@@ -5000,8 +5042,12 @@ function SettingsWorkspace({
               <dd>{settings.bookingBufferMinutes} минут</dd>
             </div>
             <div>
-              <dt>Слотов в день</dt>
-              <dd>{settings.dailySlotCapacity} слотов</dd>
+              <dt>Публичный лимит в день</dt>
+              <dd>{settings.publicBookingDailyLimit ?? settings.dailySlotCapacity} записей; вручную можно больше</dd>
+            </div>
+            <div>
+              <dt>Онлайн-запись</dt>
+              <dd>{settings.publicBookingEnabled ? "Включена" : "Отключена; используется Studio24"}</dd>
             </div>
             <div>
               <dt>Google Calendar</dt>
@@ -5399,6 +5445,7 @@ function Workspace({
   adminUsers,
   appointments,
   blogPosts,
+  calendarBlocks,
   calendarAppointmentFocus,
   certificates,
   clients,
@@ -5416,6 +5463,8 @@ function Workspace({
   isUserCreateOpen,
   media,
   onCancelAppointment,
+  onCreateCalendarBlock,
+  onDeleteCalendarBlock,
   onCalendarCreateIntent,
   onCalendarDateChange,
   onCloseBlogCreate,
@@ -5428,6 +5477,7 @@ function Workspace({
   onCloseSettingsEdit,
   onCloseUserCreate,
   onEditAppointment,
+  onEditCalendarBlock,
   onSaveAppointment,
   onOpenSettingsEdit,
   onSaveBlogPost,
@@ -5462,6 +5512,7 @@ function Workspace({
   adminUsers: AdminUserRecord[];
   appointments: Appointment[];
   blogPosts: BlogPostRecord[];
+  calendarBlocks: CalendarBlock[];
   calendarAppointmentFocus?: CalendarAppointmentFocus;
   certificates: CertificateRecord[];
   clients: ClientRecord[];
@@ -5479,6 +5530,8 @@ function Workspace({
   isUserCreateOpen: boolean;
   media: MediaRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
+  onCreateCalendarBlock: (date: string) => void;
+  onDeleteCalendarBlock: (block: CalendarBlock) => void;
   onCalendarCreateIntent: () => void;
   onCalendarDateChange: (date: string) => void;
   onCloseBlogCreate: () => void;
@@ -5491,6 +5544,7 @@ function Workspace({
   onCloseSettingsEdit: () => void;
   onCloseUserCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onEditCalendarBlock: (block: CalendarBlock) => void;
   onSaveAppointment: (
     appointment: Appointment,
     action?: AdminAuditAction,
@@ -5685,12 +5739,17 @@ function Workspace({
       <CalendarWorkspace
         appointments={appointments}
         bookingBufferMinutes={settings.bookingBufferMinutes}
+        calendarBlocks={calendarBlocks}
+        canManageBlocks={role === "owner" || role === "administrator" || role === "specialist"}
         clients={clients}
-        dailySlotCapacity={settings.dailySlotCapacity}
+        dailySlotCapacity={settings.publicBookingDailyLimit ?? settings.dailySlotCapacity}
         key={`${selectedCalendarDate ?? "default-calendar"}:${selectedClientName ?? "all-clients"}:${calendarAppointmentFocus?.appointmentKey ?? "default-focus"}`}
         onCancelAppointment={onCancelAppointment}
+        onCreateCalendarBlock={onCreateCalendarBlock}
+        onDeleteCalendarBlock={onDeleteCalendarBlock}
         onCalendarDateChange={onCalendarDateChange}
         onEditAppointment={onEditAppointment}
+        onEditCalendarBlock={onEditCalendarBlock}
         onSaveAppointment={onSaveAppointment}
         query={query}
         role={role}
@@ -5735,8 +5794,14 @@ export function AdminShell({
   const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
   const [dismissedCalendarActionKey, setDismissedCalendarActionKey] = useState("");
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
+  const [editingCalendarBlock, setEditingCalendarBlock] = useState<CalendarBlock | undefined>();
+  const [calendarBlockDate, setCalendarBlockDate] = useState("");
+  const [isCalendarBlockDialogOpen, setIsCalendarBlockDialogOpen] = useState(false);
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() =>
     buildInitialCalendarAppointments(initialRecords),
+  );
+  const [calendarBlocks, setCalendarBlocks] = useState<CalendarBlock[]>(() =>
+    buildInitialCalendarBlocks(initialRecords),
   );
   const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows(initialRecords));
   const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows(initialRecords));
@@ -5750,7 +5815,11 @@ export function AdminShell({
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord(initialData));
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers(initialData));
   const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
-  const { message: persistenceStatus, showStatus: showPersistenceStatus } = useTransientStatus(activeSection);
+  const {
+    message: persistenceStatus,
+    showStatus: showPersistenceStatus,
+    variant: persistenceStatusVariant,
+  } = useTransientStatus(activeSection);
   const isSupabaseBacked = initialData?.source === "supabase";
   const selectedRouteAppointment = selectedAppointmentKey
     ? calendarAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentKey)
@@ -5806,6 +5875,88 @@ export function AdminShell({
     };
   }
 
+  function openCalendarBlockCreate(date: string) {
+    setEditingCalendarBlock(undefined);
+    setCalendarBlockDate(date);
+    setIsCalendarBlockDialogOpen(true);
+  }
+
+  function openCalendarBlockEdit(block: CalendarBlock) {
+    setEditingCalendarBlock(block);
+    setCalendarBlockDate(block.blockDate);
+    setIsCalendarBlockDialogOpen(true);
+  }
+
+  function closeCalendarBlockDialog() {
+    setIsCalendarBlockDialogOpen(false);
+    setEditingCalendarBlock(undefined);
+  }
+
+  async function saveCalendarBlock(block: CalendarBlock): Promise<CalendarBlockSaveResult> {
+    if (!isSupabaseBacked) {
+      setCalendarBlocks((current) => [
+        ...current.filter((candidate) => candidate.id !== block.id),
+        block,
+      ]);
+      showPersistenceStatus("Недоступное время сохранено в демо-режиме.", { autoDismiss: true });
+      return { ok: true };
+    }
+
+    try {
+      const response = await fetch("/api/admin/calendar-blocks", {
+        body: JSON.stringify(block),
+        headers: await getAdminApiHeaders(),
+        method: editingCalendarBlock ? "PATCH" : "POST",
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { block?: CalendarBlock; error?: string }
+        | null;
+
+      if (!response.ok || !result?.block) {
+        return { message: result?.error ?? "Не удалось сохранить недоступное время.", ok: false };
+      }
+
+      const savedBlock = result.block;
+      setCalendarBlocks((current) => [
+        ...current.filter((candidate) => candidate.id !== savedBlock.id),
+        savedBlock,
+      ]);
+      showPersistenceStatus("Недоступное время сохранено в Supabase.", { autoDismiss: true });
+      return { ok: true };
+    } catch {
+      return { message: "Сервер недоступен. Повторите попытку.", ok: false };
+    }
+  }
+
+  async function deleteCalendarBlock(block: CalendarBlock) {
+    if (!window.confirm(`Удалить недоступное время ${block.startsAt} - ${block.endsAt}?`)) return;
+
+    if (!isSupabaseBacked) {
+      setCalendarBlocks((current) => current.filter((candidate) => candidate.id !== block.id));
+      showPersistenceStatus("Недоступное время удалено в демо-режиме.", { autoDismiss: true });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/calendar-blocks", {
+        body: JSON.stringify({ id: block.id, version: block.version ?? 1 }),
+        headers: await getAdminApiHeaders(),
+        method: "DELETE",
+      });
+      const result = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        showPersistenceStatus(result?.error ?? "Не удалось удалить недоступное время.", { variant: "error" });
+        return;
+      }
+
+      setCalendarBlocks((current) => current.filter((candidate) => candidate.id !== block.id));
+      showPersistenceStatus("Недоступное время удалено из Supabase.", { autoDismiss: true });
+    } catch {
+      showPersistenceStatus("Сервер недоступен. Повторите попытку.", { variant: "error" });
+    }
+  }
+
   async function handleLogout() {
     await signOutAdminBrowserSession();
     await fetch("/api/admin/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -5823,19 +5974,21 @@ export function AdminShell({
         headers: await getAdminApiHeaders(),
         method: "POST",
       });
-      const result = (await response.json().catch(() => null)) as { message?: string; ok?: boolean } | null;
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string; message?: string; ok?: boolean; version?: number }
+        | null;
 
       if (!response.ok || result?.ok === false) {
-        const message = result?.message ?? "Supabase не подтвердил изменение. Исходные данные восстановлены.";
-        showPersistenceStatus(message);
+        const message = result?.message ?? result?.error ?? "Supabase не подтвердил изменение. Исходные данные восстановлены.";
+        showPersistenceStatus(message, { variant: "error" });
         return { message, ok: false };
       }
 
       showPersistenceStatus("Изменение сохранено в Supabase.", { autoDismiss: true });
-      return { ok: true };
+      return { ok: true, version: result?.version };
     } catch {
       const message = "Supabase недоступен. Исходные данные восстановлены.";
-      showPersistenceStatus(message);
+      showPersistenceStatus(message, { variant: "error" });
       return { message, ok: false };
     }
   }
@@ -6201,6 +6354,11 @@ export function AdminShell({
           current.filter((candidate) => appointmentKey(candidate) !== appointmentKey(persistedAppointment)),
         );
       }
+    } else if (result.version) {
+      handleAppointmentUpdate(
+        { ...persistedAppointment, version: result.version },
+        appointmentKey(persistedAppointment),
+      );
     }
 
     return result;
@@ -6219,6 +6377,8 @@ export function AdminShell({
 
     if (!result.ok && previousAppointment) {
       handleAppointmentUpdate(previousAppointment, appointmentKey(appointment));
+    } else if (result.ok && result.version) {
+      handleAppointmentUpdate({ ...appointment, version: result.version }, appointmentKey(appointment));
     }
 
     return result;
@@ -6231,6 +6391,8 @@ export function AdminShell({
 
     if (!result.ok) {
       handleAppointmentUpdate(appointment, appointmentKey(cancelledAppointment));
+    } else if (result.version) {
+      handleAppointmentUpdate({ ...cancelledAppointment, version: result.version });
     }
 
     return result;
@@ -6678,7 +6840,10 @@ export function AdminShell({
         </section>
 
         {persistenceStatus ? (
-          <p className="admin-export-notice" role="status">
+          <p
+            className={`admin-export-notice${persistenceStatusVariant === "error" ? " is-error" : ""}`}
+            role={persistenceStatusVariant === "error" ? "alert" : "status"}
+          >
             {persistenceStatus}
           </p>
         ) : null}
@@ -6687,6 +6852,7 @@ export function AdminShell({
           adminUsers={adminUsers}
           appointments={calendarAppointments}
           blogPosts={blogPosts}
+          calendarBlocks={calendarBlocks}
           calendarAppointmentFocus={activeCalendarAppointmentFocus}
           certificates={certificates}
           clients={clients}
@@ -6704,6 +6870,8 @@ export function AdminShell({
           isUserCreateOpen={isUserCreateOpen}
           media={media}
           onCancelAppointment={openAppointmentCancel}
+          onCreateCalendarBlock={openCalendarBlockCreate}
+          onDeleteCalendarBlock={deleteCalendarBlock}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
           onCalendarDateChange={updateActiveCalendarDate}
           onCloseBlogCreate={() => setIsBlogCreateOpen(false)}
@@ -6716,6 +6884,7 @@ export function AdminShell({
           onCloseSettingsEdit={() => setIsSettingsEditOpen(false)}
           onCloseUserCreate={() => setIsUserCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
+          onEditCalendarBlock={openCalendarBlockEdit}
           onSaveAppointment={saveCalendarAppointmentInline}
           onOpenSettingsEdit={() => setIsSettingsEditOpen(true)}
           onSaveAdminUser={saveAdminUserRecord}
@@ -6768,6 +6937,16 @@ export function AdminShell({
             action={activeModule.primaryAction}
             moduleTitle={activeModule.title}
             onClose={closeActionDialog}
+          />
+        ) : null}
+
+        {isCalendarBlockDialogOpen ? (
+          <CalendarBlockDialog
+            initialBlock={editingCalendarBlock}
+            initialDate={calendarBlockDate || activeCalendarDate}
+            key={editingCalendarBlock?.id ?? `new-block-${calendarBlockDate || activeCalendarDate}`}
+            onClose={closeCalendarBlockDialog}
+            onSave={saveCalendarBlock}
           />
         ) : null}
         {cancellingAppointment ? (

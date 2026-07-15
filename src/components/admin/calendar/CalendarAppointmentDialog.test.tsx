@@ -86,6 +86,36 @@ function renderAppointmentDialog(overrides: Partial<CalendarAppointmentDialogPro
 }
 
 describe("CalendarAppointmentDialog", () => {
+  it("keeps the booked service and duration immutable for public appointments", () => {
+    renderAppointmentDialog({
+      initialAppointment: {
+        ...conflictingAppointment,
+        origin: "public",
+        publicReference: "MMN-20260714-0001",
+      },
+    });
+    const dialog = screen.getByRole("dialog");
+
+    expect(within(dialog).getByLabelText("Услуга")).toBeDisabled();
+    expect(within(dialog).getByLabelText("Длительность, минут")).toBeDisabled();
+    expect(within(dialog).getByRole("status")).toHaveTextContent(
+      "Услуга и длительность зафиксированы клиентом при онлайн-записи",
+    );
+  });
+
+  it("preserves an existing appointment buffer snapshot when settings change", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      bookingBufferMinutes: 30,
+      initialAppointment: { ...conflictingAppointment, bufferMinutes: 15 },
+    });
+    const dialog = screen.getByRole("dialog");
+
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ bufferMinutes: 15 }));
+  });
+
   it("searches existing clients and links the selected identity on save", async () => {
     const user = userEvent.setup();
     const { onSave } = renderAppointmentDialog();

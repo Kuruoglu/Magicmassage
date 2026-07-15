@@ -67,6 +67,24 @@ describe("localized public page views", () => {
     expect(screen.getByText(content.about.values[2])).toBeInTheDocument();
   });
 
+  it("links service detail booking actions to the selected service when enabled", () => {
+    const content = getPublicPagesContent("en");
+    const service = content.services.items[0];
+
+    render(
+      <ServiceDetailPageView
+        locale="en"
+        service={service}
+        bookingAction={content.services.bookingAction}
+        publicBookingEnabled
+      />,
+    );
+
+    for (const action of screen.getAllByRole("link", { name: content.services.bookingAction })) {
+      expect(action).toHaveAttribute("href", `/en/booking?service=${service.slug}`);
+    }
+  });
+
   it("renders About certificates as accessible lazy-loaded images", () => {
     const content = getPublicPagesContent("en");
     render(<AboutPageView locale="en" content={content.about} />);

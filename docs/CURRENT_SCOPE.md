@@ -3,69 +3,83 @@
 This file is the short source of truth for future sessions. If it conflicts with
 older plans or specs, follow this file and update the older document.
 
-## First Release
+## Current Release
 
-Magic Massage Natali is currently a simplified public website:
+Magic Massage Natali now combines the localized public site with the protected
+admin/CRM platform:
 
-- Next.js App Router with TypeScript.
-- Static content maintained in code.
-- Public locales: `bg`, `ru`, `ua`, and `en`.
-- `UA` is the visible label; `ua` is the URL segment; metadata uses `uk-UA`.
-- Home, Services, individual service pages, Gift Certificates, About, Contacts,
-  privacy/cookie/legal information.
-- Booking CTAs open Studio24 by client request.
-- Gift certificates use an embedded Stripe Payment Element in test/demo mode
-  until final prices and live-payment flags are approved.
-- Real salon/treatment photography is used from project assets.
-- Google Maps may be used only with cookie consent or another privacy-safe
+- Next.js App Router with TypeScript and public locales `bg`, `ru`, `ua`, and
+  `en`. `UA` is the visible label, while metadata uses `uk-UA`.
+- Public services, contacts, blog, media, certificates, and feature flags are
+  read from Supabase with the documented static fallbacks where applicable.
+- Public instant booking is controlled by `public_booking_enabled`. When it is
+  disabled, booking CTAs fall back to Studio24 and `/[locale]/booking` is hidden.
+- A customer chooses a service, price/duration variant, available date and time,
+  enters contact details, and confirms the booking. A selected time is held for
+  five minutes; one browser session may have only one active hold, and selecting
+  another time atomically replaces it. Final confirmation creates a confirmed
+  appointment immediately.
+- The public booking session is a short-lived signed HttpOnly cookie. Reloading
+  or switching locale restores the same active hold with a rotated bearer token;
+  forged or expired cookies cannot restore or create holds.
+- Public availability is capped at eight non-cancelled appointments per day.
+  Natali may create any number of manual admin appointments, including a ninth
+  or tenth appointment; the public cap never blocks an authorized admin write.
+- Booking buffers are owner-configurable as 15 or 30 minutes and are snapshotted
+  on each appointment. Public starts use a 15-minute grid.
+- Natali can add full-day or timed personal blocks in the admin calendar. Blocks,
+  appointments, active holds, working hours, lead time, and the public daily cap
+  all participate in public availability.
+- Gift certificates use an embedded Stripe Payment Element and remain guarded by
+  the existing feature and live-payment flags.
+- Google Maps may load only after cookie consent or through another privacy-safe
   pattern.
 
-## Approved Admin Direction
+## Admin Platform
 
-The client has re-approved a custom admin/CRM platform as the next product
-direction after the current public-site MVP line. For admin, Supabase, roles,
-clients, calendar, blog, settings, and Stripe finance exports, use
-[ADMIN_SCOPE.md](./ADMIN_SCOPE.md) as the source of truth.
+Use [ADMIN_SCOPE.md](./ADMIN_SCOPE.md) for detailed admin behavior. The active
+platform includes Supabase/PostgreSQL, Supabase Auth, protected `/admin` routes,
+role checks, clients, appointments, calendar blocks, services, prices, media,
+contacts, blog, settings, certificates, and finance exports.
 
-The old MVP exclusions below describe the current public-site release only. They
-do not apply to tasks that explicitly start from the approved admin scope.
+Important booking invariants:
 
-The approved admin direction includes:
+- Public slot hold and confirmation operations are atomic and idempotent.
+- Public confirmations are created with `confirmed` status and an immutable
+  public reference, price/duration snapshot, booking origin, and buffer snapshot.
+- Admin calendar blocks are separate records, never fake clients or fake
+  appointments.
+- Owner booking-setting changes and calendar-block mutations are audited.
+- Manual admin appointments show capacity overflow such as `10 из 8`, but remain
+  permitted.
 
-- Supabase/PostgreSQL, Supabase Auth, Row Level Security, and Storage.
-- A protected `/admin` area.
-- Clients, users, roles, certificates, calendar, services, price list, media,
-  contacts, blog, settings, and finance modules.
-- A `Бухгалтер` role with narrow read/export access to Stripe sales reports for
-  tax periods.
-- A target migration from Studio24 handoff to internal request-based booking.
+## Explicitly Out Of Scope
 
-## Explicitly Out Of Scope For The Current Public-Site First Release
-
-- Supabase/PostgreSQL.
-- Custom admin panel.
-- Internal booking flow.
-- Specialist availability and booking database constraints.
+- Customer accounts, self-service cancellation, and self-service rescheduling.
 - Booking emails, reminders, and Telegram automation.
-- Blog.
-- Localized service URL slugs.
-- Admin publication workflow or publication gates.
+- Online deposits or massage payments outside the gift-certificate flow.
+- Waiting lists, packages, loyalty, and promotion codes.
+- Two-way Google Calendar synchronization.
+- Multiple-specialist public scheduling.
 
 ## Approved Decisions
 
 - English is an approved public locale.
-- Shared English service slugs are acceptable for the first release.
-- Studio24 is the booking provider for the first release.
-- Gift certificates and online card payments are approved for the current
-  implementation slice, but live payment is blocked until final prices are
-  confirmed.
+- Shared English service slugs remain acceptable.
+- Internal instant booking is the primary flow when enabled; Studio24 is the
+  operational fallback when it is disabled.
+- Gift certificates and online card payments are approved, but live payment
+  remains blocked until final prices and production flags are confirmed.
 - Natali's experience and certificate claims are confirmed by the client.
 - CTA color contrast should not be changed unless specifically requested again.
 
 ## Still Important
 
-- Keep mobile drawer focus behavior covered by tests.
-- Keep cookie consent active for Google Maps and other non-essential third-party content.
+- Keep public booking limits enforced in database transactions, not only in UI.
+- Keep manual admin appointments independent from the public eight-per-day cap.
+- Keep mobile drawer focus behavior and booking keyboard flow covered by tests.
+- Keep the real-Supabase browser smoke covering hold creation and reload restore.
+- Keep cookie consent active for Google Maps and non-essential third-party content.
 - Keep Stripe Elements text accurate: Stripe handles card data and Magic Massage
   Natali does not store card number, CVC, or financial data.
 - Keep sitemap `lastModified` tied to real content dates or omit it.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getLocaleSwitchPath,
+  getPublicBookingPath,
   getPublicPagePath,
   publicPageKeys,
 } from "./public-routes";
@@ -35,5 +36,12 @@ describe("public route helpers", () => {
     expect(getLocaleSwitchPath("ua", "contacts")).toBe("/ua/contacts");
     expect(getLocaleSwitchPath("en", "contacts")).toBe("/en/contacts");
     expect(getLocaleSwitchPath("bg", "privacy")).toBe("/bg/privacy");
+  });
+
+  it("builds the feature-gated booking path with an optional service", () => {
+    expect(getPublicBookingPath("ru")).toBe("/ru/booking");
+    expect(getPublicBookingPath("en", "classic-massage")).toBe(
+      "/en/booking?service=classic-massage",
+    );
   });
 });

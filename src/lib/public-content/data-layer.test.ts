@@ -403,10 +403,10 @@ describe("public content data layer", () => {
     expect(result.data).toMatchObject({ locale: "bg", usedLocaleFallback: true });
   });
 
-  it("loads the gift certificate feature flag and handles a missing singleton", async () => {
+  it("loads public site feature flags and handles a missing singleton", async () => {
     const configured = createMockClient({
       admin_public_site_flags: {
-        data: [{ gift_certificates_enabled: false, id: "site" }],
+        data: [{ gift_certificates_enabled: false, id: "site", public_booking_enabled: true }],
         error: null,
       },
     }).client;
@@ -415,7 +415,7 @@ describe("public content data layer", () => {
     }).client;
 
     await expect(createPublicContentDataLayer(configured).getSiteFeatures()).resolves.toEqual({
-      data: { giftCertificatesEnabled: false },
+      data: { giftCertificatesEnabled: false, publicBookingEnabled: true },
       source: "supabase",
       status: "ok",
     });

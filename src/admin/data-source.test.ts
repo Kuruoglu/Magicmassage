@@ -25,6 +25,7 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
   return {
     listAppointments: async () => [],
     listAdminUsers: async () => [],
+    listCalendarBlocks: async () => [],
     listCertificates: async () => [],
     listClients: async () => [],
     listBlogPosts: async () => [],
@@ -157,7 +158,7 @@ describe("admin data source", () => {
     };
     const settings: SettingsRecord = {
       auditLogRetentionDays: 540,
-      bookingBufferMinutes: 45,
+      bookingBufferMinutes: 30,
       businessName: "Supabase Magic Massage",
       cookiePrivacyMode: "Supabase privacy text.",
       currency: "EUR",
@@ -347,6 +348,7 @@ describe("admin data source", () => {
       financeRows,
       records: {
         appointments: [],
+        calendarBlocks: [],
         certificates: [],
         clients: [],
       },

@@ -32,3 +32,12 @@ export function getPublicPagePath(locale: Locale, page: PublicPageKey): string {
 export function getLocaleSwitchPath(locale: Locale, page: PublicPageKey): string {
   return getPublicPagePath(locale, page);
 }
+
+export function getPublicBookingPath(locale: Locale, serviceSlug?: string): string {
+  const path = `/${locale}/booking`;
+
+  if (!serviceSlug) return path;
+
+  const search = new URLSearchParams({ service: serviceSlug });
+  return `${path}?${search.toString()}`;
+}

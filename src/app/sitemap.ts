@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 import { getBlogPath, getBlogPostPath } from "@/components/public-blog/blog-routes";
 import { getPublicShellRuntime, getRuntimeBlogPosts } from "@/content/public-content-runtime";
 import { locales } from "@/i18n/config";
-import { getPublicPagePath } from "@/navigation/public-routes";
+import { getPublicBookingPath, getPublicPagePath } from "@/navigation/public-routes";
 import { getServicePagePath } from "@/navigation/service-routes";
 import { getPublicSitemapPages } from "@/seo/public-page-metadata";
 import { publicContentLastModified } from "@/seo/content-dates";
@@ -30,6 +30,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly" as const,
         priority: page === "home" && locale === "bg" ? 1 : 0.85,
       })),
+      ...(shell.publicBookingEnabled
+          ? [{
+            url: `${siteUrl}${getPublicBookingPath(locale)}`,
+            lastModified: publicContentLastModified,
+            changeFrequency: "daily" as const,
+            priority: 0.9,
+          }]
+        : []),
       ...shell.services.map((service) => ({
         url: `${siteUrl}${getServicePagePath(locale, service.slug)}`,
         lastModified: publicContentLastModified,

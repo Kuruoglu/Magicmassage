@@ -136,7 +136,11 @@ const blogPostRecord: BlogPostRecord = {
 
 const settingsRecord: SettingsRecord = {
   auditLogRetentionDays: 365,
-  bookingBufferMinutes: 45,
+  bookingBufferMinutes: 30,
+  bookingHoldMinutes: 5,
+  bookingHorizonDays: 60,
+  bookingMinLeadMinutes: 240,
+  bookingSlotStepMinutes: 15,
   businessName: "Magic Massage Natali",
   cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
   currency: "EUR",
@@ -146,6 +150,8 @@ const settingsRecord: SettingsRecord = {
   emailSender: "info@magicmassage.bg",
   googleCalendarId: "natali@example.com",
   googleCalendarMode: "Односторонняя",
+  publicBookingDailyLimit: 8,
+  publicBookingEnabled: true,
   reminderTemplate: "Напоминание о записи за день до сеанса.",
   rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
   stripeMode: "Тестовый",
@@ -475,6 +481,30 @@ describe("admin persistence", () => {
       message: "Unable to persist admin record.",
       mode: "supabase",
       ok: false,
+    });
+  });
+
+  it("preserves known appointment conflict reasons across the persistence boundary", async () => {
+    const result = await persistAdminRecord(
+      { record: appointmentRecord, type: "appointment" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveAppointment: async () => {
+              throw new Error(
+                "admin_save_appointment_with_audit: appointment_calendar_block_conflict",
+              );
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({
+      message: "Unable to persist admin record.",
+      mode: "supabase",
+      ok: false,
+      reason: "appointment_calendar_block_conflict",
     });
   });
 

@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getPublicShellRuntime,
   getRuntimeGiftCertificatesEnabled,
+  getRuntimePublicBookingEnabled,
   getRuntimeServices,
 } from "./public-content-runtime";
 
 const runtimeMock = vi.hoisted(() => ({
   featuresResult: {
-    data: { giftCertificatesEnabled: true },
+    data: { giftCertificatesEnabled: true, publicBookingEnabled: true },
     source: "supabase",
     status: "ok",
   } as unknown,
@@ -36,7 +37,7 @@ vi.mock("@/lib/public-content", async (importOriginal) => {
 describe("public content runtime failure policy", () => {
   beforeEach(() => {
     runtimeMock.featuresResult = {
-      data: { giftCertificatesEnabled: true },
+      data: { giftCertificatesEnabled: true, publicBookingEnabled: true },
       source: "supabase",
       status: "ok",
     };
@@ -106,6 +107,27 @@ describe("public content runtime failure policy", () => {
     await expect(getRuntimeGiftCertificatesEnabled()).resolves.toBe(false);
     await expect(getPublicShellRuntime("bg")).resolves.toMatchObject({
       giftCertificatesEnabled: false,
+      publicBookingEnabled: false,
+    });
+  });
+
+  it("enables public booking only from an explicit successful feature read", async () => {
+    await expect(getRuntimePublicBookingEnabled()).resolves.toBe(true);
+    await expect(getPublicShellRuntime("bg")).resolves.toMatchObject({
+      publicBookingEnabled: true,
+    });
+
+    runtimeMock.featuresResult = {
+      data: null,
+      fallback: "static-content",
+      reason: "public_supabase_not_configured",
+      source: "supabase",
+      status: "not_configured",
+    };
+
+    await expect(getRuntimePublicBookingEnabled()).resolves.toBe(false);
+    await expect(getPublicShellRuntime("bg")).resolves.toMatchObject({
+      publicBookingEnabled: false,
     });
   });
 });

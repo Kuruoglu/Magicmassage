@@ -7,6 +7,7 @@ import type { ServiceContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
 import type { PublicMediaPlacement } from "@/lib/public-content/types";
 import { resolvePublicMediaPlacement } from "@/lib/media-placement";
+import { getPublicBookingPath } from "@/navigation/public-routes";
 import { createLocalBusinessJsonLd } from "@/seo/local-business-json-ld";
 
 type HomePageViewProps = {
@@ -14,6 +15,7 @@ type HomePageViewProps = {
   content: HomeContent;
   services?: ServiceContent[];
   mediaPlacements?: PublicMediaPlacement[];
+  publicBookingEnabled?: boolean;
 };
 
 function TrustIcon({ type }: { type: HomeContent["trust"][number]["icon"] }) {
@@ -47,7 +49,13 @@ function TrustIcon({ type }: { type: HomeContent["trust"][number]["icon"] }) {
   );
 }
 
-export function HomePageView({ locale, content, mediaPlacements, services = content.services.items }: HomePageViewProps) {
+export function HomePageView({
+  locale,
+  content,
+  mediaPlacements,
+  publicBookingEnabled = false,
+  services = content.services.items,
+}: HomePageViewProps) {
   const base = `/${locale}`;
   const localBusinessJsonLd = createLocalBusinessJsonLd(locale, content);
   const heroMedia = resolvePublicMediaPlacement(mediaPlacements, "home.hero", locale);
@@ -81,9 +89,15 @@ export function HomePageView({ locale, content, mediaPlacements, services = cont
               <h1>{content.hero.title}</h1>
               <p className="hero-description">{content.hero.description}</p>
               <div className="button-row">
-                <a className="button" {...externalBookingLinkProps}>
-                  {content.hero.primaryAction}
-                </a>
+                {publicBookingEnabled ? (
+                  <Link className="button" href={getPublicBookingPath(locale)}>
+                    {content.hero.primaryAction}
+                  </Link>
+                ) : (
+                  <a className="button" {...externalBookingLinkProps}>
+                    {content.hero.primaryAction}
+                  </a>
+                )}
                 <Link className="text-link text-link-light" href={`${base}/services`}>
                   {content.hero.secondaryAction}
                   <span aria-hidden="true"> →</span>
@@ -154,12 +168,21 @@ export function HomePageView({ locale, content, mediaPlacements, services = cont
                 <div className="service-copy">
                   <h3>{service.title}</h3>
                   <p>{service.description}</p>
-                  <a
-                    {...externalBookingLinkProps}
-                    aria-label={`${content.navigation.booking}: ${service.title}`}
-                  >
-                    {content.navigation.booking} <span aria-hidden="true">↗</span>
-                  </a>
+                  {publicBookingEnabled ? (
+                    <Link
+                      href={getPublicBookingPath(locale, service.slug)}
+                      aria-label={`${content.navigation.booking}: ${service.title}`}
+                    >
+                      {content.navigation.booking} <span aria-hidden="true">→</span>
+                    </Link>
+                  ) : (
+                    <a
+                      {...externalBookingLinkProps}
+                      aria-label={`${content.navigation.booking}: ${service.title}`}
+                    >
+                      {content.navigation.booking} <span aria-hidden="true">↗</span>
+                    </a>
+                  )}
                 </div>
               </article>
             ))}
@@ -220,9 +243,15 @@ export function HomePageView({ locale, content, mediaPlacements, services = cont
             </div>
             <div className="booking-action">
               <p>{content.booking.description}</p>
-              <a className="button" {...externalBookingLinkProps}>
-                {content.booking.action}
-              </a>
+              {publicBookingEnabled ? (
+                <Link className="button" href={getPublicBookingPath(locale)}>
+                  {content.booking.action}
+                </Link>
+              ) : (
+                <a className="button" {...externalBookingLinkProps}>
+                  {content.booking.action}
+                </a>
+              )}
             </div>
           </div>
         </section>

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/content/public-content-runtime", () => ({
   getPublicShellRuntime: vi.fn(async (locale: string) => ({
     giftCertificatesEnabled: locale !== "en",
+    publicBookingEnabled: locale === "bg",
     mediaPlacements: [],
     services: [
       { slug: "classic-massage" },
@@ -25,12 +26,14 @@ describe("sitemap", () => {
   it("contains every localized public page and published blog URL", async () => {
     const urls = (await sitemap()).map((entry) => entry.url);
 
-    expect(urls).toHaveLength(47);
+    expect(urls).toHaveLength(48);
     expect(urls).toContain("https://magicmassagenatali.bg/bg");
     expect(urls).toContain("https://magicmassagenatali.bg/bg/services");
     expect(urls).toContain("https://magicmassagenatali.bg/bg/gift-certificates");
+    expect(urls).toContain("https://magicmassagenatali.bg/bg/booking");
     expect(urls).toContain("https://magicmassagenatali.bg/ru/about");
     expect(urls).toContain("https://magicmassagenatali.bg/ru/gift-certificates");
+    expect(urls).not.toContain("https://magicmassagenatali.bg/ru/booking");
     expect(urls).toContain("https://magicmassagenatali.bg/ua/contacts");
     expect(urls).toContain("https://magicmassagenatali.bg/ua/gift-certificates");
     expect(urls).toContain("https://magicmassagenatali.bg/en");

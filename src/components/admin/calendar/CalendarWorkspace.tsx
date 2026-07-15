@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { type DragEvent, useMemo, useState } from "react";
+import { type CSSProperties, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { AdminRoleId } from "@/admin/config";
 import {
@@ -9,6 +10,7 @@ import {
   findAppointmentClient,
   findClientByIdentity,
   type Appointment,
+  type CalendarBlock,
   type ClientRecord,
 } from "@/admin/domain";
 import type { AdminAuditAction } from "@/admin/persistence";
@@ -42,6 +44,7 @@ import {
   formatCalendarDay,
   freeSlotCount,
   freeSlotLabel,
+  manualAppointmentOverflow,
   slotCountLabel,
   sortAppointments,
 } from "./format";
@@ -74,7 +77,7 @@ export type CalendarAppointmentFocus = {
 };
 
 export type CalendarAppointmentSaveResult =
-  | { ok: true }
+  | { ok: true; version?: number }
   | {
       message: string;
       ok: false;
@@ -90,11 +93,16 @@ type PendingCalendarConflict = {
 export type CalendarWorkspaceProps = {
   appointments: Appointment[];
   bookingBufferMinutes: number;
+  calendarBlocks?: CalendarBlock[];
+  canManageBlocks: boolean;
   clients: ClientRecord[];
   dailySlotCapacity: number;
   onCancelAppointment: (appointment: Appointment) => void;
+  onCreateCalendarBlock?: (date: string) => void;
+  onDeleteCalendarBlock?: (block: CalendarBlock) => void;
   onCalendarDateChange: (date: string) => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onEditCalendarBlock?: (block: CalendarBlock) => void;
   onSaveAppointment: (
     appointment: Appointment,
     action?: AdminAuditAction,
@@ -108,14 +116,150 @@ export type CalendarWorkspaceProps = {
   siteSettings: CalendarScheduleSettings;
 };
 
+function isFullDayCalendarBlock(block: CalendarBlock) {
+  return block.startsAt === "00:00" && (block.endsAt === "23:59" || block.endsAt === "24:00");
+}
+
+function calendarBlockKindLabel(block: CalendarBlock) {
+  if (block.kind === "personal") return "Личное время";
+  if (block.kind === "unavailable") return "Недоступно";
+  return "Другое";
+}
+
+function calendarBlockCountLabel(count: number) {
+  if (count === 1) return "1 блокировка";
+  if (count > 1 && count < 5) return `${count} блокировки`;
+  return `${count} блокировок`;
+}
+
+function monthAvailabilityLabels(
+  blocks: CalendarBlock[],
+  freeCount: number,
+  manualOverflow: number,
+) {
+  if (blocks.some(isFullDayCalendarBlock)) {
+    return { compact: "Недоступно", full: "Недоступно весь день" };
+  }
+
+  if (manualOverflow > 0) {
+    if (blocks.length > 0) {
+      return {
+        compact: "Ограничено",
+        full: `Ограничено: ${calendarBlockCountLabel(blocks.length)}; +${manualOverflow} вручную`,
+      };
+    }
+
+    return { compact: `+${manualOverflow} ручн.`, full: `+${manualOverflow} вручную` };
+  }
+
+  if (blocks.length > 0) {
+    const capacityLabel = freeCount > 0 ? `${freeCount} по дневному лимиту` : "дневной лимит исчерпан";
+    return {
+      compact: "Ограничено",
+      full: `Ограничено: ${calendarBlockCountLabel(blocks.length)}, ${capacityLabel}`,
+    };
+  }
+
+  return { compact: compactFreeSlotLabel(freeCount), full: freeSlotLabel(freeCount) };
+}
+
+function CalendarBlockScheduleItem({
+  block,
+  canEdit,
+  compact,
+  onEdit,
+}: {
+  block: CalendarBlock;
+  canEdit: boolean;
+  compact: boolean;
+  onEdit?: (block: CalendarBlock) => void;
+}) {
+  const dayStartMinutes = timeToMinutes(CALENDAR_DAY_START);
+  const dayEndMinutes = timeToMinutes(CALENDAR_DAY_END);
+  const blockStartMinutes = Math.min(
+    dayEndMinutes,
+    Math.max(dayStartMinutes, timeToMinutes(block.startsAt)),
+  );
+  const rawEndMinutes = isFullDayCalendarBlock(block)
+    ? dayEndMinutes
+    : timeToMinutes(block.endsAt);
+  const blockEndMinutes = Math.min(dayEndMinutes, Math.max(blockStartMinutes, rawEndMinutes));
+  const top = ((blockStartMinutes - dayStartMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
+  const height = Math.max(
+    24,
+    ((blockEndMinutes - blockStartMinutes) / 60) * CALENDAR_HOUR_HEIGHT - 2,
+  );
+  const kindLabel = calendarBlockKindLabel(block);
+  const timeLabel = isFullDayCalendarBlock(block)
+    ? "Весь день"
+    : `${block.startsAt} - ${block.endsAt}`;
+  const style = {
+    background: "rgba(255, 248, 230, 0.94)",
+    border: "1px solid #b37719",
+    borderLeft: "4px solid #b37719",
+    borderRadius: "6px",
+    color: "#68430a",
+    display: "grid",
+    gap: "2px",
+    height: `${height}px`,
+    left: compact ? "2px" : "4px",
+    overflow: "hidden",
+    padding: compact ? "3px 4px" : "6px 8px",
+    pointerEvents: canEdit ? "auto" : "none",
+    position: "absolute",
+    right: compact ? "2px" : "4px",
+    top: `${top}px`,
+    zIndex: 2,
+  } satisfies CSSProperties;
+
+  const content = (
+    <>
+      <strong style={{ fontSize: compact ? "0.68rem" : "0.78rem", lineHeight: 1.2 }}>{timeLabel}</strong>
+      <span
+        style={{
+          fontSize: compact ? "0.62rem" : "0.72rem",
+          lineHeight: 1.2,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {kindLabel}{block.internalNote && !compact ? ` · ${block.internalNote}` : ""}
+      </span>
+    </>
+  );
+
+  const label = `Недоступное время: ${timeLabel}, ${kindLabel}${block.internalNote ? `, ${block.internalNote}` : ""}`;
+  return canEdit ? (
+    <button
+      aria-label={`${label}. Изменить`}
+      className="admin-calendar-block-overlay is-interactive"
+      onClick={() => onEdit?.(block)}
+      style={style}
+      type="button"
+    >
+      {content}
+    </button>
+  ) : (
+    <article aria-label={label} className="admin-calendar-block-overlay" role="listitem" style={style}>
+      {content}
+    </article>
+  );
+}
+
 export function CalendarWorkspace({
   appointments,
   bookingBufferMinutes,
+  calendarBlocks = [],
+  canManageBlocks,
   clients,
   dailySlotCapacity,
   onCancelAppointment,
+  onCreateCalendarBlock,
+  onDeleteCalendarBlock,
   onCalendarDateChange,
   onEditAppointment,
+  onEditCalendarBlock,
   onSaveAppointment,
   query,
   role,
@@ -124,6 +268,8 @@ export function CalendarWorkspace({
   selectedClientName,
   siteSettings,
 }: CalendarWorkspaceProps) {
+  const calendarViewRef = useRef<HTMLDivElement>(null);
+  const [blockOverlayTargets, setBlockOverlayTargets] = useState<HTMLElement[]>([]);
   const workingSchedule = useMemo(
     () => createCalendarWorkingSchedule(siteSettings),
     [siteSettings],
@@ -174,6 +320,14 @@ export function CalendarWorkspace({
   const selectedDayAppointments = sortAppointments(
     filteredAppointments.filter((appointment) => appointment.date === selectedDate),
   );
+  const selectedDayBlocks = calendarBlocks
+    .filter((block) => block.blockDate === selectedDate)
+    .sort((first, second) => first.startsAt.localeCompare(second.startsAt));
+  const selectedDayCapacityCount = appointments.filter(
+    (appointment) => appointment.date === selectedDate,
+  ).filter(
+    (appointment) => appointment.status !== "Отменена",
+  ).length;
   const listAppointments = sortAppointments(filteredAppointments);
   const visibleAppointments = mode === "day" ? selectedDayAppointments : listAppointments;
   const appointmentDetailPool = mode === "day" ? selectedDayAppointments : listAppointments;
@@ -194,12 +348,47 @@ export function CalendarWorkspace({
     date: addDays(weekStart, index),
     day: Number(addDays(weekStart, index).slice(-2)),
   }));
-  const selectedDayFreeCount = freeSlotCount(selectedDayAppointments.length, dailySlotCapacity);
+  const selectedDayFreeCount = selectedDayBlocks.some(isFullDayCalendarBlock)
+    ? 0
+    : freeSlotCount(selectedDayCapacityCount, dailySlotCapacity);
+  const selectedDayManualOverflow = manualAppointmentOverflow(selectedDayCapacityCount, dailySlotCapacity);
   const confirmedListCount = listAppointments.filter((appointment) => appointment.status === "Подтверждена").length;
   const attentionListCount = listAppointments.filter(
     (appointment) => appointment.status !== "Подтверждена" && appointment.status !== "Отменена",
   ).length;
   const canOverrideOverlap = role === "owner" || role === "administrator";
+
+  useEffect(() => {
+    const targets =
+      mode === "day" || mode === "week"
+        ? Array.from(
+            calendarViewRef.current?.querySelectorAll<HTMLElement>(".admin-calendar-time-column") ?? [],
+          )
+        : [];
+    setBlockOverlayTargets(targets);
+  }, [mode, selectedDate]);
+
+  function renderCalendarBlockOverlays(days: Array<{ date: string }>, compact: boolean) {
+    return blockOverlayTargets.flatMap((target, index) => {
+      const date = days[index]?.date;
+      if (!date) return [];
+
+      return calendarBlocks
+        .filter((block) => block.blockDate === date)
+        .map((block) =>
+          createPortal(
+            <CalendarBlockScheduleItem
+              block={block}
+              canEdit={canManageBlocks}
+              compact={compact}
+              onEdit={onEditCalendarBlock}
+            />,
+            target,
+            block.id,
+          ),
+        );
+    });
+  }
 
   function switchMode(nextMode: CalendarMode) {
     setMode(nextMode);
@@ -448,8 +637,10 @@ export function CalendarWorkspace({
     <div className="admin-split-view admin-calendar-workspace">
       <section className="admin-panel admin-calendar-panel" aria-labelledby="calendar-heading">
         <CalendarToolbar
+          canManageBlocks={canManageBlocks}
           heading={calendarHeading}
           mode={mode}
+          onAddBlock={() => onCreateCalendarBlock?.(selectedDate)}
           onDateChange={(date) =>
             selectDate(
               date,
@@ -549,11 +740,20 @@ export function CalendarWorkspace({
               ))}
               {monthDays.map((day) => {
                 const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
+                const dayBlocks = calendarBlocks.filter((block) => block.blockDate === day.date);
+                const dayBlockCount = dayBlocks.length;
+                const capacityAppointmentCount = appointments.filter(
+                  (appointment) => appointment.date === day.date,
+                ).filter(
+                  (appointment) => appointment.status !== "Отменена",
+                ).length;
                 const countLabel = appointmentCountLabel(dayAppointments.length);
-                const freeCount = freeSlotCount(dayAppointments.length, dailySlotCapacity);
-                const freeLabel = freeSlotLabel(freeCount);
+                const freeCount = freeSlotCount(capacityAppointmentCount, dailySlotCapacity);
+                const manualOverflow = manualAppointmentOverflow(capacityAppointmentCount, dailySlotCapacity);
+                const availabilityLabels = monthAvailabilityLabels(dayBlocks, freeCount, manualOverflow);
+                const freeLabel = availabilityLabels.full;
                 const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
-                const compactFreeLabel = compactFreeSlotLabel(freeCount);
+                const compactFreeLabel = availabilityLabels.compact;
 
                 return (
                   <span
@@ -562,7 +762,7 @@ export function CalendarWorkspace({
                     role="gridcell"
                   >
                     <button
-                      aria-label={`${formatCalendarDay(day.date)}, ${countLabel}, ${freeLabel}`}
+                      aria-label={`${formatCalendarDay(day.date)}, ${countLabel}, ${freeLabel}${dayBlockCount ? `, блокировок: ${dayBlockCount}` : ""}`}
                       aria-pressed={selectedDate === day.date}
                       className="admin-calendar-day-button"
                       onClick={() => selectDate(day.date, dayAppointments, "day")}
@@ -574,6 +774,7 @@ export function CalendarWorkspace({
                         <span className="admin-month-count-compact">{compactCountLabel}</span>
                         <span className="admin-month-free-full">{freeLabel}</span>
                         <span className="admin-month-free-compact">{compactFreeLabel}</span>
+                        {dayBlockCount ? <span>Блоков: {dayBlockCount}</span> : null}
                       </small>
                     </button>
                   </span>
@@ -584,7 +785,7 @@ export function CalendarWorkspace({
               <div>
                 <span className="admin-kicker">План месяца</span>
                 <p>
-                  В ячейках месяца показаны только количество записей и свободные слоты. Нажатие на день открывает дневной режим.
+                  В ячейках месяца показаны количество записей, дневной лимит и ограничения по времени. Нажатие на день открывает дневной режим.
                 </p>
               </div>
               <dl className="admin-detail-list">
@@ -600,23 +801,67 @@ export function CalendarWorkspace({
             </div>
           </>
         ) : mode === "week" ? (
-          <WeekCalendar
-            appointments={filteredAppointments}
-            heading={calendarHeading}
-            onDropAppointment={dropAppointment}
-            onSelectDate={(date, dateAppointments) => selectDate(date, dateAppointments, "day")}
-            renderAppointment={renderAppointment}
-            weekDays={weekDays}
-          />
+          <div ref={calendarViewRef} style={{ display: "contents" }}>
+            <WeekCalendar
+              appointments={filteredAppointments}
+              heading={calendarHeading}
+              onDropAppointment={dropAppointment}
+              onSelectDate={(date, dateAppointments) => selectDate(date, dateAppointments, "day")}
+              renderAppointment={renderAppointment}
+              weekDays={weekDays}
+            />
+            {renderCalendarBlockOverlays(weekDays, true)}
+          </div>
         ) : mode === "day" ? (
-          <DayCalendar
-            appointments={selectedDayAppointments}
-            bookingBufferMinutes={bookingBufferMinutes}
-            freeSlotCount={selectedDayFreeCount}
-            onDropAppointment={dropAppointment}
-            renderAppointment={renderAppointment}
-            selectedDate={selectedDate}
-          />
+          <div ref={calendarViewRef} style={{ display: "contents" }}>
+            {selectedDayBlocks.length > 0 ? (
+              <div className="admin-calendar-block-list" aria-label="Недоступное время">
+                {selectedDayBlocks.map((block) => (
+                  <article className="admin-calendar-block-row" key={block.id}>
+                    <div>
+                      <strong>
+                        {isFullDayCalendarBlock(block) ? "Весь день" : `${block.startsAt} - ${block.endsAt}`}
+                      </strong>
+                      <span>
+                        {calendarBlockKindLabel(block)}
+                        {block.internalNote ? ` · ${block.internalNote}` : ""}
+                      </span>
+                    </div>
+                    {canManageBlocks ? (
+                      <div className="admin-detail-actions">
+                        <button className="admin-secondary-button" onClick={() => onEditCalendarBlock?.(block)} type="button">
+                          Изменить
+                        </button>
+                        <button className="admin-danger-button" onClick={() => onDeleteCalendarBlock?.(block)} type="button">
+                          Удалить
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            {selectedDayManualOverflow > 0 ? (
+              <div className="admin-calendar-capacity-note" role="status">
+                <strong>
+                  {selectedDayCapacityCount} из {dailySlotCapacity}
+                </strong>
+                <span>
+                  {selectedDayManualOverflow} {selectedDayManualOverflow === 1 ? "запись добавлена" : "записи добавлены"} вручную.
+                  Онлайн-запись на этот день закрыта.
+                </span>
+              </div>
+            ) : null}
+            <DayCalendar
+              appointments={selectedDayAppointments}
+              bookingBufferMinutes={bookingBufferMinutes}
+              freeSlotCount={selectedDayFreeCount}
+              onDropAppointment={dropAppointment}
+              renderAppointment={renderAppointment}
+              selectedDate={selectedDate}
+            />
+            {renderCalendarBlockOverlays([{ date: selectedDate }], false)}
+          </div>
         ) : (
           <>
             <div className="admin-appointment-summary" aria-label="Сводка списка записей">
@@ -660,7 +905,7 @@ export function CalendarWorkspace({
             </div>
           </>
         )}
-        {mode !== "month" && mode !== "week" && visibleAppointments.length === 0 ? (
+        {mode !== "month" && mode !== "week" && visibleAppointments.length === 0 && (mode !== "day" || selectedDayBlocks.length === 0) ? (
           <p className="admin-empty-state">Записи не найдены.</p>
         ) : null}
       </section>

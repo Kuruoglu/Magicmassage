@@ -1,8 +1,10 @@
 import { CALENDAR_MODES, type CalendarMode } from "./constants";
 
 type CalendarToolbarProps = {
+  canManageBlocks: boolean;
   heading: string;
   mode: CalendarMode;
+  onAddBlock: () => void;
   onDateChange: (date: string) => void;
   onGoToToday: () => void;
   onMovePeriod: (direction: "next" | "previous") => void;
@@ -11,8 +13,10 @@ type CalendarToolbarProps = {
 };
 
 export function CalendarToolbar({
+  canManageBlocks,
   heading,
   mode,
+  onAddBlock,
   onDateChange,
   onGoToToday,
   onMovePeriod,
@@ -54,6 +58,11 @@ export function CalendarToolbar({
             {calendarMode.label}
           </button>
         ))}
+        {canManageBlocks ? (
+          <button className="admin-calendar-block-action" onClick={onAddBlock} type="button">
+            Заблокировать время
+          </button>
+        ) : null}
       </div>
     </div>
   );

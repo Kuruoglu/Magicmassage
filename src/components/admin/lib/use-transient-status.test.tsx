@@ -27,10 +27,11 @@ describe("useTransientStatus", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useTransientStatus("clients"));
 
-    act(() => result.current.showStatus("Supabase недоступен."));
+    act(() => result.current.showStatus("Supabase недоступен.", { variant: "error" }));
     act(() => vi.advanceTimersByTime(10_000));
 
     expect(result.current.message).toBe("Supabase недоступен.");
+    expect(result.current.variant).toBe("error");
   });
 
   it("clears on section change and ignores a late result from the previous section", () => {

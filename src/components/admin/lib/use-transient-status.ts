@@ -9,6 +9,7 @@ type TransientStatusState = {
   message: string;
   scopeVersion: symbol;
   sequence: number;
+  variant: "error" | "success";
 };
 
 export function useTransientStatus(scope: string, dismissDelay = defaultDismissDelay) {
@@ -18,6 +19,7 @@ export function useTransientStatus(scope: string, dismissDelay = defaultDismissD
     message: "",
     scopeVersion,
     sequence: 0,
+    variant: "success",
   });
   const currentScopeVersion = useRef(scopeVersion);
 
@@ -26,7 +28,7 @@ export function useTransientStatus(scope: string, dismissDelay = defaultDismissD
   }, [scopeVersion]);
 
   const showStatus = useCallback(
-    (message: string, options: { autoDismiss?: boolean } = {}) => {
+    (message: string, options: { autoDismiss?: boolean; variant?: "error" | "success" } = {}) => {
       if (currentScopeVersion.current !== scopeVersion) return;
 
       setStatus((current) => ({
@@ -34,6 +36,7 @@ export function useTransientStatus(scope: string, dismissDelay = defaultDismissD
         message,
         scopeVersion,
         sequence: current.sequence + 1,
+        variant: options.variant ?? "success",
       }));
     },
     [scopeVersion],
@@ -51,5 +54,9 @@ export function useTransientStatus(scope: string, dismissDelay = defaultDismissD
     return () => window.clearTimeout(timeout);
   }, [dismissDelay, scopeVersion, status.autoDismiss, status.message, status.scopeVersion, status.sequence]);
 
-  return { message: status.scopeVersion === scopeVersion ? status.message : "", showStatus };
+  return {
+    message: status.scopeVersion === scopeVersion ? status.message : "",
+    showStatus,
+    variant: status.scopeVersion === scopeVersion ? status.variant : "success",
+  };
 }

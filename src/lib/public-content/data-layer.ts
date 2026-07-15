@@ -727,7 +727,7 @@ export function createPublicContentDataLayer(
       const rows = await readRows(
         client!
           .from("admin_public_site_flags")
-          .select("id, gift_certificates_enabled")
+          .select("id, gift_certificates_enabled, public_booking_enabled")
           .eq("id", "site")
           .limit(1),
       );
@@ -742,7 +742,10 @@ export function createPublicContentDataLayer(
         throw new PublicContentReadError("invalid_data");
       }
 
-      return ok({ giftCertificatesEnabled: asBoolean(row, "gift_certificates_enabled") });
+      return ok({
+        giftCertificatesEnabled: asBoolean(row, "gift_certificates_enabled"),
+        publicBookingEnabled: asBoolean(row, "public_booking_enabled"),
+      });
     });
   }
 

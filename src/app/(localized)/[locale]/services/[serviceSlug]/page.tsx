@@ -126,6 +126,7 @@ export default async function ServicePage({ params }: ServicePageProps) {
         locale={locale}
         service={service}
         bookingAction={publicContent.services.bookingAction}
+        publicBookingEnabled={shellRuntime.publicBookingEnabled}
       />
     </PublicPageShell>
   );

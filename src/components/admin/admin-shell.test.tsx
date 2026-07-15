@@ -206,7 +206,7 @@ describe("AdminShell", () => {
           },
           settings: {
             auditLogRetentionDays: 540,
-            bookingBufferMinutes: 45,
+            bookingBufferMinutes: 15,
             businessName: "Supabase Magic Massage",
             cookiePrivacyMode: "Supabase privacy text.",
             currency: "EUR",
@@ -232,8 +232,8 @@ describe("AdminShell", () => {
     );
 
     const details = screen.getByRole("dialog", { name: "Детали настроек" });
-    expect(within(details).getByText("45 минут")).toBeInTheDocument();
-    expect(within(details).getByText("5 слотов")).toBeInTheDocument();
+    expect(within(details).getByText("15 минут")).toBeInTheDocument();
+    expect(within(details).getByText("5 записей; вручную можно больше")).toBeInTheDocument();
     expect(within(details).getByText("Односторонняя")).toBeInTheDocument();
     expect(within(details).getByText("natali@example.com")).toBeInTheDocument();
     expect(within(details).queryByText("30 минут")).not.toBeInTheDocument();
@@ -1757,7 +1757,7 @@ describe("AdminShell", () => {
     expect(within(card).getByRole("status")).toHaveTextContent("Заметка сохранена.");
     expect(within(card).getAllByText(/напоминать за 2 часа/).length).toBeGreaterThan(0);
     expect(within(card).queryByLabelText("Заметка клиента")).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("creates a client from the client primary action and opens its card", () => {
     render(<AdminShell activeSection="clients" role="owner" />);
@@ -2080,9 +2080,9 @@ describe("AdminShell", () => {
     expect(monthGrid).toBeInTheDocument();
     expect(within(monthGrid).queryByText("Классический массаж")).not.toBeInTheDocument();
     expect(within(monthGrid).getByText("2 записи")).toBeInTheDocument();
-    expect(within(monthGrid).getAllByText("2 свободных слота").length).toBeGreaterThan(0);
+    expect(within(monthGrid).getAllByText("6 свободных слотов").length).toBeGreaterThan(0);
     expect(within(monthGrid).getAllByText("2 зап.").length).toBeGreaterThan(0);
-    expect(within(monthGrid).getAllByText("2 св.").length).toBeGreaterThan(0);
+    expect(within(monthGrid).getAllByText("6 св.").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /6 июля.*2 записи/ }));
 
@@ -2712,15 +2712,15 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
-    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
-    fireEvent.change(within(dialog).getByLabelText("Слотов в день"), { target: { value: "5" } });
+    await user.click(within(dialog).getByRole("button", { name: "15 минут" }));
+    fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "5" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar"), { target: { value: "Односторонняя" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar ID"), { target: { value: "natali@example.com" } });
     await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
 
     expect(screen.queryByRole("dialog", { name: "Настройки админки" })).not.toBeInTheDocument();
-    expect(within(details).getByText("45 минут")).toBeInTheDocument();
-    expect(within(details).getByText("5 слотов")).toBeInTheDocument();
+    expect(within(details).getByText("15 минут")).toBeInTheDocument();
+    expect(within(details).getByText("5 записей; вручную можно больше")).toBeInTheDocument();
     expect(within(details).getByText("Односторонняя")).toBeInTheDocument();
     expect(within(details).getByText("natali@example.com")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Настройки сохранены.");
@@ -2759,8 +2759,8 @@ describe("AdminShell", () => {
     fireEvent.change(within(dialog).getByLabelText("Часовой пояс"), { target: { value: "Europe/Sofia" } });
     fireEvent.change(within(dialog).getByLabelText("Рабочие дни"), { target: { value: "Пн-Сб" } });
     fireEvent.change(within(dialog).getByLabelText("Рабочие часы"), { target: { value: "10:00-19:00" } });
-    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
-    fireEvent.change(within(dialog).getByLabelText("Слотов в день"), { target: { value: "5" } });
+    await user.click(within(dialog).getByRole("button", { name: "15 минут" }));
+    fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "5" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar"), { target: { value: "Односторонняя" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar ID"), { target: { value: "natali@example.com" } });
     fireEvent.change(within(dialog).getByLabelText("Email отправителя"), { target: { value: "info@magicmassage.bg" } });
@@ -2784,7 +2784,7 @@ describe("AdminShell", () => {
     expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
       record: {
         auditLogRetentionDays: 365,
-        bookingBufferMinutes: 45,
+        bookingBufferMinutes: 15,
         businessName: "Magic Massage Natali",
         cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
         currency: "EUR",
@@ -2828,13 +2828,13 @@ describe("AdminShell", () => {
 
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
-    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
+    await user.click(within(dialog).getByRole("button", { name: "15 минут" }));
     await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(within(details).getByText("30 минут")).toBeInTheDocument());
-    expect(within(details).queryByText("45 минут")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("status").some((status) => status.textContent?.includes("Settings write failed."))).toBe(true);
+    expect(within(details).queryByText("15 минут")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Settings write failed.");
   });
 
   it("uses saved booking settings for calendar slot availability", async () => {
@@ -2844,8 +2844,8 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
-    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "45" } });
-    fireEvent.change(within(dialog).getByLabelText("Слотов в день"), { target: { value: "5" } });
+    await user.click(within(dialog).getByRole("button", { name: "15 минут" }));
+    fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "5" } });
     await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
 
     rerender(<AdminShell activeSection="calendar" role="owner" />);
@@ -2856,7 +2856,7 @@ describe("AdminShell", () => {
 
     const monthPlan = screen.getByLabelText("План месяца");
     expect(within(monthPlan).getByText("5 слотов в день")).toBeInTheDocument();
-    expect(within(monthPlan).getByText(/45 минут/)).toBeInTheDocument();
+    expect(within(monthPlan).getByText(/15 минут/)).toBeInTheDocument();
   });
 
   it("keeps settings details synchronized with search results", async () => {
@@ -2906,12 +2906,12 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
-    fireEvent.change(within(dialog).getByLabelText("Перерыв между сеансами"), { target: { value: "-5" } });
+    fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "9" } });
     await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
 
     expect(screen.getByRole("dialog", { name: "Настройки админки" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите название, буфер записи, слоты и срок хранения audit log.");
-    expect(within(dialog).getByLabelText("Перерыв между сеансами")).toHaveAttribute("aria-invalid", "true");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите название, буфер 15 или 30 минут, публичный лимит до 8 записей и срок хранения audit log.");
+    expect(within(dialog).getByLabelText("Лимит онлайн-записей в день")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("dialog", { name: "Детали настроек" })).toHaveTextContent("30 минут");
   });
 

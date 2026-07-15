@@ -40,6 +40,7 @@ const publicShellPageSuffixes = [
   "",
   "/about",
   "/blog",
+  "/booking",
   "/contacts",
   "/cookies",
   "/gift-certificates",
@@ -85,12 +86,20 @@ type AppointmentScheduleRow = {
 };
 
 type CurrentAppointmentRow = {
+  buffer_minutes?: number;
   duration_minutes?: number;
   id: string;
+  origin?: string;
   post_visit_comment: string;
   starts_at: string;
   starts_on: string;
   status: string;
+  version: number;
+};
+
+type CalendarBlockRow = {
+  ends_at: string;
+  starts_at: string;
 };
 
 const auditActionByRecordType: Record<Exclude<AdminPersistInput["type"], "appointment">, string> = {
@@ -246,14 +255,18 @@ async function classifyAppointmentOnServer(
   const currentAppointmentQuery = payload.record.id
     ? client
         .from("admin_appointments")
-        .select("duration_minutes, id, post_visit_comment, starts_at, starts_on, status")
+        .select("buffer_minutes, duration_minutes, id, origin, post_visit_comment, starts_at, starts_on, status, version")
         .eq("id", payload.record.id)
     : Promise.resolve({ data: [], error: null });
-  const [appointmentsResult, currentAppointmentResult, settingsResult] = await Promise.all([
+  const [appointmentsResult, blocksResult, currentAppointmentResult, settingsResult] = await Promise.all([
     client
       .from("admin_appointments")
       .select("buffer_minutes, duration_minutes, id, starts_at, status")
       .eq("starts_on", payload.record.date),
+    client
+      .from("admin_calendar_blocks")
+      .select("ends_at, starts_at")
+      .eq("block_date", payload.record.date),
     currentAppointmentQuery,
     client
       .from("admin_site_settings")
@@ -261,7 +274,7 @@ async function classifyAppointmentOnServer(
       .eq("id", "site"),
   ]);
 
-  if (appointmentsResult.error || currentAppointmentResult.error || settingsResult.error) {
+  if (appointmentsResult.error || blocksResult.error || currentAppointmentResult.error || settingsResult.error) {
     throw new Error("appointment schedule verification failed");
   }
 
@@ -269,17 +282,29 @@ async function classifyAppointmentOnServer(
   if (!settings || !Number.isInteger(settings.booking_buffer_minutes) || settings.booking_buffer_minutes < 0) {
     throw new Error("appointment settings are invalid");
   }
-  const duration = payload.record.durationMinutes ?? 60;
-  const start = timeToMinutes(payload.record.time);
-  const buffer = settings.booking_buffer_minutes;
-  const rows = (appointmentsResult.data ?? []) as AppointmentScheduleRow[];
   const currentAppointment = ((currentAppointmentResult.data ?? [])[0] ?? null) as CurrentAppointmentRow | null;
+  const isPublicAppointment = currentAppointment?.origin === "public";
+  const duration = isPublicAppointment && Number.isInteger(currentAppointment?.duration_minutes)
+    ? currentAppointment!.duration_minutes!
+    : (payload.record.durationMinutes ?? 60);
+  const start = timeToMinutes(payload.record.time);
+  const buffer = currentAppointment && Number.isInteger(currentAppointment.buffer_minutes)
+    ? currentAppointment!.buffer_minutes!
+    : settings.booking_buffer_minutes;
+  const rows = (appointmentsResult.data ?? []) as AppointmentScheduleRow[];
+  const blocks = (blocksResult.data ?? []) as CalendarBlockRow[];
   const overlap = activeAppointmentLabels.has(payload.record.status) && rows.some((candidate) => {
     if (candidate.id === payload.record.id || !activeAppointmentStatuses.has(candidate.status)) return false;
     const candidateStart = timeToMinutes(candidate.starts_at);
 
     return start < candidateStart + candidate.duration_minutes + candidate.buffer_minutes &&
       candidateStart < start + duration + buffer;
+  });
+  const blockConflict = activeAppointmentLabels.has(payload.record.status) && blocks.some((block) => {
+    const blockStart = timeToMinutes(block.starts_at);
+    const blockEnd = timeToMinutes(block.ends_at);
+
+    return start < blockEnd && blockStart < start + duration + buffer;
   });
   const workingDays = parseWorkingDays(settings.working_days);
   const workingHours = parseWorkingHours(settings.working_hours);
@@ -298,8 +323,13 @@ async function classifyAppointmentOnServer(
     appointmentStart > localDateTimeInTimeZone(new Date(), settings.timezone);
 
   return {
-    auditAction: deriveAppointmentAuditAction(payload, currentAppointment),
+    auditAction: deriveAppointmentAuditAction({
+      ...payload,
+      record: { ...payload.record, durationMinutes: duration },
+    }, currentAppointment),
+    blockConflict,
     buffer,
+    duration,
     outsideWorkingHours,
     overlap,
     postVisitCommentBlocked,
@@ -410,6 +440,13 @@ export async function POST(request: Request) {
     try {
       const classification = await classifyAppointmentOnServer(supabaseAdminClient, payload);
 
+      if (classification.blockConflict) {
+        return NextResponse.json(
+          { error: "Appointment conflicts with blocked personal time." },
+          { status: 409 },
+        );
+      }
+
       if (classification.postVisitCommentBlocked) {
         return NextResponse.json(
           { error: "Post-visit comments cannot be changed before a future appointment is completed." },
@@ -431,6 +468,7 @@ export async function POST(request: Request) {
         record: {
           ...payload.record,
           bufferMinutes: classification.buffer,
+          durationMinutes: classification.duration,
         },
         audit: {
           ...payload.audit!,
@@ -489,8 +527,26 @@ export async function POST(request: Request) {
     revalidatePublicContent(persistPayload);
   }
 
+  if (!result.ok && result.reason) {
+    const conflictMessage = result.reason === "appointment_calendar_block_conflict"
+      ? "Appointment conflicts with blocked personal time."
+      : result.reason === "appointment_concurrent_update"
+        ? "Appointment changed while it was being saved. Reload and try again."
+        : result.reason === "appointment_public_hold_conflict"
+          ? "This time is temporarily held by an online customer. Choose another time."
+          : result.reason === "appointment_overlap_conflict"
+            ? "Appointment overlaps another active appointment."
+            : "Public booking service, duration, and booking metadata cannot be changed.";
+
+    return NextResponse.json({ error: conflictMessage }, { status: 409 });
+  }
+
+  const responseResult = result.ok && persistPayload.type === "appointment"
+    ? { ...result, version: (persistPayload.record.version ?? 0) + 1 }
+    : result;
+
   return NextResponse.json(
-    result.ok ? result : { ...result, message: "Не удалось сохранить изменения. Повторите попытку." },
+    responseResult.ok ? responseResult : { ...responseResult, message: "Не удалось сохранить изменения. Повторите попытку." },
     { status: result.ok || result.mode === "demo" ? 200 : 500 },
   );
 }

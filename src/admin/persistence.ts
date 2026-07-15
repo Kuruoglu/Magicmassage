@@ -110,7 +110,33 @@ export type AdminPersistResult =
       message: string;
       mode: "demo" | "supabase";
       ok: false;
+      reason?: AdminPersistFailureReason;
     };
+
+export type AdminPersistFailureReason =
+  | "appointment_calendar_block_conflict"
+  | "appointment_concurrent_update"
+  | "appointment_overlap_conflict"
+  | "appointment_public_hold_conflict"
+  | "public_appointment_immutable";
+
+const adminPersistFailureReasons = new Set<AdminPersistFailureReason>([
+  "appointment_calendar_block_conflict",
+  "appointment_concurrent_update",
+  "appointment_overlap_conflict",
+  "appointment_public_hold_conflict",
+  "public_appointment_immutable",
+]);
+
+function getAdminPersistFailureReason(error: unknown): AdminPersistFailureReason | undefined {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message.includes("admin_appointments_active_schedule_excl")) {
+    return "appointment_overlap_conflict";
+  }
+
+  return [...adminPersistFailureReasons].find((reason) => message.includes(reason));
+}
 
 type AdminPersistDependencies = {
   createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
@@ -299,9 +325,18 @@ function isAppointmentRecordShape(record: Record<string, unknown>) {
       "overlapOverriddenBy",
       "postVisitComment",
       "postVisitCommentedAt",
+      "publicContactPreference",
+      "publicEmail",
+      "publicNote",
+      "publicPhone",
+      "publicReference",
+      "locale",
+      "origin",
+      "serviceSlug",
       "service",
       "status",
       "time",
+      "version",
     ]) &&
     hasString(record, "client") &&
     hasString(record, "clientId") &&
@@ -325,10 +360,19 @@ function isAppointmentRecordShape(record: Record<string, unknown>) {
     (overlapOverride !== true || Boolean((record.overlapOverrideReason as string | undefined)?.trim())) &&
     (postVisitComment === undefined || typeof postVisitComment === "string") &&
     isOptionalIsoTimestamp(postVisitCommentedAt) &&
+    (record.publicContactPreference === undefined || ["phone", "viber", "telegram", "email"].includes(record.publicContactPreference as string)) &&
+    isOptionalString(record.publicEmail) &&
+    isOptionalString(record.publicNote) &&
+    isOptionalString(record.publicPhone) &&
+    isOptionalString(record.publicReference) &&
+    isOptionalString(record.locale) &&
+    (record.origin === undefined || record.origin === "admin" || record.origin === "public") &&
+    isOptionalString(record.serviceSlug) &&
     hasString(record, "service") &&
     typeof record.status === "string" &&
     appointmentStatuses.has(record.status) &&
-    isTime(record.time)
+    isTime(record.time) &&
+    (record.version === undefined || (Number.isInteger(record.version) && (record.version as number) > 0))
   );
 }
 
@@ -622,6 +666,10 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     hasOnlyKeys(record, [
       "auditLogRetentionDays",
       "bookingBufferMinutes",
+      "bookingHoldMinutes",
+      "bookingHorizonDays",
+      "bookingMinLeadMinutes",
+      "bookingSlotStepMinutes",
       "businessName",
       "cookiePrivacyMode",
       "currency",
@@ -632,6 +680,8 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
       "googleCalendarId",
       "googleCalendarMode",
       "giftCertificatesEnabled",
+      "publicBookingDailyLimit",
+      "publicBookingEnabled",
       "reminderTemplate",
       "rolesPolicy",
       "stripeMode",
@@ -642,6 +692,17 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     ]) &&
     hasNumber(record, "auditLogRetentionDays") &&
     hasNumber(record, "bookingBufferMinutes") &&
+    [15, 30].includes(record.bookingBufferMinutes as number) &&
+    hasNumber(record, "bookingHoldMinutes") &&
+    Number(record.bookingHoldMinutes) >= 1 &&
+    Number(record.bookingHoldMinutes) <= 30 &&
+    hasNumber(record, "bookingHorizonDays") &&
+    Number(record.bookingHorizonDays) >= 1 &&
+    Number(record.bookingHorizonDays) <= 365 &&
+    hasNumber(record, "bookingMinLeadMinutes") &&
+    Number(record.bookingMinLeadMinutes) >= 0 &&
+    Number(record.bookingMinLeadMinutes) <= 10080 &&
+    record.bookingSlotStepMinutes === 15 &&
     hasString(record, "businessName") &&
     hasString(record, "cookiePrivacyMode") &&
     record.currency === "EUR" &&
@@ -652,6 +713,10 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     hasString(record, "googleCalendarId") &&
     hasString(record, "googleCalendarMode") &&
     (record.giftCertificatesEnabled === undefined || typeof record.giftCertificatesEnabled === "boolean") &&
+    hasNumber(record, "publicBookingDailyLimit") &&
+    Number(record.publicBookingDailyLimit) >= 1 &&
+    Number(record.publicBookingDailyLimit) <= 8 &&
+    typeof record.publicBookingEnabled === "boolean" &&
     hasString(record, "reminderTemplate") &&
     hasString(record, "rolesPolicy") &&
     hasString(record, "stripeMode") &&
@@ -802,11 +867,13 @@ export async function persistAdminRecord(
     };
   } catch (error) {
     console.error("Unable to persist admin record", error);
+    const reason = getAdminPersistFailureReason(error);
 
     return {
       message: "Unable to persist admin record.",
       mode: "supabase",
       ok: false,
+      ...(reason ? { reason } : {}),
     };
   }
 }

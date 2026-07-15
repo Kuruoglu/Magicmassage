@@ -11,6 +11,7 @@ import { getPublicPagesContent, type ServiceContent } from "@/content/public-pag
 import { locales, type Locale } from "@/i18n/config";
 import {
   getLocaleSwitchPath,
+  getPublicBookingPath,
   getPublicPagePath,
   type PublicPageKey,
 } from "@/navigation/public-routes";
@@ -33,6 +34,7 @@ type SiteHeaderProps = {
   giftCertificatesEnabled?: boolean;
   localePaths?: Partial<Record<Locale, string>>;
   mediaPlacements?: PublicMediaPlacement[];
+  publicBookingEnabled?: boolean;
   services?: ServiceContent[];
 };
 
@@ -43,6 +45,7 @@ export function SiteHeader({
   giftCertificatesEnabled = true,
   localePaths,
   mediaPlacements,
+  publicBookingEnabled = false,
   services: runtimeServices,
 }: SiteHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -217,9 +220,15 @@ export function SiteHeader({
               ))}
             </div>
           </details>
-          <a className="button button-small" {...externalBookingLinkProps}>
-            {content.navigation.booking}
-          </a>
+          {publicBookingEnabled ? (
+            <Link className="button button-small" href={getPublicBookingPath(locale)}>
+              {content.navigation.booking}
+            </Link>
+          ) : (
+            <a className="button button-small" {...externalBookingLinkProps}>
+              {content.navigation.booking}
+            </a>
+          )}
           <button
             ref={menuToggleRef}
             className="menu-toggle"
@@ -331,9 +340,15 @@ export function SiteHeader({
         </nav>
 
         <div className="mobile-menu-footer">
-          <a className="button" {...externalBookingLinkProps} onClick={closeMenu}>
-            {content.navigation.booking}
-          </a>
+          {publicBookingEnabled ? (
+            <Link className="button" href={getPublicBookingPath(locale)} onClick={closeMenu}>
+              {content.navigation.booking}
+            </Link>
+          ) : (
+            <a className="button" {...externalBookingLinkProps} onClick={closeMenu}>
+              {content.navigation.booking}
+            </a>
+          )}
           <div className="mobile-messenger-actions" aria-label="Messengers">
             <a
               href={messengerLinks.telegram.href}

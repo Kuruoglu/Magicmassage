@@ -26,6 +26,19 @@ describe("HomePageView", () => {
     expect(screen.getByRole("link", { name: "Виж всички масажи" })).toHaveAttribute("href", "/bg/services");
   });
 
+  it("uses internal booking routes only when public booking is enabled", () => {
+    const content = getHomeContent("en");
+    render(<HomePageView locale="en" content={content} publicBookingEnabled />);
+
+    expect(screen.getAllByRole("link", { name: content.hero.primaryAction })[0]).toHaveAttribute(
+      "href",
+      "/en/booking",
+    );
+    expect(
+      screen.getByRole("link", { name: `${content.navigation.booking}: ${content.services.items[0].title}` }),
+    ).toHaveAttribute("href", `/en/booking?service=${content.services.items[0].slug}`);
+  });
+
   it("uses the treatment photography as the hero background", () => {
     render(<HomePageView locale="bg" content={getHomeContent("bg")} />);
 

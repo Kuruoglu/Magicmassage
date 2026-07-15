@@ -21,7 +21,8 @@
     "test:e2e": "npm run test:e2e:ui && npm run test:e2e:admin-auth",
     "test:e2e:ui": "playwright test --config playwright.config.ts",
     "test:e2e:admin-auth": "node scripts/run-admin-auth-e2e.mjs",
-    "test:e2e:admin-auth:required": "node scripts/run-admin-auth-e2e.mjs --required"
+    "test:e2e:admin-auth:required": "node scripts/run-admin-auth-e2e.mjs --required",
+    "test:booking-db": "node --env-file=.env.local scripts/verify-booking-db.mjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^6.7.0",

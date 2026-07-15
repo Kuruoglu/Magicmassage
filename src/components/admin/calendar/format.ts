@@ -62,6 +62,10 @@ export function freeSlotCount(appointmentCount: number, dailySlotCapacity: numbe
   return Math.max(0, dailySlotCapacity - appointmentCount);
 }
 
+export function manualAppointmentOverflow(appointmentCount: number, dailySlotCapacity: number) {
+  return Math.max(0, appointmentCount - dailySlotCapacity);
+}
+
 export function freeSlotLabel(count: number) {
   if (count === 1) {
     return "1 свободный слот";

@@ -14,17 +14,38 @@ export type Appointment = {
   clientId?: string;
   date: string;
   durationMinutes?: number;
+  locale?: string;
   time: string;
   client: string;
   note: string;
+  origin?: "admin" | "public";
   overlapOverride?: boolean;
   overlapOverrideReason?: string;
   overlapOverriddenAt?: string;
   overlapOverriddenBy?: string;
   postVisitComment?: string;
   postVisitCommentedAt?: string;
+  publicNote?: string;
+  publicContactPreference?: "phone" | "viber" | "telegram" | "email";
+  publicEmail?: string;
+  publicPhone?: string;
+  publicReference?: string;
+  serviceSlug?: string;
   service: string;
   status: AppointmentStatus;
+  version?: number;
+};
+
+export type CalendarBlockKind = "personal" | "unavailable" | "other";
+
+export type CalendarBlock = {
+  blockDate: string;
+  endsAt: string;
+  id: string;
+  internalNote: string;
+  kind: CalendarBlockKind;
+  startsAt: string;
+  version?: number;
 };
 
 export type ClientVisit = {
@@ -208,6 +229,10 @@ export type StripeMode = "Тестовый" | "Live после подтверж�
 export type SettingsRecord = {
   auditLogRetentionDays: number;
   bookingBufferMinutes: number;
+  bookingHoldMinutes?: number;
+  bookingHorizonDays?: number;
+  bookingMinLeadMinutes?: number;
+  bookingSlotStepMinutes?: number;
   businessName: string;
   cookiePrivacyMode: string;
   currency: "EUR";
@@ -218,6 +243,8 @@ export type SettingsRecord = {
   giftCertificatesEnabled?: boolean;
   googleCalendarId: string;
   googleCalendarMode: CalendarSyncMode;
+  publicBookingDailyLimit?: number;
+  publicBookingEnabled?: boolean;
   reminderTemplate: string;
   rolesPolicy: string;
   stripeMode: StripeMode;
@@ -257,6 +284,7 @@ type DemoCertificateRow = Pick<CertificateRecord, "amount" | "buyer" | "clientNa
 
 export type AdminDomainRecords = {
   appointments: Appointment[];
+  calendarBlocks?: CalendarBlock[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
 };
@@ -285,16 +313,35 @@ export type AdminAppointmentDatabaseRow = {
   client_name_snapshot: string;
   duration_minutes: number;
   internal_note: string;
+  locale?: string | null;
+  origin?: string;
   overlap_override?: boolean;
   overlap_override_reason?: string;
   overlap_overridden_at?: string | null;
   overlap_overridden_by?: string | null;
   post_visit_comment: string;
   post_visit_commented_at: string | null;
+  public_note?: string;
+  public_contact_preference_snapshot?: "phone" | "viber" | "telegram" | "email" | null;
+  public_email_snapshot?: string | null;
+  public_phone_snapshot?: string | null;
+  public_reference?: string | null;
+  service_slug?: string | null;
   service_name: string;
   starts_at: string;
   starts_on: string;
   status: string;
+  version?: number;
+};
+
+export type AdminCalendarBlockDatabaseRow = {
+  block_date: string;
+  ends_at: string;
+  id: string;
+  internal_note: string;
+  kind: CalendarBlockKind;
+  starts_at: string;
+  version: number;
 };
 
 export type AdminCertificateDatabaseRow = {
@@ -439,6 +486,10 @@ export type AdminBlogPostDatabaseRow = {
 export type AdminSiteSettingsDatabaseRow = {
   audit_log_retention_days: number;
   booking_buffer_minutes: number;
+  booking_hold_minutes?: number;
+  booking_horizon_days?: number;
+  booking_min_lead_minutes?: number;
+  booking_slot_step_minutes?: number;
   business_name: string;
   cookie_privacy_mode: string;
   currency: "EUR";
@@ -450,6 +501,8 @@ export type AdminSiteSettingsDatabaseRow = {
   google_calendar_mode: string;
   gift_certificates_enabled: boolean;
   id: "site";
+  public_booking_daily_limit?: number;
+  public_booking_enabled?: boolean;
   reminder_template: string;
   roles_policy: string;
   stripe_mode: string;
@@ -644,6 +697,7 @@ export function createAdminDemoRecords({
 
   return {
     appointments: buildAppointmentRecords(appointmentRows, clients),
+    calendarBlocks: [],
     certificates: buildCertificateRecords(certificateRows, clients, financeRows),
     clients,
   };

@@ -198,7 +198,11 @@ const settingsPayload = {
   audit: { action: "site.gift_certificates" },
   record: {
     auditLogRetentionDays: 365,
-    bookingBufferMinutes: 45,
+    bookingBufferMinutes: 30,
+    bookingHoldMinutes: 5,
+    bookingHorizonDays: 60,
+    bookingMinLeadMinutes: 240,
+    bookingSlotStepMinutes: 15,
     businessName: "Magic Massage Natali",
     cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
     currency: "EUR",
@@ -208,6 +212,8 @@ const settingsPayload = {
     emailSender: "info@magicmassage.bg",
     googleCalendarId: "natali@example.com",
     googleCalendarMode: "Односторонняя",
+    publicBookingDailyLimit: 8,
+    publicBookingEnabled: true,
     reminderTemplate: "Напоминание о записи за день до сеанса.",
     rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
     stripeMode: "Тестовый",
@@ -220,12 +226,14 @@ const settingsPayload = {
 } as const;
 
 type AppointmentRouteClientOptions = {
+  blockRows?: Record<string, unknown>[];
   currentRows?: Record<string, unknown>[];
   scheduleRows?: Record<string, unknown>[];
   settings?: Record<string, unknown>;
 };
 
 function createAppointmentRouteClient({
+  blockRows = [],
   currentRows = [],
   scheduleRows = [],
   settings = {
@@ -252,6 +260,14 @@ function createAppointmentRouteClient({
       return {
         select: vi.fn(() => ({
           eq: vi.fn(async () => ({ data: [settings], error: null })),
+        })),
+      };
+    }
+
+    if (table === "admin_calendar_blocks") {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ data: blockRows, error: null })),
         })),
       };
     }
@@ -513,6 +529,7 @@ describe("admin records persistence API route", () => {
       "",
       "/about",
       "/blog",
+      "/booking",
       "/contacts",
       "/cookies",
       "/gift-certificates",
@@ -530,7 +547,7 @@ describe("admin records persistence API route", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/[locale]/blog/[slug]", "layout");
     expect(revalidatePath).toHaveBeenCalledWith("/[locale]/services/[serviceSlug]", "page");
     expect(revalidatePath).toHaveBeenCalledWith("/sitemap.xml");
-    expect(revalidatePath).toHaveBeenCalledTimes(39);
+    expect(revalidatePath).toHaveBeenCalledTimes(43);
   });
 
   it("does not revalidate public pages when settings persistence fails", async () => {
@@ -831,6 +848,108 @@ describe("admin records persistence API route", () => {
     expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
       audit: expect.objectContaining({ outsideWorkingHours: true }),
     }));
+  });
+
+  it("preserves the duration and buffer captured by an existing public booking", async () => {
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.update", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        bufferMinutes: 30,
+        durationMinutes: 60,
+        overlapOverride: false,
+        overlapOverrideReason: "",
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        buffer_minutes: 15,
+        duration_minutes: 90,
+        id: payload.record.id,
+        origin: "public",
+        post_visit_comment: "",
+        starts_at: "14:00:00",
+        starts_on: payload.record.date,
+        status: "confirmed",
+      }],
+    });
+    supabaseAdminRouteMock.client = client;
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
+      record: expect.objectContaining({
+        bufferMinutes: 15,
+        durationMinutes: 90,
+      }),
+    }));
+  });
+
+  it("rejects an active appointment that overlaps blocked personal time", async () => {
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.create", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        id: "appointment-blocked",
+        overlapOverride: false,
+        overlapOverrideReason: "",
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      blockRows: [{ ends_at: "15:30:00", starts_at: "14:30:00" }],
+    });
+    supabaseAdminRouteMock.client = client;
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Appointment conflicts with blocked personal time.",
+    });
+    expect(persistAdminRecord).not.toHaveBeenCalled();
+  });
+
+  it("maps a transactional calendar-block race to a conflict response", async () => {
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.create", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        id: "appointment-race",
+        overlapOverride: false,
+        overlapOverrideReason: "",
+      },
+    };
+    const { client } = createAppointmentRouteClient();
+    supabaseAdminRouteMock.client = client;
+    vi.mocked(persistAdminRecord).mockResolvedValueOnce({
+      message: "Unable to persist admin record.",
+      mode: "supabase",
+      ok: false,
+      reason: "appointment_calendar_block_conflict",
+    });
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Appointment conflicts with blocked personal time.",
+    });
   });
 
   it("rejects a changed post-visit comment for a future non-completed DB appointment", async () => {

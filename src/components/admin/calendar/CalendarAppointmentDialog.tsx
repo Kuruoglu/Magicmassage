@@ -91,6 +91,7 @@ export function CalendarAppointmentDialog({
   const [initialForm] = useState<Appointment>(() => ({
     client: initialAppointment?.client ?? prefillClient?.name ?? prefillClientName ?? "",
     clientId: initialAppointment?.clientId ?? prefillClient?.id,
+    bufferMinutes: initialAppointment?.bufferMinutes ?? bookingBufferMinutes,
     date: initialAppointment?.date ?? prefillDate ?? getCalendarIsoDate(workingSchedule),
     durationMinutes: initialAppointment?.durationMinutes ?? 60,
     id: initialAppointment?.id,
@@ -104,6 +105,7 @@ export function CalendarAppointmentDialog({
     service: initialAppointment?.service ?? appointmentServiceOptions[0],
     status: initialAppointment?.status ?? "Новая заявка",
     time: initialAppointment?.time ?? "14:00",
+    version: initialAppointment?.version,
   }));
   const [form, setForm] = useState<Appointment>(() => initialForm);
   const [error, setError] = useState("");
@@ -111,6 +113,7 @@ export function CalendarAppointmentDialog({
   const [areClientSuggestionsDismissed, setAreClientSuggestionsDismissed] = useState(false);
   const clientSuggestionsId = useId();
   const isEditing = Boolean(initialAppointment);
+  const isPublicBooking = initialAppointment?.origin === "public";
   const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(initialForm);
   const schedulingClassification = useMemo(() => {
     if (!isIsoDate(form.date) || !/^\d{2}:\d{2}$/.test(form.time)) {
@@ -123,7 +126,7 @@ export function CalendarAppointmentDialog({
     }
 
     const candidate = {
-      bufferMinutes: bookingBufferMinutes,
+      bufferMinutes: form.bufferMinutes ?? bookingBufferMinutes,
       date: form.date,
       duration: form.durationMinutes ?? 60,
       start: form.time,
@@ -267,7 +270,7 @@ export function CalendarAppointmentDialog({
 
     const result = await onSave({
       ...form,
-      bufferMinutes: bookingBufferMinutes,
+      bufferMinutes: initialAppointment ? form.bufferMinutes : bookingBufferMinutes,
       client,
       clientId: linkedClient?.id,
       durationMinutes: Math.max(form.durationMinutes ?? 60, 15),
@@ -309,6 +312,11 @@ export function CalendarAppointmentDialog({
             ) : null}
 
             <AdminDrawerSection title="Клиент и услуга">
+              {isPublicBooking ? (
+                <div className="admin-form-alert" role="status">
+                  <p>Услуга и длительность зафиксированы клиентом при онлайн-записи.</p>
+                </div>
+              ) : null}
               <label>
                 Клиент
                 <input
@@ -358,7 +366,11 @@ export function CalendarAppointmentDialog({
               ) : null}
               <label>
                 Услуга
-                <select onChange={(event) => updateForm("service", event.target.value)} value={form.service}>
+                <select
+                  disabled={isPublicBooking}
+                  onChange={(event) => updateForm("service", event.target.value)}
+                  value={form.service}
+                >
                   {appointmentServiceOptions.map((service) => (
                     <option key={service} value={service}>
                       {service}
@@ -420,6 +432,7 @@ export function CalendarAppointmentDialog({
               <label>
                 Длительность, минут
                 <input
+                  disabled={isPublicBooking}
                   min="15"
                   onChange={(event) => updateForm("durationMinutes", Number(event.target.value))}
                   step="15"

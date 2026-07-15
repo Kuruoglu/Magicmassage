@@ -2,7 +2,8 @@ import { createEvent, fireEvent, render, screen, waitFor, within } from "@testin
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Appointment, ClientRecord } from "@/admin/domain";
+import type { AdminRoleId } from "@/admin/config";
+import type { Appointment, CalendarBlock, ClientRecord } from "@/admin/domain";
 
 import { CalendarWorkspace, type CalendarAppointmentSaveResult } from "./CalendarWorkspace";
 
@@ -72,12 +73,42 @@ const siteSettings = {
   workingHours: "10:00-19:00",
 };
 
+const timedCalendarBlock: CalendarBlock = {
+  blockDate: "2026-07-06",
+  endsAt: "13:00",
+  id: "calendar-block-timed",
+  internalNote: "Личная встреча",
+  kind: "personal",
+  startsAt: "12:00",
+};
+
+const fullDayCalendarBlock: CalendarBlock = {
+  blockDate: "2026-07-06",
+  endsAt: "23:59",
+  id: "calendar-block-full-day",
+  internalNote: "Выходной",
+  kind: "unavailable",
+  startsAt: "00:00",
+};
+
 function renderCalendar({
   calendarAppointments = appointments,
+  calendarBlocks = [],
+  canManageBlocks = true,
+  onCreateCalendarBlock = vi.fn(),
+  onDeleteCalendarBlock = vi.fn(),
+  onEditCalendarBlock = vi.fn(),
   onSaveAppointment = vi.fn(async () => ({ ok: true }) as CalendarAppointmentSaveResult),
+  query = "",
+  role = "owner",
   scheduleSettings = siteSettings,
 }: {
   calendarAppointments?: Appointment[];
+  calendarBlocks?: CalendarBlock[];
+  canManageBlocks?: boolean;
+  onCreateCalendarBlock?: (date: string) => void;
+  onDeleteCalendarBlock?: (block: CalendarBlock) => void;
+  onEditCalendarBlock?: (block: CalendarBlock) => void;
   onSaveAppointment?: (
     appointment: Appointment,
     action?: Parameters<typeof CalendarWorkspace>[0]["onSaveAppointment"] extends (
@@ -87,20 +118,27 @@ function renderCalendar({
       ? T
       : never,
   ) => Promise<CalendarAppointmentSaveResult>;
+  role?: AdminRoleId;
+  query?: string;
   scheduleSettings?: typeof siteSettings;
 } = {}) {
   render(
     <CalendarWorkspace
       appointments={calendarAppointments}
       bookingBufferMinutes={30}
+      calendarBlocks={calendarBlocks}
+      canManageBlocks={canManageBlocks}
       clients={clients}
       dailySlotCapacity={4}
       onCancelAppointment={vi.fn()}
+      onCreateCalendarBlock={onCreateCalendarBlock}
+      onDeleteCalendarBlock={onDeleteCalendarBlock}
       onCalendarDateChange={vi.fn()}
       onEditAppointment={vi.fn()}
+      onEditCalendarBlock={onEditCalendarBlock}
       onSaveAppointment={onSaveAppointment}
-      query=""
-      role="owner"
+      query={query}
+      role={role}
       selectedCalendarDate="2026-07-06"
       siteSettings={scheduleSettings}
     />,
@@ -135,6 +173,7 @@ describe("CalendarWorkspace", () => {
       <CalendarWorkspace
         appointments={[appointments[0]]}
         bookingBufferMinutes={30}
+        canManageBlocks
         clients={clients}
         dailySlotCapacity={4}
         onCancelAppointment={vi.fn()}
@@ -221,7 +260,7 @@ describe("CalendarWorkspace", () => {
 
     renderCalendar({ calendarAppointments: simultaneousAppointments });
 
-    const listItems = screen.getAllByRole("listitem");
+    const listItems = Array.from(document.querySelectorAll<HTMLElement>(".admin-timed-appointment"));
     expect(listItems).toHaveLength(3);
     expect(listItems[0]).toHaveTextContent(appointments[0].client);
     expect(listItems[1]).toHaveTextContent("Elena Smirnova");
@@ -230,6 +269,88 @@ describe("CalendarWorkspace", () => {
     expect(listItems[0].style.width).toBe("calc(33.3333% - 8px)");
     expect(listItems[1].style.left).toBe("calc(33.3333% + 4px)");
     expect(listItems[2].style.left).toBe("calc(66.6667% + 4px)");
+  });
+
+  it.each<AdminRoleId>(["owner", "administrator", "specialist"])(
+    "shows calendar-block management controls for %s",
+    async (role) => {
+      const user = userEvent.setup();
+      const onCreateCalendarBlock = vi.fn();
+      const onDeleteCalendarBlock = vi.fn();
+      const onEditCalendarBlock = vi.fn();
+      renderCalendar({
+        calendarBlocks: [timedCalendarBlock],
+        canManageBlocks: true,
+        onCreateCalendarBlock,
+        onDeleteCalendarBlock,
+        onEditCalendarBlock,
+        role,
+      });
+
+      await user.click(screen.getByRole("button", { name: "Заблокировать время" }));
+      await user.click(screen.getByRole("button", { name: "Изменить" }));
+      await user.click(screen.getByRole("button", { name: "Удалить" }));
+
+      expect(onCreateCalendarBlock).toHaveBeenCalledWith("2026-07-06");
+      expect(onEditCalendarBlock).toHaveBeenCalledWith(timedCalendarBlock);
+      expect(onDeleteCalendarBlock).toHaveBeenCalledWith(timedCalendarBlock);
+    },
+  );
+
+  it("keeps calendar-block management controls hidden for a read-only viewer", () => {
+    renderCalendar({
+      calendarBlocks: [timedCalendarBlock],
+      canManageBlocks: false,
+      role: "viewer",
+    });
+
+    expect(screen.queryByRole("button", { name: "Заблокировать время" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Изменить" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Удалить" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Недоступное время")).toHaveTextContent("Личная встреча");
+  });
+
+  it("shows full-day closure and timed restrictions accurately in month availability", async () => {
+    const user = userEvent.setup();
+    renderCalendar({
+      calendarBlocks: [
+        fullDayCalendarBlock,
+        { ...timedCalendarBlock, blockDate: "2026-07-07", id: "calendar-block-next-day" },
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+
+    const fullDayButton = screen.getByRole("button", { name: /^6 июля,/ });
+    const timedDayButton = screen.getByRole("button", { name: /^7 июля,/ });
+    expect(fullDayButton).toHaveAccessibleName(/Недоступно весь день/);
+    expect(fullDayButton).not.toHaveAccessibleName(/свободн/i);
+    expect(timedDayButton).toHaveAccessibleName(/Ограничено: 1 блокировка, 4 по дневному лимиту/);
+  });
+
+  it("renders timed blocks inside both day and week schedule columns", async () => {
+    const user = userEvent.setup();
+    renderCalendar({ calendarBlocks: [timedCalendarBlock] });
+
+    const dayBlock = await screen.findByRole("button", { name: /Недоступное время: 12:00 - 13:00/ });
+    expect(dayBlock.parentElement).toHaveClass("admin-calendar-time-column");
+    expect(dayBlock).toHaveStyle({ height: "70px", top: "864px" });
+
+    await user.click(screen.getByRole("button", { name: "Неделя" }));
+
+    await waitFor(() => {
+      const weekBlock = screen.getByRole("button", { name: /Недоступное время: 12:00 - 13:00/ });
+      expect(weekBlock.parentElement).toHaveClass("admin-calendar-time-column");
+      expect(weekBlock).toHaveStyle({ height: "70px", top: "864px" });
+    });
+  });
+
+  it("keeps capacity totals based on all appointments while search filters the display", () => {
+    renderCalendar({ query: "Анна" });
+
+    expect(screen.getByText("2 свободных слота")).toBeInTheDocument();
+    expect(screen.getByText("Анна Петрова")).toBeInTheDocument();
+    expect(screen.queryByText("Мария Иванова")).not.toBeInTheDocument();
   });
 
   it("marks appointments outside the saved site working hours", () => {

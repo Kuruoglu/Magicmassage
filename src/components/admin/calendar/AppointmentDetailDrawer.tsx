@@ -55,6 +55,9 @@ export function AppointmentDetailDrawer({
   const needsCompletionWarning =
     canCommentAfterVisit && appointment.status !== "Завершена" && appointment.status !== "Не пришёл";
   const hasUnsavedChanges = postVisitComment !== savedPostVisitComment;
+  const publicContactLabel = appointment.publicContactPreference
+    ? ({ email: "Email", phone: "Телефон", telegram: "Telegram", viber: "Viber" } as const)[appointment.publicContactPreference]
+    : undefined;
 
   async function savePostVisitComment() {
     setPostVisitSaveState("saving");
@@ -124,6 +127,34 @@ export function AppointmentDetailDrawer({
               </dd>
             </div>
             <div>
+              <dt>Источник</dt>
+              <dd>{appointment.origin === "public" ? "Онлайн-запись" : "Добавлена вручную"}</dd>
+            </div>
+            {appointment.publicReference ? (
+              <div>
+                <dt>Номер подтверждения</dt>
+                <dd className="admin-tabular">{appointment.publicReference}</dd>
+              </div>
+            ) : null}
+            {appointment.publicPhone ? (
+              <div>
+                <dt>Телефон из онлайн-записи</dt>
+                <dd className="admin-tabular">{appointment.publicPhone}</dd>
+              </div>
+            ) : null}
+            {appointment.publicEmail ? (
+              <div>
+                <dt>Email из онлайн-записи</dt>
+                <dd>{appointment.publicEmail}</dd>
+              </div>
+            ) : null}
+            {publicContactLabel ? (
+              <div>
+                <dt>Предпочтительный способ связи</dt>
+                <dd>{publicContactLabel}</dd>
+              </div>
+            ) : null}
+            <div>
               <dt>Время</dt>
               <dd>
                 {appointment.time} · {appointment.durationMinutes ?? 60} мин
@@ -133,6 +164,12 @@ export function AppointmentDetailDrawer({
               <dt>Комментарий</dt>
               <dd>{appointment.note || "Комментарий к записи пока пуст."}</dd>
             </div>
+            {appointment.publicNote ? (
+              <div>
+                <dt>Данные онлайн-записи</dt>
+                <dd>{appointment.publicNote}</dd>
+              </div>
+            ) : null}
           </dl>
         </AdminDrawerSection>
         <AdminDrawerSection title="После визита">

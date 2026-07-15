@@ -58,6 +58,7 @@ type LoadAdminShellDataOptions = {
 
 const emptyRecords: AdminDomainRecords = {
   appointments: [],
+  calendarBlocks: [],
   certificates: [],
   clients: [],
 };

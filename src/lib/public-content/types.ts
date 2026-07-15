@@ -133,6 +133,7 @@ export type PublicBlogListData = {
 
 export type PublicSiteFeatures = {
   giftCertificatesEnabled: boolean;
+  publicBookingEnabled: boolean;
 };
 
 export type PublicContentQueryResponse = {

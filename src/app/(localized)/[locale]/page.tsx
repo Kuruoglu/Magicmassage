@@ -42,6 +42,7 @@ export default async function LocalePage({ params }: LocalePageProps) {
         locale={locale}
         content={content}
         mediaPlacements={shellRuntime.mediaPlacements}
+        publicBookingEnabled={shellRuntime.publicBookingEnabled}
         services={shellRuntime.services}
       />
     </PublicPageShell>

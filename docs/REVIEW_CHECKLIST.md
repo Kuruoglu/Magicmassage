@@ -13,7 +13,18 @@ npm test -- --run
 npm run build
 ```
 
+When booking migrations or concurrency rules change and the Supabase admin
+environment is configured, also run the self-cleaning remote smoke:
+
+```powershell
+npm run test:booking-db
+```
+
 When Playwright is available, run the public smoke suite too.
+
+```powershell
+npm run test:e2e
+```
 
 ## Public Smoke Coverage
 
@@ -27,6 +38,8 @@ Verify in a browser:
 - At least one service detail page renders.
 - Language switcher preserves the current public page.
 - Studio24 booking CTA opens the expected external URL.
+- Public instant booking creates one real hold, keeps one countdown, restores the
+  contact step after reload, and removes its remote fixture after the test.
 - Stripe Payment Element is embedded only on the gift certificate payment flow;
   card number, CVC, and financial data are not handled by site code.
 - Mobile menu opens, closes, handles keyboard focus correctly, and does not leave

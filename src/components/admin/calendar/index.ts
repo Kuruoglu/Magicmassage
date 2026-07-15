@@ -86,6 +86,8 @@ export { CalendarAppointmentCancelDialog } from "./CalendarAppointmentCancelDial
 export type { CalendarAppointmentCancelDialogProps } from "./CalendarAppointmentCancelDialog";
 export { CalendarAppointmentDialog } from "./CalendarAppointmentDialog";
 export type { CalendarAppointmentDialogProps } from "./CalendarAppointmentDialog";
+export { CalendarBlockDialog } from "./CalendarBlockDialog";
+export type { CalendarBlockSaveResult } from "./CalendarBlockDialog";
 export { CalendarToolbar } from "./CalendarToolbar";
 export { CalendarWorkspace } from "./CalendarWorkspace";
 export type {

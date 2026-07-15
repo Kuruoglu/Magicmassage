@@ -245,7 +245,11 @@ const blogPostRecord: BlogPostRecord = {
 
 const settingsRecord: SettingsRecord = {
   auditLogRetentionDays: 365,
-  bookingBufferMinutes: 45,
+  bookingBufferMinutes: 30,
+  bookingHoldMinutes: 5,
+  bookingHorizonDays: 60,
+  bookingMinLeadMinutes: 240,
+  bookingSlotStepMinutes: 15,
   businessName: "Magic Massage Natali",
   cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
   currency: "EUR",
@@ -255,6 +259,8 @@ const settingsRecord: SettingsRecord = {
   emailSender: "info@magicmassage.bg",
   googleCalendarId: "natali@example.com",
   googleCalendarMode: "Односторонняя",
+  publicBookingDailyLimit: 8,
+  publicBookingEnabled: true,
   reminderTemplate: "Напоминание о записи за день до сеанса.",
   rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
   stripeMode: "Тестовый",
@@ -614,7 +620,11 @@ describe("admin Supabase repository", () => {
       admin_site_settings: [
         {
           audit_log_retention_days: 540,
-          booking_buffer_minutes: 45,
+          booking_buffer_minutes: 30,
+          booking_hold_minutes: 5,
+          booking_horizon_days: 60,
+          booking_min_lead_minutes: 240,
+          booking_slot_step_minutes: 15,
           business_name: "Supabase Magic Massage",
           cookie_privacy_mode: "Supabase privacy text.",
           currency: "EUR",
@@ -625,6 +635,8 @@ describe("admin Supabase repository", () => {
           google_calendar_id: "natali@example.com",
           google_calendar_mode: "one_way",
           id: "site",
+          public_booking_daily_limit: 8,
+          public_booking_enabled: true,
           reminder_template: "Supabase reminder.",
           roles_policy: "Supabase roles.",
           stripe_mode: "live_confirmed",
@@ -641,7 +653,11 @@ describe("admin Supabase repository", () => {
 
     expect(settings).toEqual({
       auditLogRetentionDays: 540,
-      bookingBufferMinutes: 45,
+      bookingBufferMinutes: 30,
+      bookingHoldMinutes: 5,
+      bookingHorizonDays: 60,
+      bookingMinLeadMinutes: 240,
+      bookingSlotStepMinutes: 15,
       businessName: "Supabase Magic Massage",
       cookiePrivacyMode: "Supabase privacy text.",
       currency: "EUR",
@@ -651,6 +667,8 @@ describe("admin Supabase repository", () => {
       emailSender: "admin@magicmassage.bg",
       googleCalendarId: "natali@example.com",
       googleCalendarMode: "Односторонняя",
+      publicBookingDailyLimit: 8,
+      publicBookingEnabled: true,
       reminderTemplate: "Supabase reminder.",
       rolesPolicy: "Supabase roles.",
       stripeMode: "Live после подтверждения",
@@ -709,6 +727,7 @@ describe("admin Supabase repository", () => {
     expect(client.operations.filter((operation) => operation.action === "select")).toEqual([
       expect.objectContaining({ order: { ascending: true, column: "full_name" }, table: "admin_clients" }),
       expect.objectContaining({ order: { ascending: true, column: "starts_on" }, table: "admin_appointments" }),
+      expect.objectContaining({ order: { ascending: true, column: "block_date" }, table: "admin_calendar_blocks" }),
       expect.objectContaining({ order: { ascending: false, column: "paid_on" }, table: "admin_certificates" }),
     ]);
   });
@@ -832,7 +851,14 @@ describe("admin Supabase repository", () => {
       time: "15:00",
     }, repositoryAuditContext);
 
-    expectAtomicRecordRpc(client, "appointment", {
+    expect(client.operations[0]).toEqual({
+      action: "rpc",
+      functionName: "admin_save_appointment_with_audit",
+      parameters: {
+        p_action: "appointment.update",
+        p_actor_user_id: repositoryAuditContext.actorUserId,
+        p_audit_metadata: repositoryAuditContext.metadata,
+        p_record: {
         buffer_minutes: 15,
         client_id: "client-359873334411",
         client_name_snapshot: "Olena K.",
@@ -849,6 +875,8 @@ describe("admin Supabase repository", () => {
         starts_at: "15:00",
         starts_on: "2026-07-08",
         status: "confirmed",
+        },
+      },
     });
   });
 
@@ -1174,9 +1202,18 @@ describe("admin Supabase repository", () => {
 
     await repository.saveSettings(settingsRecord, repositoryAuditContext);
 
-    expectAtomicRecordRpc(client, "settings", {
+    expect(client.operations[0]).toEqual({
+      action: "rpc",
+      functionName: "admin_save_booking_settings_with_audit",
+      parameters: {
+        p_actor_user_id: repositoryAuditContext.actorUserId,
+        p_settings: {
         audit_log_retention_days: 365,
-        booking_buffer_minutes: 45,
+        booking_buffer_minutes: 30,
+        booking_hold_minutes: 5,
+        booking_horizon_days: 60,
+        booking_min_lead_minutes: 240,
+        booking_slot_step_minutes: 15,
         business_name: "Magic Massage Natali",
         cookie_privacy_mode: "Stripe и Google Maps загружаются только по назначению.",
         currency: "EUR",
@@ -1188,6 +1225,8 @@ describe("admin Supabase repository", () => {
         google_calendar_id: "natali@example.com",
         google_calendar_mode: "one_way",
         id: "site",
+        public_booking_daily_limit: 8,
+        public_booking_enabled: true,
         reminder_template: "Напоминание о записи за день до сеанса.",
         roles_policy: "Бухгалтер: только Stripe-отчеты.",
         stripe_mode: "test",
@@ -1195,6 +1234,8 @@ describe("admin Supabase repository", () => {
         updated_on: "2026-07-09",
         working_days: "Пн-Сб",
         working_hours: "10:00-19:00",
+        },
+      },
     });
   });
 

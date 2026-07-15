@@ -5,6 +5,7 @@ import { normalizeClientPhone, parseEuroAmountToCents } from "./domain";
 import type {
   AdminAppointmentDatabaseRow,
   AdminBlogPostDatabaseRow,
+  AdminCalendarBlockDatabaseRow,
   AdminCertificateDatabaseRow,
   AdminClientDatabaseRow,
   AdminContactChannelDatabaseRow,
@@ -23,6 +24,7 @@ import type {
   AppointmentStatus,
   BlogPostRecord,
   BlogStatus,
+  CalendarBlock,
   CalendarSyncMode,
   CertificateRecord,
   CertificateStatus,
@@ -120,6 +122,7 @@ export type AdminRepository = {
   listAppointments(): Promise<Appointment[]>;
   listAdminUsers(): Promise<AdminUserRecord[]>;
   listBlogPosts(): Promise<BlogPostRecord[]>;
+  listCalendarBlocks(): Promise<CalendarBlock[]>;
   listCertificates(): Promise<CertificateRecord[]>;
   listClients(): Promise<ClientRecord[]>;
   listContactChannels(): Promise<ContactChannelRecord[]>;
@@ -167,16 +170,35 @@ const appointmentColumns = [
   "client_name_snapshot",
   "duration_minutes",
   "internal_note",
+  "locale",
+  "origin",
   "overlap_override",
   "overlap_override_reason",
   "overlap_overridden_at",
   "overlap_overridden_by",
   "post_visit_comment",
   "post_visit_commented_at",
+  "public_note",
+  "public_contact_preference_snapshot",
+  "public_email_snapshot",
+  "public_phone_snapshot",
+  "public_reference",
+  "service_slug",
   "service_name",
   "starts_at",
   "starts_on",
   "status",
+  "version",
+].join(", ");
+
+const calendarBlockColumns = [
+  "block_date",
+  "ends_at",
+  "id",
+  "internal_note",
+  "kind",
+  "starts_at",
+  "version",
 ].join(", ");
 
 const certificateColumns = [
@@ -344,6 +366,10 @@ const siteSettingsColumns = [
   "id",
   "audit_log_retention_days",
   "booking_buffer_minutes",
+  "booking_hold_minutes",
+  "booking_horizon_days",
+  "booking_min_lead_minutes",
+  "booking_slot_step_minutes",
   "business_name",
   "cookie_privacy_mode",
   "currency",
@@ -354,6 +380,8 @@ const siteSettingsColumns = [
   "google_calendar_id",
   "google_calendar_mode",
   "gift_certificates_enabled",
+  "public_booking_daily_limit",
+  "public_booking_enabled",
   "reminder_template",
   "roles_policy",
   "stripe_mode",
@@ -734,16 +762,37 @@ function mapAppointmentRow(row: AdminAppointmentDatabaseRow): Appointment {
     date: row.starts_on,
     durationMinutes: row.duration_minutes,
     id: row.id,
+    locale: row.locale ?? undefined,
     note: row.internal_note,
+    origin: row.origin === "public" ? "public" : "admin",
     overlapOverride: row.overlap_override,
     overlapOverrideReason: row.overlap_override_reason,
     overlapOverriddenAt: row.overlap_overridden_at ?? undefined,
     overlapOverriddenBy: row.overlap_overridden_by ?? undefined,
     postVisitComment: row.post_visit_comment,
     postVisitCommentedAt: row.post_visit_commented_at ?? undefined,
+    publicNote: row.public_note,
+    publicContactPreference: row.public_contact_preference_snapshot ?? undefined,
+    publicEmail: row.public_email_snapshot ?? undefined,
+    publicPhone: row.public_phone_snapshot ?? undefined,
+    publicReference: row.public_reference ?? undefined,
     service: row.service_name,
+    serviceSlug: row.service_slug ?? undefined,
     status: mapAppointmentStatus(row.status),
     time: normalizeTime(row.starts_at),
+    version: row.version ?? 1,
+  };
+}
+
+function mapCalendarBlockRow(row: AdminCalendarBlockDatabaseRow): CalendarBlock {
+  return {
+    blockDate: row.block_date,
+    endsAt: normalizeTime(row.ends_at),
+    id: row.id,
+    internalNote: row.internal_note,
+    kind: row.kind,
+    startsAt: normalizeTime(row.starts_at),
+    version: row.version,
   };
 }
 
@@ -769,6 +818,7 @@ function mapAppointmentRecordToRow(appointment: Appointment): AdminAppointmentDa
     starts_at: appointment.time,
     starts_on: appointment.date,
     status: mapAppointmentStatusToDatabase(appointment.status),
+    version: appointment.version,
   };
 }
 
@@ -1150,6 +1200,10 @@ function mapSettingsRow(row: AdminSiteSettingsDatabaseRow): SettingsRecord {
   return {
     auditLogRetentionDays: row.audit_log_retention_days,
     bookingBufferMinutes: row.booking_buffer_minutes,
+    bookingHoldMinutes: row.booking_hold_minutes ?? 5,
+    bookingHorizonDays: row.booking_horizon_days ?? 60,
+    bookingMinLeadMinutes: row.booking_min_lead_minutes ?? 240,
+    bookingSlotStepMinutes: row.booking_slot_step_minutes ?? 15,
     businessName: row.business_name,
     cookiePrivacyMode: row.cookie_privacy_mode,
     currency: row.currency,
@@ -1160,6 +1214,8 @@ function mapSettingsRow(row: AdminSiteSettingsDatabaseRow): SettingsRecord {
     googleCalendarId: row.google_calendar_id,
     googleCalendarMode: mapCalendarSyncMode(row.google_calendar_mode),
     giftCertificatesEnabled: row.gift_certificates_enabled,
+    publicBookingDailyLimit: row.public_booking_daily_limit ?? 8,
+    publicBookingEnabled: row.public_booking_enabled ?? false,
     reminderTemplate: row.reminder_template,
     rolesPolicy: row.roles_policy,
     stripeMode: mapStripeMode(row.stripe_mode),
@@ -1174,6 +1230,10 @@ function mapSettingsRecordToRow(settings: SettingsRecord): AdminSiteSettingsData
   return {
     audit_log_retention_days: settings.auditLogRetentionDays,
     booking_buffer_minutes: settings.bookingBufferMinutes,
+    booking_hold_minutes: settings.bookingHoldMinutes ?? 5,
+    booking_horizon_days: settings.bookingHorizonDays ?? 60,
+    booking_min_lead_minutes: settings.bookingMinLeadMinutes ?? 240,
+    booking_slot_step_minutes: settings.bookingSlotStepMinutes ?? 15,
     business_name: settings.businessName,
     cookie_privacy_mode: settings.cookiePrivacyMode,
     currency: settings.currency,
@@ -1185,6 +1245,8 @@ function mapSettingsRecordToRow(settings: SettingsRecord): AdminSiteSettingsData
     google_calendar_mode: mapCalendarSyncModeToDatabase(settings.googleCalendarMode),
     gift_certificates_enabled: settings.giftCertificatesEnabled !== false,
     id: "site",
+    public_booking_daily_limit: settings.publicBookingDailyLimit ?? settings.dailySlotCapacity,
+    public_booking_enabled: settings.publicBookingEnabled ?? false,
     reminder_template: settings.reminderTemplate,
     roles_policy: settings.rolesPolicy,
     stripe_mode: mapStripeModeToDatabase(settings.stripeMode),
@@ -1302,6 +1364,17 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     return rows.map(mapAppointmentRow);
   }
 
+  async function listCalendarBlocks() {
+    const rows = await selectRows<AdminCalendarBlockDatabaseRow>(
+      client,
+      "admin_calendar_blocks",
+      calendarBlockColumns,
+      (query) => query.order("block_date", { ascending: true }),
+    );
+
+    return rows.map(mapCalendarBlockRow);
+  }
+
   async function listCertificates() {
     const rows = await selectRows<AdminCertificateDatabaseRow>(client, "admin_certificates", certificateColumns, (query) =>
       query.order("paid_on", { ascending: false }),
@@ -1381,10 +1454,12 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   async function loadDomainRecords() {
     const clients = await listClients();
     const appointments = await listAppointments();
+    const calendarBlocks = await listCalendarBlocks();
     const certificates = await listCertificates();
 
     return {
       appointments,
+      calendarBlocks,
       certificates,
       clients: addAppointmentHistories(clients, appointments),
     };
@@ -1449,7 +1524,18 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function saveAppointment(appointment: Appointment, auditContext?: AdminRepositoryAuditContext) {
-    await saveRecordWithAudit("appointment", mapAppointmentRecordToRow(appointment), auditContext);
+    const record = mapAppointmentRecordToRow(appointment);
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_save_appointment_with_audit: verified actor is required");
+    }
+
+    await callRpc(client, "admin_save_appointment_with_audit", {
+      p_action: verifiedAuditContext.action ?? "appointment.update",
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_audit_metadata: verifiedAuditContext.metadata,
+      p_record: record,
+    });
   }
 
   async function saveCertificate(certificate: CertificateRecord, auditContext?: AdminRepositoryAuditContext) {
@@ -1554,13 +1640,22 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function saveSettings(settings: SettingsRecord, auditContext?: AdminRepositoryAuditContext) {
-    await saveRecordWithAudit("settings", mapSettingsRecordToRow(settings), auditContext);
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_save_booking_settings_with_audit: verified actor is required");
+    }
+
+    await callRpc(client, "admin_save_booking_settings_with_audit", {
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_settings: mapSettingsRecordToRow(settings),
+    });
   }
 
   return {
     listAppointments,
     listAdminUsers,
     listBlogPosts,
+    listCalendarBlocks,
     listCertificates,
     listClients,
     listContactChannels,

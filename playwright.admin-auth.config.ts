@@ -21,9 +21,15 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      dependencies: ["public-booking-chromium"],
       grep: /@persistent/,
       name: "prompt-persistence-chromium",
       testMatch: "**/prompt-completion.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "public-booking-chromium",
+      testMatch: "**/public-booking-auth.spec.ts",
       use: { ...devices["Desktop Chrome"] },
     },
   ],

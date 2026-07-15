@@ -10,6 +10,7 @@ import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 
 type PublicPageShellProps = {
+  allowStickyContent?: boolean;
   locale: Locale;
   currentPage?: PublicPageKey;
   content: HomeContent;
@@ -17,10 +18,12 @@ type PublicPageShellProps = {
   giftCertificatesEnabled?: boolean;
   localePaths?: Partial<Record<Locale, string>>;
   mediaPlacements?: PublicMediaPlacement[];
+  publicBookingEnabled?: boolean;
   services?: ServiceContent[];
 };
 
 export function PublicPageShell({
+  allowStickyContent = false,
   locale,
   currentPage,
   content,
@@ -28,10 +31,11 @@ export function PublicPageShell({
   giftCertificatesEnabled = true,
   localePaths,
   mediaPlacements,
+  publicBookingEnabled = false,
   services,
 }: PublicPageShellProps) {
   return (
-    <div className="site-shell">
+    <div className="site-shell" style={allowStickyContent ? { overflow: "visible" } : undefined}>
       <SiteHeader
         locale={locale}
         currentPage={currentPage}
@@ -39,6 +43,7 @@ export function PublicPageShell({
         giftCertificatesEnabled={giftCertificatesEnabled}
         localePaths={localePaths}
         mediaPlacements={mediaPlacements}
+        publicBookingEnabled={publicBookingEnabled}
         services={services}
       />
       {children}

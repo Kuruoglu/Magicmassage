@@ -132,6 +132,31 @@ describe("PublicPageShell", () => {
     );
   });
 
+  it("keeps Studio24 as the default and switches header CTAs only when public booking is enabled", () => {
+    const content = getHomeContent("en");
+    const { rerender } = render(
+      <PublicPageShell locale="en" currentPage="home" content={content}>
+        <main>Home</main>
+      </PublicPageShell>,
+    );
+
+    expect(screen.getByRole("link", { name: content.navigation.booking })).toHaveAttribute(
+      "href",
+      studio24BookingUrl,
+    );
+
+    rerender(
+      <PublicPageShell locale="en" currentPage="home" content={content} publicBookingEnabled>
+        <main>Home</main>
+      </PublicPageShell>,
+    );
+
+    expect(screen.getByRole("link", { name: content.navigation.booking })).toHaveAttribute(
+      "href",
+      "/en/booking",
+    );
+  });
+
   it("removes gift certificates from desktop and mobile navigation when disabled", async () => {
     const user = userEvent.setup();
     render(

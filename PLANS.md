@@ -2,7 +2,7 @@
 
 ## How To Use This File
 
-This is the living roadmap for the current simplified first release. Read it
+This is the living roadmap for the current public site and admin platform. Read it
 together with [AGENTS.md](./AGENTS.md), [docs/CURRENT_SCOPE.md](./docs/CURRENT_SCOPE.md),
 [docs/AGENT_NOTES.md](./docs/AGENT_NOTES.md), and
 [docs/REVIEW_CHECKLIST.md](./docs/REVIEW_CHECKLIST.md).
@@ -14,35 +14,41 @@ together with [AGENTS.md](./AGENTS.md), [docs/CURRENT_SCOPE.md](./docs/CURRENT_S
 
 ## Goal
 
-Launch a fast, accessible, multilingual public website for Magic Massage Natali
-in Burgas with service pages, local SEO, real photography, contact information,
-cookie consent, appointment calls to action that open Studio24, and a guarded
-gift certificate purchase flow.
+Launch a fast, accessible, multilingual public website and operational admin/CRM
+for Magic Massage Natali in Burgas, including internal instant booking, calendar
+management, local SEO, real photography, cookie consent, and a guarded gift
+certificate purchase flow.
 
 ## Current MVP Decisions
 
-- The first release is a public website, not a custom booking platform.
-- Booking CTAs open Studio24 by client request.
+- Internal instant booking is primary when `public_booking_enabled` is enabled;
+  Studio24 remains the fallback when it is disabled.
+- Public booking allows at most eight non-cancelled appointments per day. Natali
+  can manually create a ninth, tenth, or later appointment from the admin.
+- A customer-selected time receives a five-minute hold; final submission creates
+  an immediately confirmed appointment without owner approval.
+- The signed HttpOnly booking session restores its active hold after reload or a
+  locale change, while rotating the raw confirmation token.
+- Natali can add timed or full-day personal calendar blocks. The booking buffer
+  is owner-configurable as 15 or 30 minutes.
 - Gift certificates and online card payments are in the current implementation
   slice. Live payments remain blocked until final prices are confirmed.
-- There is no first-release Supabase database, custom admin panel, internal
-  booking flow, booking email automation, or Telegram booking notification workflow.
+- Booking email automation and Telegram booking notifications remain later work.
 - Public locales are `bg`, `ru`, `ua`, and `en`.
 - `ua` remains the public URL segment and `UA` user-facing label; metadata maps
   it to `uk-UA`.
 - Shared English service slugs are acceptable for the first release.
-- Service content is maintained in code; there is no admin publication gate.
-- No blog is included in the first release.
+- Public services and blog content use the implemented Supabase publication gates.
 - Natali's experience and certificate claims are confirmed by the client.
 - Google Maps iframe usage requires cookie consent before loading, or an
   equivalent privacy-safe pattern.
 - Sitemap entries should use real content update dates or omit `lastModified`.
 - A small Playwright smoke suite should cover public critical flows.
 
-## Approved Next Direction - Admin Platform
+## Admin Platform
 
-The client has re-approved a custom admin/CRM platform as the next product
-direction, separate from the current public-site MVP line. The detailed source
+The client approved and implementation has started on a custom admin/CRM
+platform integrated with the public site. The detailed source
 of truth is [docs/ADMIN_SCOPE.md](./docs/ADMIN_SCOPE.md).
 
 The approved admin direction includes Supabase/PostgreSQL, Supabase Auth, Row
@@ -52,14 +58,13 @@ and finance reports. It also includes a narrow `Бухгалтер` role that ca
 Stripe sales for a selected tax period, including gross, fees, refunds, and net
 totals.
 
-The target admin version migrates booking away from Studio24 to an internal
-request-based booking flow. Until that work begins, the current public-site MVP
-can continue to use Studio24 as documented below.
+The current version migrates primary booking away from Studio24 to an internal
+instant-confirmation flow while retaining Studio24 as a feature-flag fallback.
 
 Calendar integration order is approved as follows:
 
-1. Build the full internal admin calendar first, including day, week, month, and
-   list views.
+1. Maintain the full internal admin calendar, including day, week, month, and
+   list views, manual appointments, and personal blocks.
 2. Add one-way synchronization from the admin calendar to Google Calendar after
    the internal booking/calendar model is stable.
 3. Treat two-way synchronization from Google Calendar back to the admin calendar
@@ -74,7 +79,7 @@ The first production release includes:
 - Public URL segments `/bg`, `/ru`, `/ua`, and `/en`.
 - Home landing page, Services, individual service pages, Gift Certificates,
   About, Contacts, and required privacy/cookie/legal information.
-- Studio24 appointment handoff for booking CTAs.
+- Internal instant booking with Studio24 fallback controlled by an owner setting.
 - Stripe Payment Element for gift certificate payments, using card-based
   payment methods and guarded live-payment flags.
 - A light Premium Wellness visual system using real salon photography stored
@@ -86,10 +91,8 @@ The first production release includes:
 Out of MVP scope:
 
 - Blog.
-- Custom administration panel.
-- Supabase/PostgreSQL.
-- Internal booking, availability, specialists, booking status history, and
-  customer management links.
+- Customer self-service cancellation and rescheduling links.
+- Multiple-specialist public availability.
 - Booking emails, reminders, and Telegram notifications.
 - Customer accounts, loyalty features, and full Telegram booking.
 
@@ -143,7 +146,9 @@ pipeline passes, and browser smoke checks cover the critical public flows.
   content.
 - [ ] Add Gift Certificates page with embedded Stripe Payment Element,
   server-side totals, PDF/email fulfillment, and live-payment safety flags.
-- [ ] Ensure Studio24 booking CTAs are clear and tested.
+- [x] Add and test internal booking CTAs with Studio24 fallback.
+- [x] Add service, duration, date, availability, contact, hold, and confirmation steps.
+- [x] Add public daily capacity, configurable buffers, and admin personal blocks.
 - [ ] Validate responsive behavior, keyboard use, focus order, and reduced motion.
 
 **Exit criteria:** All first-release public pages work on supported viewport
@@ -161,8 +166,8 @@ checks.
 - [ ] Add or verify LocalBusiness, Service, Breadcrumb, and eligible FAQ
   structured data.
 - [ ] Verify consistent business name, address, and phone data.
-- [ ] Provide the Studio24 appointment URL for Google Business Profile where
-  appropriate.
+- [ ] Provide the internal booking URL for Google Business Profile when the
+  production domain is ready.
 - [ ] Connect Google Search Console.
 - [ ] Add privacy-respecting analytics only with consent if requested.
 - [ ] Validate Core Web Vitals and image loading behavior.
@@ -179,14 +184,14 @@ pages.
 - [ ] Verify reduced-motion behavior for decorative animations.
 - [x] Verify cookie consent blocks Google Maps until allowed.
 - [ ] Run an accessibility review of public workflows.
-- [ ] Run dependency audit and apply safe targeted updates where possible.
+- [x] Run dependency audit and apply safe targeted updates where possible.
 - [ ] Verify production environment variables and domain configuration.
 - [ ] Verify Stripe test keys, webhook secret, Resend sender, and live-payment
   flags before enabling real payments.
-- [ ] Run linting, type checking, tests, Playwright smoke tests, and production
+- [x] Run linting, type checking, tests, Playwright smoke tests, and production
   build.
 - [ ] Complete a production smoke test in BG, RU, UA, and EN.
-- [ ] Confirm Natali accepts the public site and Studio24 booking handoff.
+- [ ] Confirm Natali accepts the public site and internal booking flow.
 
 **Exit criteria:** All critical checks pass, no high-severity accessibility or
 security findings remain, and the owner accepts the production public website.

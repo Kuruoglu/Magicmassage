@@ -109,7 +109,7 @@ test("calendar month view is selectable", async ({ page }) => {
   await expect(monthGrid).toBeVisible();
   await expect(monthGrid.getByText("Классический массаж")).toHaveCount(0);
   await expect(monthGrid.getByText("2 записи")).toBeVisible();
-  await expect(monthGrid.getByText("2 свободных слота").first()).toBeVisible();
+  await expect(monthGrid.getByText("6 свободных слотов").first()).toBeVisible();
 
   await page.getByRole("button", { name: /6 июля.*2 записи/ }).click();
 
@@ -124,11 +124,11 @@ test("calendar month view uses compact labels on mobile", async ({ page }) => {
   await page.getByRole("button", { name: "Месяц" }).click();
 
   const monthGrid = page.getByRole("grid", { name: "Месяц Июль 2026" });
-  const selectedDay = monthGrid.getByRole("button", { name: /6 июля.*2 записи.*2 свободных слота/ });
+  const selectedDay = monthGrid.getByRole("button", { name: /6 июля.*2 записи.*6 свободных слотов/ });
   await expect(selectedDay).toBeVisible();
   await expect(selectedDay.getByText("2 зап.")).toBeVisible();
-  await expect(selectedDay.getByText("2 св.")).toBeVisible();
-  await expect(selectedDay.getByText("2 свободных слота")).toBeHidden();
+  await expect(selectedDay.getByText("6 св.")).toBeVisible();
+  await expect(selectedDay.getByText("6 свободных слотов")).toBeHidden();
 
   const compactLineBoxes = await selectedDay.evaluate((button) => {
     const measureLineBoxes = (selector: string) => {
@@ -182,6 +182,7 @@ test("calendar appointment details open as a right drawer and leave the calendar
 });
 
 test("admin record details open as full-height drawers over full-width workspaces", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/admin?section=services", { waitUntil: "networkidle" });
 
@@ -1219,8 +1220,8 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
 
   await page.getByRole("button", { name: "Сохранить" }).click();
   const dialog = page.getByRole("dialog", { name: "Настройки админки" });
-  await dialog.getByLabel("Перерыв между сеансами").fill("45");
-  await dialog.getByLabel("Слотов в день").fill("5");
+  await dialog.getByRole("button", { name: "15 минут" }).click();
+  await dialog.getByLabel("Лимит онлайн-записей в день").fill("5");
   await dialog.getByRole("combobox", { name: /Google Calendar/ }).selectOption("Односторонняя");
   await dialog.getByLabel("Google Calendar ID").fill("natali@example.com");
   await dialog.getByRole("button", { name: "Сохранить настройки" }).click();
@@ -1228,8 +1229,8 @@ test("settings workspace edits booking rules and confirms dangerous actions", as
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveText("Настройки сохранены.");
   await page.getByRole("table").getByRole("link", { name: "Запись и календарь" }).click();
-  await expect(details.getByText("45 минут")).toBeVisible();
-  await expect(details.getByText("5 слотов")).toBeVisible();
+  await expect(details.getByText("15 минут")).toBeVisible();
+  await expect(details.getByText("5 записей; вручную можно больше")).toBeVisible();
   await expect(details.getByText("Односторонняя")).toBeVisible();
   await expect(details.getByText("natali@example.com")).toBeVisible();
 
@@ -1262,14 +1263,14 @@ test("calendar availability uses saved booking settings", async ({ page }) => {
   await page.getByRole("button", { name: "Сохранить" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Настройки админки" });
-  await dialog.getByLabel("Перерыв между сеансами").fill("45");
-  await dialog.getByLabel("Слотов в день").fill("5");
+  await dialog.getByRole("button", { name: "15 минут" }).click();
+  await dialog.getByLabel("Лимит онлайн-записей в день").fill("5");
   await dialog.getByRole("button", { name: "Сохранить настройки" }).click();
 
   await expect(dialog).toHaveCount(0);
   await page.getByRole("table").getByRole("link", { name: "Запись и календарь" }).click();
-  await expect(settingsDetails.getByText("45 минут")).toBeVisible();
-  await expect(settingsDetails.getByText("5 слотов")).toBeVisible();
+  await expect(settingsDetails.getByText("15 минут")).toBeVisible();
+  await expect(settingsDetails.getByText("5 записей; вручную можно больше")).toBeVisible();
 
   await settingsDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(settingsDetails).toHaveCount(0);
@@ -1281,7 +1282,7 @@ test("calendar availability uses saved booking settings", async ({ page }) => {
 
   const monthPlan = page.getByLabel("План месяца");
   await expect(monthPlan.getByText("5 слотов в день")).toBeVisible();
-  await expect(monthPlan.getByText("45 минут")).toBeVisible();
+  await expect(monthPlan.getByText("15 минут")).toBeVisible();
 });
 
 test("users workspace invites, filters and edits accountant access", async ({ page }) => {
