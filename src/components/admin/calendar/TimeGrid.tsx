@@ -104,12 +104,15 @@ export type TimeGridDay = {
 
 type TimeGridProps = {
   days: TimeGridDay[];
+  dragPreview?: Appointment;
   mode: "day" | "week";
+  onDragOverAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   renderAppointment: (
     appointment: Appointment,
     compact: boolean,
     layout?: AppointmentOverlapLayout,
+    isDragPreview?: boolean,
   ) => ReactNode;
 };
 
@@ -128,11 +131,15 @@ function TimeAxis() {
 function TimeColumn({
   compact,
   day,
+  dragPreview,
+  onDragOverAppointment,
   onDropAppointment,
   renderAppointment,
 }: {
   compact: boolean;
   day: TimeGridDay;
+  dragPreview?: Appointment;
+  onDragOverAppointment: TimeGridProps["onDragOverAppointment"];
   onDropAppointment: TimeGridProps["onDropAppointment"];
   renderAppointment: TimeGridProps["renderAppointment"];
 }) {
@@ -142,7 +149,7 @@ function TimeColumn({
     <section
       aria-label={day.ariaLabel}
       className={["admin-calendar-time-column", day.className].filter(Boolean).join(" ")}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) => onDragOverAppointment(event, day.date)}
       onDrop={(event) => onDropAppointment(event, day.date)}
       role="list"
     >
@@ -155,11 +162,19 @@ function TimeColumn({
         ))}
       </div>
       {laidOutAppointments.map(({ appointment, layout }) => renderAppointment(appointment, compact, layout))}
+      {dragPreview?.date === day.date ? renderAppointment(dragPreview, compact, undefined, true) : null}
     </section>
   );
 }
 
-export function TimeGrid({ days, mode, onDropAppointment, renderAppointment }: TimeGridProps) {
+export function TimeGrid({
+  days,
+  dragPreview,
+  mode,
+  onDragOverAppointment,
+  onDropAppointment,
+  renderAppointment,
+}: TimeGridProps) {
   const dayScrollRef = useRef<HTMLDivElement>(null);
   const selectedDay = days[0]?.date;
   const calendarGridHeight =
@@ -187,7 +202,9 @@ export function TimeGrid({ days, mode, onDropAppointment, renderAppointment }: T
             <TimeColumn
               compact
               day={day}
+              dragPreview={dragPreview}
               key={day.date}
+              onDragOverAppointment={onDragOverAppointment}
               onDropAppointment={onDropAppointment}
               renderAppointment={renderAppointment}
             />
@@ -210,6 +227,8 @@ export function TimeGrid({ days, mode, onDropAppointment, renderAppointment }: T
         <TimeColumn
           compact={false}
           day={day}
+          dragPreview={dragPreview}
+          onDragOverAppointment={onDragOverAppointment}
           onDropAppointment={onDropAppointment}
           renderAppointment={renderAppointment}
         />

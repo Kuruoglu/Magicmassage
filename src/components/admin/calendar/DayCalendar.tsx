@@ -3,21 +3,30 @@ import type { DragEvent, ReactNode } from "react";
 import type { Appointment } from "@/admin/domain";
 
 import { appointmentCountLabel, formatCalendarDay, freeSlotLabel } from "./format";
-import { TimeGrid } from "./TimeGrid";
+import { TimeGrid, type AppointmentOverlapLayout } from "./TimeGrid";
 
 type DayCalendarProps = {
   appointments: Appointment[];
   bookingBufferMinutes: number;
+  dragPreview?: Appointment;
   freeSlotCount: number;
+  onDragOverAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
-  renderAppointment: (appointment: Appointment, compact: boolean) => ReactNode;
+  renderAppointment: (
+    appointment: Appointment,
+    compact: boolean,
+    layout?: AppointmentOverlapLayout,
+    isDragPreview?: boolean,
+  ) => ReactNode;
   selectedDate: string;
 };
 
 export function DayCalendar({
   appointments,
   bookingBufferMinutes,
+  dragPreview,
   freeSlotCount,
+  onDragOverAppointment,
   onDropAppointment,
   renderAppointment,
   selectedDate,
@@ -39,6 +48,7 @@ export function DayCalendar({
         </div>
       </div>
       <TimeGrid
+        dragPreview={dragPreview}
         days={[
           {
             appointments,
@@ -47,6 +57,7 @@ export function DayCalendar({
           },
         ]}
         mode="day"
+        onDragOverAppointment={onDragOverAppointment}
         onDropAppointment={onDropAppointment}
         renderAppointment={renderAppointment}
       />

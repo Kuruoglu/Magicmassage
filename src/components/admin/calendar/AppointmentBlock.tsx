@@ -23,6 +23,8 @@ type AppointmentBlockProps = {
   appointment: Appointment;
   classification: AppointmentClassification;
   compact?: boolean;
+  isDragging?: boolean;
+  isDragPreview?: boolean;
   isPending?: boolean;
   isSelected: boolean;
   layout?: AppointmentOverlapLayout;
@@ -46,6 +48,8 @@ export function AppointmentBlock({
   appointment,
   classification,
   compact = false,
+  isDragging = false,
+  isDragPreview = false,
   isPending = false,
   isSelected,
   layout = { column: 0, columnCount: 1, leftPercentage: 0, widthPercentage: 100 },
@@ -65,6 +69,8 @@ export function AppointmentBlock({
     classification.overlap ? "has-overlap" : "",
     classification.outsideWorkingHours ? "is-outside-hours" : "",
     appointment.status === "Отменена" ? "is-cancelled" : "",
+    isDragging ? "is-dragging" : "",
+    isDragPreview ? "is-drag-preview" : "",
     isPending ? "is-pending" : "",
   ]
     .filter(Boolean)
@@ -72,12 +78,13 @@ export function AppointmentBlock({
 
   return (
     <article
+      aria-hidden={isDragPreview || undefined}
       className={className}
       aria-busy={isPending || undefined}
-      draggable={!isPending}
-      onDragEnd={onDragEnd}
-      onDragStart={(event) => onDragStart(event, appointment)}
-      role="listitem"
+      draggable={!isDragPreview && !isPending}
+      onDragEnd={isDragPreview ? undefined : onDragEnd}
+      onDragStart={isDragPreview ? undefined : (event) => onDragStart(event, appointment)}
+      role={isDragPreview ? undefined : "listitem"}
       style={{
         height: `${height}px`,
         left: `calc(${layout.leftPercentage}% + 4px)`,
@@ -86,24 +93,36 @@ export function AppointmentBlock({
         width: `calc(${layout.widthPercentage}% - 8px)`,
       }}
     >
-      <button disabled={isPending} aria-pressed={isSelected} onClick={() => onSelect(appointment)} type="button">
-        <time>{appointment.time}</time>
-        <strong>{appointment.client}</strong>
-        <span>{appointment.service}</span>
-        {classification.overlap ? <small>Пересечение</small> : null}
-        {classification.outsideWorkingHours ? <small>Вне рабочих часов</small> : null}
-      </button>
-      <AppointmentResizeHandle
-        appointment={appointment}
-        disabled={isPending}
-        onPreview={(deltaMinutes) =>
-          setResizePreviewDelta(clampAppointmentDurationToDay(appointment, deltaMinutes) - appointmentDuration)
-        }
-        onResize={(resizedAppointment, deltaMinutes) => {
-          setResizePreviewDelta(0);
-          onResize(resizedAppointment, deltaMinutes);
-        }}
-      />
+      {isDragPreview ? (
+        <div className="admin-timed-appointment-preview-content">
+          <time>{appointment.time}</time>
+          <strong>{appointment.client}</strong>
+          <span>{appointment.service}</span>
+          {classification.overlap ? <small>Пересечение</small> : null}
+          {classification.outsideWorkingHours ? <small>Вне рабочих часов</small> : null}
+        </div>
+      ) : (
+        <>
+          <button disabled={isPending} aria-pressed={isSelected} onClick={() => onSelect(appointment)} type="button">
+            <time>{appointment.time}</time>
+            <strong>{appointment.client}</strong>
+            <span>{appointment.service}</span>
+            {classification.overlap ? <small>Пересечение</small> : null}
+            {classification.outsideWorkingHours ? <small>Вне рабочих часов</small> : null}
+          </button>
+          <AppointmentResizeHandle
+            appointment={appointment}
+            disabled={isPending}
+            onPreview={(deltaMinutes) =>
+              setResizePreviewDelta(clampAppointmentDurationToDay(appointment, deltaMinutes) - appointmentDuration)
+            }
+            onResize={(resizedAppointment, deltaMinutes) => {
+              setResizePreviewDelta(0);
+              onResize(resizedAppointment, deltaMinutes);
+            }}
+          />
+        </>
+      )}
     </article>
   );
 }

@@ -90,6 +90,11 @@ type PendingCalendarConflict = {
   originalAppointment: Appointment;
 };
 
+type AppointmentDragPreview = {
+  appointment: Appointment;
+  originalKey: string;
+};
+
 export type CalendarWorkspaceProps = {
   appointments: Appointment[];
   bookingBufferMinutes: number;
@@ -310,6 +315,9 @@ export function CalendarWorkspace({
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
   const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(Boolean(selectedAppointmentFocus));
   const [draggedAppointmentKey, setDraggedAppointmentKey] = useState("");
+  const [appointmentDragPreview, setAppointmentDragPreview] = useState<AppointmentDragPreview | null>(null);
+  const appointmentDragGrabOffsetRef = useRef(0);
+  const nativeDragImageRef = useRef<HTMLElement | null>(null);
   const [selectedKey, setSelectedKey] = useState(
     () => selectedAppointmentFocus?.appointmentKey ?? appointmentKey(initialSelectedAppointment ?? fallbackAppointment),
   );
@@ -367,6 +375,13 @@ export function CalendarWorkspace({
         : [];
     setBlockOverlayTargets(targets);
   }, [mode, selectedDate]);
+
+  useEffect(
+    () => () => {
+      nativeDragImageRef.current?.remove();
+    },
+    [],
+  );
 
   function renderCalendarBlockOverlays(days: Array<{ date: string }>, compact: boolean) {
     return blockOverlayTargets.flatMap((target, index) => {
@@ -430,9 +445,7 @@ export function CalendarWorkspace({
     }
   }
 
-  function classificationFor(appointment: Appointment) {
-    const key = appointmentKey(appointment);
-
+  function classificationFor(appointment: Appointment, ignoredAppointmentKey = appointmentKey(appointment)) {
     if (!isSchedulingBlockingStatus(appointment.status)) {
       return {
         outsideWorkingHours: classifyAppointmentAgainstSchedule(
@@ -457,10 +470,10 @@ export function CalendarWorkspace({
       ...classifyAppointmentAgainstSchedule(candidate, workingSchedule),
       overlap: hasAppointmentOverlap(
         candidate,
-        filteredAppointments
+        appointments
           .filter(
             (candidate) =>
-              appointmentKey(candidate) !== key && isSchedulingBlockingStatus(candidate.status),
+              appointmentKey(candidate) !== ignoredAppointmentKey && isSchedulingBlockingStatus(candidate.status),
           )
           .map((candidate) => ({
             date: candidate.date,
@@ -476,7 +489,7 @@ export function CalendarWorkspace({
 
     const originalKey = appointmentKey(originalAppointment);
 
-    return filteredAppointments.find(
+    return appointments.find(
       (candidate) =>
         appointmentKey(candidate) !== originalKey &&
         isSchedulingBlockingStatus(candidate.status) &&
@@ -568,22 +581,47 @@ export function CalendarWorkspace({
 
   function startAppointmentDrag(event: DragEvent<HTMLElement>, appointment: Appointment) {
     const key = appointmentKey(appointment);
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const clientY = Number.isFinite(event.clientY) ? event.clientY : bounds.top;
+    appointmentDragGrabOffsetRef.current = Math.min(
+      Math.max(clientY - bounds.top, 0),
+      bounds.height,
+    );
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/admin-appointment-key", key);
+    if (typeof event.dataTransfer.setDragImage === "function") {
+      nativeDragImageRef.current?.remove();
+      const dragImage = document.createElement("span");
+      dragImage.setAttribute("aria-hidden", "true");
+      Object.assign(dragImage.style, {
+        height: "1px",
+        left: "0",
+        opacity: "0",
+        pointerEvents: "none",
+        position: "fixed",
+        top: "0",
+        width: "1px",
+      });
+      document.body.appendChild(dragImage);
+      event.dataTransfer.setDragImage(dragImage, 0, 0);
+      nativeDragImageRef.current = dragImage;
+    }
     setDraggedAppointmentKey(key);
+    setAppointmentDragPreview(null);
   }
 
-  function dropAppointment(event: DragEvent<HTMLElement>, date: string) {
-    event.preventDefault();
+  function draggedAppointmentFor(event: DragEvent<HTMLElement>) {
     const key = event.dataTransfer.getData("text/admin-appointment-key") || draggedAppointmentKey;
-    const appointment = filteredAppointments.find((candidate) => appointmentKey(candidate) === key);
+    return filteredAppointments.find((candidate) => appointmentKey(candidate) === key);
+  }
 
-    if (!appointment) {
-      return;
-    }
-
+  function draggedAppointmentTime(event: DragEvent<HTMLElement>, appointment: Appointment) {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const position = Math.min(Math.max(event.clientY - bounds.top, 0), bounds.height);
+    const clientY = Number.isFinite(event.clientY) ? event.clientY : bounds.top;
+    const position = Math.min(
+      Math.max(clientY - bounds.top - appointmentDragGrabOffsetRef.current, 0),
+      bounds.height,
+    );
     const rawTime = positionToTime(position, CALENDAR_DAY_START, CALENDAR_HOUR_HEIGHT);
     const dayStartMinutes = timeToMinutes(CALENDAR_DAY_START);
     const appointmentDuration = Math.max(
@@ -599,9 +637,55 @@ export function CalendarWorkspace({
       Math.max(dayStartMinutes, snapMinutes(timeToMinutes(rawTime))),
       latestSnappedStartMinutes,
     );
-    const snappedTime = minutesToTime(snappedMinutes);
-    const movedAppointment = { ...appointment, date, time: snappedTime };
+
+    return minutesToTime(snappedMinutes);
+  }
+
+  function previewAppointmentDrag(event: DragEvent<HTMLElement>, date: string) {
+    event.preventDefault();
+    const appointment = draggedAppointmentFor(event);
+
+    if (!appointment) return;
+
+    const originalKey = appointmentKey(appointment);
+    const time = draggedAppointmentTime(event, appointment);
+    event.dataTransfer.dropEffect = "move";
+    setAppointmentDragPreview((current) => {
+      if (
+        current?.originalKey === originalKey &&
+        current.appointment.date === date &&
+        current.appointment.time === time
+      ) {
+        return current;
+      }
+
+      return {
+        appointment: { ...appointment, date, time },
+        originalKey,
+      };
+    });
+  }
+
+  function clearAppointmentDrag() {
+    appointmentDragGrabOffsetRef.current = 0;
+    nativeDragImageRef.current?.remove();
+    nativeDragImageRef.current = null;
     setDraggedAppointmentKey("");
+    setAppointmentDragPreview(null);
+  }
+
+  function dropAppointment(event: DragEvent<HTMLElement>, date: string) {
+    event.preventDefault();
+    const appointment = draggedAppointmentFor(event);
+
+    if (!appointment) {
+      clearAppointmentDrag();
+      return;
+    }
+
+    const snappedTime = draggedAppointmentTime(event, appointment);
+    const movedAppointment = { ...appointment, date, time: snappedTime };
+    clearAppointmentDrag();
     requestAppointmentChange(appointment, movedAppointment, "appointment.drag");
   }
 
@@ -609,19 +693,25 @@ export function CalendarWorkspace({
     appointment: Appointment,
     compact = false,
     layout?: AppointmentOverlapLayout,
+    isDragPreview = false,
   ) {
     const key = appointmentKey(appointment);
+    const classification = isDragPreview
+      ? classificationFor(appointment, appointmentDragPreview?.originalKey)
+      : classificationFor(appointment);
 
     return (
       <AppointmentBlock
         appointment={appointment}
-        classification={classificationFor(appointment)}
+        classification={classification}
         compact={compact}
+        isDragging={!isDragPreview && key === draggedAppointmentKey}
+        isDragPreview={isDragPreview}
         isPending={key === pendingAppointmentKey}
         isSelected={key === selectedAppointmentKey}
-        key={key}
+        key={isDragPreview ? `drag-preview-${appointmentDragPreview?.originalKey}` : key}
         layout={layout}
-        onDragEnd={() => setDraggedAppointmentKey("")}
+        onDragEnd={clearAppointmentDrag}
         onDragStart={startAppointmentDrag}
         onResize={resizeAppointment}
         onSelect={selectAppointment}
@@ -665,6 +755,12 @@ export function CalendarWorkspace({
             </div>
           </div>
         ) : null}
+
+        <p aria-atomic="true" aria-label="Время переноса записи" aria-live="polite" className="sr-only">
+          {appointmentDragPreview
+            ? `Перенос записи ${appointmentDragPreview.appointment.client}: ${formatCalendarDay(appointmentDragPreview.appointment.date)}, ${appointmentDragPreview.appointment.time}`
+            : ""}
+        </p>
 
         {pendingAppointmentKey ? (
           <p className="admin-export-notice" role="status">
@@ -805,7 +901,9 @@ export function CalendarWorkspace({
           <div ref={calendarViewRef} style={{ display: "contents" }}>
             <WeekCalendar
               appointments={filteredAppointments}
+              dragPreview={appointmentDragPreview?.appointment}
               heading={calendarHeading}
+              onDragOverAppointment={previewAppointmentDrag}
               onDropAppointment={dropAppointment}
               onSelectDate={(date, dateAppointments) => selectDate(date, dateAppointments, "day")}
               renderAppointment={renderAppointment}
@@ -856,7 +954,9 @@ export function CalendarWorkspace({
             <DayCalendar
               appointments={selectedDayAppointments}
               bookingBufferMinutes={bookingBufferMinutes}
+              dragPreview={appointmentDragPreview?.appointment}
               freeSlotCount={selectedDayFreeCount}
+              onDragOverAppointment={previewAppointmentDrag}
               onDropAppointment={dropAppointment}
               renderAppointment={renderAppointment}
               selectedDate={selectedDate}

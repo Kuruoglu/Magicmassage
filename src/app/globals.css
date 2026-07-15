@@ -4601,7 +4601,34 @@ button.admin-calendar-item[aria-pressed="true"] {
   opacity: 0.56;
 }
 
-.admin-timed-appointment > button:first-child {
+.admin-timed-appointment.is-dragging {
+  opacity: 0.32;
+}
+
+.admin-timed-appointment.is-drag-preview {
+  background: #edf8f2;
+  border-color: #2f7659;
+  border-left-color: #2f7659;
+  border-style: dashed;
+  box-shadow: 0 8px 22px rgba(28, 91, 66, 0.2);
+  pointer-events: none;
+  z-index: 8;
+}
+
+.admin-timed-appointment.is-drag-preview.has-overlap {
+  background: #fff4d7;
+  border-color: #b84e4e;
+  border-left-color: #b84e4e;
+}
+
+.admin-timed-appointment.is-drag-preview.is-outside-hours:not(.has-overlap) {
+  background: #fff8e6;
+  border-color: #b37719;
+  border-left-color: #b37719;
+}
+
+.admin-timed-appointment > button:first-child,
+.admin-timed-appointment-preview-content {
   align-content: start;
   background: transparent;
   border: 0;

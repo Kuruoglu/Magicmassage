@@ -74,19 +74,30 @@ async function clickDialogBackdrop(dialog: Locator, page: Page) {
   await page.mouse.click(x, y);
 }
 
-async function dragAppointmentTo(source: Locator, target: Locator, hour: number, minute = 0) {
-  const targetBox = await target.boundingBox();
+async function dragAppointmentTo(
+  source: Locator,
+  target: Locator,
+  hour: number,
+  minute = 0,
+  beforeDrop?: () => Promise<void>,
+) {
+  const [sourceBox, targetBox] = await Promise.all([source.boundingBox(), target.boundingBox()]);
 
+  expect(sourceBox).not.toBeNull();
   expect(targetBox).not.toBeNull();
 
   const targetY = ((hour - calendarStartHour) + minute / 60) * calendarHourHeight;
+  const grabOffsetY = Math.min(calendarHourHeight / 2, sourceBox!.height / 2);
+  const sourceX = sourceBox!.x + sourceBox!.width / 2;
+  const sourceY = sourceBox!.y + grabOffsetY;
   const clientX = targetBox!.x + Math.max(8, targetBox!.width / 2);
-  const clientY = targetBox!.y + targetY;
+  const clientY = targetBox!.y + targetY + grabOffsetY;
   const dataTransfer = await source.evaluateHandle(() => new DataTransfer());
 
   try {
-    await source.dispatchEvent("dragstart", { dataTransfer });
+    await source.dispatchEvent("dragstart", { clientX: sourceX, clientY: sourceY, dataTransfer });
     await target.dispatchEvent("dragover", { clientX, clientY, dataTransfer });
+    await beforeDrop?.();
     await target.dispatchEvent("drop", { clientX, clientY, dataTransfer });
   } finally {
     await dataTransfer.dispose();
@@ -305,7 +316,11 @@ test("7a. allows an appointment to end when the next appointment begins", async 
   const schedule = page.getByLabel("Расписание 6 июля");
   const appointment = schedule.getByRole("listitem").filter({ hasText: "Анна Петрова" });
 
-  await dragAppointmentTo(appointment, schedule, 11, 30);
+  await dragAppointmentTo(appointment, schedule, 11, 30, async () => {
+    const preview = schedule.locator(".admin-timed-appointment.is-drag-preview");
+    await expect(preview).toContainText("11:30");
+    await expect(preview).toContainText("Анна Петрова");
+  });
 
   await expect(page.getByRole("region", { name: "Изменение пересекается с другой записью" })).toHaveCount(0);
   await expect(schedule.getByRole("button", { name: /11:30.*Анна Петрова/ })).toBeVisible();

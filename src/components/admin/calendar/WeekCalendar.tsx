@@ -9,7 +9,7 @@ import {
   CALENDAR_WEEKDAY_LABELS,
 } from "./constants";
 import { appointmentCountLabel, formatCalendarDay, formatCalendarShortDay } from "./format";
-import { TimeGrid } from "./TimeGrid";
+import { TimeGrid, type AppointmentOverlapLayout } from "./TimeGrid";
 import { timeToPosition } from "./time";
 
 export type CalendarWeekDay = {
@@ -19,16 +19,25 @@ export type CalendarWeekDay = {
 
 type WeekCalendarProps = {
   appointments: Appointment[];
+  dragPreview?: Appointment;
   heading: string;
+  onDragOverAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onSelectDate: (date: string, appointments: Appointment[]) => void;
-  renderAppointment: (appointment: Appointment, compact: boolean) => ReactNode;
+  renderAppointment: (
+    appointment: Appointment,
+    compact: boolean,
+    layout?: AppointmentOverlapLayout,
+    isDragPreview?: boolean,
+  ) => ReactNode;
   weekDays: CalendarWeekDay[];
 };
 
 export function WeekCalendar({
   appointments,
+  dragPreview,
   heading,
+  onDragOverAppointment,
   onDropAppointment,
   onSelectDate,
   renderAppointment,
@@ -83,7 +92,9 @@ export function WeekCalendar({
       </div>
       <TimeGrid
         days={timeGridDays}
+        dragPreview={dragPreview}
         mode="week"
+        onDragOverAppointment={onDragOverAppointment}
         onDropAppointment={onDropAppointment}
         renderAppointment={renderAppointment}
       />

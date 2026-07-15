@@ -153,6 +153,7 @@ function createDataTransfer() {
   return {
     effectAllowed: "all",
     getData: (type: string) => data.get(type) ?? "",
+    setDragImage: vi.fn(),
     setData: (type: string, value: string) => {
       data.set(type, value);
     },
@@ -228,6 +229,92 @@ describe("CalendarWorkspace", () => {
         expect.objectContaining({ id: "appointment-anna", time: "10:00" }),
       ),
     );
+  });
+
+  it("keeps the grabbed point aligned and previews the exact drop time", async () => {
+    const sourceAppointment: Appointment = {
+      ...appointments[0],
+      durationMinutes: 60,
+      time: "09:00",
+    };
+    const nextAppointment: Appointment = {
+      ...appointments[1],
+      durationMinutes: 60,
+      time: "10:30",
+    };
+    const { onSaveAppointment } = renderCalendar({
+      calendarAppointments: [sourceAppointment, nextAppointment],
+      scheduleSettings: { ...siteSettings, workingHours: "08:00-19:00" },
+    });
+    const sourceBlock = screen
+      .getByText(sourceAppointment.client)
+      .closest(".admin-timed-appointment") as HTMLElement;
+    const timeColumn = screen.getByRole("list");
+    const dataTransfer = createDataTransfer();
+
+    vi.spyOn(sourceBlock, "getBoundingClientRect").mockReturnValue({
+      bottom: 172,
+      height: 72,
+      left: 0,
+      right: 400,
+      top: 100,
+      width: 400,
+      x: 0,
+      y: 100,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(timeColumn, "getBoundingClientRect").mockReturnValue({
+      bottom: 1928,
+      height: 1728,
+      left: 0,
+      right: 800,
+      top: 200,
+      width: 800,
+      x: 0,
+      y: 200,
+      toJSON: () => ({}),
+    });
+
+    const dragStartEvent = createEvent.dragStart(sourceBlock);
+    Object.defineProperties(dragStartEvent, {
+      clientY: { value: 136 },
+      dataTransfer: { value: dataTransfer },
+    });
+    fireEvent(sourceBlock, dragStartEvent);
+    const dragOverEvent = createEvent.dragOver(timeColumn);
+    Object.defineProperties(dragOverEvent, {
+      clientY: { value: 920 },
+      dataTransfer: { value: dataTransfer },
+    });
+    fireEvent(timeColumn, dragOverEvent);
+
+    const preview = document.querySelector<HTMLElement>(".admin-timed-appointment.is-drag-preview");
+    expect(sourceBlock).toHaveClass("is-dragging");
+    expect(preview).toHaveTextContent("09:30");
+    expect(preview).toHaveTextContent(sourceAppointment.client);
+    expect(screen.getByLabelText("Время переноса записи")).toHaveTextContent(
+      "Перенос записи Анна Петрова: 6 июля, 09:30",
+    );
+    expect(dataTransfer.setDragImage).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("region", { name: "Изменение пересекается с другой записью" })).not.toBeInTheDocument();
+
+    const dropEvent = createEvent.drop(timeColumn);
+    Object.defineProperties(dropEvent, {
+      clientY: { value: 920 },
+      dataTransfer: { value: dataTransfer },
+    });
+    fireEvent(timeColumn, dropEvent);
+
+    await waitFor(() =>
+      expect(onSaveAppointment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: sourceAppointment.id, time: "09:30" }),
+        "appointment.drag",
+        expect.objectContaining({ id: sourceAppointment.id, time: "09:00" }),
+      ),
+    );
+    expect(sourceBlock).not.toHaveClass("is-dragging");
+    expect(document.querySelector(".admin-timed-appointment.is-drag-preview")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Изменение пересекается с другой записью" })).not.toBeInTheDocument();
   });
 
   it("does not resize a 23:45 appointment past the end of the day", async () => {
@@ -404,6 +491,20 @@ describe("CalendarWorkspace", () => {
         "appointment.resize",
         expect.objectContaining({ durationMinutes: 60, id: "appointment-anna" }),
       ),
+    );
+  });
+
+  it("detects an overlap with an appointment hidden by search", async () => {
+    const user = userEvent.setup();
+    const { onSaveAppointment } = renderCalendar({ query: "Анна" });
+    const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
+
+    expect(screen.queryByText("Мария Иванова")).not.toBeInTheDocument();
+    await user.click(within(annaBlock).getByRole("button", { name: "Увеличить длительность на 15 минут" }));
+
+    expect(onSaveAppointment).not.toHaveBeenCalled();
+    expect(screen.getByRole("region", { name: "Изменение пересекается с другой записью" })).toHaveTextContent(
+      "Мария Иванова",
     );
   });
 
