@@ -4103,6 +4103,85 @@ button.admin-calendar-item[aria-pressed="true"] {
   margin-top: 6px;
 }
 
+.admin-calendar-conflict {
+  background: var(--admin-warning-bg);
+  border: 1px solid rgba(138, 90, 0, 0.22);
+  border-left: 4px solid var(--admin-warning);
+  border-radius: 0 8px 8px 0;
+  color: var(--admin-text);
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.admin-calendar-conflict-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-calendar-conflict-title {
+  color: var(--admin-warning);
+  font-size: 0.88rem;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.admin-calendar-conflict-copy p,
+.admin-calendar-conflict > p {
+  color: var(--admin-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-calendar-conflict-reason {
+  color: var(--admin-muted);
+  display: grid;
+  font-size: 0.76rem;
+  font-weight: 800;
+  gap: 6px;
+  max-width: 720px;
+  min-width: 0;
+}
+
+.admin-calendar-conflict-reason-input {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: var(--admin-text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.4;
+  min-height: 72px;
+  padding: 9px 10px;
+  resize: vertical;
+  width: 100%;
+}
+
+.admin-calendar-conflict-reason-input:focus-visible {
+  border-color: rgba(124, 77, 161, 0.54);
+  box-shadow: 0 0 0 3px rgba(124, 77, 161, 0.14);
+  outline: 0;
+}
+
+.admin-calendar-conflict-actions {
+  margin-top: 2px;
+}
+
+.admin-calendar-conflict-actions .admin-danger-button,
+.admin-calendar-conflict-actions .admin-outline-action {
+  min-height: 42px;
+  padding: 0 14px;
+  white-space: normal;
+}
+
 .admin-calendar-capacity-note {
   align-items: center;
   background: var(--admin-warning-bg);
@@ -4114,6 +4193,23 @@ button.admin-calendar-item[aria-pressed="true"] {
   gap: 8px 14px;
   margin: 14px 0;
   padding: 12px 14px;
+}
+
+@media (max-width: 620px) {
+  .admin-calendar-conflict {
+    padding: 14px;
+  }
+
+  .admin-calendar-conflict-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-calendar-conflict-actions .admin-danger-button,
+  .admin-calendar-conflict-actions .admin-outline-action {
+    width: 100%;
+  }
 }
 
 .admin-calendar-capacity-note strong {

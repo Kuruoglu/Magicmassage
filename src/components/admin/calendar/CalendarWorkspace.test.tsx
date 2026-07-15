@@ -383,7 +383,12 @@ describe("CalendarWorkspace", () => {
     await user.click(within(annaBlock as HTMLElement).getByRole("button", { name: "Увеличить длительность на 15 минут" }));
 
     expect(onSaveAppointment).not.toHaveBeenCalled();
-    const conflict = screen.getByRole("alert");
+    const conflict = screen.getByRole("region", { name: "Изменение пересекается с другой записью" });
+    expect(conflict).toHaveClass("admin-calendar-conflict");
+    expect(within(conflict).getByRole("alert")).toHaveTextContent("Мария Иванова");
+    const reasonField = within(conflict).getByRole("textbox");
+    expect(reasonField).toHaveClass("admin-calendar-conflict-reason-input");
+    expect(reasonField.closest("label")).toHaveClass("admin-calendar-conflict-reason");
     expect(conflict).toHaveTextContent("Мария Иванова");
     await user.type(within(conflict).getByLabelText("Причина ручного пересечения"), "Согласовано владельцем");
     await user.click(within(conflict).getByRole("button", { name: "Сохранить с пересечением" }));

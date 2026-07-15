@@ -681,16 +681,21 @@ export function CalendarWorkspace({
           </p>
         ) : null}
         {pendingConflict ? (
-          <div className="admin-form-alert" role="alert">
-            <strong>Изменение пересекается с другой записью</strong>
-            <p>
-              {pendingConflict.conflictingAppointment.client}, {formatCalendarDay(pendingConflict.conflictingAppointment.date)} в{" "}
-              {pendingConflict.conflictingAppointment.time}, {pendingConflict.conflictingAppointment.service}.
-            </p>
+          <section className="admin-calendar-conflict" aria-labelledby="admin-calendar-conflict-title">
+            <div className="admin-calendar-conflict-copy" role="alert">
+              <strong className="admin-calendar-conflict-title" id="admin-calendar-conflict-title">
+                Изменение пересекается с другой записью
+              </strong>
+              <p>
+                {pendingConflict.conflictingAppointment.client}, {formatCalendarDay(pendingConflict.conflictingAppointment.date)} в{" "}
+                {pendingConflict.conflictingAppointment.time}, {pendingConflict.conflictingAppointment.service}.
+              </p>
+            </div>
             {canOverrideOverlap ? (
-              <label>
+              <label className="admin-calendar-conflict-reason">
                 Причина ручного пересечения
                 <textarea
+                  className="admin-calendar-conflict-reason-input"
                   onChange={(event) => setOverlapOverrideReason(event.target.value)}
                   required
                   rows={2}
@@ -700,7 +705,10 @@ export function CalendarWorkspace({
             ) : (
               <p>Для сохранения с пересечением требуется роль владельца или администратора.</p>
             )}
-            <div className="admin-detail-actions">
+            <div className="admin-detail-actions admin-calendar-conflict-actions">
+              <button className="admin-outline-action" onClick={() => setPendingConflict(null)} type="button">
+                Отменить изменение
+              </button>
               {canOverrideOverlap ? (
                 <button
                   className="admin-danger-button"
@@ -723,11 +731,8 @@ export function CalendarWorkspace({
                   Сохранить с пересечением
                 </button>
               ) : null}
-              <button className="admin-text-action" onClick={() => setPendingConflict(null)} type="button">
-                Отменить изменение
-              </button>
             </div>
-          </div>
+          </section>
         ) : null}
 
         {mode === "month" ? (

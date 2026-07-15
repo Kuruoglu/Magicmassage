@@ -299,6 +299,49 @@ test("7. drags a day-view appointment to a different time", async ({ page }) => 
   await expect(schedule.getByRole("button", { name: /10:00.*Анна Петрова/ })).toHaveCount(0);
 });
 
+test("7a. styles an overlapping move as a usable conflict panel", async ({ page }) => {
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
+
+  const schedule = page.getByLabel("Расписание 6 июля");
+  const appointment = schedule.getByRole("listitem").filter({ hasText: "Анна Петрова" });
+
+  await dragAppointmentTo(appointment, schedule, 12, 30);
+
+  const conflict = page.getByRole("region", { name: "Изменение пересекается с другой записью" });
+  const reason = conflict.getByLabel("Причина ручного пересечения");
+  const cancel = conflict.getByRole("button", { name: "Отменить изменение" });
+  const save = conflict.getByRole("button", { name: "Сохранить с пересечением" });
+
+  await expect(conflict).toBeVisible();
+  await expect(conflict.getByRole("alert")).toContainText("Мария Иванова");
+  await expect(conflict).toHaveCSS("background-color", "rgb(255, 244, 215)");
+  await expect(conflict).toHaveCSS("border-left-width", "4px");
+  await expect(reason).toHaveCSS("border-radius", "8px");
+  await expect(save).toBeDisabled();
+
+  const [cancelBox, saveBox] = await Promise.all([cancel.boundingBox(), save.boundingBox()]);
+  expect(cancelBox?.height).toBeGreaterThanOrEqual(42);
+  expect(saveBox?.height).toBeGreaterThanOrEqual(42);
+  expect(await conflict.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const [mobileConflictBox, mobileCancelBox, mobileSaveBox] = await Promise.all([
+    conflict.boundingBox(),
+    cancel.boundingBox(),
+    save.boundingBox(),
+  ]);
+  expect(mobileCancelBox?.width).toBeGreaterThan((mobileConflictBox?.width ?? 0) - 40);
+  expect(mobileSaveBox?.width).toBeGreaterThan((mobileConflictBox?.width ?? 0) - 40);
+  expect(mobileSaveBox?.y).toBeGreaterThan(mobileCancelBox?.y ?? 0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+  await cancel.click();
+
+  await expect(conflict).toHaveCount(0);
+  await expect(schedule.getByRole("button", { name: /10:00.*Анна Петрова/ })).toBeVisible();
+  await expect(schedule.getByRole("button", { name: /12:30.*Мария Иванова/ })).toBeVisible();
+});
+
 test("8. increases an appointment duration in day view", async ({ page }) => {
   await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
 
