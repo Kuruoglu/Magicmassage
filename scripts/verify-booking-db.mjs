@@ -18,8 +18,11 @@ const clientIds = new Set();
 const idempotencyHashes = new Set();
 const tokenHashes = new Set();
 const sessionHashes = new Set();
+const specialistIds = new Set();
+const serviceSlugs = new Set();
 const runId = randomUUID().replaceAll("-", "");
 let adminUserId;
+let specialistUserId;
 
 function hash(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -67,6 +70,7 @@ function appointmentRecord({
   status = "confirmed",
   time,
   version = null,
+  specialistId,
 }) {
   return {
     buffer_minutes: bufferMinutes,
@@ -82,6 +86,7 @@ function appointmentRecord({
     post_visit_comment: "",
     post_visit_commented_at: null,
     service_name: "Booking DB smoke service",
+    ...(specialistId ? { specialist_id: specialistId } : {}),
     starts_at: time,
     starts_on: date,
     status,
@@ -99,10 +104,10 @@ async function createHold({ date, priceVariantId, sessionKeyHash, time, tokenHas
   });
 }
 
-async function saveAppointment(record, action = "appointment.create") {
+async function saveAppointment(record, action = "appointment.create", actorUserId = adminUserId) {
   return supabase.rpc("admin_save_appointment_with_audit", {
     p_action: action,
-    p_actor_user_id: adminUserId,
+    p_actor_user_id: actorUserId,
     p_audit_metadata: { source: "booking_db_smoke" },
     p_record: record,
   });
@@ -116,8 +121,9 @@ async function mutateBlock({
   expectedVersion = null,
   note = "Booking DB smoke",
   startsAt,
+  specialistId = null,
 }) {
-  return supabase.rpc("admin_mutate_calendar_block", {
+  return supabase.rpc("admin_mutate_specialist_calendar_block", {
     p_action: action,
     p_actor_user_id: adminUserId,
     p_block_date: blockDate,
@@ -126,6 +132,7 @@ async function mutateBlock({
     p_expected_version: expectedVersion,
     p_internal_note: note,
     p_kind: "personal",
+    p_specialist_id: specialistId,
     p_starts_at: startsAt,
   });
 }
@@ -202,6 +209,12 @@ async function cleanup() {
     if (result.error) cleanupErrors.push(result.error);
   }
   if (adminUserId) {
+    const alertResult = await supabase
+      .from("admin_security_alerts")
+      .delete()
+      .eq("actor_user_id", adminUserId);
+    if (alertResult.error) cleanupErrors.push(alertResult.error);
+
     const auditResult = await supabase
       .from("admin_audit_log")
       .delete()
@@ -213,6 +226,21 @@ async function cleanup() {
 
     const userResult = await supabase.auth.admin.deleteUser(adminUserId);
     if (userResult.error) cleanupErrors.push(userResult.error);
+  }
+  if (specialistUserId) {
+    const profileResult = await supabase.from("admin_profiles").delete().eq("user_id", specialistUserId);
+    if (profileResult.error) cleanupErrors.push(profileResult.error);
+
+    const userResult = await supabase.auth.admin.deleteUser(specialistUserId);
+    if (userResult.error) cleanupErrors.push(userResult.error);
+  }
+  if (specialistIds.size > 0) {
+    const result = await supabase.from("admin_specialists").delete().in("id", [...specialistIds]);
+    if (result.error) cleanupErrors.push(result.error);
+  }
+  if (serviceSlugs.size > 0) {
+    const result = await supabase.from("admin_services").delete().in("slug", [...serviceSlugs]);
+    if (result.error) cleanupErrors.push(result.error);
   }
 
   if (cleanupErrors.length > 0) {
@@ -229,15 +257,26 @@ try {
   if (optionsError) throw optionsError;
   const priceVariantId = options?.services?.[0]?.variants?.[0]?.id;
   assert(typeof priceVariantId === "string", "No public booking price variant is available.");
+  const variantResult = await supabase
+    .from("admin_price_variants")
+    .select("duration_minutes, service_slug")
+    .eq("id", priceVariantId)
+    .single();
+  if (variantResult.error) throw variantResult.error;
+  const serviceSlug = variantResult.data.service_slug;
 
   const settingsResult = await supabase
     .from("admin_site_settings")
-    .select("booking_min_lead_minutes, booking_slot_step_minutes, public_booking_daily_limit, public_booking_enabled")
+    .select("booking_buffer_minutes, booking_min_lead_minutes, booking_slot_step_minutes, public_booking_daily_limit, public_booking_enabled")
     .eq("id", "site")
     .single();
   if (settingsResult.error) throw settingsResult.error;
   assert(settingsResult.data.public_booking_enabled, "Public booking must be enabled for the DB smoke.");
-  assert(settingsResult.data.public_booking_daily_limit === 8, "Public booking daily limit must be 8.");
+  const publicDailyLimit = settingsResult.data.public_booking_daily_limit;
+  assert(
+    Number.isInteger(publicDailyLimit) && publicDailyLimit >= 1 && publicDailyLimit <= 8,
+    "Public booking daily limit must be between 1 and 8.",
+  );
   assert(settingsResult.data.booking_slot_step_minutes === 30, "Public booking slot step must be 30 minutes.");
   assert(settingsResult.data.booking_min_lead_minutes === 30, "Public booking same-day lead must be 30 minutes.");
 
@@ -296,6 +335,120 @@ try {
     status: "returning",
   });
   if (clientResult.error) throw clientResult.error;
+
+  const defaultSpecialist = await supabase
+    .from("admin_specialists")
+    .select("id")
+    .eq("is_default", true)
+    .single();
+  if (defaultSpecialist.error) throw defaultSpecialist.error;
+  const secondSpecialistId = randomUUID();
+  specialistIds.add(secondSpecialistId);
+  const secondSpecialist = await supabase.from("admin_specialists").insert({
+    color: "#4f6ea8",
+    display_name: "Booking DB Second Specialist",
+    display_order: 999,
+    id: secondSpecialistId,
+    is_default: false,
+    public_booking_enabled: false,
+    public_daily_limit: publicDailyLimit === 8 ? 1 : 8,
+    public_slug: `booking-db-${runId.slice(0, 12)}`,
+    status: "active",
+  });
+  if (secondSpecialist.error) throw secondSpecialist.error;
+  const synchronizedSecondSpecialist = await supabase
+    .from("admin_specialists")
+    .select("public_daily_limit")
+    .eq("id", secondSpecialistId)
+    .single();
+  if (synchronizedSecondSpecialist.error) throw synchronizedSecondSpecialist.error;
+  const dailyLimitSynchronized = synchronizedSecondSpecialist.data.public_daily_limit === publicDailyLimit;
+  const assignment = await supabase.from("admin_specialist_services").insert({
+    service_slug: serviceSlug,
+    specialist_id: secondSpecialistId,
+  });
+  if (assignment.error) throw assignment.error;
+
+  const eligibleSpecialists = await supabase
+    .from("admin_specialists")
+    .select("id")
+    .eq("status", "active")
+    .eq("public_booking_enabled", true);
+  if (eligibleSpecialists.error) throw eligibleSpecialists.error;
+  const testServiceSlug = `booking-db-service-${runId}`;
+  serviceSlugs.add(testServiceSlug);
+  const testService = await supabase.from("admin_services").insert({
+    category: "DB smoke",
+    name: "Booking DB smoke service assignment",
+    slug: testServiceSlug,
+    status: "draft",
+  });
+  if (testService.error) throw testService.error;
+  const testServiceAssignments = await supabase
+    .from("admin_specialist_services")
+    .select("specialist_id")
+    .eq("service_slug", testServiceSlug);
+  if (testServiceAssignments.error) throw testServiceAssignments.error;
+  const assignedSpecialistIds = new Set(testServiceAssignments.data.map((row) => row.specialist_id));
+  const newServiceAutoAssigned = eligibleSpecialists.data.length > 0
+    && eligibleSpecialists.data.every((specialist) => assignedSpecialistIds.has(specialist.id));
+
+  const specialistUserResult = await supabase.auth.admin.createUser({
+    email: `booking-db-specialist-${runId}@example.com`,
+    email_confirm: true,
+    password: randomBytes(24).toString("base64url"),
+  });
+  if (specialistUserResult.error) throw specialistUserResult.error;
+  specialistUserId = specialistUserResult.data.user.id;
+  specialistIds.add(specialistUserId);
+  const specialistProfile = await supabase.from("admin_profiles").insert({
+    display_name: "Booking DB Specialist",
+    email: `booking-db-specialist-${runId}@example.com`,
+    role: "specialist",
+    status: "active",
+    user_id: specialistUserId,
+  });
+  if (specialistProfile.error) throw specialistProfile.error;
+  const disablePublicSpecialist = await supabase
+    .from("admin_specialists")
+    .update({ public_booking_enabled: false })
+    .eq("id", specialistUserId);
+  if (disablePublicSpecialist.error) throw disablePublicSpecialist.error;
+
+  const forbiddenSpecialistAppointmentId = `appointment-booking-db-specialist-forbidden-${runId}`;
+  appointmentIds.add(forbiddenSpecialistAppointmentId);
+  const forbiddenSpecialistAppointment = await saveAppointment(appointmentRecord({
+    clientId,
+    date: versionDay.date,
+    id: forbiddenSpecialistAppointmentId,
+    specialistId: specialistUserId,
+    time: "04:00",
+  }), "appointment.create", specialistUserId);
+  const specialistArbitraryClientRejected = errorMatches(
+    forbiddenSpecialistAppointment.error,
+    "appointment_client_forbidden",
+  );
+
+  const specialistSeedAppointmentId = `appointment-booking-db-specialist-seed-${runId}`;
+  appointmentIds.add(specialistSeedAppointmentId);
+  const specialistSeedAppointment = await saveAppointment(appointmentRecord({
+    clientId,
+    date: versionDay.date,
+    id: specialistSeedAppointmentId,
+    specialistId: specialistUserId,
+    time: "04:00",
+  }));
+  if (specialistSeedAppointment.error) throw specialistSeedAppointment.error;
+  const allowedSpecialistAppointmentId = `appointment-booking-db-specialist-allowed-${runId}`;
+  appointmentIds.add(allowedSpecialistAppointmentId);
+  const allowedSpecialistAppointment = await saveAppointment(appointmentRecord({
+    clientId,
+    date: versionDay.date,
+    id: allowedSpecialistAppointmentId,
+    specialistId: specialistUserId,
+    time: "04:30",
+  }), "appointment.create", specialistUserId);
+  const specialistAssignedClientAllowed = !allowedSpecialistAppointment.error;
 
   const oldHoldResult = await supabase.rpc("public_booking_create_hold", {
     p_price_variant_id: priceVariantId,
@@ -430,12 +583,19 @@ try {
     tokenHash: conflictToken,
   });
   if (conflictHold.error) throw conflictHold.error;
+  const heldSpecialist = await supabase
+    .from("public_booking_holds")
+    .select("specialist_id")
+    .eq("token_hash", conflictToken)
+    .single();
+  if (heldSpecialist.error) throw heldSpecialist.error;
   const conflictAppointmentId = `appointment-booking-db-conflict-${runId}`;
   appointmentIds.add(conflictAppointmentId);
   const conflictAppointment = await saveAppointment(appointmentRecord({
     clientId,
     date: capacityDay.date,
     id: conflictAppointmentId,
+    specialistId: heldSpecialist.data.specialist_id,
     status: "confirmed",
     time: capacityDay.slots[0],
   }));
@@ -482,6 +642,28 @@ try {
   const staleAppointmentVersionRejected = currentAppointment.data.version === 2
     && errorMatches(staleAppointment.error, "appointment_concurrent_update");
 
+  const concurrentContactReveals = await Promise.all(Array.from({ length: 61 }, () =>
+    supabase.rpc("admin_reveal_appointment_contact", {
+      p_actor_user_id: adminUserId,
+      p_appointment_id: versionAppointmentId,
+      p_purpose: "Booking DB smoke",
+    })));
+  const successfulContactReveals = concurrentContactReveals.filter((result) => !result.error).length;
+  const limitedContactReveals = concurrentContactReveals.filter((result) =>
+    errorMatches(result.error, "contact_reveal_rate_limited")
+  ).length;
+  const contactRevealRateLimitSerialized = successfulContactReveals === 60 && limitedContactReveals === 1;
+  const contactRevealAlerts = await supabase
+    .from("admin_security_alerts")
+    .select("alert_type, metadata, severity")
+    .eq("actor_user_id", adminUserId)
+    .eq("alert_type", "bulk_contact_reveal");
+  if (contactRevealAlerts.error) throw contactRevealAlerts.error;
+  const securityAlertWarningCreated = contactRevealAlerts.data.length === 1
+    && contactRevealAlerts.data[0].severity === "warning"
+    && contactRevealAlerts.data[0].metadata?.contactRevealCount === 20
+    && contactRevealAlerts.data[0].metadata?.windowMinutes === 10;
+
   const adjacentAppointmentId = `appointment-booking-db-adjacent-${runId}`;
   appointmentIds.add(adjacentAppointmentId);
   const adjacentAppointment = await saveAppointment(appointmentRecord({
@@ -507,6 +689,27 @@ try {
     "appointment_overlap_conflict",
   );
 
+  const defaultParallelId = `appointment-booking-db-default-specialist-${runId}`;
+  const secondParallelId = `appointment-booking-db-second-specialist-${runId}`;
+  appointmentIds.add(defaultParallelId);
+  appointmentIds.add(secondParallelId);
+  const defaultParallel = await saveAppointment(appointmentRecord({
+    clientId,
+    date: versionDay.date,
+    id: defaultParallelId,
+    specialistId: defaultSpecialist.data.id,
+    time: "07:30",
+  }));
+  if (defaultParallel.error) throw defaultParallel.error;
+  const secondParallel = await saveAppointment(appointmentRecord({
+    clientId,
+    date: versionDay.date,
+    id: secondParallelId,
+    specialistId: secondSpecialistId,
+    time: "07:30",
+  }));
+  const crossSpecialistParallelAllowed = !secondParallel.error;
+
   const bufferedManualTime = versionDay.slots.find((time) =>
     versionDay.slots.includes(addMinutes(time, 30))
   );
@@ -520,19 +723,23 @@ try {
       clientId,
       date: versionDay.date,
       id: bufferedAppointmentId,
+      specialistId: defaultSpecialist.data.id,
       time: bufferedManualTime,
     }));
     if (bufferedAppointment.error) throw bufferedAppointment.error;
 
-    const publicHoldInsideBuffer = await createHold({
-      date: versionDay.date,
-      priceVariantId,
-      sessionKeyHash: opaqueHash(sessionHashes),
-      time: addMinutes(bufferedManualTime, 30),
-      tokenHash: opaqueHash(tokenHashes),
+    const publicAvailabilityInsideBuffer = await supabase.rpc("public_booking_specialist_available", {
+      p_buffer_minutes: settingsResult.data.booking_buffer_minutes,
+      p_duration_minutes: variantResult.data.duration_minutes,
+      p_excluded_hold_id: null,
+      p_service_slug: serviceSlug,
+      p_specialist_id: defaultSpecialist.data.id,
+      p_starts_at: addMinutes(bufferedManualTime, 30),
+      p_starts_on: versionDay.date,
     });
+    if (publicAvailabilityInsideBuffer.error) throw publicAvailabilityInsideBuffer.error;
     manualBuffersStillBlockPublicHolds.push(
-      errorMatches(publicHoldInsideBuffer.error, "slot_unavailable"),
+      publicAvailabilityInsideBuffer.data === false,
     );
 
     const removedBufferedAppointment = await supabase
@@ -547,6 +754,7 @@ try {
   const createdBlock = await mutateBlock({
     blockDate: versionDay.date,
     endsAt: blockEnd,
+    specialistId: defaultSpecialist.data.id,
     startsAt: blockStart,
   });
   if (createdBlock.error) throw createdBlock.error;
@@ -557,6 +765,7 @@ try {
     endsAt: blockEnd,
     expectedVersion: createdBlock.data.version,
     note: "Updated once",
+    specialistId: defaultSpecialist.data.id,
     startsAt: blockStart,
   });
   if (updatedBlock.error) throw updatedBlock.error;
@@ -566,35 +775,23 @@ try {
     endsAt: blockEnd,
     expectedVersion: createdBlock.data.version,
     note: "Stale update",
+    specialistId: defaultSpecialist.data.id,
     startsAt: blockStart,
   });
   const staleBlockVersionRejected = updatedBlock.data.version === 2
     && errorMatches(staleBlock.error, "calendar_block_concurrent_update");
 
-  const blockedSlot = await createHold({
-    date: versionDay.date,
-    priceVariantId,
-    sessionKeyHash: opaqueHash(sessionHashes),
-    time: blockStart,
-    tokenHash: opaqueHash(tokenHashes),
+  const blockedSlot = await supabase.rpc("public_booking_specialist_available", {
+    p_buffer_minutes: settingsResult.data.booking_buffer_minutes,
+    p_duration_minutes: variantResult.data.duration_minutes,
+    p_excluded_hold_id: null,
+    p_service_slug: serviceSlug,
+    p_specialist_id: defaultSpecialist.data.id,
+    p_starts_at: blockStart,
+    p_starts_on: versionDay.date,
   });
-  const personalBlockRemovesSlot = errorMatches(blockedSlot.error, "slot_unavailable");
-
-  const existingAppointments = await supabase
-    .from("admin_appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("starts_on", capacityDay.date)
-    .neq("status", "cancelled");
-  if (existingAppointments.error) throw existingAppointments.error;
-  const existingHolds = await supabase
-    .from("public_booking_holds")
-    .select("id")
-    .eq("starts_on", capacityDay.date)
-    .eq("status", "active")
-    .gt("expires_at", new Date().toISOString());
-  if (existingHolds.error) throw existingHolds.error;
-  const reservedBefore = (existingAppointments.count ?? 0) + existingHolds.data.length;
-  assert(reservedBefore < 8, "The capacity smoke date is already at its public limit.");
+  if (blockedSlot.error) throw blockedSlot.error;
+  const personalBlockRemovesSlot = blockedSlot.data === false;
 
   const capacitySession = opaqueHash(sessionHashes);
   const capacityToken = opaqueHash(tokenHashes);
@@ -608,7 +805,7 @@ try {
   if (capacityHold.error) throw capacityHold.error;
   const heldSnapshot = await supabase
     .from("public_booking_holds")
-    .select("buffer_minutes, currency, duration_minutes, price_cents")
+    .select("buffer_minutes, currency, duration_minutes, price_cents, specialist_id")
     .eq("token_hash", capacityToken)
     .single();
   if (heldSnapshot.error) throw heldSnapshot.error;
@@ -616,8 +813,29 @@ try {
     && capacityHold.data.durationMinutes === heldSnapshot.data.duration_minutes
     && capacityHold.data.priceCents === heldSnapshot.data.price_cents;
 
+  const specialistAppointments = await supabase
+    .from("admin_appointments")
+    .select("id", { count: "exact", head: true })
+    .eq("specialist_id", heldSnapshot.data.specialist_id)
+    .eq("starts_on", capacityDay.date)
+    .neq("status", "cancelled");
+  if (specialistAppointments.error) throw specialistAppointments.error;
+  const specialistHolds = await supabase
+    .from("public_booking_holds")
+    .select("id")
+    .eq("specialist_id", heldSnapshot.data.specialist_id)
+    .eq("starts_on", capacityDay.date)
+    .eq("status", "active")
+    .gt("expires_at", new Date().toISOString());
+  if (specialistHolds.error) throw specialistHolds.error;
+  const specialistReservedBefore = (specialistAppointments.count ?? 0) + specialistHolds.data.length;
+  assert(
+    specialistReservedBefore <= publicDailyLimit,
+    "The assigned specialist already exceeds the public limit.",
+  );
+
   const manualAppointmentIds = [];
-  const manualAppointmentsToCap = 8 - reservedBefore - 1;
+  const manualAppointmentsToCap = publicDailyLimit - specialistReservedBefore;
   for (let index = 0; index < manualAppointmentsToCap; index += 1) {
     const id = `appointment-booking-db-manual-${runId}-${index}`;
     manualAppointmentIds.push(id);
@@ -626,21 +844,26 @@ try {
       clientId,
       date: capacityDay.date,
       id,
+      specialistId: heldSnapshot.data.specialist_id,
       time: addMinutes("00:00", index * 30),
     }));
     if (result.error) throw result.error;
   }
 
-  const capacityContender = await createHold({
-    date: capacityDay.date,
-    priceVariantId,
-    sessionKeyHash: opaqueHash(sessionHashes),
-    time: capacityDay.slots[1],
-    tokenHash: opaqueHash(tokenHashes),
+  const assignedSpecialistAvailability = await supabase.rpc("public_booking_specialist_available", {
+    p_buffer_minutes: heldSnapshot.data.buffer_minutes,
+    p_duration_minutes: heldSnapshot.data.duration_minutes,
+    p_excluded_hold_id: null,
+    p_service_slug: serviceSlug,
+    p_specialist_id: heldSnapshot.data.specialist_id,
+    p_starts_at: "23:00",
+    p_starts_on: capacityDay.date,
   });
-  const holdCountsTowardCap = errorMatches(capacityContender.error, "cap_reached");
+  if (assignedSpecialistAvailability.error) throw assignedSpecialistAvailability.error;
+  const holdCountsTowardCap = assignedSpecialistAvailability.data === false;
 
-  for (let index = manualAppointmentIds.length; index < 9; index += 1) {
+  const manualOverflowTarget = publicDailyLimit + 1;
+  for (let index = manualAppointmentIds.length; index < manualOverflowTarget; index += 1) {
     const id = `appointment-booking-db-manual-${runId}-${index}`;
     manualAppointmentIds.push(id);
     appointmentIds.add(id);
@@ -648,6 +871,7 @@ try {
       clientId,
       date: capacityDay.date,
       id,
+      specialistId: heldSnapshot.data.specialist_id,
       time: addMinutes("00:00", index * 30),
     }));
     if (result.error) throw result.error;
@@ -657,7 +881,7 @@ try {
     .select("id", { count: "exact", head: true })
     .in("id", manualAppointmentIds);
   if (manualAppointments.error) throw manualAppointments.error;
-  const manualAppointmentsBeforeConfirmation = manualAppointments.count === 9;
+  const manualAppointmentsBeforeConfirmation = manualAppointments.count === manualOverflowTarget;
 
   const idempotencyKeyHash = opaqueHash(idempotencyHashes);
   const parallelRestores = await Promise.all([
@@ -782,9 +1006,12 @@ try {
     && adjustedPublicAppointment.data.service_name === publicAppointment.data.service_name;
 
   output = {
+    contactRevealRateLimitSerialized,
     bookingSnapshotsPreserved,
     concurrentSlotSerialized,
+    crossSpecialistParallelAllowed,
     crmPreserved,
+    dailyLimitSynchronized,
     halfHourGridEnforced,
     holdBlocksManualOverlap,
     holdCountsTowardCap,
@@ -795,6 +1022,7 @@ try {
     manualActualOverlapRejected,
     manualBackToBackAllowed,
     manualBuffersStillBlockPublicHolds: manualBuffersStillBlockPublicHolds.every(Boolean),
+    newServiceAutoAssigned,
     obsoleteConfirmRpcRemoved,
     obsoleteHoldRpcRemoved,
     offGridStartRejected,
@@ -803,6 +1031,7 @@ try {
       && parallelSessionVersionsStable,
     publicConfirmationAfterManualOverflow,
     publicDurationAdjusted,
+    securityAlertWarningCreated,
     sessionHoldRestored,
     sessionHoldReplaced,
     sessionConfirmationRestored,
@@ -810,6 +1039,8 @@ try {
     staleSelectionVersionRejected,
     staleAppointmentVersionRejected,
     staleBlockVersionRejected,
+    specialistArbitraryClientRejected,
+    specialistAssignedClientAllowed,
   };
 
   for (const [name, passed] of Object.entries(output)) {

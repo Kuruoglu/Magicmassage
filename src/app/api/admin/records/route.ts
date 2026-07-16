@@ -49,6 +49,7 @@ const publicShellPageSuffixes = [
   "/terms",
 ] as const;
 const cancelledAppointmentStatus = "\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u0430";
+const nataliSpecialistId = "00000000-0000-4000-8000-000000000001";
 const publishedStatus = "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430";
 const scheduledStatus = "\u0417\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430";
 const weekdayByToken: Record<string, number> = {
@@ -80,6 +81,7 @@ const weekdayByToken: Record<string, number> = {
 type AppointmentScheduleRow = {
   duration_minutes: number;
   id: string;
+  specialist_id?: string | null;
   starts_at: string;
   status: string;
 };
@@ -90,6 +92,7 @@ type CurrentAppointmentRow = {
   id: string;
   origin?: string;
   post_visit_comment: string;
+  specialist_id?: string | null;
   starts_at: string;
   starts_on: string;
   status: string;
@@ -98,6 +101,7 @@ type CurrentAppointmentRow = {
 
 type CalendarBlockRow = {
   ends_at: string;
+  specialist_id?: string | null;
   starts_at: string;
 };
 
@@ -250,21 +254,30 @@ function deriveAppointmentAuditAction(
 async function classifyAppointmentOnServer(
   client: SupabaseAdminClient,
   payload: Extract<AdminPersistInput, { type: "appointment" }>,
+  authorizedSpecialistId?: string,
 ) {
   const currentAppointmentQuery = payload.record.id
-    ? client
-        .from("admin_appointments")
-        .select("buffer_minutes, duration_minutes, id, origin, post_visit_comment, starts_at, starts_on, status, version")
-        .eq("id", payload.record.id)
+    ? (() => {
+        let query = client
+          .from("admin_appointments")
+          .select("buffer_minutes, duration_minutes, id, origin, post_visit_comment, specialist_id, starts_at, starts_on, status, version")
+          .eq("id", payload.record.id);
+
+        if (authorizedSpecialistId) {
+          query = query.eq("specialist_id", authorizedSpecialistId);
+        }
+
+        return query;
+      })()
     : Promise.resolve({ data: [], error: null });
   const [appointmentsResult, blocksResult, currentAppointmentResult, settingsResult] = await Promise.all([
     client
       .from("admin_appointments")
-      .select("duration_minutes, id, starts_at, status")
+      .select("duration_minutes, id, specialist_id, starts_at, status")
       .eq("starts_on", payload.record.date),
     client
       .from("admin_calendar_blocks")
-      .select("ends_at, starts_at")
+      .select("ends_at, specialist_id, starts_at")
       .eq("block_date", payload.record.date),
     currentAppointmentQuery,
     client
@@ -282,6 +295,10 @@ async function classifyAppointmentOnServer(
     throw new Error("appointment settings are invalid");
   }
   const currentAppointment = ((currentAppointmentResult.data ?? [])[0] ?? null) as CurrentAppointmentRow | null;
+  const effectiveSpecialistId = authorizedSpecialistId ??
+    payload.record.specialistId ??
+    currentAppointment?.specialist_id ??
+    nataliSpecialistId;
   const duration = payload.record.durationMinutes ?? currentAppointment?.duration_minutes ?? 60;
   const start = timeToMinutes(payload.record.time);
   const buffer = currentAppointment && Number.isInteger(currentAppointment.buffer_minutes)
@@ -291,12 +308,14 @@ async function classifyAppointmentOnServer(
   const blocks = (blocksResult.data ?? []) as CalendarBlockRow[];
   const overlap = activeAppointmentLabels.has(payload.record.status) && rows.some((candidate) => {
     if (candidate.id === payload.record.id || !activeAppointmentStatuses.has(candidate.status)) return false;
+    if ((candidate.specialist_id ?? nataliSpecialistId) !== effectiveSpecialistId) return false;
     const candidateStart = timeToMinutes(candidate.starts_at);
 
     return start < candidateStart + candidate.duration_minutes &&
       candidateStart < start + duration;
   });
   const blockConflict = activeAppointmentLabels.has(payload.record.status) && blocks.some((block) => {
+    if ((block.specialist_id ?? nataliSpecialistId) !== effectiveSpecialistId) return false;
     const blockStart = timeToMinutes(block.starts_at);
     const blockEnd = timeToMinutes(block.ends_at);
 
@@ -326,6 +345,7 @@ async function classifyAppointmentOnServer(
     blockConflict,
     buffer,
     duration,
+    effectiveSpecialistId,
     outsideWorkingHours,
     overlap,
     postVisitCommentBlocked,
@@ -386,7 +406,7 @@ export async function POST(request: Request) {
   }
 
   const supabaseAdminClient = createSupabaseAdminClient();
-  let actor: { role: AdminRoleId; userId: string } | undefined;
+  let actor: { role: AdminRoleId; specialistId?: string; userId: string } | undefined;
 
   if (supabaseAdminClient) {
     const authorization = await authorizeSupabaseAdminAccess(
@@ -399,7 +419,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authorization.message }, { status: authorization.statusCode });
     }
 
-    actor = { role: authorization.role, userId: authorization.userId };
+    actor = {
+      role: authorization.role,
+      specialistId: authorization.specialistId,
+      userId: authorization.userId,
+    };
+    if (actor.role === "specialist" && !actor.specialistId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   } else if (!isAdminDemoFallbackAllowed()) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   } else if (resolveAdminSupabaseEnv() && !resolveSupabaseAdminEnv()) {
@@ -434,7 +461,11 @@ export async function POST(request: Request) {
 
   if (payload.type === "appointment" && supabaseAdminClient) {
     try {
-      const classification = await classifyAppointmentOnServer(supabaseAdminClient, payload);
+      const classification = await classifyAppointmentOnServer(
+        supabaseAdminClient,
+        payload,
+        actor?.role === "specialist" ? actor.specialistId : undefined,
+      );
 
       if (classification.blockConflict) {
         return NextResponse.json(
@@ -465,6 +496,9 @@ export async function POST(request: Request) {
           ...payload.record,
           bufferMinutes: classification.buffer,
           durationMinutes: classification.duration,
+          ...(actor?.role === "specialist"
+            ? { specialistId: classification.effectiveSpecialistId }
+            : {}),
         },
         audit: {
           ...payload.audit!,

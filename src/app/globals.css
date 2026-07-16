@@ -3142,6 +3142,103 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   color: var(--admin-danger);
 }
 
+.admin-security-alerts {
+  border: 1px solid #d5a64c;
+  border-left-width: 4px;
+  background: #fff8e7;
+  color: #2b2131;
+  margin: 0 0 18px;
+  padding: 16px 18px;
+}
+
+.admin-security-alerts-head,
+.admin-security-alert-row {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.admin-security-alerts-head span,
+.admin-security-alert-row span {
+  color: #746b78;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-security-alerts-head h2 {
+  font-size: 18px;
+  margin: 3px 0 0;
+}
+
+.admin-security-alerts-head > strong {
+  align-items: center;
+  background: #9b6710;
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  min-width: 28px;
+}
+
+.admin-security-alert-row {
+  border-top: 1px solid #ead7ad;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.admin-security-alert-row p,
+.admin-security-alert-error {
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.admin-security-alert-row button {
+  background: #fff;
+  border: 1px solid #9b6710;
+  border-radius: 6px;
+  color: #6f4708;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.admin-security-alert-row button:hover:not(:disabled) {
+  background: #fff2cf;
+}
+
+.admin-security-alert-row button:focus-visible {
+  outline: 3px solid rgba(124, 77, 161, 0.28);
+  outline-offset: 2px;
+}
+
+.admin-security-alert-row button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.admin-security-alert-error {
+  color: #a32c2c;
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .admin-security-alert-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-security-alert-row button {
+    width: 100%;
+  }
+}
+
 .admin-finance-period {
   align-items: end;
   background: var(--admin-surface-muted);

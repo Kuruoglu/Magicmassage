@@ -6,18 +6,21 @@ import { authorizeSupabaseAdminAccess } from "@/lib/supabase/admin";
 
 import { POST } from "./route";
 
+const rpc = vi.fn(async () => ({ data: null, error: null }));
+
 vi.mock("@/lib/supabase/admin", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/supabase/admin")>();
 
   return {
     ...actual,
     authorizeSupabaseAdminAccess: vi.fn(),
-    createSupabaseAdminClient: vi.fn(() => ({})),
+    createSupabaseAdminClient: vi.fn(() => ({ rpc })),
   };
 });
 
 describe("admin session cookie", () => {
   beforeEach(() => {
+    rpc.mockClear();
     vi.mocked(authorizeSupabaseAdminAccess).mockResolvedValue({
       mode: "supabase",
       ok: true,
@@ -41,5 +44,8 @@ describe("admin session cookie", () => {
     ]));
     expect(cookies.every((cookie) => cookie.includes("HttpOnly") && /SameSite=Lax/i.test(cookie))).toBe(true);
     expect(cookies.some((cookie) => /Path=\/(?:;|$)/.test(cookie))).toBe(false);
+    expect(rpc).toHaveBeenCalledWith("admin_mark_login", {
+      p_actor_user_id: "11111111-1111-4111-8111-111111111111",
+    });
   });
 });

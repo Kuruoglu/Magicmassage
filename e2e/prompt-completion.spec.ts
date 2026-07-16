@@ -6,6 +6,8 @@ import {
   type TestInfo,
 } from "@playwright/test";
 
+import { createTotpCode } from "../test/totp";
+
 const persistentProjectName = "prompt-persistence-chromium";
 const supabaseSaveMessage = "Изменение сохранено в Supabase.";
 const calendarHourHeight = 72;
@@ -30,11 +32,12 @@ async function openPersistentAdmin(page: Page, testInfo: TestInfo, requiredSecti
   const publicUrl = configuredValue("NEXT_PUBLIC_SUPABASE_URL");
   const publicKey = configuredValue("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   const secretKey = configuredValue("SUPABASE_SECRET_KEY");
+  const totpSecret = configuredValue("E2E_ADMIN_TOTP_SECRET");
 
-  if (!email || !password || !publicUrl || !publicKey || !secretKey) {
+  if (!email || !password || !publicUrl || !publicKey || !secretKey || !totpSecret) {
     test.skip(
       true,
-      "Configure the public Supabase pair, SUPABASE_SECRET_KEY, and dedicated E2E admin credentials to run persistent public/admin scenarios.",
+      "Configure the public Supabase pair, SUPABASE_SECRET_KEY, dedicated E2E admin credentials, and its TOTP secret to run persistent public/admin scenarios.",
     );
   }
 
@@ -43,9 +46,11 @@ async function openPersistentAdmin(page: Page, testInfo: TestInfo, requiredSecti
   if (/\/admin\/login$/.test(page.url())) {
     await page.getByLabel("Email").fill(email!);
     await page.getByLabel("Password").fill(password!);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByLabel("Код").fill(createTotpCode(totpSecret!));
     await Promise.all([
       page.waitForURL(/\/admin(?:\?.*)?$/),
-      page.getByRole("button", { name: "Sign in" }).click(),
+      page.getByRole("button", { exact: true, name: "Войти" }).click(),
     ]);
   }
 
@@ -543,19 +548,27 @@ test("10a. keeps horizontal week scrolling available beside a compact resize gri
   const y = appointmentBox!.y + 8;
 
   try {
+    await session.send("Emulation.setTouchEmulationEnabled", {
+      enabled: true,
+      maxTouchPoints: 1,
+    });
     await session.send("Input.dispatchTouchEvent", {
       touchPoints: [{ x, y }],
       type: "touchStart",
     });
-    await session.send("Input.dispatchTouchEvent", {
-      touchPoints: [{ x: x - 90, y }],
-      type: "touchMove",
-    });
+    for (const delta of [30, 60, 90]) {
+      await page.waitForTimeout(32);
+      await session.send("Input.dispatchTouchEvent", {
+        touchPoints: [{ x: x - delta, y }],
+        type: "touchMove",
+      });
+    }
     await session.send("Input.dispatchTouchEvent", {
       touchPoints: [],
       type: "touchEnd",
     });
   } finally {
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: false }).catch(() => undefined);
     await session.detach();
   }
 

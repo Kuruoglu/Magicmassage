@@ -13,6 +13,7 @@ type CalendarBlockPayload = {
   id?: string;
   internalNote: string;
   kind: CalendarBlockKind;
+  specialistId?: string;
   startsAt: string;
   version?: number;
 };
@@ -28,7 +29,7 @@ type CalendarBlockRpcClient = {
 
 type CalendarBlockAccess =
   | { ok: false; response: NextResponse }
-  | { actorUserId: string; client: CalendarBlockRpcClient; ok: true };
+  | { actorUserId: string; client: CalendarBlockRpcClient; ok: true; specialistId?: string };
 
 const allowedKinds = new Set<CalendarBlockKind>(["personal", "unavailable", "other"]);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -48,7 +49,7 @@ function isRealIsoDate(value: string) {
 function isCalendarBlockPayload(value: unknown, requireId: boolean): value is CalendarBlockPayload {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  const allowedKeys = ["blockDate", "endsAt", "id", "internalNote", "kind", "startsAt", "version"];
+  const allowedKeys = ["blockDate", "endsAt", "id", "internalNote", "kind", "specialistId", "startsAt", "version"];
 
   return (
     Object.keys(record).every((key) => allowedKeys.includes(key)) &&
@@ -63,6 +64,7 @@ function isCalendarBlockPayload(value: unknown, requireId: boolean): value is Ca
     allowedKinds.has(record.kind as CalendarBlockKind) &&
     typeof record.internalNote === "string" &&
     record.internalNote.length <= 2000 &&
+    (record.specialistId === undefined || (typeof record.specialistId === "string" && uuidPattern.test(record.specialistId))) &&
     (record.id === undefined || (typeof record.id === "string" && uuidPattern.test(record.id))) &&
     (record.version === undefined || (Number.isInteger(record.version) && (record.version as number) > 0)) &&
     (!requireId || typeof record.version === "number") &&
@@ -88,6 +90,7 @@ function mapCalendarBlock(data: Record<string, unknown>): CalendarBlock | null {
     id: data.id,
     internalNote: typeof data.internal_note === "string" ? data.internal_note : "",
     kind: data.kind as CalendarBlockKind,
+    specialistId: typeof data.specialist_id === "string" ? data.specialist_id : undefined,
     startsAt: data.starts_at.slice(0, 5),
     version: typeof data.version === "number" ? data.version : 1,
   };
@@ -134,6 +137,7 @@ async function authorize(request: Request): Promise<CalendarBlockAccess> {
     actorUserId: authorization.userId,
     client: client as unknown as CalendarBlockRpcClient,
     ok: true,
+    specialistId: authorization.specialistId,
   };
 }
 
@@ -154,7 +158,7 @@ async function upsert(request: Request, requireId: boolean): Promise<NextRespons
     return errorResponse("Проверьте дату, время и тип блокировки.", 400);
   }
 
-  const { data, error } = await access.client.rpc("admin_mutate_calendar_block", {
+  const { data, error } = await access.client.rpc("admin_mutate_specialist_calendar_block", {
     p_action: "upsert",
     p_actor_user_id: access.actorUserId,
     p_block_date: payload.blockDate,
@@ -162,6 +166,7 @@ async function upsert(request: Request, requireId: boolean): Promise<NextRespons
     p_ends_at: payload.endsAt,
     p_internal_note: payload.internalNote.trim(),
     p_kind: payload.kind,
+    p_specialist_id: access.specialistId ?? payload.specialistId ?? null,
     p_starts_at: payload.startsAt,
     p_expected_version: payload.version ?? null,
   });
@@ -190,7 +195,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     typeof payload !== "object" ||
     payload === null ||
     Array.isArray(payload) ||
-    Object.keys(payload).some((key) => key !== "id" && key !== "version") ||
+    Object.keys(payload).some((key) => key !== "id" && key !== "version" && key !== "specialistId") ||
     typeof (payload as Record<string, unknown>).id !== "string" ||
     !uuidPattern.test((payload as { id: string }).id) ||
     !Number.isInteger((payload as Record<string, unknown>).version) ||
@@ -199,7 +204,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     return errorResponse("Недоступное время не найдено.", 400);
   }
 
-  const { data, error } = await access.client.rpc("admin_mutate_calendar_block", {
+  const { data, error } = await access.client.rpc("admin_mutate_specialist_calendar_block", {
     p_action: "delete",
     p_actor_user_id: access.actorUserId,
     p_block_date: null,
@@ -207,6 +212,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     p_ends_at: null,
     p_internal_note: null,
     p_kind: null,
+    p_specialist_id: access.specialistId ?? null,
     p_starts_at: null,
     p_expected_version: (payload as { version: number }).version,
   });

@@ -65,7 +65,7 @@ describe("admin calendar blocks API", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ block: { ...block, version: 1 } });
-    expect(routeMocks.rpc).toHaveBeenCalledWith("admin_mutate_calendar_block", expect.objectContaining({
+    expect(routeMocks.rpc).toHaveBeenCalledWith("admin_mutate_specialist_calendar_block", expect.objectContaining({
       p_action: "upsert",
       p_actor_user_id: "11111111-1111-4111-8111-111111111111",
       p_block_id: block.id,
@@ -119,7 +119,7 @@ describe("admin calendar blocks API", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ deleted: true });
-    expect(routeMocks.rpc).toHaveBeenCalledWith("admin_mutate_calendar_block", expect.objectContaining({
+    expect(routeMocks.rpc).toHaveBeenCalledWith("admin_mutate_specialist_calendar_block", expect.objectContaining({
       p_action: "delete",
       p_block_id: block.id,
       p_expected_version: 1,

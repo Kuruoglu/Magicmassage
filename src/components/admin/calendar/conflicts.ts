@@ -6,6 +6,7 @@ import type { AppointmentStatus } from "@/admin/domain";
 export type CalendarAppointmentTime = {
   date: string;
   duration: number;
+  specialistId?: string;
   start: string;
 };
 
@@ -55,6 +56,7 @@ export function appointmentsOverlap(
 
   return (
     first.date === second.date &&
+    first.specialistId === second.specialistId &&
     firstInterval.start < secondInterval.end &&
     secondInterval.start < firstInterval.end
   );

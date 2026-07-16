@@ -118,6 +118,7 @@ export function AppointmentBlock({
           <time>{appointment.time}</time>
           <strong>{appointment.client}</strong>
           <span>{appointment.service}</span>
+          {appointment.specialistName ? <span>{appointment.specialistName}</span> : null}
           {classification.overlap ? <small>Пересечение</small> : null}
           {classification.outsideWorkingHours ? <small>Вне рабочих часов</small> : null}
         </div>
@@ -127,6 +128,7 @@ export function AppointmentBlock({
             <time>{appointment.time}</time>
             <strong>{appointment.client}</strong>
             <span>{appointment.service}</span>
+            {appointment.specialistName ? <span>{appointment.specialistName}</span> : null}
             {classification.overlap ? <small>Пересечение</small> : null}
             {classification.outsideWorkingHours ? <small>Вне рабочих часов</small> : null}
           </button>

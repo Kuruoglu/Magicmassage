@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AdminRoleId } from "@/admin/config";
-import type { Appointment, CalendarBlock, ClientRecord } from "@/admin/domain";
+import type { Appointment, CalendarBlock, ClientRecord, SpecialistRecord } from "@/admin/domain";
 
 import { CalendarWorkspace, type CalendarAppointmentSaveResult } from "./CalendarWorkspace";
 
@@ -42,6 +42,25 @@ const clients: ClientRecord[] = [
   },
 ];
 
+const specialists: SpecialistRecord[] = [
+  {
+    color: "#7c4d9d",
+    displayName: "Натали",
+    displayOrder: 1,
+    id: "specialist-natali",
+    publicBookingEnabled: true,
+    status: "active",
+  },
+  {
+    color: "#2f7d6d",
+    displayName: "Яна",
+    displayOrder: 2,
+    id: "specialist-yana",
+    publicBookingEnabled: true,
+    status: "active",
+  },
+];
+
 const appointments: Appointment[] = [
   {
     client: "Анна Петрова",
@@ -51,6 +70,8 @@ const appointments: Appointment[] = [
     id: "appointment-anna",
     note: "",
     service: "Классический массаж",
+    specialistId: "specialist-natali",
+    specialistName: "Натали",
     status: "Подтверждена",
     time: "10:00",
   },
@@ -62,6 +83,8 @@ const appointments: Appointment[] = [
     id: "appointment-maria",
     note: "",
     service: "Лимфодренажный массаж",
+    specialistId: "specialist-natali",
+    specialistName: "Натали",
     status: "Подтверждена",
     time: "11:00",
   },
@@ -79,6 +102,8 @@ const timedCalendarBlock: CalendarBlock = {
   id: "calendar-block-timed",
   internalNote: "Личная встреча",
   kind: "personal",
+  specialistId: "specialist-natali",
+  specialistName: "Натали",
   startsAt: "12:00",
 };
 
@@ -88,6 +113,8 @@ const fullDayCalendarBlock: CalendarBlock = {
   id: "calendar-block-full-day",
   internalNote: "Выходной",
   kind: "unavailable",
+  specialistId: "specialist-natali",
+  specialistName: "Натали",
   startsAt: "00:00",
 };
 
@@ -102,6 +129,8 @@ function renderCalendar({
   query = "",
   role = "owner",
   scheduleSettings = siteSettings,
+  specialistRecords = [specialists[0]],
+  currentSpecialistId,
 }: {
   calendarAppointments?: Appointment[];
   calendarBlocks?: CalendarBlock[];
@@ -121,6 +150,8 @@ function renderCalendar({
   role?: AdminRoleId;
   query?: string;
   scheduleSettings?: typeof siteSettings;
+  specialistRecords?: SpecialistRecord[];
+  currentSpecialistId?: string;
 } = {}) {
   render(
     <CalendarWorkspace
@@ -129,6 +160,7 @@ function renderCalendar({
       calendarBlocks={calendarBlocks}
       canManageBlocks={canManageBlocks}
       clients={clients}
+      currentSpecialistId={currentSpecialistId}
       dailySlotCapacity={4}
       onCancelAppointment={vi.fn()}
       onCreateCalendarBlock={onCreateCalendarBlock}
@@ -141,6 +173,7 @@ function renderCalendar({
       role={role}
       selectedCalendarDate="2026-07-06"
       siteSettings={scheduleSettings}
+      specialists={specialistRecords}
     />,
   );
 
@@ -161,6 +194,48 @@ function createDataTransfer() {
 }
 
 describe("CalendarWorkspace", () => {
+  it("lets an owner filter the calendar by specialist", async () => {
+    const user = userEvent.setup();
+    const yanaAppointment: Appointment = {
+      ...appointments[1],
+      id: "appointment-yana",
+      specialistId: "specialist-yana",
+      specialistName: "Яна",
+    };
+    renderCalendar({
+      calendarAppointments: [appointments[0], yanaAppointment],
+      specialistRecords: specialists,
+    });
+
+    expect(screen.getByText("Анна Петрова")).toBeVisible();
+    expect(screen.getByText("Мария Иванова")).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Показать календарь специалиста"), "specialist-yana");
+
+    expect(screen.queryByText("Анна Петрова")).not.toBeInTheDocument();
+    expect(screen.getByText("Мария Иванова")).toBeVisible();
+    expect(screen.getAllByText("Яна")).toHaveLength(2);
+  });
+
+  it("fixes a specialist to their own calendar", () => {
+    const yanaAppointment: Appointment = {
+      ...appointments[1],
+      id: "appointment-yana",
+      specialistId: "specialist-yana",
+      specialistName: "Яна",
+    };
+    renderCalendar({
+      calendarAppointments: [appointments[0], yanaAppointment],
+      currentSpecialistId: "specialist-yana",
+      role: "specialist",
+      specialistRecords: specialists,
+    });
+
+    expect(screen.getByLabelText("Текущий календарь специалиста")).toHaveTextContent("Мой календарьЯна");
+    expect(screen.queryByLabelText("Показать календарь специалиста")).not.toBeInTheDocument();
+    expect(screen.queryByText("Анна Петрова")).not.toBeInTheDocument();
+    expect(screen.getByText("Мария Иванова")).toBeVisible();
+  });
+
   it("jumps to an exact date from the toolbar date picker", async () => {
     renderCalendar({ calendarAppointments: [] });
 

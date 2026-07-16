@@ -23,6 +23,21 @@ describe("calendar scheduling classification", () => {
     expect(appointmentsOverlap(appointment(), appointment({ date: "2026-07-15", start: "10:30" }))).toBe(false);
   });
 
+  it("does not treat simultaneous appointments for different specialists as a conflict", () => {
+    expect(
+      appointmentsOverlap(
+        appointment({ specialistId: "specialist-natali" }),
+        appointment({ specialistId: "specialist-yana" }),
+      ),
+    ).toBe(false);
+    expect(
+      appointmentsOverlap(
+        appointment({ specialistId: "specialist-natali" }),
+        appointment({ specialistId: "specialist-natali" }),
+      ),
+    ).toBe(true);
+  });
+
   it("allows admin appointments to meet at their real duration boundary", () => {
     expect(
       appointmentsOverlap(

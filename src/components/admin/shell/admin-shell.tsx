@@ -77,6 +77,7 @@ import {
 } from "@/components/admin/calendar";
 import { getAdminAuthorizationHeader, signOutAdminBrowserSession } from "@/lib/supabase/browser";
 import { AdminMobileHeader, AdminMobileNavigation } from "@/components/admin/mobile";
+import { AdminSecurityAlerts } from "@/components/admin/security-alerts";
 import {
   MediaDetail,
   MediaGrid,
@@ -135,12 +136,14 @@ import {
   type ServiceRecord,
   type ServiceStatus,
   type SettingsRecord,
+  type SpecialistRecord,
   type StripeMode,
 } from "@/admin/domain";
 
 type AdminCalendarAction = "create";
 export type AdminShellProps = {
   activeSection: AdminSectionId;
+  actorUserId?: string;
   calendarAction?: AdminCalendarAction;
   initialData?: AdminShellInitialData;
   role: AdminRoleId;
@@ -687,6 +690,7 @@ function cloneAdminDomainRecords(records: AdminDomainRecords): AdminDomainRecord
       history: client.history.map((visit) => ({ ...visit })),
       tags: [...client.tags],
     })),
+    specialists: (records.specialists ?? []).map((specialist) => ({ ...specialist })),
   };
 }
 
@@ -1412,7 +1416,8 @@ function AdminUserDialog({
             <label className="admin-checkbox-label">
               <input
                 checked={form.twoFactor}
-                onChange={(event) => updateForm("twoFactor", event.target.checked)}
+                disabled
+                readOnly
                 type="checkbox"
               />
               2FA включена
@@ -2554,11 +2559,22 @@ function DashboardWorkspace({
   const filteredCertificates = certificates.filter((certificate) =>
     matchesSearch([certificate.code, certificate.buyer, certificate.clientName, certificate.recipient, certificate.status], query),
   );
+  const isSpecialist = role === "specialist";
+  const visibleMetrics = isSpecialist
+    ? [
+        { label: "Мои записи", tone: "primary", value: String(appointments.length) },
+        {
+          label: "Подтверждены",
+          tone: "success",
+          value: String(appointments.filter((appointment) => appointment.status === "Подтверждена").length),
+        },
+      ]
+    : dashboardMetrics;
 
   return (
     <div className="admin-dashboard-grid">
       <section className="admin-metric-row" aria-label="Ключевые показатели">
-        {dashboardMetrics.map((metric) => (
+        {visibleMetrics.map((metric) => (
           <article className={`admin-metric admin-metric-${metric.tone}`} key={metric.label}>
             <span>{metric.label}</span>
             <strong>{metric.value}</strong>
@@ -2593,9 +2609,13 @@ function DashboardWorkspace({
                   <tr key={appointmentKey(appointment)}>
                     <td className="admin-tabular">{appointment.time}</td>
                     <td>
-                      <Link className="admin-row-action admin-row-link" href={clientProfileHref(appointmentClientIdentity, role)}>
-                        {appointment.client}
-                      </Link>
+                      {isSpecialist ? (
+                        appointment.client
+                      ) : (
+                        <Link className="admin-row-action admin-row-link" href={clientProfileHref(appointmentClientIdentity, role)}>
+                          {appointment.client}
+                        </Link>
+                      )}
                     </td>
                     <td>{appointment.service}</td>
                     <td>
@@ -2615,7 +2635,7 @@ function DashboardWorkspace({
         {filteredAppointments.length === 0 ? <EmptyState label="По этому запросу записей нет." /> : null}
       </section>
 
-      <section className="admin-panel" aria-labelledby="certificate-heading">
+      {!isSpecialist ? <section className="admin-panel" aria-labelledby="certificate-heading">
         <div className="admin-panel-head">
           <h2 id="certificate-heading">Сертификаты</h2>
           <Link className="admin-text-action" href={`/admin?section=certificates&role=${role}`}>
@@ -2640,7 +2660,7 @@ function DashboardWorkspace({
           ))}
         </div>
         {filteredCertificates.length === 0 ? <EmptyState label="Сертификаты не найдены." /> : null}
-      </section>
+      </section> : null}
 
     </div>
   );
@@ -5442,6 +5462,7 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 }
 
 function Workspace({
+  actorUserId,
   adminUsers,
   appointments,
   blogPosts,
@@ -5508,7 +5529,10 @@ function Workspace({
   selectedSettingsGroupId,
   services,
   settings,
+  specialists,
+  currentSpecialistId,
 }: {
+  actorUserId?: string;
   adminUsers: AdminUserRecord[];
   appointments: Appointment[];
   blogPosts: BlogPostRecord[];
@@ -5579,6 +5603,8 @@ function Workspace({
   selectedSettingsGroupId?: string;
   services: ServiceRecord[];
   settings: SettingsRecord;
+  specialists: SpecialistRecord[];
+  currentSpecialistId?: string;
 }) {
   if (section === "dashboard") {
     return <DashboardWorkspace appointments={appointments} certificates={certificates} clients={clients} query={query} role={role} />;
@@ -5737,11 +5763,13 @@ function Workspace({
   if (section === "calendar") {
     return (
       <CalendarWorkspace
+        actorUserId={actorUserId}
         appointments={appointments}
         bookingBufferMinutes={settings.bookingBufferMinutes}
         calendarBlocks={calendarBlocks}
         canManageBlocks={role === "owner" || role === "administrator" || role === "specialist"}
         clients={clients}
+        currentSpecialistId={currentSpecialistId}
         dailySlotCapacity={settings.publicBookingDailyLimit ?? settings.dailySlotCapacity}
         key={`${selectedCalendarDate ?? "default-calendar"}:${selectedClientName ?? "all-clients"}:${calendarAppointmentFocus?.appointmentKey ?? "default-focus"}`}
         onCancelAppointment={onCancelAppointment}
@@ -5757,6 +5785,7 @@ function Workspace({
         selectedCalendarDate={selectedCalendarDate}
         selectedClientName={selectedClientName}
         siteSettings={settings}
+        specialists={specialists}
       />
     );
   }
@@ -5770,6 +5799,7 @@ function Workspace({
 
 export function AdminShell({
   activeSection,
+  actorUserId,
   calendarAction,
   initialData,
   role,
@@ -5787,8 +5817,12 @@ export function AdminShell({
 }: AdminShellProps) {
   const navigation = getAdminNavigationForRole(role);
   const activeModule = getAdminModule(activeSection);
+  const activeDescription = role === "specialist" && activeSection === "dashboard"
+    ? "Ваши ближайшие записи и быстрый переход в личный календарь."
+    : activeModule.description;
   const initialRecords = useMemo(() => buildInitialAdminRecords(initialData), [initialData]);
   const initialFinanceRows = useMemo(() => buildInitialFinanceRows(initialData), [initialData]);
+  const specialists = initialRecords.specialists ?? [];
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
@@ -6042,6 +6076,7 @@ export function AdminShell({
     const appointmentTime = {
       date: appointment.date,
       duration: appointment.durationMinutes ?? 60,
+      specialistId: appointment.specialistId,
       start: appointment.time,
     };
     const overlap = hasAppointmentOverlap(
@@ -6054,6 +6089,7 @@ export function AdminShell({
         .map((candidate) => ({
           date: candidate.date,
           duration: candidate.durationMinutes ?? 60,
+          specialistId: candidate.specialistId,
           start: candidate.time,
         })),
     );
@@ -6812,7 +6848,7 @@ export function AdminShell({
             <input
               id="admin-search-input"
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Клиент, сертификат, платеж"
+              placeholder={role === "specialist" ? "Клиент, услуга, время" : "Клиент, сертификат, платеж"}
               type="search"
               value={query}
             />
@@ -6830,7 +6866,7 @@ export function AdminShell({
           <div>
             <span className="admin-kicker">{activeModule.group}</span>
             <h1 id="admin-page-title">{activeModule.title}</h1>
-            <p>{activeModule.description}</p>
+            <p>{activeDescription}</p>
           </div>
           {activeModule.primaryAction ? (
             <button onClick={openPrimaryAction} type="button">
@@ -6848,7 +6884,16 @@ export function AdminShell({
           </p>
         ) : null}
 
+        <AdminSecurityAlerts
+          enabled={
+            isSupabaseBacked &&
+            activeSection === "dashboard" &&
+            (role === "owner" || role === "administrator")
+          }
+        />
+
         <Workspace
+          actorUserId={actorUserId}
           adminUsers={adminUsers}
           appointments={calendarAppointments}
           blogPosts={blogPosts}
@@ -6856,6 +6901,7 @@ export function AdminShell({
           calendarAppointmentFocus={activeCalendarAppointmentFocus}
           certificates={certificates}
           clients={clients}
+          currentSpecialistId={initialData?.currentSpecialistId}
           contactChannels={contactChannels}
           contactSettings={contactSettings}
           financeRows={stripeSales}
@@ -6915,6 +6961,7 @@ export function AdminShell({
           selectedSettingsGroupId={selectedSettingsGroupId}
           services={services}
           settings={settings}
+          specialists={specialists}
         />
 
         {isCalendarActionDialogOpen ? (
@@ -6922,6 +6969,7 @@ export function AdminShell({
             appointments={calendarAppointments}
             bookingBufferMinutes={settings.bookingBufferMinutes}
             clients={clients}
+            currentSpecialistId={initialData?.currentSpecialistId}
             initialAppointment={editingAppointment}
             key={calendarDialogKey}
             onClose={closeActionDialog}
@@ -6931,6 +6979,7 @@ export function AdminShell({
             prefillDate={editingAppointment ? undefined : activeCalendarDate}
             role={role}
             siteSettings={settings}
+            specialists={specialists}
           />
         ) : isActionOpen && activeModule.primaryAction ? (
           <QuickActionDialog
@@ -6942,11 +6991,14 @@ export function AdminShell({
 
         {isCalendarBlockDialogOpen ? (
           <CalendarBlockDialog
+            currentSpecialistId={initialData?.currentSpecialistId}
             initialBlock={editingCalendarBlock}
             initialDate={calendarBlockDate || activeCalendarDate}
             key={editingCalendarBlock?.id ?? `new-block-${calendarBlockDate || activeCalendarDate}`}
             onClose={closeCalendarBlockDialog}
             onSave={saveCalendarBlock}
+            role={role}
+            specialists={specialists}
           />
         ) : null}
         {cancellingAppointment ? (

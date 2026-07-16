@@ -24,6 +24,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: authorization.message }, { status: authorization.statusCode });
   }
 
+  const { error: loginAuditError } = await client.rpc("admin_mark_login", {
+    p_actor_user_id: authorization.userId,
+  });
+  if (loginAuditError) {
+    console.error("Admin login audit failed", loginAuditError.message);
+    return NextResponse.json({ error: "Unable to establish an audited admin session" }, { status: 500 });
+  }
+
   const response = NextResponse.json({ ok: true, role: authorization.role });
 
   response.cookies.set(adminAccessTokenCookieName, token ?? "", {

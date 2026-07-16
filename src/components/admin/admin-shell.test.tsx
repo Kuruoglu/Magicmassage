@@ -72,6 +72,53 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("link", { name: /Пользователи и роли/ })).not.toBeInTheDocument();
   });
 
+  it("keeps specialist dashboard data inside the calendar scope", () => {
+    render(<AdminShell activeSection="dashboard" role="specialist" />);
+
+    expect(screen.queryByRole("heading", { name: "Сертификаты" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Анна Петрова" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Ключевые показатели")).toHaveTextContent("Мои записи");
+    expect(screen.getByRole("searchbox", { name: "Поиск" })).toHaveAttribute(
+      "placeholder",
+      "Клиент, услуга, время",
+    );
+  });
+
+  it("preserves specialist records from server data in the calendar shell", () => {
+    render(
+      <AdminShell
+        activeSection="calendar"
+        initialData={{
+          currentSpecialistId: "specialist-codex",
+          financeRows: [],
+          records: {
+            appointments: [],
+            calendarBlocks: [],
+            certificates: [],
+            clients: [],
+            specialists: [
+              {
+                color: "#3f7d6c",
+                displayName: "Codex Specialist",
+                displayOrder: 1,
+                id: "specialist-codex",
+                publicBookingEnabled: true,
+                status: "active",
+              },
+            ],
+          },
+          source: "supabase",
+        }}
+        role="specialist"
+        selectedCalendarDate="2026-07-20"
+      />,
+    );
+
+    expect(screen.getByLabelText("Текущий календарь специалиста")).toHaveTextContent(
+      "Мой календарьCodex Specialist",
+    );
+  });
+
   it("shows the strict finance workspace for the accountant role only", () => {
     render(<AdminShell activeSection="finances" role="accountant" />);
 
@@ -2313,7 +2360,7 @@ describe("AdminShell", () => {
     await user.clear(within(dialog).getByLabelText("Дата"));
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Укажите клиента, дату и время.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Укажите клиента, специалиста, дату и время.");
     expect(screen.getByRole("dialog", { name: "Новая запись" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Ирина Тестова/ })).not.toBeInTheDocument();
   });

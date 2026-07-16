@@ -33,6 +33,7 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     listMedia: async () => [],
     listPrices: async () => [],
     listServices: async () => [],
+    listSpecialists: async () => [],
     listStripeSales: async () => [],
     loadContactSettings: async () => undefined,
     loadDomainRecords: async () => emptyRecords,
@@ -355,5 +356,28 @@ describe("admin data source", () => {
       source: "supabase",
     });
     expect(listStripeSales).toHaveBeenCalledWith({ from: "2026-07-01", to: "2026-07-31" });
+  });
+
+  it("loads only the linked specialist calendar scope", async () => {
+    const fakeClient = { from: () => ({}) } as unknown as AdminSupabaseClient;
+    const specialistId = "22222222-2222-4222-8222-222222222222";
+    const loadDomainRecords = vi.fn(async () => emptyRecords);
+    const repository = createRepositoryStub({ loadDomainRecords });
+
+    const data = await loadAdminShellData({
+      createClient: () => fakeClient,
+      createRepository: () => repository,
+      env: { NODE_ENV: "production" },
+      role: "specialist",
+      specialistId,
+    });
+
+    expect(loadDomainRecords).toHaveBeenCalledWith(specialistId);
+    expect(data).toMatchObject({
+      currentSpecialistId: specialistId,
+      financeRows: [],
+      records: emptyRecords,
+      source: "supabase",
+    });
   });
 });

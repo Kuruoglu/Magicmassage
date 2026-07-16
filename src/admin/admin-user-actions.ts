@@ -181,22 +181,55 @@ export async function runAdminUserAction(
     };
   }
 
+  let actorUserId: string | undefined;
   if (!deps?.skipAuthorization) {
     const authorization = await authorizeSupabaseAdminAccess(client, deps?.actorToken, { allowedRoles: ["owner"] });
 
     if (!authorization.ok) {
       return authorization;
     }
+    actorUserId = authorization.userId;
   }
 
   if (input.action === "updateProfile") {
-    return upsertAdminProfile(client, {
+    const status = mapStatusToDatabase(input.user.status);
+    if (status === "suspended" && actorUserId === input.user.id) {
+      return {
+        message: "You cannot suspend your own owner account.",
+        mode: "supabase",
+        ok: false,
+        statusCode: 403,
+      };
+    }
+
+    if (status === "active") {
+      const unbanResult = await client.auth.admin.updateUserById(input.user.id, { ban_duration: "none" });
+      if (unbanResult.error) {
+        console.error("Supabase admin user unban failed", unbanResult.error.message);
+        return { message: "Admin user action failed.", mode: "supabase", ok: false };
+      }
+    }
+
+    const profileResult = await upsertAdminProfile(client, {
       email: normalizeEmail(input.user.email),
       name: normalizeUserText(input.user.name),
       role: input.user.role,
-      status: mapStatusToDatabase(input.user.status),
+      status,
       userId: input.user.id,
     });
+    if (!profileResult.ok || status !== "suspended") return profileResult;
+
+    const banResult = await client.auth.admin.updateUserById(input.user.id, { ban_duration: "876000h" });
+    if (banResult.error) {
+      console.error("Supabase admin user ban failed", banResult.error.message);
+      return {
+        message: "Profile access is suspended, but Supabase Auth ban needs attention.",
+        mode: "supabase",
+        ok: false,
+      };
+    }
+
+    return profileResult;
   }
 
   const inviteOptions: Parameters<SupabaseAdminClient["auth"]["admin"]["inviteUserByEmail"]>[1] = {

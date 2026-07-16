@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 
 import nextEnv from "@next/env";
@@ -17,9 +17,113 @@ function configuredValue(name) {
   return process.env[name]?.trim() || undefined;
 }
 
+function decodeBase32(value) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bits = value
+    .toUpperCase()
+    .replace(/[^A-Z2-7]/g, "")
+    .split("")
+    .map((character) => alphabet.indexOf(character).toString(2).padStart(5, "0"))
+    .join("");
+  const bytes = [];
+
+  for (let offset = 0; offset + 8 <= bits.length; offset += 8) {
+    bytes.push(Number.parseInt(bits.slice(offset, offset + 8), 2));
+  }
+
+  return Buffer.from(bytes);
+}
+
+function createTotpCode(secret, timestamp = Date.now()) {
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(timestamp / 30_000)));
+  const digest = createHmac("sha1", decodeBase32(secret)).update(counter).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binaryCode =
+    (digest[offset] & 0x7f) * 0x1000000 +
+    digest[offset + 1] * 0x10000 +
+    digest[offset + 2] * 0x100 +
+    digest[offset + 3];
+
+  return String(binaryCode % 1_000_000).padStart(6, "0");
+}
+
+async function runCleanupSteps(steps) {
+  const failures = [];
+
+  for (const [label, operation] of steps) {
+    try {
+      const result = await operation();
+      if (result?.error) {
+        failures.push(`${label}: ${result.error.message}`);
+      }
+    } catch (error) {
+      failures.push(`${label}: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(failures.join("; "));
+  }
+}
+
+async function failAfterCleanup(message, steps) {
+  try {
+    await runCleanupSteps(steps);
+  } catch (cleanupError) {
+    throw new Error(
+      `${message} Cleanup also failed: ${cleanupError instanceof Error ? cleanupError.message : "unknown error"}`,
+    );
+  }
+
+  throw new Error(message);
+}
+
+async function createRunSecurityAlert(serviceClient, userId) {
+  const { data, error } = await serviceClient
+    .from("admin_security_alerts")
+    .insert({
+      actor_user_id: userId,
+      alert_type: "bulk_contact_reveal",
+      metadata: {
+        contactRevealCount: 20,
+        e2eRunId: randomUUID(),
+        windowMinutes: 10,
+      },
+      severity: "warning",
+    })
+    .select("id")
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error(`Could not provision the E2E security alert: ${error?.message ?? "missing alert id"}`);
+  }
+
+  return data.id;
+}
+
+async function resolveConfiguredUserId(url, publishableKey, credentials) {
+  const authClient = createClient(url, publishableKey, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+  });
+  const { data, error } = await authClient.auth.signInWithPassword(credentials);
+  const userId = data.user?.id;
+  const { error: signOutError } = await authClient.auth.signOut({ scope: "local" });
+
+  if (error || !userId) {
+    throw new Error(`Could not resolve the configured E2E admin user: ${error?.message ?? "missing user"}`);
+  }
+  if (signOutError) {
+    throw new Error(`Could not close the configured E2E lookup session: ${signOutError.message}`);
+  }
+
+  return userId;
+}
+
 async function provisionEphemeralAdmin() {
   const url = configuredValue("NEXT_PUBLIC_SUPABASE_URL");
   const secretKey = configuredValue("SUPABASE_SECRET_KEY");
+  const publishableKey = configuredValue("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   const configuredEmail = configuredValue("E2E_ADMIN_EMAIL");
   const configuredPassword = configuredValue("E2E_ADMIN_PASSWORD");
 
@@ -28,15 +132,31 @@ async function provisionEphemeralAdmin() {
   }
 
   if (configuredEmail && configuredPassword) {
+    if (!url || !secretKey || !publishableKey) {
+      throw new Error(
+        "Configured E2E admin credentials require the Supabase URL, publishable key, and secret key.",
+      );
+    }
+    const serviceClient = createClient(url, secretKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const credentials = { email: configuredEmail, password: configuredPassword };
+    const userId = await resolveConfiguredUserId(url, publishableKey, credentials);
+    const alertId = await createRunSecurityAlert(serviceClient, userId);
+
     return {
-      cleanup: async () => undefined,
-      credentials: { email: configuredEmail, password: configuredPassword },
-      serviceClient: url && secretKey ? createClient(url, secretKey) : null,
+      alertId,
+      cleanup: () => runCleanupSteps([
+        ["configured security alert cleanup", () => serviceClient.from("admin_security_alerts").delete().eq("id", alertId)],
+      ]),
+      credentials,
+      serviceClient,
+      totpSecret: configuredValue("E2E_ADMIN_TOTP_SECRET"),
     };
   }
 
-  if (!url || !secretKey) {
-    return { cleanup: async () => undefined, credentials: null, serviceClient: null };
+  if (!url || !secretKey || !publishableKey) {
+    return { alertId: null, cleanup: async () => undefined, credentials: null, serviceClient: null, totpSecret: null };
   }
 
   const serviceClient = createClient(url, secretKey, {
@@ -48,7 +168,7 @@ async function provisionEphemeralAdmin() {
     email,
     email_confirm: true,
     password,
-    user_metadata: { display_name: "Codex E2E Owner" },
+    user_metadata: { display_name: "Codex E2E Administrator" },
   });
   const userId = data.user?.id;
 
@@ -57,25 +177,78 @@ async function provisionEphemeralAdmin() {
   }
 
   const { error: profileError } = await serviceClient.from("admin_profiles").insert({
-    display_name: "Codex E2E Owner",
+    display_name: "Codex E2E Administrator",
     email,
-    role: "owner",
+    role: "administrator",
     status: "active",
     user_id: userId,
   });
 
   if (profileError) {
-    await serviceClient.auth.admin.deleteUser(userId);
-    throw new Error("Could not provision the ephemeral Supabase E2E admin profile.");
+    await failAfterCleanup("Could not provision the ephemeral Supabase E2E admin profile.", [
+      ["ephemeral Auth cleanup after profile failure", () => serviceClient.auth.admin.deleteUser(userId)],
+    ]);
+  }
+
+  const authClient = createClient(url, publishableKey, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+  });
+  const { error: signInError } = await authClient.auth.signInWithPassword({ email, password });
+  if (signInError) {
+    await failAfterCleanup("Could not sign in the ephemeral Supabase E2E user for MFA enrollment.", [
+      ["ephemeral profile cleanup after sign-in failure", () => serviceClient.from("admin_profiles").delete().eq("user_id", userId)],
+      ["ephemeral Auth cleanup after sign-in failure", () => serviceClient.auth.admin.deleteUser(userId)],
+    ]);
+  }
+  const { data: enrollment, error: enrollmentError } = await authClient.auth.mfa.enroll({
+    factorType: "totp",
+    friendlyName: `Magic Massage E2E ${Date.now()}`,
+  });
+  if (enrollmentError || !enrollment) {
+    await failAfterCleanup("Could not enroll MFA for the ephemeral Supabase E2E user.", [
+      ["ephemeral MFA session cleanup after enrollment failure", () => authClient.auth.signOut({ scope: "local" })],
+      ["ephemeral profile cleanup after enrollment failure", () => serviceClient.from("admin_profiles").delete().eq("user_id", userId)],
+      ["ephemeral Auth cleanup after enrollment failure", () => serviceClient.auth.admin.deleteUser(userId)],
+    ]);
+  }
+  const totpSecret = enrollment.totp.secret;
+  const { error: verifyError } = await authClient.auth.mfa.challengeAndVerify({
+    code: createTotpCode(totpSecret),
+    factorId: enrollment.id,
+  });
+  const { error: enrollmentSignOutError } = await authClient.auth.signOut({ scope: "local" });
+  if (verifyError || enrollmentSignOutError) {
+    await failAfterCleanup(
+      `Could not verify and close MFA enrollment for the ephemeral Supabase E2E user: ${
+        verifyError?.message ?? enrollmentSignOutError?.message ?? "unknown error"
+      }`,
+      [
+        ["ephemeral profile cleanup after verification failure", () => serviceClient.from("admin_profiles").delete().eq("user_id", userId)],
+        ["ephemeral Auth cleanup after verification failure", () => serviceClient.auth.admin.deleteUser(userId)],
+      ],
+    );
+  }
+  let alertId;
+  try {
+    alertId = await createRunSecurityAlert(serviceClient, userId);
+  } catch (alertError) {
+    await runCleanupSteps([
+      ["ephemeral profile cleanup after alert failure", () => serviceClient.from("admin_profiles").delete().eq("user_id", userId)],
+      ["ephemeral Auth cleanup after alert failure", () => serviceClient.auth.admin.deleteUser(userId)],
+    ]);
+    throw alertError;
   }
 
   return {
+    alertId,
     credentials: { email, password },
     serviceClient,
-    cleanup: async () => {
-      await serviceClient.from("admin_profiles").delete().eq("user_id", userId);
-      await serviceClient.auth.admin.deleteUser(userId);
-    },
+    totpSecret,
+    cleanup: () => runCleanupSteps([
+      ["ephemeral security alert cleanup", () => serviceClient.from("admin_security_alerts").delete().eq("id", alertId)],
+      ["ephemeral profile cleanup", () => serviceClient.from("admin_profiles").delete().eq("user_id", userId)],
+      ["ephemeral Auth cleanup", () => serviceClient.auth.admin.deleteUser(userId)],
+    ]),
   };
 }
 
@@ -190,6 +363,10 @@ try {
               E2E_ADMIN_PASSWORD: provisioned.credentials.password,
             }
           : {}),
+        ...(provisioned.totpSecret
+          ? { E2E_ADMIN_TOTP_SECRET: provisioned.totpSecret }
+          : {}),
+        ...(provisioned.alertId ? { E2E_SECURITY_ALERT_ID: provisioned.alertId } : {}),
         ...(required ? { E2E_ADMIN_AUTH_REQUIRED: "true" } : {}),
       },
       stdio: "inherit",
@@ -199,14 +376,19 @@ try {
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Admin auth E2E setup failed.");
 } finally {
-  try {
-    await restorePersistentState(provisioned?.serviceClient ?? null, persistentSnapshot);
-    await cleanupPersistentFixtures(provisioned?.serviceClient ?? null);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : "Admin auth E2E cleanup failed.");
-    exitCode = 1;
-  } finally {
-    await provisioned?.cleanup();
+  const finalizers = [
+    ["Persistent state restoration", () => restorePersistentState(provisioned?.serviceClient ?? null, persistentSnapshot)],
+    ["Persistent fixture cleanup", () => cleanupPersistentFixtures(provisioned?.serviceClient ?? null)],
+    ["Provisioned auth fixture cleanup", () => provisioned?.cleanup()],
+  ];
+
+  for (const [label, finalize] of finalizers) {
+    try {
+      await finalize();
+    } catch (error) {
+      console.error(`${label} failed: ${error instanceof Error ? error.message : "unknown error"}`);
+      exitCode = 1;
+    }
   }
 }
 

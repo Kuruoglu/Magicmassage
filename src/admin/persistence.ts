@@ -334,6 +334,8 @@ function isAppointmentRecordShape(record: Record<string, unknown>) {
       "origin",
       "serviceSlug",
       "service",
+      "specialistId",
+      "specialistName",
       "status",
       "time",
       "version",
@@ -369,6 +371,8 @@ function isAppointmentRecordShape(record: Record<string, unknown>) {
     (record.origin === undefined || record.origin === "admin" || record.origin === "public") &&
     isOptionalString(record.serviceSlug) &&
     hasString(record, "service") &&
+    isOptionalString(record.specialistId) &&
+    isOptionalString(record.specialistName) &&
     typeof record.status === "string" &&
     appointmentStatuses.has(record.status) &&
     isTime(record.time) &&

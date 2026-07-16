@@ -12,6 +12,7 @@ import {
   type Appointment,
   type CalendarBlock,
   type ClientRecord,
+  type SpecialistRecord,
 } from "@/admin/domain";
 import type { AdminAuditAction } from "@/admin/persistence";
 import { matchesSearch } from "@/components/admin/lib/filters";
@@ -96,6 +97,7 @@ type AppointmentDragPreview = {
 };
 
 export type CalendarWorkspaceProps = {
+  actorUserId?: string;
   appointments: Appointment[];
   bookingBufferMinutes: number;
   calendarBlocks?: CalendarBlock[];
@@ -119,6 +121,8 @@ export type CalendarWorkspaceProps = {
   selectedCalendarDate?: string;
   selectedClientName?: string;
   siteSettings: CalendarScheduleSettings;
+  specialists?: SpecialistRecord[];
+  currentSpecialistId?: string;
 };
 
 function isFullDayCalendarBlock(block: CalendarBlock) {
@@ -229,12 +233,14 @@ function CalendarBlockScheduleItem({
           whiteSpace: "nowrap",
         }}
       >
-        {kindLabel}{block.internalNote && !compact ? ` · ${block.internalNote}` : ""}
+        {kindLabel}
+        {block.specialistName ? ` · ${block.specialistName}` : ""}
+        {block.internalNote && !compact ? ` · ${block.internalNote}` : ""}
       </span>
     </>
   );
 
-  const label = `Недоступное время: ${timeLabel}, ${kindLabel}${block.internalNote ? `, ${block.internalNote}` : ""}`;
+  const label = `Недоступное время: ${timeLabel}, ${kindLabel}${block.specialistName ? `, ${block.specialistName}` : ""}${block.internalNote ? `, ${block.internalNote}` : ""}`;
   return canEdit ? (
     <button
       aria-label={`${label}. Изменить`}
@@ -272,6 +278,8 @@ export function CalendarWorkspace({
   selectedCalendarDate,
   selectedClientName,
   siteSettings,
+  specialists = [],
+  currentSpecialistId,
 }: CalendarWorkspaceProps) {
   const calendarViewRef = useRef<HTMLDivElement>(null);
   const [blockOverlayTargets, setBlockOverlayTargets] = useState<HTMLElement[]>([]);
@@ -279,12 +287,33 @@ export function CalendarWorkspace({
     () => createCalendarWorkingSchedule(siteSettings),
     [siteSettings],
   );
+  const activeSpecialists = useMemo(
+    () => specialists
+      .filter((specialist) => specialist.status === "active")
+      .sort((first, second) => first.displayOrder - second.displayOrder),
+    [specialists],
+  );
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState(
+    role === "specialist" ? (currentSpecialistId ?? activeSpecialists[0]?.id ?? "all") : "all",
+  );
+  const effectiveSpecialistId = role === "specialist"
+    ? (currentSpecialistId ?? selectedSpecialistId)
+    : selectedSpecialistId;
+  const specialistScopedAppointments = effectiveSpecialistId === "all"
+    ? appointments
+    : appointments.filter((appointment) => appointment.specialistId === effectiveSpecialistId);
+  const specialistScopedBlocks = effectiveSpecialistId === "all"
+    ? calendarBlocks
+    : calendarBlocks.filter((block) => block.specialistId === effectiveSpecialistId);
+  const selectedSpecialist = activeSpecialists.find(
+    (specialist) => specialist.id === effectiveSpecialistId,
+  );
   const selectedClientFilter = findClientByIdentity(clients, selectedClientName);
   const selectedClientFilterName = selectedClientFilter?.name;
   const clientScopedAppointments = selectedClientFilterName
-    ? appointments.filter((appointment) => appointmentBelongsToClient(appointment, selectedClientFilter, clients))
-    : appointments;
-  const fallbackAppointment = appointments[0] ?? {
+    ? specialistScopedAppointments.filter((appointment) => appointmentBelongsToClient(appointment, selectedClientFilter, clients))
+    : specialistScopedAppointments;
+  const fallbackAppointment = specialistScopedAppointments[0] ?? {
     client: "Нет записи",
     date: getCalendarIsoDate(workingSchedule),
     durationMinutes: 60,
@@ -295,7 +324,7 @@ export function CalendarWorkspace({
   };
   const filteredAppointments = clientScopedAppointments.filter((appointment) =>
     matchesSearch(
-      [appointment.date, appointment.time, appointment.client, appointment.service, appointment.status, appointment.note],
+      [appointment.date, appointment.time, appointment.client, appointment.service, appointment.specialistName, appointment.status, appointment.note],
       query,
     ),
   );
@@ -330,10 +359,10 @@ export function CalendarWorkspace({
   const selectedDayAppointments = sortAppointments(
     filteredAppointments.filter((appointment) => appointment.date === selectedDate),
   );
-  const selectedDayBlocks = calendarBlocks
+  const selectedDayBlocks = specialistScopedBlocks
     .filter((block) => block.blockDate === selectedDate)
     .sort((first, second) => first.startsAt.localeCompare(second.startsAt));
-  const selectedDayCapacityCount = appointments.filter(
+  const selectedDayCapacityCount = specialistScopedAppointments.filter(
     (appointment) => appointment.date === selectedDate,
   ).filter(
     (appointment) => appointment.status !== "Отменена",
@@ -358,9 +387,12 @@ export function CalendarWorkspace({
     date: addDays(weekStart, index),
     day: Number(addDays(weekStart, index).slice(-2)),
   }));
+  const specialistCapacity = effectiveSpecialistId === "all"
+    ? dailySlotCapacity * Math.max(activeSpecialists.length, 1)
+    : dailySlotCapacity;
   const selectedDayFreeCount = selectedDayBlocks.some(isFullDayCalendarBlock)
     ? 0
-    : freeSlotCount(selectedDayCapacityCount, dailySlotCapacity);
+    : freeSlotCount(selectedDayCapacityCount, specialistCapacity);
 
   useEffect(() => {
     if (!resizingAppointmentKey) return;
@@ -368,7 +400,7 @@ export function CalendarWorkspace({
     document.body.classList.add("admin-calendar-resize-active");
     return () => document.body.classList.remove("admin-calendar-resize-active");
   }, [resizingAppointmentKey]);
-  const selectedDayManualOverflow = manualAppointmentOverflow(selectedDayCapacityCount, dailySlotCapacity);
+  const selectedDayManualOverflow = manualAppointmentOverflow(selectedDayCapacityCount, specialistCapacity);
   const confirmedListCount = listAppointments.filter((appointment) => appointment.status === "Подтверждена").length;
   const attentionListCount = listAppointments.filter(
     (appointment) => appointment.status !== "Подтверждена" && appointment.status !== "Отменена",
@@ -397,7 +429,7 @@ export function CalendarWorkspace({
       const date = days[index]?.date;
       if (!date) return [];
 
-      return calendarBlocks
+      return specialistScopedBlocks
         .filter((block) => block.blockDate === date)
         .map((block) =>
           createPortal(
@@ -478,8 +510,8 @@ export function CalendarWorkspace({
     return {
       ...classifyAppointmentAgainstSchedule(candidate, workingSchedule),
       overlap: hasAppointmentOverlap(
-        candidate,
-        appointments
+        { ...candidate, specialistId: appointment.specialistId },
+        specialistScopedAppointments
           .filter(
             (candidate) =>
               appointmentKey(candidate) !== ignoredAppointmentKey && isSchedulingBlockingStatus(candidate.status),
@@ -487,6 +519,7 @@ export function CalendarWorkspace({
           .map((candidate) => ({
             date: candidate.date,
             duration: candidate.durationMinutes ?? 60,
+            specialistId: candidate.specialistId,
             start: candidate.time,
           })),
       ),
@@ -498,7 +531,7 @@ export function CalendarWorkspace({
 
     const originalKey = appointmentKey(originalAppointment);
 
-    return appointments.find(
+    return specialistScopedAppointments.find(
       (candidate) =>
         appointmentKey(candidate) !== originalKey &&
         isSchedulingBlockingStatus(candidate.status) &&
@@ -506,11 +539,13 @@ export function CalendarWorkspace({
           {
             date: appointment.date,
             duration: appointment.durationMinutes ?? 60,
+            specialistId: appointment.specialistId,
             start: appointment.time,
           },
           {
             date: candidate.date,
             duration: candidate.durationMinutes ?? 60,
+            specialistId: candidate.specialistId,
             start: candidate.time,
           },
         ),
@@ -748,6 +783,14 @@ export function CalendarWorkspace({
     );
   }
 
+  function changeSpecialistScope(specialistId: string) {
+    setSelectedSpecialistId(specialistId);
+    setIsAppointmentDrawerOpen(false);
+    setSelectedKey("");
+    setPendingConflict(null);
+    setCalendarError("");
+  }
+
   return (
     <div className="admin-split-view admin-calendar-workspace">
       <section className="admin-panel admin-calendar-panel" aria-labelledby="calendar-heading">
@@ -768,6 +811,32 @@ export function CalendarWorkspace({
           onSwitchMode={switchMode}
           selectedDate={selectedDate}
         />
+        {role === "owner" || role === "administrator" ? (
+          <div className="admin-route-context" aria-label="Фильтр календаря по специалисту">
+            <label>
+              Специалист
+              <select
+                aria-label="Показать календарь специалиста"
+                onChange={(event) => changeSpecialistScope(event.target.value)}
+                value={effectiveSpecialistId}
+              >
+                <option value="all">Все специалисты</option>
+                {activeSpecialists.map((specialist) => (
+                  <option key={specialist.id} value={specialist.id}>
+                    {specialist.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : role === "specialist" ? (
+          <div className="admin-route-context" aria-label="Текущий календарь специалиста">
+            <div>
+              <strong>Мой календарь</strong>
+              <span>{selectedSpecialist?.displayName ?? "Назначенный специалист"}</span>
+            </div>
+          </div>
+        ) : null}
         {selectedClientFilterName ? (
           <div className="admin-route-context" aria-label="Фильтр календаря по клиенту">
             <div>
@@ -775,9 +844,11 @@ export function CalendarWorkspace({
               <span>Календарь открыт на ближайшей записи клиента, список и месяц тоже считаются только по нему.</span>
             </div>
             <div className="admin-route-context-actions">
-              <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilter.id, role)}>
-                Открыть карточку клиента
-              </Link>
+              {role !== "specialist" ? (
+                <Link className="admin-client-inline-link" href={clientProfileHref(selectedClientFilter.id, role)}>
+                  Открыть карточку клиента
+                </Link>
+              ) : null}
               <Link className="admin-client-inline-link" href={adminSectionHref("calendar", role)}>
                 Сбросить фильтр
               </Link>
@@ -866,16 +937,16 @@ export function CalendarWorkspace({
               ))}
               {monthDays.map((day) => {
                 const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
-                const dayBlocks = calendarBlocks.filter((block) => block.blockDate === day.date);
+                const dayBlocks = specialistScopedBlocks.filter((block) => block.blockDate === day.date);
                 const dayBlockCount = dayBlocks.length;
-                const capacityAppointmentCount = appointments.filter(
+                const capacityAppointmentCount = specialistScopedAppointments.filter(
                   (appointment) => appointment.date === day.date,
                 ).filter(
                   (appointment) => appointment.status !== "Отменена",
                 ).length;
                 const countLabel = appointmentCountLabel(dayAppointments.length);
-                const freeCount = freeSlotCount(capacityAppointmentCount, dailySlotCapacity);
-                const manualOverflow = manualAppointmentOverflow(capacityAppointmentCount, dailySlotCapacity);
+                const freeCount = freeSlotCount(capacityAppointmentCount, specialistCapacity);
+                const manualOverflow = manualAppointmentOverflow(capacityAppointmentCount, specialistCapacity);
                 const availabilityLabels = monthAvailabilityLabels(dayBlocks, freeCount, manualOverflow);
                 const freeLabel = availabilityLabels.full;
                 const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
@@ -917,7 +988,7 @@ export function CalendarWorkspace({
               <dl className="admin-detail-list">
                 <div>
                   <dt>Расчет слотов</dt>
-                  <dd>{slotCountLabel(dailySlotCapacity)} в день</dd>
+                  <dd>{slotCountLabel(specialistCapacity)} в день</dd>
                 </div>
                 <div>
                   <dt>Буфер между сеансами</dt>
@@ -953,6 +1024,7 @@ export function CalendarWorkspace({
                       </strong>
                       <span>
                         {calendarBlockKindLabel(block)}
+                        {block.specialistName ? ` · ${block.specialistName}` : ""}
                         {block.internalNote ? ` · ${block.internalNote}` : ""}
                       </span>
                     </div>
@@ -973,7 +1045,7 @@ export function CalendarWorkspace({
             {selectedDayManualOverflow > 0 ? (
               <div className="admin-calendar-capacity-note" role="status">
                 <strong>
-                  {selectedDayCapacityCount} из {dailySlotCapacity}
+                  {selectedDayCapacityCount} из {specialistCapacity}
                 </strong>
                 <span>
                   {selectedDayManualOverflow} {selectedDayManualOverflow === 1 ? "запись добавлена" : "записи добавлены"} вручную.
@@ -1027,6 +1099,7 @@ export function CalendarWorkspace({
                       <strong>{appointment.client}</strong>
                       <small>
                         {formatCalendarDay(appointment.date)} · {appointment.service}
+                        {appointment.specialistName ? ` · ${appointment.specialistName}` : ""}
                       </small>
                       {appointment.note ? <small>{appointment.note}</small> : null}
                     </span>

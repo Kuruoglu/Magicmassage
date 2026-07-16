@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Appointment, ClientRecord } from "@/admin/domain";
+import type { Appointment, ClientRecord, SpecialistRecord } from "@/admin/domain";
 
 import {
   CalendarAppointmentCancelDialog,
@@ -46,6 +46,25 @@ const clients: ClientRecord[] = [
   },
 ];
 
+const specialists: SpecialistRecord[] = [
+  {
+    color: "#7c4d9d",
+    displayName: "Натали",
+    displayOrder: 1,
+    id: "specialist-natali",
+    publicBookingEnabled: true,
+    status: "active",
+  },
+  {
+    color: "#2f7d6d",
+    displayName: "Яна",
+    displayOrder: 2,
+    id: "specialist-yana",
+    publicBookingEnabled: true,
+    status: "active",
+  },
+];
+
 const conflictingAppointment: Appointment = {
   client: "Мария Иванова",
   clientId: "client-maria",
@@ -54,6 +73,8 @@ const conflictingAppointment: Appointment = {
   id: "appointment-maria",
   note: "",
   service: "Лимфодренажный массаж",
+  specialistId: "specialist-natali",
+  specialistName: "Натали",
   status: "Подтверждена",
   time: "14:30",
 };
@@ -78,6 +99,7 @@ function renderAppointmentDialog(overrides: Partial<CalendarAppointmentDialogPro
       prefillDate="2026-07-14"
       role="owner"
       siteSettings={siteSettings}
+      specialists={specialists}
       {...overrides}
     />,
   );
@@ -231,7 +253,7 @@ describe("CalendarAppointmentDialog", () => {
     fireEvent.change(within(dialog).getByLabelText("Дата"), { target: { value: "" } });
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
 
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите клиента, дату и время.");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите клиента, специалиста, дату и время.");
     expect(onSave).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -242,6 +264,7 @@ describe("CalendarAppointmentDialog", () => {
       appointments: [conflictingAppointment],
       prefillClient: clients[0],
       role: "specialist",
+      currentSpecialistId: "specialist-natali",
     });
     const dialog = screen.getByRole("dialog", { name: "Новая запись" });
 
@@ -256,6 +279,48 @@ describe("CalendarAppointmentDialog", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it("lets an owner assign another specialist without creating a cross-specialist conflict", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      appointments: [conflictingAppointment],
+      prefillClient: clients[0],
+    });
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+
+    expect(within(dialog).getByRole("status")).toHaveTextContent("Запись пересекается с Мария Иванова");
+    await user.selectOptions(within(dialog).getByLabelText("Специалист"), "specialist-yana");
+    expect(within(dialog).queryByText(/Запись пересекается/)).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specialistId: "specialist-yana",
+        specialistName: "Яна",
+      }),
+    );
+  });
+
+  it("fixes a specialist to their own calendar", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      currentSpecialistId: "specialist-yana",
+      prefillClient: clients[0],
+      role: "specialist",
+    });
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+
+    expect(within(dialog).getByLabelText("Специалист")).toHaveTextContent("Яна");
+    expect(within(dialog).queryByRole("combobox", { name: "Специалист" })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specialistId: "specialist-yana",
+        specialistName: "Яна",
+      }),
+    );
+  });
+
   it("allows back-to-back appointments and ignores completed appointments for conflicts", () => {
     const { rerender } = render(
       <CalendarAppointmentDialog
@@ -268,6 +333,7 @@ describe("CalendarAppointmentDialog", () => {
         prefillDate="2026-07-14"
         role="owner"
         siteSettings={siteSettings}
+        specialists={specialists}
       />,
     );
 
@@ -289,6 +355,7 @@ describe("CalendarAppointmentDialog", () => {
         prefillDate="2026-07-14"
         role="owner"
         siteSettings={siteSettings}
+        specialists={specialists}
       />,
     );
 

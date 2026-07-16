@@ -18,6 +18,7 @@ import type {
   AdminServiceDatabaseRow,
   AdminServiceTranslationDatabaseRow,
   AdminSiteSettingsDatabaseRow,
+  AdminSpecialistDatabaseRow,
   AdminUserRecord,
   AdminUserStatus,
   Appointment,
@@ -45,6 +46,7 @@ import type {
   ServiceTranslationRecord,
   ServiceStatus,
   SettingsRecord,
+  SpecialistRecord,
   StripeMode,
 } from "./domain";
 
@@ -121,19 +123,20 @@ export type AdminFinanceExportLogInput = {
 };
 
 export type AdminRepository = {
-  listAppointments(): Promise<Appointment[]>;
+  listAppointments(specialistId?: string): Promise<Appointment[]>;
   listAdminUsers(): Promise<AdminUserRecord[]>;
   listBlogPosts(): Promise<BlogPostRecord[]>;
-  listCalendarBlocks(): Promise<CalendarBlock[]>;
+  listCalendarBlocks(specialistId?: string): Promise<CalendarBlock[]>;
   listCertificates(): Promise<CertificateRecord[]>;
   listClients(): Promise<ClientRecord[]>;
   listContactChannels(): Promise<ContactChannelRecord[]>;
   listMedia(): Promise<MediaRecord[]>;
   listPrices(): Promise<PriceRecord[]>;
   listServices(): Promise<ServiceRecord[]>;
+  listSpecialists(): Promise<SpecialistRecord[]>;
   listStripeSales(period: AdminFinancePeriod): Promise<FinanceRow[]>;
   loadContactSettings(): Promise<ContactSettingsRecord | undefined>;
-  loadDomainRecords(): Promise<AdminDomainRecords>;
+  loadDomainRecords(specialistId?: string): Promise<AdminDomainRecords>;
   loadSettings(): Promise<SettingsRecord | undefined>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
   saveAppointment(appointment: Appointment, auditContext?: AdminRepositoryAuditContext): Promise<void>;
@@ -187,6 +190,7 @@ const appointmentColumns = [
   "public_reference",
   "service_slug",
   "service_name",
+  "specialist_id",
   "starts_at",
   "starts_on",
   "status",
@@ -199,8 +203,18 @@ const calendarBlockColumns = [
   "id",
   "internal_note",
   "kind",
+  "specialist_id",
   "starts_at",
   "version",
+].join(", ");
+
+const specialistColumns = [
+  "color",
+  "display_name",
+  "display_order",
+  "id",
+  "public_booking_enabled",
+  "status",
 ].join(", ");
 
 const certificateColumns = [
@@ -327,6 +341,7 @@ const adminProfileColumns = [
   "display_name",
   "email",
   "last_login_at",
+  "mfa_verified_at",
   "role",
   "status",
   "updated_at",
@@ -780,6 +795,7 @@ function mapAppointmentRow(row: AdminAppointmentDatabaseRow): Appointment {
     publicReference: row.public_reference ?? undefined,
     service: row.service_name,
     serviceSlug: row.service_slug ?? undefined,
+    specialistId: row.specialist_id ?? undefined,
     status: mapAppointmentStatus(row.status),
     time: normalizeTime(row.starts_at),
     version: row.version ?? 1,
@@ -793,6 +809,7 @@ function mapCalendarBlockRow(row: AdminCalendarBlockDatabaseRow): CalendarBlock 
     id: row.id,
     internalNote: row.internal_note,
     kind: row.kind,
+    specialistId: row.specialist_id ?? undefined,
     startsAt: normalizeTime(row.starts_at),
     version: row.version,
   };
@@ -803,7 +820,7 @@ function mapAppointmentRecordToRow(appointment: Appointment): AdminAppointmentDa
     throw new Error("admin_appointments: client_id is required");
   }
 
-  return {
+  const row: AdminAppointmentDatabaseRow = {
     buffer_minutes: appointment.bufferMinutes ?? 15,
     client_id: appointment.clientId,
     client_name_snapshot: appointment.client,
@@ -820,7 +837,47 @@ function mapAppointmentRecordToRow(appointment: Appointment): AdminAppointmentDa
     starts_at: appointment.time,
     starts_on: appointment.date,
     status: mapAppointmentStatusToDatabase(appointment.status),
-    version: appointment.version,
+  };
+
+  if (appointment.specialistId) row.specialist_id = appointment.specialistId;
+  if (appointment.version !== undefined) row.version = appointment.version;
+
+  return row;
+}
+
+function mapSpecialistRow(row: AdminSpecialistDatabaseRow): SpecialistRecord {
+  return {
+    color: row.color,
+    displayName: row.display_name,
+    displayOrder: row.display_order,
+    id: row.id,
+    publicBookingEnabled: row.public_booking_enabled,
+    status: row.status,
+  };
+}
+
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length > 4 ? `${phone.slice(0, 4)}••••${digits.slice(-2)}` : "••••";
+}
+
+function maskEmail(email: string) {
+  const [local, domain] = email.split("@", 2);
+  return domain ? `${local.slice(0, 1)}•••@${domain}` : "••••";
+}
+
+function restrictClientContact(client: ClientRecord): ClientRecord {
+  return {
+    ...client,
+    contactRestricted: true,
+    email: maskEmail(client.email),
+    history: [],
+    note: "",
+    phone: maskPhone(client.phone),
+    preferredContact: "Скрыто",
+    tags: [],
+    telegram: "",
+    totalSpend: "—",
   };
 }
 
@@ -1275,7 +1332,7 @@ function mapAdminProfileRow(row: AdminProfileDatabaseRow): AdminUserRecord {
     name: row.display_name,
     role: resolveAdminRole(row.role),
     status: mapAdminUserStatus(row.status),
-    twoFactor: false,
+    twoFactor: Boolean(row.mfa_verified_at),
   };
 }
 
@@ -1392,20 +1449,20 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     return rows.map(mapClientRow);
   }
 
-  async function listAppointments() {
+  async function listAppointments(specialistId?: string) {
     const rows = await selectRows<AdminAppointmentDatabaseRow>(client, "admin_appointments", appointmentColumns, (query) =>
-      query.order("starts_on", { ascending: true }),
+      (specialistId ? query.eq("specialist_id", specialistId) : query).order("starts_on", { ascending: true }),
     );
 
     return rows.map(mapAppointmentRow);
   }
 
-  async function listCalendarBlocks() {
+  async function listCalendarBlocks(specialistId?: string) {
     const rows = await selectRows<AdminCalendarBlockDatabaseRow>(
       client,
       "admin_calendar_blocks",
       calendarBlockColumns,
-      (query) => query.order("block_date", { ascending: true }),
+      (query) => (specialistId ? query.eq("specialist_id", specialistId) : query).order("block_date", { ascending: true }),
     );
 
     return rows.map(mapCalendarBlockRow);
@@ -1431,6 +1488,14 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     );
 
     return rows.map((row) => mapServiceRow(row, translationRows));
+  }
+
+  async function listSpecialists() {
+    const rows = await selectRows<AdminSpecialistDatabaseRow>(client, "admin_specialists", specialistColumns, (query) =>
+      query.order("display_order", { ascending: true }),
+    );
+
+    return rows.map(mapSpecialistRow);
   }
 
   async function listPrices() {
@@ -1487,17 +1552,40 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     return rows[0] ? mapSettingsRow(rows[0]) : undefined;
   }
 
-  async function loadDomainRecords() {
-    const clients = await listClients();
-    const appointments = await listAppointments();
-    const calendarBlocks = await listCalendarBlocks();
-    const certificates = await listCertificates();
+  async function loadDomainRecords(specialistId?: string) {
+    const allClients = await listClients();
+    const [appointments, calendarBlocks, specialists] = await Promise.all([
+      listAppointments(specialistId),
+      listCalendarBlocks(specialistId),
+      listSpecialists(),
+    ]);
+    const assignedClientIds = new Set(appointments.map((appointment) => appointment.clientId).filter(Boolean));
+    const clients = specialistId
+      ? allClients.filter((clientRecord) => assignedClientIds.has(clientRecord.id)).map(restrictClientContact)
+      : allClients;
+    const certificates = specialistId ? [] : await listCertificates();
+    const specialistNames = new Map(specialists.map((specialist) => [specialist.id, specialist.displayName]));
+    const namedAppointments = appointments.map((appointment) => ({
+      ...appointment,
+      specialistName: appointment.specialistId ? specialistNames.get(appointment.specialistId) : undefined,
+      ...(specialistId
+        ? {
+            publicEmail: maskEmail(appointment.publicEmail ?? ""),
+            publicPhone: maskPhone(appointment.publicPhone ?? ""),
+          }
+        : {}),
+    }));
+    const namedCalendarBlocks = calendarBlocks.map((block) => ({
+      ...block,
+      specialistName: block.specialistId ? specialistNames.get(block.specialistId) : undefined,
+    }));
 
     return {
-      appointments,
-      calendarBlocks,
+      appointments: namedAppointments,
+      calendarBlocks: namedCalendarBlocks,
       certificates,
-      clients: addAppointmentHistories(clients, appointments),
+      clients: specialistId ? clients : addAppointmentHistories(clients, appointments),
+      specialists,
     };
   }
 
@@ -1698,6 +1786,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     listMedia,
     listPrices,
     listServices,
+    listSpecialists,
     listStripeSales,
     loadContactSettings,
     loadDomainRecords,

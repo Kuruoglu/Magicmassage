@@ -117,6 +117,24 @@ const backToBackAdminAppointmentsMigrationPath = join(
   "migrations",
   "20260715270000_allow_back_to_back_admin_appointments.sql",
 );
+const multiSpecialistSecurityMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260716100000_multi_specialist_access_security.sql",
+);
+const adminMfaTrackingMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716120000_track_admin_mfa_login.sql",
+);
+const lastOwnerProtectionMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716130000_protect_last_admin_owner.sql",
+);
+const specialistOffboardingMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716140000_harden_specialist_offboarding.sql",
+);
+const multiSpecialistHardeningMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716150000_harden_multi_specialist_security.sql",
+);
 
 function migrationSql() {
   return readFileSync(migrationPath, "utf8");
@@ -441,5 +459,113 @@ describe("public booking migration", () => {
 
     expect(sql).toContain("drop function if exists public.public_booking_confirm");
     expect(sql).toContain("text, text, text, text, text, text, text, text, boolean");
+  });
+
+  it("isolates specialist calendars and contact access in the latest migration", () => {
+    const sql = readFileSync(multiSpecialistSecurityMigrationPath, "utf8");
+
+    expect(sql).toContain("create table if not exists public.admin_specialists");
+    expect(sql).toContain("specialist_id with =");
+    expect(sql).toContain("public_daily_limit integer not null default 8");
+    expect(sql).toContain("create or replace function public.public_booking_specialist_available");
+    expect(sql).toContain("create or replace function public.admin_mutate_specialist_calendar_block");
+    expect(sql).toContain("create or replace function public.admin_reveal_appointment_contact");
+    expect(sql).toContain("revoke select on table public.admin_clients from authenticated");
+    expect(sql).toContain("client.contact.reveal");
+    expect(sql).toContain("bulk_contact_reveal");
+  });
+
+  it("tracks aal2 logins and protects the last active owner", () => {
+    const mfaSql = readFileSync(adminMfaTrackingMigrationPath, "utf8");
+    const ownerSql = readFileSync(lastOwnerProtectionMigrationPath, "utf8");
+
+    expect(mfaSql).toContain("mfa_verified_at");
+    expect(mfaSql).toContain("'assurance_level', 'aal2'");
+    expect(ownerSql).toContain("last_active_owner_required");
+    expect(ownerSql).toContain("before update of role, status or delete");
+  });
+
+  it("removes direct staff reads and finalizes specialist offboarding", () => {
+    const sql = readFileSync(specialistOffboardingMigrationPath, "utf8");
+
+    expect(sql).toContain("revoke select on table public.admin_profiles from authenticated");
+    expect(sql).toContain("revoke select on table public.admin_audit_log from authenticated");
+    expect(sql).toContain("create or replace function public.admin_finalize_specialist_offboarding");
+    expect(sql).toContain("status = 'offboarded'");
+    expect(sql).toContain("set status = 'expired'");
+    expect(sql).toContain("after update of role, status or delete");
+  });
+
+  it("hardens specialist authorization, concurrency, assignment, and alert RPCs", () => {
+    const sql = readFileSync(multiSpecialistHardeningMigrationPath, "utf8");
+    const appointmentRpc = sql.slice(
+      sql.indexOf("create or replace function public.admin_save_appointment_with_audit"),
+      sql.indexOf("create or replace function public.admin_lock_public_daily_limit"),
+    );
+    const holdRpc = sql.slice(
+      sql.indexOf("create or replace function public.public_booking_create_hold"),
+      sql.indexOf("create or replace function public.admin_reveal_appointment_contact"),
+    );
+    const revealRpc = sql.slice(
+      sql.indexOf("create or replace function public.admin_reveal_appointment_contact"),
+      sql.indexOf("create or replace function public.admin_protect_last_active_owner"),
+    );
+    const alertListRpc = sql.slice(
+      sql.indexOf("create or replace function public.admin_list_security_alerts()"),
+      sql.indexOf("create or replace function public.admin_resolve_security_alert"),
+    );
+    const alertResolveRpc = sql.slice(
+      sql.indexOf("create or replace function public.admin_resolve_security_alert"),
+      sql.indexOf("-- Preserve the server write boundary"),
+    );
+
+    expect(appointmentRpc).toContain("appointment_client_forbidden");
+    expect(appointmentRpc).toContain("assigned_appointment.specialist_id = actor_specialist_id");
+    expect(appointmentRpc).toContain("assigned_appointment.client_id = requested_client_id");
+    expect(appointmentRpc).toContain("appointment_public_hold_conflict");
+    expect(appointmentRpc).not.toContain("public_booking_daily_limit");
+
+    expect(sql).toContain("hashtextextended('admin-contact-reveal:' || p_actor_user_id::text, 0)");
+    expect(revealRpc).toContain("recent_reveals >= 60");
+    expect(revealRpc).toContain("recent_reveals >= 19");
+    expect(revealRpc).toContain("appointment.status not in ('confirmed', 'pending', 'request')");
+    expect(revealRpc).toContain("interval '48 hours'");
+    expect(revealRpc).toContain("interval '180 days'");
+    expect(sql).toContain("hashtextextended('admin-active-owner', 0)");
+
+    expect(sql).toContain("create trigger sync_public_daily_limit");
+    expect(sql).toContain("new.public_daily_limit := canonical_daily_limit");
+    expect(sql).toContain("hashtextextended('admin-public-daily-limit', 0)");
+    expect(sql).toContain("specialist.public_daily_limit is distinct from new.public_booking_daily_limit");
+    expect(sql).toContain("create trigger assign_new_service_to_specialists");
+    expect(sql).toContain("create trigger assign_specialist_to_services_on_insert");
+    expect(sql).toContain("hashtextextended('admin-specialist-services', 0)");
+    expect(sql).toContain("specialist.status = 'active'");
+    expect(sql).toContain("specialist.public_booking_enabled");
+
+    expect(holdRpc).toContain("from public.public_booking_holds active_hold");
+    expect(holdRpc).toContain("active_hold.expires_at > now()");
+    expect(holdRpc).toContain("active_hold.id <> existing_session_hold.id");
+
+    expect(alertListRpc).toContain("returns table (");
+    expect(alertListRpc).toContain("actor_name text");
+    expect(alertListRpc).toContain("event_count integer");
+    expect(alertListRpc).toContain("security definer");
+    expect(alertListRpc).toContain("coalesce(auth.jwt() ->> 'aal', '') <> 'aal2'");
+    expect(alertListRpc).toContain("profile.role::text in ('owner', 'administrator')");
+    expect(alertListRpc).toContain("coalesce(auth.role(), '') = 'service_role'");
+    expect(alertListRpc).not.toContain("alert.actor_user_id,");
+    expect(alertListRpc).not.toContain("alert.metadata,");
+    expect(alertResolveRpc).toContain("returns boolean");
+    expect(alertResolveRpc).toContain("alert.resolved_at is null");
+    expect(alertResolveRpc).toContain("return false;");
+    expect(alertResolveRpc).toContain("return true;");
+    expect(alertResolveRpc).toContain("'security_alert.resolve'");
+    expect(sql).toContain("grant execute on function public.admin_list_security_alerts() to authenticated, service_role");
+    expect(alertResolveRpc).toContain("p_actor_user_id uuid default null");
+    expect(alertResolveRpc).toContain("actor_user_id uuid := coalesce(authenticated_user_id, p_actor_user_id)");
+    expect(sql).toContain("grant execute on function public.admin_resolve_security_alert(uuid, uuid) to authenticated, service_role");
+    expect(sql).toContain("revoke all on table public.admin_security_alerts from anon, authenticated");
+    expect(sql).toContain("grant select, insert, update, delete on table public.admin_security_alerts to service_role");
   });
 });

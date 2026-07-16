@@ -22,9 +22,11 @@ admin/CRM platform:
 - The public booking session is a short-lived signed HttpOnly cookie. Reloading
   or switching locale restores the same active hold with a rotated bearer token;
   forged or expired cookies cannot restore or create holds.
-- Public availability is capped at eight non-cancelled appointments per day.
-  Natali may create any number of manual admin appointments, including a ninth
-  or tenth appointment; the public cap never blocks an authorized admin write.
+- Public availability is automatically distributed across active specialists.
+  Each specialist uses the owner-configured public cap from 1 to 8 appointments
+  per day (8 by default).
+  An authorized owner may create a ninth, tenth, or later manual appointment;
+  the public cap never blocks an authorized admin write.
 - Booking buffers are owner-configurable as 15 or 30 minutes and are snapshotted
   on each appointment. Public starts use a 30-minute grid with a 30-minute
   same-day lead time.
@@ -43,6 +45,13 @@ platform includes Supabase/PostgreSQL, Supabase Auth, protected `/admin` routes,
 role checks, clients, appointments, calendar blocks, services, prices, media,
 contacts, blog, settings, certificates, and finance exports.
 
+Specialist access is intentionally narrow: each specialist has a separate
+calendar, sees only assigned appointments and blocks, has no standalone client
+or certificate module, and may reveal an assigned client's contact details only
+through the audited, rate-limited appointment action. The first client assignment
+must be made by an owner or administrator. Every admin role requires TOTP
+multi-factor authentication.
+
 Important booking invariants:
 
 - Public slot hold and confirmation operations are atomic and idempotent.
@@ -51,6 +60,10 @@ Important booking invariants:
 - Admin calendar blocks are separate records, never fake clients or fake
   appointments.
 - Owner booking-setting changes and calendar-block mutations are audited.
+- Specialist contact reveal is limited to operational appointment statuses and
+  the interval from 48 hours after a visit to 180 days before a future visit.
+- Bulk contact access creates a visible owner/admin security alert; resolving it
+  records the responsible owner or administrator in the audit log.
 - Manual admin appointments show capacity overflow such as `10 из 8`, but remain
   permitted.
 
@@ -61,7 +74,6 @@ Important booking invariants:
 - Online deposits or massage payments outside the gift-certificate flow.
 - Waiting lists, packages, loyalty, and promotion codes.
 - Two-way Google Calendar synchronization.
-- Multiple-specialist public scheduling.
 
 ## Approved Decisions
 

@@ -5,6 +5,25 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CalendarBlockDialog } from "./CalendarBlockDialog";
 
+const specialists = [
+  {
+    color: "#7c4d9d",
+    displayName: "Натали",
+    displayOrder: 1,
+    id: "specialist-natali",
+    publicBookingEnabled: true,
+    status: "active" as const,
+  },
+  {
+    color: "#2f7d6d",
+    displayName: "Яна",
+    displayOrder: 2,
+    id: "specialist-yana",
+    publicBookingEnabled: true,
+    status: "active" as const,
+  },
+];
+
 describe("CalendarBlockDialog", () => {
   it("contains keyboard focus, closes on Escape, and restores focus to its trigger", async () => {
     const user = userEvent.setup();
@@ -92,6 +111,53 @@ describe("CalendarBlockDialog", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("пересекается с записью клиента");
     expect(screen.getByRole("dialog", { name: "Заблокировать время" })).toBeInTheDocument();
+  });
+
+  it("assigns owner-created blocked time to the selected specialist", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn(async () => ({ ok: true as const }));
+
+    render(
+      <CalendarBlockDialog
+        initialDate="2026-07-20"
+        onClose={vi.fn()}
+        onSave={onSave}
+        role="owner"
+        specialists={specialists}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText("Специалист"), "specialist-yana");
+    await user.click(screen.getByRole("button", { name: "Заблокировать" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specialistId: "specialist-yana",
+        specialistName: "Яна",
+      }),
+    );
+  });
+
+  it("keeps specialist-created blocked time in their own calendar", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn(async () => ({ ok: true as const }));
+
+    render(
+      <CalendarBlockDialog
+        currentSpecialistId="specialist-yana"
+        initialDate="2026-07-20"
+        onClose={vi.fn()}
+        onSave={onSave}
+        role="specialist"
+        specialists={specialists}
+      />,
+    );
+
+    expect(screen.getByLabelText("Специалист")).toHaveTextContent("Яна");
+    expect(screen.queryByRole("combobox", { name: "Специалист" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Заблокировать" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ specialistId: "specialist-yana" }));
   });
 
   it("ignores every close action while a block is being saved", async () => {

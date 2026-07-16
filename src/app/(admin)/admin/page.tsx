@@ -20,6 +20,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const query = await searchParams;
   const serviceClient = createSupabaseAdminClient();
   let role: AdminRoleId = "owner";
+  let actorUserId: string | undefined;
+  let specialistId: string | undefined;
 
   if (serviceClient) {
     const cookieStore = await cookies();
@@ -37,6 +39,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     }
 
     role = authorization.role;
+    actorUserId = authorization.userId;
+    specialistId = authorization.specialistId;
   } else if (!isAdminDemoFallbackAllowed()) {
     redirect("/admin/login");
   }
@@ -44,12 +48,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const selection = resolveAdminShellSelection(query, role);
   const initialData = await loadAdminShellData({
     activeSection: selection.activeSection,
+    specialistId,
     role,
   });
 
   return (
     <AdminShell
       activeSection={selection.activeSection}
+      actorUserId={actorUserId}
       calendarAction={selection.calendarAction}
       initialData={initialData}
       role={role}

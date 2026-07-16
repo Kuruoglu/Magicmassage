@@ -8,17 +8,21 @@ import {
   useState,
 } from "react";
 
-import type { CalendarBlock, CalendarBlockKind } from "@/admin/domain";
+import type { AdminRoleId } from "@/admin/config";
+import type { CalendarBlock, CalendarBlockKind, SpecialistRecord } from "@/admin/domain";
 
 export type CalendarBlockSaveResult =
   | { ok: true }
   | { message: string; ok: false };
 
 type CalendarBlockDialogProps = {
+  currentSpecialistId?: string;
   initialBlock?: CalendarBlock;
   initialDate: string;
   onClose: () => void;
   onSave: (block: CalendarBlock) => Promise<CalendarBlockSaveResult>;
+  role?: AdminRoleId;
+  specialists?: SpecialistRecord[];
 };
 
 const kindOptions: Array<{ label: string; value: CalendarBlockKind }> = [
@@ -36,10 +40,13 @@ function getFocusableElements(container: HTMLElement) {
 }
 
 export function CalendarBlockDialog({
+  currentSpecialistId,
   initialBlock,
   initialDate,
   onClose,
   onSave,
+  role = "owner",
+  specialists = [],
 }: CalendarBlockDialogProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -48,6 +55,13 @@ export function CalendarBlockDialog({
   const [endsAt, setEndsAt] = useState(initialBlock?.endsAt ?? "13:00");
   const [kind, setKind] = useState<CalendarBlockKind>(initialBlock?.kind ?? "personal");
   const [internalNote, setInternalNote] = useState(initialBlock?.internalNote ?? "");
+  const activeSpecialists = specialists.filter((specialist) => specialist.status === "active");
+  const defaultSpecialist =
+    activeSpecialists.find((specialist) => specialist.id === currentSpecialistId) ??
+    activeSpecialists[0];
+  const [specialistId, setSpecialistId] = useState<string | undefined>(
+    initialBlock?.specialistId ?? defaultSpecialist?.id,
+  );
   const [isFullDay, setIsFullDay] = useState(
     initialBlock?.startsAt === "00:00" && initialBlock.endsAt === "23:59",
   );
@@ -106,10 +120,12 @@ export function CalendarBlockDialog({
     const nextStartsAt = isFullDay ? "00:00" : startsAt;
     const nextEndsAt = isFullDay ? "23:59" : endsAt;
 
-    if (!blockDate || nextStartsAt >= nextEndsAt) {
-      setError("Проверьте дату и укажите время окончания позже времени начала.");
+    if (!blockDate || nextStartsAt >= nextEndsAt || (activeSpecialists.length > 0 && !specialistId)) {
+      setError("Проверьте специалиста, дату и укажите время окончания позже времени начала.");
       return;
     }
+
+    const specialist = activeSpecialists.find((candidate) => candidate.id === specialistId);
 
     setIsSaving(true);
     setError("");
@@ -119,6 +135,8 @@ export function CalendarBlockDialog({
       id: initialBlock?.id ?? crypto.randomUUID(),
       internalNote: internalNote.trim(),
       kind,
+      specialistId,
+      specialistName: specialist?.displayName ?? initialBlock?.specialistName,
       startsAt: nextStartsAt,
       version: initialBlock?.version,
     });
@@ -156,6 +174,35 @@ export function CalendarBlockDialog({
         </div>
 
         <form className="admin-action-body" onSubmit={handleSubmit}>
+          {role === "owner" || role === "administrator" ? (
+            <label>
+              Специалист
+              <select
+                disabled={activeSpecialists.length === 0}
+                onChange={(event) => {
+                  setSpecialistId(event.target.value || undefined);
+                  setError("");
+                }}
+                required
+                value={specialistId ?? ""}
+              >
+                {activeSpecialists.length === 0 ? (
+                  <option value="">Нет доступных специалистов</option>
+                ) : null}
+                {activeSpecialists.map((specialist) => (
+                  <option key={specialist.id} value={specialist.id}>
+                    {specialist.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div className="admin-form-readonly" aria-label="Специалист">
+              <span>Специалист</span>
+              <strong>{initialBlock?.specialistName ?? defaultSpecialist?.displayName ?? "Календарь специалиста"}</strong>
+            </div>
+          )}
+
           <label>
             Дата
             <input onChange={(event) => setBlockDate(event.target.value)} required type="date" value={blockDate} />

@@ -541,12 +541,17 @@ describe("admin persistence", () => {
   it("rejects invalid appointment enums, dates, times, durations, and buffers", () => {
     const input = { audit: { action: "appointment.update" }, record: appointmentRecord, type: "appointment" };
 
+    expect(isAdminPersistInput({
+      ...input,
+      record: { ...appointmentRecord, specialistId: "11111111-1111-4111-8111-111111111111" },
+    })).toBe(true);
     expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, date: "2026-02-30" } })).toBe(false);
     expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, time: "25:00" } })).toBe(false);
     expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, durationMinutes: 0 } })).toBe(false);
     expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, bufferMinutes: -1 } })).toBe(false);
     expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, postVisitCommentedAt: "not-a-date" } })).toBe(false);
     expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, status: "unknown" } })).toBe(false);
+    expect(isAdminPersistInput({ ...input, record: { ...appointmentRecord, specialistId: 123 } })).toBe(false);
     expect(isAdminPersistInput({ record: { ...priceRecord, durationMinutes: 60.5 }, type: "price" })).toBe(false);
   });
 

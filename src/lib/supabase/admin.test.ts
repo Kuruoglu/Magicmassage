@@ -128,6 +128,7 @@ describe("server-only Supabase admin client", () => {
     await expect(
       authorizeSupabaseAdminAccess(client as unknown as SupabaseAdminClient, "admin-token", {
         allowedRoles: ["owner", "administrator"],
+        requireAal2: false,
       }),
     ).resolves.toEqual({
       mode: "supabase",
@@ -142,7 +143,7 @@ describe("server-only Supabase admin client", () => {
       },
       {
         action: "select",
-        columns: "role, status, user_id",
+        columns: "role, specialist_id, status, user_id",
         filters: [{ column: "user_id", value: "11111111-1111-4111-8111-111111111111" }],
         table: "admin_profiles",
       },
@@ -199,6 +200,30 @@ describe("server-only Supabase admin client", () => {
       mode: "supabase",
       ok: false,
       statusCode: 403,
+    });
+  });
+
+  it("requires an aal2 token for every admin role", async () => {
+    const client = new FakeSupabaseAdminClient();
+    const aal1Token = `header.${Buffer.from(JSON.stringify({ aal: "aal1" })).toString("base64url")}.signature`;
+
+    client.profileRows = [
+      {
+        role: "accountant",
+        status: "active",
+        user_id: "11111111-1111-4111-8111-111111111111",
+      },
+    ];
+
+    await expect(
+      authorizeSupabaseAdminAccess(client as unknown as SupabaseAdminClient, aal1Token, {
+        allowedRoles: ["accountant"],
+      }),
+    ).resolves.toEqual({
+      message: "Multi-factor authentication required",
+      mode: "supabase",
+      ok: false,
+      statusCode: 401,
     });
   });
 });

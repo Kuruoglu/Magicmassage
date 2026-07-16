@@ -247,12 +247,25 @@ function createAppointmentRouteClient({
   const from = vi.fn((table: string) => {
     if (table === "admin_appointments") {
       return {
-        select: vi.fn(() => ({
-          eq: vi.fn(async (column: string) => ({
-            data: column === "id" ? currentRows : scheduleRows,
-            error: null,
-          })),
-        })),
+        select: vi.fn(() => {
+          let rows: Record<string, unknown>[] | undefined;
+          const query = {
+            eq: vi.fn((column: string, value: unknown) => {
+              rows ??= column === "id" ? currentRows : scheduleRows;
+              if (column === "specialist_id") {
+                rows = rows.filter((row) => row.specialist_id === value);
+              }
+
+              return query;
+            }),
+            then: (
+              resolve: (value: { data: Record<string, unknown>[]; error: null }) => unknown,
+              reject: (reason: unknown) => unknown,
+            ) => Promise.resolve({ data: rows ?? [], error: null }).then(resolve, reject),
+          };
+
+          return query;
+        }),
       };
     }
 
@@ -697,6 +710,7 @@ describe("admin records persistence API route", () => {
       currentRows: [{
         id: "appointment-overlap",
         post_visit_comment: "",
+        specialist_id: "22222222-2222-4222-8222-222222222222",
         starts_at: "14:00:00",
         starts_on: "2026-07-20",
         status: "confirmed",
@@ -705,6 +719,7 @@ describe("admin records persistence API route", () => {
         buffer_minutes: 30,
         duration_minutes: 60,
         id: "appointment-existing",
+        specialist_id: "22222222-2222-4222-8222-222222222222",
         starts_at: "14:30:00",
         status: "confirmed",
       }],
@@ -714,6 +729,7 @@ describe("admin records persistence API route", () => {
       mode: "supabase",
       ok: true,
       role: "specialist",
+      specialistId: "22222222-2222-4222-8222-222222222222",
       userId: "22222222-2222-4222-8222-222222222222",
     };
 
@@ -813,6 +829,141 @@ describe("admin records persistence API route", () => {
       ...payload,
       record: { ...payload.record, bufferMinutes: 30 },
     });
+  });
+
+  it("does not treat another specialist's appointment or block as an HTTP preflight conflict", async () => {
+    const specialistId = "11111111-1111-4111-8111-111111111111";
+    const otherSpecialistId = "22222222-2222-4222-8222-222222222222";
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.create", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        id: "appointment-parallel-specialist",
+        overlapOverride: false,
+        overlapOverrideReason: "",
+        specialistId,
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      blockRows: [{
+        ends_at: "15:30:00",
+        specialist_id: otherSpecialistId,
+        starts_at: "14:30:00",
+      }],
+      scheduleRows: [{
+        duration_minutes: 60,
+        id: "appointment-other-specialist",
+        specialist_id: otherSpecialistId,
+        starts_at: "14:00:00",
+        status: "confirmed",
+      }],
+    });
+    supabaseAdminRouteMock.client = client;
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
+      record: expect.objectContaining({ specialistId }),
+    }));
+  });
+
+  it("forces specialist appointment writes into the authorized specialist calendar", async () => {
+    const authorizedSpecialistId = "22222222-2222-4222-8222-222222222222";
+    const requestedSpecialistId = "11111111-1111-4111-8111-111111111111";
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.create", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        id: "appointment-forced-specialist",
+        overlapOverride: false,
+        overlapOverrideReason: "",
+        specialistId: requestedSpecialistId,
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      scheduleRows: [{
+        duration_minutes: 60,
+        id: "appointment-requested-calendar",
+        specialist_id: requestedSpecialistId,
+        starts_at: "14:00:00",
+        status: "confirmed",
+      }],
+    });
+    supabaseAdminRouteMock.client = client;
+    supabaseAdminRouteMock.authorizationResult = {
+      mode: "supabase",
+      ok: true,
+      role: "specialist",
+      specialistId: authorizedSpecialistId,
+      userId: "33333333-3333-4333-8333-333333333333",
+    };
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
+      record: expect.objectContaining({ specialistId: authorizedSpecialistId }),
+    }));
+  });
+
+  it("does not read or classify another specialist's current appointment during HTTP preflight", async () => {
+    const authorizedSpecialistId = "22222222-2222-4222-8222-222222222222";
+    const otherSpecialistId = "11111111-1111-4111-8111-111111111111";
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.update", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        id: "appointment-foreign-specialist",
+        overlapOverride: false,
+        overlapOverrideReason: "",
+        specialistId: otherSpecialistId,
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        duration_minutes: 120,
+        id: payload.record.id,
+        post_visit_comment: "Private post-visit note",
+        specialist_id: otherSpecialistId,
+        starts_at: "08:00:00",
+        starts_on: payload.record.date,
+        status: "cancelled",
+      }],
+    });
+    supabaseAdminRouteMock.client = client;
+    supabaseAdminRouteMock.authorizationResult = {
+      mode: "supabase",
+      ok: true,
+      role: "specialist",
+      specialistId: authorizedSpecialistId,
+      userId: "33333333-3333-4333-8333-333333333333",
+    };
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
+      audit: expect.objectContaining({ action: "appointment.create" }),
+      record: expect.objectContaining({
+        specialistId: authorizedSpecialistId,
+      }),
+    }));
   });
 
   it("classifies saved working hours and stores the server-side booking buffer", async () => {

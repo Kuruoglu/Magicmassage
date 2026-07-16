@@ -384,6 +384,7 @@ describe("admin Supabase repository", () => {
           display_name: "Supabase Accountant",
           email: "accountant@example.com",
           last_login_at: "2026-07-08T09:15:00.000Z",
+          mfa_verified_at: null,
           role: "accountant",
           status: "active",
           updated_at: "2026-07-08T09:20:00.000Z",
@@ -785,6 +786,7 @@ describe("admin Supabase repository", () => {
       }),
       expect.objectContaining({ order: { ascending: true, column: "starts_on" }, table: "admin_appointments" }),
       expect.objectContaining({ order: { ascending: true, column: "block_date" }, table: "admin_calendar_blocks" }),
+      expect.objectContaining({ order: { ascending: true, column: "display_order" }, table: "admin_specialists" }),
       expect.objectContaining({ order: { ascending: false, column: "paid_on" }, table: "admin_certificates" }),
     ]);
   });

@@ -23,6 +23,7 @@ export type AdminShellInitialData = {
   blogPosts?: BlogPostRecord[];
   contactChannels?: ContactChannelRecord[];
   contactSettings?: ContactSettingsRecord;
+  currentSpecialistId?: string;
   financeRows: FinanceRow[];
   loadError?: string;
   media?: MediaRecord[];
@@ -54,6 +55,7 @@ type LoadAdminShellDataOptions = {
   env?: AdminSupabaseEnvSource;
   now?: Date;
   role?: AdminRoleId;
+  specialistId?: string;
 };
 
 const emptyRecords: AdminDomainRecords = {
@@ -118,6 +120,7 @@ export async function loadAdminShellData({
   env = process.env,
   now = new Date(),
   role = "owner",
+  specialistId,
 }: LoadAdminShellDataOptions = {}): Promise<AdminShellInitialData> {
   const client = createClient(env);
 
@@ -138,9 +141,13 @@ export async function loadAdminShellData({
     }
 
     if (role === "specialist") {
+      if (!specialistId) {
+        throw new Error("Specialist profile is not linked to a calendar.");
+      }
       return {
+        currentSpecialistId: specialistId,
         financeRows: [],
-        records: await repository.loadDomainRecords(),
+        records: await repository.loadDomainRecords(specialistId),
         source: "supabase",
       };
     }

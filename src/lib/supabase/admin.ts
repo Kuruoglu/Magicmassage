@@ -39,6 +39,11 @@ type AdminAuthGetUserResult = {
   } | null;
 };
 
+type AdminAuthUpdateUserResult = {
+  data: { user: { id: string } | null };
+  error: { message: string } | null;
+};
+
 export type SupabaseAdminClient = AdminSupabaseClient & {
   auth: {
     admin: {
@@ -49,6 +54,10 @@ export type SupabaseAdminClient = AdminSupabaseClient & {
           redirectTo?: string;
         },
       ): PromiseLike<AdminAuthInviteResult>;
+      updateUserById(
+        userId: string,
+        attributes: { ban_duration?: string },
+      ): PromiseLike<AdminAuthUpdateUserResult>;
     };
     getUser(token: string): PromiseLike<AdminAuthGetUserResult>;
   };
@@ -59,6 +68,7 @@ export type SupabaseAdminAuthorizationResult =
       mode: "supabase";
       ok: true;
       role: AdminRoleId;
+      specialistId?: string;
       userId: string;
     }
   | {
@@ -70,10 +80,12 @@ export type SupabaseAdminAuthorizationResult =
 
 type AuthorizeSupabaseAdminAccessOptions = {
   allowedRoles?: readonly AdminRoleId[];
+  requireAal2?: boolean;
 };
 
 type AdminActorProfileRow = {
   role?: string;
+  specialist_id?: string | null;
   status?: string;
   user_id?: string;
 };
@@ -112,6 +124,19 @@ function isAdminRoleId(value: unknown): value is AdminRoleId {
     value === "accountant" ||
     value === "viewer"
   );
+}
+
+function getJwtAssuranceLevel(token: string) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return undefined;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = Buffer.from(normalized, "base64").toString("utf8");
+    const value = JSON.parse(decoded) as { aal?: unknown };
+    return value.aal === "aal1" || value.aal === "aal2" ? value.aal : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function resolveSupabaseAdminEnv(env: AdminSupabaseEnvSource = process.env): AdminSupabaseEnv | null {
@@ -174,7 +199,7 @@ export async function authorizeSupabaseAdminAccess(
 
   const { data: profiles, error: profileError } = await client
     .from("admin_profiles")
-    .select("role, status, user_id")
+    .select("role, specialist_id, status, user_id")
     .eq("user_id", actorUserId);
 
   if (profileError) {
@@ -218,10 +243,30 @@ export async function authorizeSupabaseAdminAccess(
     };
   }
 
+  const requireAal2 = options.requireAal2 ?? true;
+  if (requireAal2 && getJwtAssuranceLevel(actorToken) !== "aal2") {
+    return {
+      message: "Multi-factor authentication required",
+      mode: "supabase",
+      ok: false,
+      statusCode: 401,
+    };
+  }
+
+  if (actorProfile.role === "specialist" && !actorProfile.specialist_id) {
+    return {
+      message: "Specialist profile is not linked to a calendar",
+      mode: "supabase",
+      ok: false,
+      statusCode: 403,
+    };
+  }
+
   return {
     mode: "supabase",
     ok: true,
     role: actorProfile.role,
+    specialistId: actorProfile.specialist_id ?? undefined,
     userId: actorUserId,
   };
 }

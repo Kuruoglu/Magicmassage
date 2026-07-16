@@ -2,9 +2,13 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Appointment } from "@/admin/domain";
+import type { Appointment, ClientRecord } from "@/admin/domain";
 
 import { AppointmentDetailDrawer } from "./AppointmentDetailDrawer";
+
+vi.mock("@/lib/supabase/browser", () => ({
+  getAdminAuthorizationHeader: vi.fn(async () => "Bearer test-access-token"),
+}));
 
 const completedAppointment: Appointment = {
   client: "Анна Петрова",
@@ -14,8 +18,28 @@ const completedAppointment: Appointment = {
   note: "Общая заметка записи",
   postVisitComment: "Первичный результат",
   service: "Классический массаж",
+  specialistId: "specialist-natali",
+  specialistName: "Натали",
   status: "Завершена",
   time: "14:00",
+};
+
+const restrictedClient: ClientRecord = {
+  contactRestricted: true,
+  email: "anna@example.com",
+  history: [],
+  id: "client-anna",
+  language: "ru",
+  name: "Анна Петрова",
+  next: "",
+  note: "",
+  phone: "+359881112233",
+  preferredContact: "Телефон",
+  status: "Активный клиент",
+  tags: [],
+  telegram: "",
+  totalSpend: "0 €",
+  visits: 0,
 };
 
 function renderDrawer(overrides: Partial<Parameters<typeof AppointmentDetailDrawer>[0]> = {}) {
@@ -85,5 +109,50 @@ describe("AppointmentDetailDrawer", () => {
 
     expect(screen.queryByLabelText("Комментарий после визита")).not.toBeInTheDocument();
     expect(screen.getByText(/станет доступен после завершения/)).toBeInTheDocument();
+  });
+
+  it("keeps specialist contact data masked until an audited reveal succeeds", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      json: async () => ({
+        contact: {
+          email: "anna@example.com",
+          phone: "+359881112233",
+          preferredContact: "phone",
+        },
+      }),
+      ok: true,
+    } as Response);
+
+    renderDrawer({
+      appointment: { ...completedAppointment, clientId: restrictedClient.id },
+      appointmentClient: restrictedClient,
+      role: "specialist",
+    });
+    const dialog = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+
+    expect(within(dialog).getByText("••• 2233")).toBeVisible();
+    expect(within(dialog).getByText("a•••@example.com")).toBeVisible();
+    expect(within(dialog).queryByText("+359881112233")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: "Открыть клиента" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Все сертификаты клиента")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Показать контакты" }));
+
+    await waitFor(() => expect(within(dialog).getByText("+359881112233")).toBeVisible());
+    expect(within(dialog).getByText("anna@example.com")).toBeVisible();
+    expect(within(dialog).getByRole("status")).toHaveTextContent("просмотр зарегистрирован");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/admin/client-contact",
+      expect.objectContaining({
+        body: JSON.stringify({
+          appointmentId: completedAppointment.id,
+          purpose: "Связаться с клиентом по текущей записи",
+        }),
+        headers: expect.objectContaining({ Authorization: "Bearer test-access-token" }),
+        method: "POST",
+      }),
+    );
+    fetchSpy.mockRestore();
   });
 });

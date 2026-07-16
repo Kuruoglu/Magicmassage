@@ -10,6 +10,7 @@ import {
   type Appointment,
   type AppointmentStatus,
   type ClientRecord,
+  type SpecialistRecord,
 } from "@/admin/domain";
 import { appointmentKey } from "@/components/admin/lib/links";
 import {
@@ -59,6 +60,8 @@ export type CalendarAppointmentDialogProps = {
   prefillDate?: string;
   role: AdminRoleId;
   siteSettings: CalendarScheduleSettings;
+  specialists?: SpecialistRecord[];
+  currentSpecialistId?: string;
 };
 
 function CalendarAppointmentCloseButton({ onClose }: { onClose: () => void }) {
@@ -83,11 +86,20 @@ export function CalendarAppointmentDialog({
   prefillDate,
   role,
   siteSettings,
+  specialists = [],
+  currentSpecialistId,
 }: CalendarAppointmentDialogProps) {
   const workingSchedule = useMemo(
     () => createCalendarWorkingSchedule(siteSettings),
     [siteSettings],
   );
+  const activeSpecialists = useMemo(
+    () => specialists.filter((specialist) => specialist.status === "active"),
+    [specialists],
+  );
+  const defaultSpecialist =
+    activeSpecialists.find((specialist) => specialist.id === currentSpecialistId) ??
+    activeSpecialists[0];
   const [initialForm] = useState<Appointment>(() => ({
     client: initialAppointment?.client ?? prefillClient?.name ?? prefillClientName ?? "",
     clientId: initialAppointment?.clientId ?? prefillClient?.id,
@@ -103,6 +115,8 @@ export function CalendarAppointmentDialog({
     postVisitComment: initialAppointment?.postVisitComment ?? "",
     postVisitCommentedAt: initialAppointment?.postVisitCommentedAt,
     service: initialAppointment?.service ?? appointmentServiceOptions[0],
+    specialistId: initialAppointment?.specialistId ?? defaultSpecialist?.id,
+    specialistName: initialAppointment?.specialistName ?? defaultSpecialist?.displayName,
     status: initialAppointment?.status ?? "Новая заявка",
     time: initialAppointment?.time ?? "14:00",
     version: initialAppointment?.version,
@@ -128,6 +142,7 @@ export function CalendarAppointmentDialog({
     const candidate = {
       date: form.date,
       duration: form.durationMinutes ?? 60,
+      specialistId: form.specialistId,
       start: form.time,
     };
     const overlap = hasAppointmentOverlap(
@@ -141,6 +156,7 @@ export function CalendarAppointmentDialog({
         .map((appointment) => ({
           date: appointment.date,
           duration: appointment.durationMinutes ?? 60,
+          specialistId: appointment.specialistId,
           start: appointment.time,
         })),
     );
@@ -165,11 +181,13 @@ export function CalendarAppointmentDialog({
           {
             date: form.date,
             duration: form.durationMinutes ?? 60,
+            specialistId: form.specialistId,
             start: form.time,
           },
           {
             date: appointment.date,
             duration: appointment.durationMinutes ?? 60,
+            specialistId: appointment.specialistId,
             start: appointment.time,
           },
         ),
@@ -213,6 +231,16 @@ export function CalendarAppointmentDialog({
     setError("");
   }
 
+  function selectSpecialist(specialistId: string) {
+    const specialist = activeSpecialists.find((candidate) => candidate.id === specialistId);
+    setForm((current) => ({
+      ...current,
+      specialistId: specialist?.id,
+      specialistName: specialist?.displayName,
+    }));
+    setError("");
+  }
+
   function handleClientKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape" && showClientSuggestions) {
       event.preventDefault();
@@ -245,8 +273,8 @@ export function CalendarAppointmentDialog({
 
     const client = form.client.trim();
 
-    if (!client || !form.date || !form.time) {
-      setError("Укажите клиента, дату и время.");
+    if (!client || !form.date || !form.time || (activeSpecialists.length > 0 && !form.specialistId)) {
+      setError("Укажите клиента, специалиста, дату и время.");
       return;
     }
 
@@ -374,6 +402,32 @@ export function CalendarAppointmentDialog({
                   ))}
                 </select>
               </label>
+              {role === "owner" || role === "administrator" ? (
+                <label>
+                  Специалист
+                  <select
+                    aria-invalid={error && !form.specialistId ? "true" : undefined}
+                    disabled={activeSpecialists.length === 0}
+                    onChange={(event) => selectSpecialist(event.target.value)}
+                    required
+                    value={form.specialistId ?? ""}
+                  >
+                    {activeSpecialists.length === 0 ? (
+                      <option value="">Нет доступных специалистов</option>
+                    ) : null}
+                    {activeSpecialists.map((specialist) => (
+                      <option key={specialist.id} value={specialist.id}>
+                        {specialist.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div className="admin-form-readonly" aria-label="Специалист">
+                  <span>Специалист</span>
+                  <strong>{form.specialistName ?? "Календарь специалиста"}</strong>
+                </div>
+              )}
             </AdminDrawerSection>
 
             <AdminDrawerSection title="Дата и статус">

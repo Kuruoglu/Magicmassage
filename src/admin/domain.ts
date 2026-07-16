@@ -32,6 +32,8 @@ export type Appointment = {
   publicReference?: string;
   serviceSlug?: string;
   service: string;
+  specialistId?: string;
+  specialistName?: string;
   status: AppointmentStatus;
   version?: number;
 };
@@ -44,6 +46,8 @@ export type CalendarBlock = {
   id: string;
   internalNote: string;
   kind: CalendarBlockKind;
+  specialistId?: string;
+  specialistName?: string;
   startsAt: string;
   version?: number;
 };
@@ -55,6 +59,7 @@ export type ClientVisit = {
 };
 
 export type ClientRecord = {
+  contactRestricted?: boolean;
   id: string;
   email: string;
   history: ClientVisit[];
@@ -69,6 +74,15 @@ export type ClientRecord = {
   telegram: string;
   totalSpend: string;
   visits: number;
+};
+
+export type SpecialistRecord = {
+  color: string;
+  displayName: string;
+  displayOrder: number;
+  id: string;
+  publicBookingEnabled: boolean;
+  status: "active" | "inactive";
 };
 
 export type CertificateStatus = "Оплачено" | "Отправлен" | "Ожидает PDF" | "Погашен";
@@ -287,6 +301,7 @@ export type AdminDomainRecords = {
   calendarBlocks?: CalendarBlock[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
+  specialists?: SpecialistRecord[];
 };
 
 export type AdminClientDatabaseRow = {
@@ -328,6 +343,7 @@ export type AdminAppointmentDatabaseRow = {
   public_reference?: string | null;
   service_slug?: string | null;
   service_name: string;
+  specialist_id?: string | null;
   starts_at: string;
   starts_on: string;
   status: string;
@@ -340,8 +356,18 @@ export type AdminCalendarBlockDatabaseRow = {
   id: string;
   internal_note: string;
   kind: CalendarBlockKind;
+  specialist_id?: string | null;
   starts_at: string;
   version: number;
+};
+
+export type AdminSpecialistDatabaseRow = {
+  color: string;
+  display_name: string;
+  display_order: number;
+  id: string;
+  public_booking_enabled: boolean;
+  status: "active" | "inactive";
 };
 
 export type AdminCertificateDatabaseRow = {
@@ -517,7 +543,9 @@ export type AdminProfileDatabaseRow = {
   display_name: string;
   email: string;
   last_login_at: string | null;
+  mfa_verified_at?: string | null;
   role: string;
+  specialist_id?: string | null;
   status: string;
   updated_at: string;
   user_id: string;

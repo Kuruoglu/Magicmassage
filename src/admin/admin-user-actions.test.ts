@@ -20,6 +20,11 @@ type Operation =
       options: unknown;
     }
   | {
+      action: "updateAuth";
+      attributes: unknown;
+      userId: string;
+    }
+  | {
       action: "upsert";
       options: unknown;
       table: string;
@@ -64,6 +69,10 @@ class FakeAdminServiceClient {
 
         return this.inviteResult;
       },
+      updateUserById: async (userId: string, attributes: unknown) => {
+        this.operations.push({ action: "updateAuth", attributes, userId });
+        return { data: { user: { id: userId } }, error: null };
+      },
     },
   };
 
@@ -99,6 +108,7 @@ class FakeAdminServiceClient {
 }
 
 describe("admin user actions", () => {
+  const ownerToken = `header.${Buffer.from(JSON.stringify({ aal: "aal2" })).toString("base64url")}.signature`;
   it("keeps Auth writes in demo mode when the service role key is missing", async () => {
     const result = await runAdminUserAction(
       {
@@ -162,7 +172,7 @@ describe("admin user actions", () => {
         },
       },
       {
-        actorToken: "owner-token",
+        actorToken: ownerToken,
         createClient: () => client as unknown as SupabaseAdminClient,
       },
     );
@@ -176,11 +186,11 @@ describe("admin user actions", () => {
     expect(client.operations).toEqual([
       {
         action: "getUser",
-        token: "owner-token",
+        token: ownerToken,
       },
       {
         action: "select",
-        columns: "role, status, user_id",
+        columns: "role, specialist_id, status, user_id",
         filters: [{ column: "user_id", value: "11111111-1111-4111-8111-111111111111" }],
         table: "admin_profiles",
       },
@@ -228,7 +238,7 @@ describe("admin user actions", () => {
         },
       },
       {
-        actorToken: "owner-token",
+        actorToken: ownerToken,
         createClient: () => client as unknown as SupabaseAdminClient,
       },
     );
@@ -255,7 +265,7 @@ describe("admin user actions", () => {
         },
       },
       {
-        actorToken: "owner-token",
+        actorToken: ownerToken,
         createClient: () => client as unknown as SupabaseAdminClient,
       },
     );
@@ -269,13 +279,18 @@ describe("admin user actions", () => {
     expect(client.operations).toEqual([
       {
         action: "getUser",
-        token: "owner-token",
+        token: ownerToken,
       },
       {
         action: "select",
-        columns: "role, status, user_id",
+        columns: "role, specialist_id, status, user_id",
         filters: [{ column: "user_id", value: "11111111-1111-4111-8111-111111111111" }],
         table: "admin_profiles",
+      },
+      {
+        action: "updateAuth",
+        attributes: { ban_duration: "none" },
+        userId: "11111111-1111-4111-8111-111111111113",
       },
       {
         action: "upsert",
@@ -290,6 +305,55 @@ describe("admin user actions", () => {
         },
       },
     ]);
+  });
+
+  it("suspends the profile before banning the Supabase Auth user", async () => {
+    const client = new FakeAdminServiceClient();
+    const userId = "11111111-1111-4111-8111-111111111113";
+
+    const result = await runAdminUserAction({
+      action: "updateProfile",
+      user: {
+        email: "specialist@example.com",
+        id: userId,
+        name: "Specialist Example",
+        role: "specialist",
+        status: "Пауза",
+      },
+    }, {
+      actorToken: ownerToken,
+      createClient: () => client as unknown as SupabaseAdminClient,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(client.operations.slice(-2)).toEqual([
+      expect.objectContaining({
+        action: "upsert",
+        table: "admin_profiles",
+        values: expect.objectContaining({ status: "suspended", user_id: userId }),
+      }),
+      { action: "updateAuth", attributes: { ban_duration: "876000h" }, userId },
+    ]);
+  });
+
+  it("does not let the current owner suspend their own account", async () => {
+    const client = new FakeAdminServiceClient();
+    const result = await runAdminUserAction({
+      action: "updateProfile",
+      user: {
+        email: "owner@example.com",
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "Owner",
+        role: "owner",
+        status: "Заблокирован",
+      },
+    }, {
+      actorToken: ownerToken,
+      createClient: () => client as unknown as SupabaseAdminClient,
+    });
+
+    expect(result).toMatchObject({ ok: false, statusCode: 403 });
+    expect(client.operations.some((operation) => operation.action === "upsert")).toBe(false);
   });
 
   it("validates invite and profile update payloads", () => {

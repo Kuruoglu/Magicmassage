@@ -23,8 +23,10 @@ certificate purchase flow.
 
 - Internal instant booking is primary when `public_booking_enabled` is enabled;
   Studio24 remains the fallback when it is disabled.
-- Public booking allows at most eight non-cancelled appointments per day. Natali
-  can manually create a ninth, tenth, or later appointment from the admin.
+- Public booking automatically assigns a free active specialist and allows at
+  most the owner-configured 1–8 non-cancelled appointments per specialist per
+  day (8 by default). An owner can
+  manually create a ninth, tenth, or later appointment for a specialist.
 - A customer-selected time receives a five-minute hold; final submission creates
   an immediately confirmed appointment without owner approval.
 - The signed HttpOnly booking session restores its active hold after reload or a
@@ -44,6 +46,9 @@ certificate purchase flow.
   equivalent privacy-safe pattern.
 - Sitemap entries should use real content update dates or omit `lastModified`.
 - A small Playwright smoke suite should cover public critical flows.
+- Every admin role requires TOTP MFA. Specialists have isolated calendars, no
+  global client/certificate modules, and audited on-demand contact reveal.
+  Bulk reveal alerts are visible and resolvable by owners and administrators.
 
 ## Admin Platform
 
@@ -92,7 +97,6 @@ Out of MVP scope:
 
 - Blog.
 - Customer self-service cancellation and rescheduling links.
-- Multiple-specialist public availability.
 - Booking emails, reminders, and Telegram notifications.
 - Customer accounts, loyalty features, and full Telegram booking.
 
