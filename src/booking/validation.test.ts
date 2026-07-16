@@ -22,6 +22,17 @@ describe("public booking validation", () => {
     });
     expect(parseCreateHoldPayload({ date: "2026-08-01", priceVariantId: "price-60", time: "10:15" })).toBeNull();
     expect(parseCreateHoldPayload({ date: "2026-08-01", priceVariantId: "price-60", time: "10:45" })).toBeNull();
+    expect(parseCreateHoldPayload({
+      date: "2026-08-01",
+      priceVariantId: "price-60",
+      specialistId: "yana-public",
+      time: "10:30",
+    })).toEqual({
+      date: "2026-08-01",
+      priceVariantId: "price-60",
+      specialistId: "yana-public",
+      time: "10:30",
+    });
   });
 
   it("restores confirmations only when the review URL requests it", () => {

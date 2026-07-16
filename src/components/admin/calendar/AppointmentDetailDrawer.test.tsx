@@ -6,10 +6,6 @@ import type { Appointment, ClientRecord } from "@/admin/domain";
 
 import { AppointmentDetailDrawer } from "./AppointmentDetailDrawer";
 
-vi.mock("@/lib/supabase/browser", () => ({
-  getAdminAuthorizationHeader: vi.fn(async () => "Bearer test-access-token"),
-}));
-
 const completedAppointment: Appointment = {
   client: "Анна Петрова",
   date: "2026-07-13",
@@ -111,48 +107,28 @@ describe("AppointmentDetailDrawer", () => {
     expect(screen.getByText(/станет доступен после завершения/)).toBeInTheDocument();
   });
 
-  it("keeps specialist contact data masked until an audited reveal succeeds", async () => {
-    const user = userEvent.setup();
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      json: async () => ({
-        contact: {
-          email: "anna@example.com",
-          phone: "+359881112233",
-          preferredContact: "phone",
-        },
-      }),
-      ok: true,
-    } as Response);
-
+  it("never renders contact or appointment mutation controls for a specialist", () => {
     renderDrawer({
-      appointment: { ...completedAppointment, clientId: restrictedClient.id },
+      appointment: {
+        ...completedAppointment,
+        clientId: restrictedClient.id,
+        publicEmail: restrictedClient.email,
+        publicPhone: restrictedClient.phone,
+      },
       appointmentClient: restrictedClient,
       role: "specialist",
     });
     const dialog = screen.getByRole("dialog", { name: "Детали выбранной записи" });
 
-    expect(within(dialog).getByText("••• 2233")).toBeVisible();
-    expect(within(dialog).getByText("a•••@example.com")).toBeVisible();
-    expect(within(dialog).queryByText("+359881112233")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(restrictedClient.phone)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(restrictedClient.email)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Телефон клиента")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Email клиента")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Показать контакты" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("link", { name: "Открыть клиента" })).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Все сертификаты клиента")).not.toBeInTheDocument();
-
-    await user.click(within(dialog).getByRole("button", { name: "Показать контакты" }));
-
-    await waitFor(() => expect(within(dialog).getByText("+359881112233")).toBeVisible());
-    expect(within(dialog).getByText("anna@example.com")).toBeVisible();
-    expect(within(dialog).getByRole("status")).toHaveTextContent("просмотр зарегистрирован");
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/admin/client-contact",
-      expect.objectContaining({
-        body: JSON.stringify({
-          appointmentId: completedAppointment.id,
-          purpose: "Связаться с клиентом по текущей записи",
-        }),
-        headers: expect.objectContaining({ Authorization: "Bearer test-access-token" }),
-        method: "POST",
-      }),
-    );
-    fetchSpy.mockRestore();
+    expect(within(dialog).queryByRole("button", { name: "Редактировать" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Отменить" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Комментарий после визита")).not.toBeInTheDocument();
   });
 });

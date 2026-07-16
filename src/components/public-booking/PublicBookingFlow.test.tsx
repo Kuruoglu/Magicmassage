@@ -10,6 +10,10 @@ const options = {
   services: [
     {
       slug: "classic-massage",
+      specialists: [
+        { id: "specialist-natali", displayName: "Natalia Petrova" },
+        { id: "specialist-elena", displayName: "Elena Ivanova" },
+      ],
       title: "Classic massage",
       variants: [{ id: "variant-60", durationMinutes: 60, priceCents: 5000, currency: "EUR" }],
     },
@@ -33,6 +37,14 @@ function jsonResponse(body: unknown, status = 200) {
     headers: { "Content-Type": "application/json" },
     status,
   });
+}
+
+async function chooseSpecialist(
+  user: ReturnType<typeof userEvent.setup>,
+  name: RegExp | string = /Any available specialist/i,
+) {
+  await user.click(await screen.findByRole("radio", { name }));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
 }
 
 afterEach(() => {
@@ -64,6 +76,8 @@ describe("PublicBookingFlow", () => {
           priceCents: 5500,
           selectionId: "11111111-1111-4111-8111-111111111111",
           selectionVersion: 1,
+          specialistId: "specialist-natali",
+          specialistName: "Natalia Petrova",
         }, 201);
       }
       if (url === "/api/public/booking/confirm") {
@@ -79,6 +93,8 @@ describe("PublicBookingFlow", () => {
           date: "2026-07-20",
           time: "10:00",
           serviceSlug: "classic-massage",
+          specialistId: "specialist-natali",
+          specialistName: "Natalia Petrova",
           priceVariantId: "variant-60",
         });
       }
@@ -92,12 +108,19 @@ describe("PublicBookingFlow", () => {
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await user.click(screen.getByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Choose a specialist" })).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(6);
+    await chooseSpecialist(user, "Natalia Petrova");
 
     expect(await screen.findByRole("button", { name: /20 July 2026, Available/i })).toBeInTheDocument();
     expect(screen.getByRole("listitem", { name: "Date and time" })).toHaveAttribute("aria-current", "step");
     expect(screen.queryByRole("button", { name: "Choose a time" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "10:00" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /22 July 2026, Unavailable/i })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("heading", { name: "Choose a specialist" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Natalia Petrova" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
 
     await user.click(screen.getByRole("button", { name: /20 July 2026, Available/i }));
     await user.click(screen.getByRole("button", { name: "10:00" }));
@@ -125,6 +148,7 @@ describe("PublicBookingFlow", () => {
 
     expect(await screen.findByRole("heading", { name: "Booking confirmed" })).toBeInTheDocument();
     expect(screen.getByText("MMN-2026-0042")).toBeInTheDocument();
+    expect(screen.getByText("Natalia Petrova")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveAccessibleName("Booking confirmed");
     await waitFor(() => expect(screen.getByRole("heading", { name: "Booking confirmed" })).toHaveFocus());
 
@@ -133,11 +157,13 @@ describe("PublicBookingFlow", () => {
     expect(JSON.parse(holdRequest?.body ?? "{}")).toEqual({
       date: "2026-07-20",
       priceVariantId: "variant-60",
+      specialistId: "specialist-natali",
       time: "10:00",
       website: "",
     });
     const availabilityRequest = requests.find((request) => request.url.startsWith("/api/public/booking/availability"));
     expect(availabilityRequest?.url).toContain("priceVariantId=variant-60");
+    expect(availabilityRequest?.url).toContain("specialistId=specialist-natali");
     expect(availabilityRequest?.url).toContain("days=31");
     expect(availabilityRequest?.url).toMatch(/from=\d{4}-\d{2}-\d{2}/);
 
@@ -179,6 +205,7 @@ describe("PublicBookingFlow", () => {
     render(<PublicBookingFlow locale="en" initialServiceSlug="classic-massage" />);
     await user.click(await screen.findByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    await chooseSpecialist(user);
 
     const firstVisibleDate = await screen.findByRole("button", { name: /16 July 2026, Limited/i });
     expect(Array.from(firstVisibleDate.parentElement?.children ?? []).indexOf(firstVisibleDate)).toBe(3);
@@ -204,6 +231,7 @@ describe("PublicBookingFlow", () => {
     render(<PublicBookingFlow locale="en" initialServiceSlug="classic-massage" />);
     await user.click(await screen.findByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    await chooseSpecialist(user);
 
     expect(await screen.findByRole("heading", { name: "July 2026" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /20 July 2026/i })).toBeInTheDocument();
@@ -232,8 +260,10 @@ describe("PublicBookingFlow", () => {
   });
 
   it("keeps the selected date and returns to time choice after a 409 hold conflict", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const requests: Array<{ body?: string; url: string }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      requests.push({ body: init?.body as string | undefined, url });
       if (url.startsWith("/api/public/booking/options")) return jsonResponse(options);
       if (url.startsWith("/api/public/booking/availability")) return jsonResponse(availability);
       if (url === "/api/public/booking/holds") return jsonResponse({ code: "slot_unavailable" }, 409);
@@ -245,6 +275,7 @@ describe("PublicBookingFlow", () => {
 
     await user.click(await screen.findByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    await chooseSpecialist(user);
     await user.click(await screen.findByRole("button", { name: /20 July 2026, Available/i }));
     await user.click(screen.getByRole("button", { name: "10:00" }));
 
@@ -253,6 +284,10 @@ describe("PublicBookingFlow", () => {
       expect(screen.getByRole("button", { name: /20 July 2026, Available/i })).toHaveAttribute("aria-pressed", "true");
       expect(screen.getByRole("button", { name: "10:00" })).toBeInTheDocument();
     });
+    expect(requests.find((request) => request.url.includes("/availability"))?.url).not.toContain("specialistId");
+    expect(JSON.parse(requests.find((request) => request.url.endsWith("/holds"))?.body ?? "{}")).not.toHaveProperty(
+      "specialistId",
+    );
   });
 
   it("keeps the previous hold when replacing it with a conflicting time", async () => {
@@ -272,6 +307,8 @@ describe("PublicBookingFlow", () => {
             priceCents: 5000,
             selectionId: "11111111-1111-4111-8111-111111111111",
             selectionVersion: 1,
+            specialistId: "specialist-natali",
+            specialistName: "Natalia Petrova",
           }, 201);
         }
         return jsonResponse({ code: "slot_unavailable" }, 409);
@@ -283,6 +320,7 @@ describe("PublicBookingFlow", () => {
     render(<PublicBookingFlow locale="en" initialServiceSlug="classic-massage" />);
     await user.click(await screen.findByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    await chooseSpecialist(user, "Natalia Petrova");
     await user.click(await screen.findByRole("button", { name: /20 July 2026, Available/i }));
     await user.click(screen.getByRole("button", { name: "10:00" }));
     await screen.findByRole("heading", { name: "Your contact details" });
@@ -316,6 +354,8 @@ describe("PublicBookingFlow", () => {
             selectionId: "11111111-1111-4111-8111-111111111111",
             selectionVersion: 1,
             serviceSlug: "classic-massage",
+            specialistId: "specialist-natali",
+            specialistName: "Natalia Petrova",
             time: "10:00",
           },
         });
@@ -329,6 +369,7 @@ describe("PublicBookingFlow", () => {
     render(<PublicBookingFlow locale="en" initialServiceSlug="classic-massage" />);
     await user.click(await screen.findByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    await chooseSpecialist(user, "Natalia Petrova");
     await user.click(await screen.findByRole("button", { name: /20 July 2026, Available/i }));
     await user.click(screen.getByRole("button", { name: "10:00" }));
 
@@ -355,6 +396,8 @@ describe("PublicBookingFlow", () => {
             selectionId: "11111111-1111-4111-8111-111111111111",
             selectionVersion: 1,
             serviceSlug: "classic-massage",
+            specialistId: "specialist-natali",
+            specialistName: "Natalia Petrova",
             time: "11:30",
           },
         });
@@ -368,6 +411,7 @@ describe("PublicBookingFlow", () => {
     await waitFor(() => expect(restoredHeading).toHaveFocus());
     expect(screen.getByText("20 July 2026")).toBeInTheDocument();
     expect(screen.getByText("11:30")).toBeInTheDocument();
+    expect(screen.getByText("Natalia Petrova")).toBeInTheDocument();
     expect(window.location.search).toContain("step=details");
   });
 
@@ -388,6 +432,8 @@ describe("PublicBookingFlow", () => {
             publicReference: "MMN-2026-RESTORED",
             serviceName: "Classic massage",
             serviceSlug: "classic-massage",
+            specialistId: "specialist-natali",
+            specialistName: "Natalia Petrova",
             status: "confirmed",
             time: "10:00",
           },
@@ -402,6 +448,7 @@ describe("PublicBookingFlow", () => {
     const successHeading = await screen.findByRole("heading", { name: "Booking confirmed" });
     await waitFor(() => expect(successHeading).toHaveFocus());
     expect(screen.getByText("MMN-2026-RESTORED")).toBeInTheDocument();
+    expect(screen.getByText("Natalia Petrova")).toBeInTheDocument();
     expect(screen.getByText(/60 min/)).toHaveTextContent(/€50\.00/);
     expect(requests[0]).toContain("recoverConfirmation=1");
   });
@@ -420,6 +467,8 @@ describe("PublicBookingFlow", () => {
           priceCents: 5000,
           selectionId: "11111111-1111-4111-8111-111111111111",
           selectionVersion: 1,
+          specialistId: "specialist-natali",
+          specialistName: "Natalia Petrova",
         }, 201);
       }
       return jsonResponse({}, 404);
@@ -429,6 +478,7 @@ describe("PublicBookingFlow", () => {
     render(<PublicBookingFlow locale="en" initialServiceSlug="classic-massage" />);
     await user.click(await screen.findByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    await chooseSpecialist(user, "Natalia Petrova");
     await user.click(await screen.findByRole("button", { name: /20 July 2026, Available/i }));
     await user.click(screen.getByRole("button", { name: "10:00" }));
     await user.type(await screen.findByLabelText("Name"), "A");

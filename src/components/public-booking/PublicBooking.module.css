@@ -41,7 +41,7 @@
 .progress {
   display: grid;
   gap: 0;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   list-style: none;
   margin: 26px 0 44px;
 }
@@ -178,7 +178,8 @@
 }
 
 .choiceCard,
-.variantChoice {
+.variantChoice,
+.specialistChoice {
   background: #fff;
   border: 1px solid #d8d1dc;
   border-radius: 8px;
@@ -192,14 +193,16 @@
 }
 
 .choiceCard:hover,
-.variantChoice:hover {
+.variantChoice:hover,
+.specialistChoice:hover {
   border-color: #9b6bc2;
   box-shadow: 0 10px 26px rgba(65, 43, 77, 0.08);
   transform: translateY(-1px);
 }
 
 .choiceCard[aria-pressed="true"],
-.variantChoice:has(.variantRadio:checked) {
+.variantChoice:has(.variantRadio:checked),
+.specialistChoice:has(.specialistRadio:checked) {
   background: #f6f0fa;
   border-color: #6e4a8b;
   box-shadow: inset 4px 0 0 #6e4a8b;
@@ -229,7 +232,8 @@
   line-height: 1.25;
 }
 
-.variantList {
+.variantList,
+.specialistList {
   border: 0;
   display: grid;
   gap: 12px;
@@ -245,12 +249,36 @@
   position: relative;
 }
 
-.variantChoice:has(.variantRadio:focus-visible) {
+.specialistChoice {
+  align-items: center;
+  display: flex;
+  min-height: 72px;
+  position: relative;
+}
+
+.specialistChoice > span {
+  display: grid;
+  gap: 5px;
+}
+
+.specialistChoice > span > strong {
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.specialistChoice > span > small {
+  color: #746e78;
+  line-height: 1.4;
+}
+
+.variantChoice:has(.variantRadio:focus-visible),
+.specialistChoice:has(.specialistRadio:focus-visible) {
   outline: 3px solid rgba(110, 74, 139, 0.28);
   outline-offset: 2px;
 }
 
-.variantRadio {
+.variantRadio,
+.specialistRadio {
   height: 1px;
   opacity: 0;
   position: absolute;
@@ -909,7 +937,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .choiceCard,
-  .variantChoice {
+  .variantChoice,
+  .specialistChoice {
     transition: none;
   }
 }

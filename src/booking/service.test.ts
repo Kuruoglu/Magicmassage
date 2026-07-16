@@ -32,6 +32,8 @@ describe("public booking service RPC adapter", () => {
         priceVariantId: "price-60",
         selectionId: "11111111-1111-4111-8111-111111111111",
         selectionVersion: 1,
+        specialistId: "yana-public",
+        specialistName: "Яна",
         time: "10:00",
       },
       error: null,
@@ -49,7 +51,8 @@ describe("public booking service RPC adapter", () => {
     expect(parameters.p_token_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(parameters.p_session_key_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(parameters.p_token_hash).not.toBe(result.holdToken);
-    expect(rpc.mock.calls[0][0]).toBe("public_booking_create_hold_v4");
+    expect(rpc.mock.calls[0][0]).toBe("public_booking_create_hold_v6");
+    expect(parameters.p_specialist_slug).toBeNull();
     expect(JSON.stringify(parameters)).not.toContain("ssssssss");
   });
 
@@ -64,6 +67,7 @@ describe("public booking service RPC adapter", () => {
         publicReference: "MMN-20260801-A1B2C3D4E5F6",
         serviceName: "Classic massage",
         serviceSlug: "classic-massage",
+        specialistName: "Яна",
         status: "confirmed",
         time: "10:00",
       },
@@ -110,6 +114,8 @@ describe("public booking service RPC adapter", () => {
         selectionId: "11111111-1111-4111-8111-111111111111",
         selectionVersion: 1,
         serviceSlug: "classic-massage",
+        specialistId: "yana-public",
+        specialistName: "Яна",
         time: "10:00",
       },
       error: null,
@@ -119,7 +125,7 @@ describe("public booking service RPC adapter", () => {
     const parameters = rpc.mock.calls[0][1];
 
     expect(restored?.holdToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(rpc.mock.calls[0][0]).toBe("public_booking_restore_session_hold_v4");
+    expect(rpc.mock.calls[0][0]).toBe("public_booking_restore_session_hold_v6");
     expect(parameters.p_session_key_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(parameters.p_token_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(parameters.p_token_hash).not.toBe(restored?.holdToken);
@@ -136,6 +142,7 @@ describe("public booking service RPC adapter", () => {
         publicReference: "MMN-20260801-A1B2C3D4E5F6",
         serviceName: "Classic massage",
         serviceSlug: "classic-massage",
+        specialistName: "Яна",
         status: "confirmed",
         time: "10:00",
       },

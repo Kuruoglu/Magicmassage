@@ -72,6 +72,15 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("link", { name: /Пользователи и роли/ })).not.toBeInTheDocument();
   });
 
+  it("keeps specialist calendar appointment creation read-only", () => {
+    render(<AdminShell activeSection="calendar" calendarAction="create" role="specialist" />);
+
+    expect(screen.queryByRole("button", { name: "Создать запись" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Новая запись" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Заблокировать время" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Клиент сейчас" })).toBeInTheDocument();
+  });
+
   it("keeps specialist dashboard data inside the calendar scope", () => {
     render(<AdminShell activeSection="dashboard" role="specialist" />);
 

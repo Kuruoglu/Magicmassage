@@ -197,6 +197,20 @@ const appointmentColumns = [
   "version",
 ].join(", ");
 
+const specialistAppointmentColumns = [
+  "id",
+  "buffer_minutes",
+  "client_name_snapshot",
+  "duration_minutes",
+  "service_slug",
+  "service_name",
+  "specialist_id",
+  "starts_at",
+  "starts_on",
+  "status",
+  "version",
+].join(", ");
+
 const calendarBlockColumns = [
   "block_date",
   "ends_at",
@@ -802,6 +816,23 @@ function mapAppointmentRow(row: AdminAppointmentDatabaseRow): Appointment {
   };
 }
 
+function mapSpecialistAppointmentRow(row: AdminAppointmentDatabaseRow): Appointment {
+  return {
+    bufferMinutes: row.buffer_minutes ?? 15,
+    client: row.client_name_snapshot,
+    date: row.starts_on,
+    durationMinutes: row.duration_minutes,
+    id: row.id,
+    note: "",
+    service: row.service_name,
+    serviceSlug: row.service_slug ?? undefined,
+    specialistId: row.specialist_id ?? undefined,
+    status: mapAppointmentStatus(row.status),
+    time: normalizeTime(row.starts_at),
+    version: row.version ?? 1,
+  };
+}
+
 function mapCalendarBlockRow(row: AdminCalendarBlockDatabaseRow): CalendarBlock {
   return {
     blockDate: row.block_date,
@@ -853,31 +884,6 @@ function mapSpecialistRow(row: AdminSpecialistDatabaseRow): SpecialistRecord {
     id: row.id,
     publicBookingEnabled: row.public_booking_enabled,
     status: row.status,
-  };
-}
-
-function maskPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  return digits.length > 4 ? `${phone.slice(0, 4)}••••${digits.slice(-2)}` : "••••";
-}
-
-function maskEmail(email: string) {
-  const [local, domain] = email.split("@", 2);
-  return domain ? `${local.slice(0, 1)}•••@${domain}` : "••••";
-}
-
-function restrictClientContact(client: ClientRecord): ClientRecord {
-  return {
-    ...client,
-    contactRestricted: true,
-    email: maskEmail(client.email),
-    history: [],
-    note: "",
-    phone: maskPhone(client.phone),
-    preferredContact: "Скрыто",
-    tags: [],
-    telegram: "",
-    totalSpend: "—",
   };
 }
 
@@ -1450,11 +1456,15 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function listAppointments(specialistId?: string) {
-    const rows = await selectRows<AdminAppointmentDatabaseRow>(client, "admin_appointments", appointmentColumns, (query) =>
+    const rows = await selectRows<AdminAppointmentDatabaseRow>(
+      client,
+      "admin_appointments",
+      specialistId ? specialistAppointmentColumns : appointmentColumns,
+      (query) =>
       (specialistId ? query.eq("specialist_id", specialistId) : query).order("starts_on", { ascending: true }),
     );
 
-    return rows.map(mapAppointmentRow);
+    return rows.map(specialistId ? mapSpecialistAppointmentRow : mapAppointmentRow);
   }
 
   async function listCalendarBlocks(specialistId?: string) {
@@ -1553,27 +1563,17 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function loadDomainRecords(specialistId?: string) {
-    const allClients = await listClients();
+    const allClients = specialistId ? [] : await listClients();
     const [appointments, calendarBlocks, specialists] = await Promise.all([
       listAppointments(specialistId),
       listCalendarBlocks(specialistId),
       listSpecialists(),
     ]);
-    const assignedClientIds = new Set(appointments.map((appointment) => appointment.clientId).filter(Boolean));
-    const clients = specialistId
-      ? allClients.filter((clientRecord) => assignedClientIds.has(clientRecord.id)).map(restrictClientContact)
-      : allClients;
     const certificates = specialistId ? [] : await listCertificates();
     const specialistNames = new Map(specialists.map((specialist) => [specialist.id, specialist.displayName]));
     const namedAppointments = appointments.map((appointment) => ({
       ...appointment,
       specialistName: appointment.specialistId ? specialistNames.get(appointment.specialistId) : undefined,
-      ...(specialistId
-        ? {
-            publicEmail: maskEmail(appointment.publicEmail ?? ""),
-            publicPhone: maskPhone(appointment.publicPhone ?? ""),
-          }
-        : {}),
     }));
     const namedCalendarBlocks = calendarBlocks.map((block) => ({
       ...block,
@@ -1584,7 +1584,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
       appointments: namedAppointments,
       calendarBlocks: namedCalendarBlocks,
       certificates,
-      clients: specialistId ? clients : addAppointmentHistories(clients, appointments),
+      clients: specialistId ? [] : addAppointmentHistories(allClients, appointments),
       specialists,
     };
   }

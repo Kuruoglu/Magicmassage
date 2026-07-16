@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const authorization = await authorizeSupabaseAdminAccess(
     client,
     getBearerToken(request.headers.get("authorization")),
-    { allowedRoles: ["owner", "administrator", "specialist"] },
+    { allowedRoles: ["owner", "administrator"] },
   );
   if (!authorization.ok) {
     return jsonError(authorization.message, authorization.statusCode);

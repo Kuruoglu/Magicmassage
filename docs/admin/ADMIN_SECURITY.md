@@ -20,7 +20,8 @@ public Supabase keys.
 - `owner`: all sections, users, settings, finance, audit.
 - `administrator`: operations, content, finance, non-critical settings.
 - `accountant`: finance reports and exports only.
-- `specialist`: calendar and operational appointment work only.
+- `specialist`: own read-only appointment calendar plus the contact-free
+  "Клиент сейчас" action.
 - `editor`: public content modules only.
 - `viewer`: read-only access to explicitly allowed sections, no export.
 
@@ -35,17 +36,18 @@ public Supabase keys.
   appointments, certificates, specialist schedules, alerts, or reveal logs.
 - A specialist is server-forced to the `specialist_id` linked to the profile;
   payload values cannot expand that scope.
-- Contact details are masked by default. An assigned specialist may explicitly
-  reveal them from the appointment, with purpose, audit event, rolling limits,
-  and a security alert after suspicious bulk access.
-- A specialist cannot attach an arbitrary client id. The client must already
-  have an appointment assigned to that specialist; an owner or administrator
-  establishes the first assignment.
-- Specialist reveal is limited to `confirmed`, `pending`, or `request`
-  appointments between 48 hours in the past and 180 days in the future.
-- Contact reveal counting is serialized per actor. The twentieth reveal in ten
-  minutes creates an owner/admin warning; requests after sixty successful
-  reveals in the same window are blocked.
+- A specialist response contains no client rows, client ids, phone, email,
+  contact preference, contact snapshots, or appointment notes. Contact values
+  are omitted, not masked.
+- Public booking exposes only each specialist's `public_slug`; the internal
+  specialist UUID, which may match an auth user id, stays inside service-role RPCs.
+- Contact reveal routes and RPCs allow only `owner` and `administrator`.
+- A specialist cannot create, edit, cancel, move, resize, or reassign an
+  appointment. Only an owner or administrator assigns appointments.
+- A specialist cannot create arbitrary personal blocks or edit calendar blocks.
+  The only block mutation allowed by the API is a current, contact-free
+  "Клиент сейчас" interval in the calendar linked to the authenticated profile;
+  it immediately removes that interval from public availability.
 - Owners and administrators see unresolved alerts on the dashboard. Resolution
   uses a server RPC and records the resolving actor without exposing raw alert
   metadata or client contact data.

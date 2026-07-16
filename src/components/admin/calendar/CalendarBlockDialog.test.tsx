@@ -160,6 +160,40 @@ describe("CalendarBlockDialog", () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ specialistId: "specialist-yana" }));
   });
 
+  it("creates a contact-free current-client block in the specialist calendar", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn(async () => ({ ok: true as const }));
+
+    render(
+      <CalendarBlockDialog
+        currentSpecialistId="specialist-yana"
+        initialDate="2026-07-20"
+        initialEndsAt="14:00"
+        initialStartsAt="13:00"
+        intent="walk-in"
+        onClose={vi.fn()}
+        onSave={onSave}
+        role="specialist"
+        specialists={specialists}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Занять время клиентом" });
+    expect(within(dialog).queryByText("Тип")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox", { name: "Весь день" })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Начало")).toHaveValue("13:00");
+    expect(within(dialog).getByLabelText("Конец")).toHaveValue("14:00");
+    await user.click(within(dialog).getByRole("button", { name: "Занять время" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      internalNote: "Клиент сейчас",
+      kind: "other",
+      specialistId: "specialist-yana",
+      startsAt: "13:00",
+      endsAt: "14:00",
+    }));
+  });
+
   it("ignores every close action while a block is being saved", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

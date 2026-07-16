@@ -14,7 +14,6 @@ import {
 } from "@/components/admin/drawer";
 import { isPostVisitCommentAvailable } from "@/components/admin/clients/visit-comments";
 import { statusClass } from "@/components/admin/lib/formatters";
-import { getAdminAuthorizationHeader } from "@/lib/supabase/browser";
 import {
   calendarClientHref,
   calendarCreateHref,
@@ -39,26 +38,6 @@ type AppointmentDetailDrawerProps = {
   role: AdminRoleId;
 };
 
-type RevealedContact = {
-  appointmentId: string;
-  email?: string;
-  phone?: string;
-  preferredContact?: string;
-};
-
-function maskPhone(value: string) {
-  if (!value || value.includes("*")) return value;
-  const digits = value.replace(/\D/g, "");
-  return digits.length > 3 ? `••• ${digits.slice(-4)}` : "••••";
-}
-
-function maskEmail(value: string) {
-  if (!value || value.includes("*")) return value;
-  const [localPart, domain] = value.split("@");
-  if (!domain) return "••••";
-  return `${localPart.slice(0, 1) || "•"}•••@${domain}`;
-}
-
 export function AppointmentDetailDrawer({
   appointment,
   appointmentClient,
@@ -72,69 +51,16 @@ export function AppointmentDetailDrawer({
   const [postVisitComment, setPostVisitComment] = useState(initialPostVisitComment);
   const [savedPostVisitComment, setSavedPostVisitComment] = useState(initialPostVisitComment);
   const [postVisitSaveState, setPostVisitSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [revealedContact, setRevealedContact] = useState<RevealedContact>();
-  const [contactRevealAppointmentId, setContactRevealAppointmentId] = useState("");
-  const [contactRevealState, setContactRevealState] = useState<"idle" | "loading" | "error">("idle");
-  const [contactRevealError, setContactRevealError] = useState("");
-  const canCommentAfterVisit = isPostVisitCommentAvailable(appointment);
+  const canCommentAfterVisit = role !== "specialist" && isPostVisitCommentAvailable(appointment);
   const needsCompletionWarning =
     canCommentAfterVisit && appointment.status !== "Завершена" && appointment.status !== "Не пришёл";
   const hasUnsavedChanges = postVisitComment !== savedPostVisitComment;
-  const requiresContactReveal = role === "specialist" || Boolean(appointmentClient?.contactRestricted);
-  const currentRevealedContact = revealedContact?.appointmentId === appointment.id
-    ? revealedContact
-    : undefined;
-  const rawPhone = currentRevealedContact?.phone ?? appointmentClient?.phone ?? appointment.publicPhone ?? "";
-  const rawEmail = currentRevealedContact?.email ?? appointmentClient?.email ?? appointment.publicEmail ?? "";
-  const displayedPhone = requiresContactReveal && !currentRevealedContact ? maskPhone(rawPhone) : rawPhone;
-  const displayedEmail = requiresContactReveal && !currentRevealedContact ? maskEmail(rawEmail) : rawEmail;
-  const publicContactLabel = appointment.publicContactPreference
+  const canViewContact = role === "owner" || role === "administrator";
+  const displayedPhone = canViewContact ? appointmentClient?.phone ?? appointment.publicPhone ?? "" : "";
+  const displayedEmail = canViewContact ? appointmentClient?.email ?? appointment.publicEmail ?? "" : "";
+  const publicContactLabel = canViewContact && appointment.publicContactPreference
     ? ({ email: "Email", phone: "Телефон", telegram: "Telegram", viber: "Viber" } as const)[appointment.publicContactPreference]
     : undefined;
-
-  async function revealContact() {
-    if (!appointment.id) {
-      setContactRevealState("error");
-      setContactRevealError("Контакты доступны только для сохраненной записи.");
-      return;
-    }
-
-    setContactRevealState("loading");
-    setContactRevealAppointmentId(appointment.id);
-    setRevealedContact(undefined);
-    setContactRevealError("");
-
-    try {
-      const authorization = await getAdminAuthorizationHeader();
-      const response = await fetch("/api/admin/client-contact", {
-        body: JSON.stringify({
-          appointmentId: appointment.id,
-          purpose: "Связаться с клиентом по текущей записи",
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          ...(authorization ? { Authorization: authorization } : {}),
-        },
-        method: "POST",
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        contact?: RevealedContact;
-        error?: string;
-      };
-
-      if (!response.ok || !payload.contact) {
-        throw new Error(payload.error || "Не удалось открыть контакты клиента.");
-      }
-
-      setRevealedContact({ ...payload.contact, appointmentId: appointment.id });
-      setContactRevealState("idle");
-    } catch (error) {
-      setContactRevealState("error");
-      setContactRevealError(
-        error instanceof Error ? error.message : "Не удалось открыть контакты клиента.",
-      );
-    }
-  }
 
   async function savePostVisitComment() {
     setPostVisitSaveState("saving");
@@ -179,14 +105,18 @@ export function AppointmentDetailDrawer({
                 Открыть клиента
               </Link>
             ) : null}
-            <button className="admin-text-action" onClick={() => onEditAppointment(appointment)} type="button">
-              Редактировать
-            </button>
-            {appointment.status === "Отменена" ? null : (
-              <button className="admin-danger-button" onClick={() => onCancelAppointment(appointment)} type="button">
-                Отменить
-              </button>
-            )}
+            {role === "owner" || role === "administrator" ? (
+              <>
+                <button className="admin-text-action" onClick={() => onEditAppointment(appointment)} type="button">
+                  Редактировать
+                </button>
+                {appointment.status === "Отменена" ? null : (
+                  <button className="admin-danger-button" onClick={() => onCancelAppointment(appointment)} type="button">
+                    Отменить
+                  </button>
+                )}
+              </>
+            ) : null}
           </div>
           <dl className="admin-detail-list">
             <div>
@@ -254,30 +184,6 @@ export function AppointmentDetailDrawer({
               </div>
             ) : null}
           </dl>
-          {requiresContactReveal && !currentRevealedContact ? (
-            <div className="admin-detail-actions">
-              <button
-                className="admin-outline-action"
-                disabled={
-                  (contactRevealState === "loading" && contactRevealAppointmentId === appointment.id) ||
-                  !appointment.id
-                }
-                onClick={() => void revealContact()}
-                type="button"
-              >
-                {contactRevealState === "loading" && contactRevealAppointmentId === appointment.id
-                  ? "Открываем..."
-                  : "Показать контакты"}
-              </button>
-              <small>Просмотр контактов фиксируется в журнале безопасности.</small>
-            </div>
-          ) : null}
-          {currentRevealedContact ? <small role="status">Контакты открыты и просмотр зарегистрирован.</small> : null}
-          {contactRevealState === "error" && contactRevealAppointmentId === appointment.id ? (
-            <p className="admin-form-alert" role="alert">
-              {contactRevealError}
-            </p>
-          ) : null}
         </AdminDrawerSection>
         <AdminDrawerSection title="После визита">
           {canCommentAfterVisit ? (

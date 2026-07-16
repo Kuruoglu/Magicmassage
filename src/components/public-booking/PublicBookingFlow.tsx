@@ -34,7 +34,7 @@ const localeTags: Record<Locale, string> = {
   en: "en-GB",
 };
 
-const steps: BookingStep[] = ["service", "variant", "schedule", "details", "review"];
+const steps: BookingStep[] = ["service", "variant", "specialist", "schedule", "details", "review"];
 
 type PublicBookingFlowProps = {
   initialServiceSlug?: string;
@@ -94,12 +94,14 @@ function policyNotice(policy: unknown) {
 function buildBookingUrl(input: {
   date?: string | null;
   service?: string | null;
+  specialist?: string | null;
   step: BookingStep;
   variant?: string | null;
 }) {
   const search = new URLSearchParams();
   if (input.service) search.set("service", input.service);
   if (input.variant) search.set("variant", input.variant);
+  if (input.specialist !== undefined) search.set("specialist", input.specialist ?? "any");
   if (input.date) search.set("date", input.date);
   search.set("step", input.step);
   return `${window.location.pathname}?${search.toString()}`;
@@ -281,10 +283,11 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
   const [step, setStep] = useState<BookingStep>("service");
   const [selectedServiceSlug, setSelectedServiceSlug] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState<string | null | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [availabilityDates, setAvailabilityDates] = useState<BookingAvailabilityDate[]>([]);
-  const [availabilityVariantId, setAvailabilityVariantId] = useState<string | null>(null);
+  const [loadedAvailabilityKey, setLoadedAvailabilityKey] = useState<string | null>(null);
   const [availabilityState, setAvailabilityState] = useState<"error" | "idle" | "loading" | "ready">("idle");
   const [hold, setHold] = useState<ActiveBookingHold | null>(null);
   const [holdBusy, setHoldBusy] = useState(false);
@@ -308,18 +311,34 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
     () => selectedService?.variants.find((variant) => variant.id === selectedVariantId) ?? null,
     [selectedService, selectedVariantId],
   );
+  const selectedSpecialist = useMemo(
+    () => selectedService?.specialists.find((specialist) => specialist.id === selectedSpecialistId) ?? null,
+    [selectedService, selectedSpecialistId],
+  );
+  const availabilityKey = selectedVariantId && selectedSpecialistId !== undefined
+    ? `${selectedVariantId}:${selectedSpecialistId ?? "any"}`
+    : null;
   const selectedAvailabilityDate = availabilityDates.find((date) => date.date === selectedDate) ?? null;
   const summaryQuote = confirmation?.appointment ?? hold ?? selectedVariant;
+  const summarySpecialist = confirmation?.appointment.specialistName
+    ?? hold?.specialistName
+    ?? selectedSpecialist?.displayName
+    ?? (selectedSpecialistId === null ? copy.anySpecialist : copy.notSelected);
   const notice = policyNotice(options?.policy);
 
   const writeHistory = useCallback((nextStep: BookingStep, mode: "push" | "replace", overrides?: {
     date?: string | null;
     service?: string | null;
+    specialist?: string | null;
     variant?: string | null;
   }) => {
+    const specialist = overrides && Object.prototype.hasOwnProperty.call(overrides, "specialist")
+      ? overrides.specialist
+      : selectedSpecialistId;
     const url = buildBookingUrl({
       date: overrides?.date === undefined ? selectedDate : overrides.date,
       service: overrides?.service === undefined ? selectedServiceSlug : overrides.service,
+      specialist,
       step: nextStep,
       variant: overrides?.variant === undefined ? selectedVariantId : overrides.variant,
     });
@@ -333,7 +352,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
     );
     historyIndexRef.current = nextHistoryIndex;
     if (nextStep === "schedule") scheduleHistoryIndexRef.current = nextHistoryIndex;
-  }, [selectedDate, selectedServiceSlug, selectedVariantId]);
+  }, [selectedDate, selectedServiceSlug, selectedSpecialistId, selectedVariantId]);
 
   const navigateToStep = useCallback((nextStep: BookingStep, mode: "push" | "replace" = "push") => {
     setStatusMessage(null);
@@ -370,6 +389,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
           setConfirmation(result.confirmation);
           setSelectedServiceSlug(result.confirmation.appointment.serviceSlug);
           setSelectedVariantId(result.confirmation.appointment.priceVariantId);
+          setSelectedSpecialistId(result.confirmation.appointment.specialistId ?? null);
           setSelectedDate(result.confirmation.appointment.date);
           setSelectedTime(result.confirmation.appointment.time);
           return;
@@ -388,9 +408,13 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
         const restoredVariant = restoredService?.variants.find(
           (item) => item.id === restoredHold?.priceVariantId,
         ) ?? null;
-        if (restoredHold && restoredService && restoredVariant) {
+        const restoredSpecialist = restoredService?.specialists.find(
+          (item) => item.id === restoredHold?.specialistId,
+        ) ?? null;
+        if (restoredHold && restoredService && restoredVariant && restoredSpecialist) {
           setSelectedServiceSlug(restoredService.slug);
           setSelectedVariantId(restoredVariant.id);
+          setSelectedSpecialistId(restoredSpecialist.id);
           setSelectedDate(restoredHold.date);
           setSelectedTime(restoredHold.time);
           setHold({ ...restoredHold, idempotencyKey: createIdempotencyKey() });
@@ -403,6 +427,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
             buildBookingUrl({
               date: restoredHold.date,
               service: restoredService.slug,
+              specialist: restoredSpecialist.id,
               step: "details",
               variant: restoredVariant.id,
             }),
@@ -414,15 +439,28 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
         const requestedService = search.get("service") ?? initialServiceSlug ?? null;
         const service = result.services.find((item) => item.slug === requestedService) ?? null;
         const requestedVariant = service?.variants.find((item) => item.id === search.get("variant")) ?? null;
+        const specialistParam = search.get("specialist");
+        const requestedSpecialist = specialistParam === "any"
+          ? null
+          : service?.specialists.find((item) => item.id === specialistParam)?.id;
         const requestedDate = search.get("date");
         const requestedStep = isBookingStep(search.get("step")) ? search.get("step") as BookingStep : null;
-        const initialStep: BookingStep = requestedVariant
-          ? requestedStep === "variant" ? "variant" : "schedule"
-          : service ? "variant" : "service";
+        let initialStep: BookingStep = requestedStep
+          ?? (requestedVariant
+            ? requestedSpecialist === undefined ? "specialist" : "schedule"
+            : service ? "variant" : "service");
+        if (!service) initialStep = "service";
+        else if (!requestedVariant && steps.indexOf(initialStep) > steps.indexOf("variant")) initialStep = "variant";
+        else if (requestedVariant && requestedSpecialist === undefined && steps.indexOf(initialStep) > steps.indexOf("specialist")) {
+          initialStep = "specialist";
+        } else if ((initialStep === "details" || initialStep === "review") && !restoredHold) {
+          initialStep = "schedule";
+        }
 
         setSelectedServiceSlug(service?.slug ?? null);
         setSelectedVariantId(requestedVariant?.id ?? null);
-        setSelectedDate(requestedVariant && requestedDate ? requestedDate : null);
+        setSelectedSpecialistId(requestedVariant ? requestedSpecialist : undefined);
+        setSelectedDate(requestedVariant && requestedSpecialist !== undefined && requestedDate ? requestedDate : null);
         setStep(initialStep);
         historyIndexRef.current = 0;
         scheduleHistoryIndexRef.current = 0;
@@ -430,8 +468,9 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
           { bookingFlow: true, bookingIndex: 0, step: initialStep },
           "",
           buildBookingUrl({
-            date: requestedVariant && requestedDate ? requestedDate : null,
+            date: requestedVariant && requestedSpecialist !== undefined && requestedDate ? requestedDate : null,
             service: service?.slug ?? null,
+            specialist: requestedVariant ? requestedSpecialist : undefined,
             step: initialStep,
             variant: requestedVariant?.id ?? null,
           }),
@@ -467,11 +506,16 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
       const search = new URLSearchParams(window.location.search);
       const service = options.services.find((item) => item.slug === search.get("service")) ?? null;
       const variant = service?.variants.find((item) => item.id === search.get("variant")) ?? null;
+      const specialistParam = search.get("specialist");
+      const specialist = specialistParam === "any"
+        ? null
+        : service?.specialists.find((item) => item.id === specialistParam)?.id;
       const requestedStep = isBookingStep(search.get("step")) ? search.get("step") as BookingStep : "service";
       let nextStep: BookingStep = requestedStep;
 
       if (!service) nextStep = "service";
       else if (!variant && steps.indexOf(nextStep) > steps.indexOf("variant")) nextStep = "variant";
+      else if (variant && specialist === undefined && steps.indexOf(nextStep) > steps.indexOf("specialist")) nextStep = "specialist";
       else if ((nextStep === "details" || nextStep === "review") && !hold) nextStep = "schedule";
 
       if (nextStep === "schedule") scheduleHistoryIndexRef.current = historyIndexRef.current;
@@ -482,6 +526,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
           buildBookingUrl({
             date: variant ? search.get("date") : null,
             service: service?.slug ?? null,
+            specialist: variant ? specialist : undefined,
             step: nextStep,
             variant: variant?.id ?? null,
           }),
@@ -490,7 +535,8 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
 
       setSelectedServiceSlug(service?.slug ?? null);
       setSelectedVariantId(variant?.id ?? null);
-      setSelectedDate(variant ? search.get("date") : null);
+      setSelectedSpecialistId(variant ? specialist : undefined);
+      setSelectedDate(variant && specialist !== undefined ? search.get("date") : null);
       setStep(nextStep);
       setStatusMessage(pendingScheduleMessageRef.current);
       pendingScheduleMessageRef.current = null;
@@ -501,17 +547,18 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
   }, [hold, options]);
 
   const refreshAvailability = useCallback(async (signal?: AbortSignal) => {
-    if (!selectedVariantId) return;
+    if (!selectedVariantId || selectedSpecialistId === undefined || !availabilityKey) return;
     setAvailabilityState("loading");
 
     try {
       const result = await loadBookingAvailability({
         horizonDays: options?.horizonDays ?? 31,
         signal,
+        ...(selectedSpecialistId ? { specialistId: selectedSpecialistId } : {}),
         variantId: selectedVariantId,
       });
       setAvailabilityDates(result.dates);
-      setAvailabilityVariantId(selectedVariantId);
+      setLoadedAvailabilityKey(availabilityKey);
       setAvailabilityState("ready");
       setSelectedDate((current) =>
         current && result.dates.some((date) => date.date === current && date.availability !== "unavailable")
@@ -521,17 +568,17 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
     } catch (error) {
       if ((error as Error).name !== "AbortError") setAvailabilityState("error");
     }
-  }, [options, selectedVariantId]);
+  }, [availabilityKey, options, selectedSpecialistId, selectedVariantId]);
 
   useEffect(() => {
-    if (step !== "schedule" || !selectedVariantId || availabilityVariantId === selectedVariantId) return;
+    if (step !== "schedule" || !availabilityKey || loadedAvailabilityKey === availabilityKey) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => void refreshAvailability(controller.signal), 0);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [availabilityVariantId, refreshAvailability, selectedVariantId, step]);
+  }, [availabilityKey, loadedAvailabilityKey, refreshAvailability, step]);
 
   useEffect(() => {
     if (!hold) return;
@@ -556,41 +603,66 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
     const restoredVariant = restoredService?.variants.find(
       (item) => item.id === restoredHold?.priceVariantId,
     ) ?? null;
-    if (!restoredHold || !restoredService || !restoredVariant) return null;
+    const restoredSpecialist = restoredService?.specialists.find(
+      (item) => item.id === restoredHold?.specialistId,
+    ) ?? null;
+    if (!restoredHold || !restoredService || !restoredVariant || !restoredSpecialist) return null;
 
     const activeHold = { ...restoredHold, idempotencyKey: createIdempotencyKey() };
     setSelectedServiceSlug(restoredService.slug);
     setSelectedVariantId(restoredVariant.id);
+    setSelectedSpecialistId(restoredSpecialist.id);
     setSelectedDate(restoredHold.date);
     setSelectedTime(restoredHold.time);
     setHold(activeHold);
+    setAvailabilityDates([]);
+    setLoadedAvailabilityKey(null);
 
-    return { hold: activeHold, service: restoredService, variant: restoredVariant };
+    return { hold: activeHold, service: restoredService, specialist: restoredSpecialist, variant: restoredVariant };
   }, [locale]);
 
   const selectService = (service: BookingService) => {
     setSelectedServiceSlug(service.slug);
     setSelectedVariantId(null);
+    setSelectedSpecialistId(undefined);
     setSelectedDate(null);
     setSelectedTime(null);
     setHold(null);
     setAvailabilityDates([]);
-    setAvailabilityVariantId(null);
+    setLoadedAvailabilityKey(null);
     setAvailabilityState("idle");
     setStatusMessage(null);
-    writeHistory("service", "replace", { date: null, service: service.slug, variant: null });
+    writeHistory("service", "replace", {
+      date: null,
+      service: service.slug,
+      specialist: undefined,
+      variant: null,
+    });
   };
 
   const selectVariant = (variant: BookingVariant) => {
     setSelectedVariantId(variant.id);
+    setSelectedSpecialistId(undefined);
     setSelectedDate(null);
     setSelectedTime(null);
     setHold(null);
     setAvailabilityDates([]);
-    setAvailabilityVariantId(null);
+    setLoadedAvailabilityKey(null);
     setAvailabilityState("idle");
     setStatusMessage(null);
-    writeHistory("variant", "replace", { date: null, variant: variant.id });
+    writeHistory("variant", "replace", { date: null, specialist: undefined, variant: variant.id });
+  };
+
+  const selectSpecialist = (specialistId: string | null) => {
+    setSelectedSpecialistId(specialistId);
+    setSelectedDate(null);
+    setSelectedTime(null);
+    setHold(null);
+    setAvailabilityDates([]);
+    setLoadedAvailabilityKey(null);
+    setAvailabilityState("idle");
+    setStatusMessage(null);
+    writeHistory("specialist", "replace", { date: null, specialist: specialistId });
   };
 
   const selectDate = (date: string) => {
@@ -602,7 +674,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
   };
 
   const selectTime = async (time: string) => {
-    if (!selectedServiceSlug || !selectedVariantId || !selectedDate || holdBusy) return;
+    if (!selectedServiceSlug || !selectedVariantId || selectedSpecialistId === undefined || !selectedDate || holdBusy) return;
     if (isActiveHold(hold) && selectedTime === time) {
       navigateToStep("details");
       return;
@@ -615,6 +687,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
     try {
       const result = await createBookingHold({
         date: selectedDate,
+        ...(selectedSpecialistId ? { specialistId: selectedSpecialistId } : {}),
         time,
         variantId: selectedVariantId,
       });
@@ -636,18 +709,20 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
         writeHistory("details", "push", {
           date: restored.hold.date,
           service: restored.service.slug,
+          specialist: restored.specialist.id,
           variant: restored.variant.id,
         });
       } else {
         setHold(restored?.hold ?? previousHold);
         setSelectedTime(restored?.hold.time ?? previousTime);
         setStatusMessage(error instanceof BookingApiError && error.status === 409 ? copy.conflict : copy.holdError);
-        if (!restored && !previousHold) setAvailabilityVariantId(null);
+        if (!restored && !previousHold) setLoadedAvailabilityKey(null);
         if (restored) {
           setStep("schedule");
           writeHistory("schedule", "replace", {
             date: restored.hold.date,
             service: restored.service.slug,
+            specialist: restored.specialist.id,
             variant: restored.variant.id,
           });
         }
@@ -709,7 +784,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
       }));
     } catch (error) {
       if (error instanceof BookingApiError && error.status === 409) {
-        setAvailabilityVariantId(null);
+        setLoadedAvailabilityKey(null);
         returnToSchedule(copy.conflict);
       } else {
         setStatusMessage(copy.confirmError);
@@ -741,6 +816,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
           ? `${summaryQuote.durationMinutes} ${copy.minutes} · ${formatPrice(locale, summaryQuote)}`
           : copy.notSelected}</dd>
       </div>
+      <div><dt>{copy.specialist}</dt><dd>{summarySpecialist}</dd></div>
       <div><dt>{copy.date}</dt><dd>{selectedDate ? formatDate(locale, selectedDate) : copy.notSelected}</dd></div>
       <div><dt>{copy.time}</dt><dd>{selectedTime ?? copy.notSelected}</dd></div>
       {full && contact.name ? (
@@ -833,6 +909,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
               <h2 ref={headingRef} tabIndex={-1}>
                 {step === "service" ? copy.serviceTitle : null}
                 {step === "variant" ? copy.variantTitle : null}
+                {step === "specialist" ? copy.specialistTitle : null}
                 {step === "schedule" ? copy.scheduleTitle : null}
                 {step === "details" ? copy.detailsTitle : null}
                 {step === "review" ? copy.reviewTitle : null}
@@ -840,6 +917,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
               <p>
                 {step === "service" ? copy.serviceHint : null}
                 {step === "variant" ? copy.variantHint : null}
+                {step === "specialist" ? copy.specialistHint : null}
                 {step === "schedule" ? copy.scheduleHint : null}
                 {step === "details" ? copy.detailsHint : null}
                 {step === "review" ? copy.reviewHint : null}
@@ -885,6 +963,41 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
                   />
                   <span><strong>{variant.durationMinutes}</strong> {copy.minutes}</span>
                   <strong>{formatPrice(locale, variant)}</strong>
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
+
+          {step === "specialist" ? (
+            <fieldset className={styles.specialistList}>
+              <legend className={styles.visuallyHidden}>{copy.specialistTitle}</legend>
+              <label className={styles.specialistChoice}>
+                <input
+                  aria-describedby={`${formId}-any-specialist-hint`}
+                  aria-labelledby={`${formId}-any-specialist-title`}
+                  checked={selectedSpecialistId === null}
+                  className={styles.specialistRadio}
+                  name="booking-specialist"
+                  onChange={() => selectSpecialist(null)}
+                  type="radio"
+                  value="any"
+                />
+                <span>
+                  <strong id={`${formId}-any-specialist-title`}>{copy.anySpecialist}</strong>
+                  <small id={`${formId}-any-specialist-hint`}>{copy.anySpecialistHint}</small>
+                </span>
+              </label>
+              {selectedService?.specialists.map((specialist) => (
+                <label className={styles.specialistChoice} key={specialist.id}>
+                  <input
+                    checked={selectedSpecialistId === specialist.id}
+                    className={styles.specialistRadio}
+                    name="booking-specialist"
+                    onChange={() => selectSpecialist(specialist.id)}
+                    type="radio"
+                    value={specialist.id}
+                  />
+                  <span><strong>{specialist.displayName}</strong></span>
                 </label>
               ))}
             </fieldset>
@@ -1029,7 +1142,16 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
                 <button type="button" disabled={!selectedService} onClick={() => navigateToStep("variant")}>{copy.continue}</button>
               ) : null}
               {step === "variant" ? (
-                <button type="button" disabled={!selectedVariant} onClick={() => navigateToStep("schedule")}>{copy.continue}</button>
+                <button type="button" disabled={!selectedVariant} onClick={() => navigateToStep("specialist")}>{copy.continue}</button>
+              ) : null}
+              {step === "specialist" ? (
+                <button
+                  type="button"
+                  disabled={selectedSpecialistId === undefined}
+                  onClick={() => navigateToStep("schedule")}
+                >
+                  {copy.continue}
+                </button>
               ) : null}
               {step === "details" ? <button type="submit" form={formId}>{copy.continue}</button> : null}
               {step === "review" ? (

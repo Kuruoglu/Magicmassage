@@ -14,15 +14,18 @@ admin/CRM platform:
   read from Supabase with the documented static fallbacks where applicable.
 - Public instant booking is controlled by `public_booking_enabled`. When it is
   disabled, booking CTAs fall back to Studio24 and `/[locale]/booking` is hidden.
-- A customer chooses a service, price/duration variant, available date and time,
-  enters contact details, and confirms the booking. A selected time is held for
+- A customer chooses a service, price/duration variant, a specific specialist or
+  any available specialist, then an available date and time, enters contact
+  details, and confirms the booking. A selected time is held for
   five minutes; one browser session may have only one active hold, and selecting
   another time atomically replaces it. Final confirmation creates a confirmed
   appointment immediately.
 - The public booking session is a short-lived signed HttpOnly cookie. Reloading
   or switching locale restores the same active hold with a rotated bearer token;
   forged or expired cookies cannot restore or create holds.
-- Public availability is automatically distributed across active specialists.
+- Public availability can be restricted to the specialist selected by the
+  customer. The "any specialist" option is automatically distributed across
+  active eligible specialists.
   Each specialist uses the owner-configured public cap from 1 to 8 appointments
   per day (8 by default).
   An authorized owner may create a ninth, tenth, or later manual appointment;
@@ -45,12 +48,14 @@ platform includes Supabase/PostgreSQL, Supabase Auth, protected `/admin` routes,
 role checks, clients, appointments, calendar blocks, services, prices, media,
 contacts, blog, settings, certificates, and finance exports.
 
-Specialist access is intentionally narrow: each specialist has a separate
-calendar, sees only assigned appointments and blocks, has no standalone client
-or certificate module, and may reveal an assigned client's contact details only
-through the audited, rate-limited appointment action. The first client assignment
-must be made by an owner or administrator. Every admin role requires TOTP
-multi-factor authentication.
+Specialist access is intentionally narrow: each specialist has a read-only
+appointment calendar, sees only assigned appointments and calendar blocks, and
+has no standalone client or certificate module. A specialist never receives
+client phone, email, contact preference, client id, contact snapshots, or notes.
+Only an owner or administrator creates, changes, or reassigns appointments. A
+specialist may use the contact-free "Клиент сейчас" action to occupy an interval
+in their own calendar without creating a fake client record. Every admin role
+requires TOTP multi-factor authentication.
 
 Important booking invariants:
 
@@ -60,10 +65,8 @@ Important booking invariants:
 - Admin calendar blocks are separate records, never fake clients or fake
   appointments.
 - Owner booking-setting changes and calendar-block mutations are audited.
-- Specialist contact reveal is limited to operational appointment statuses and
-  the interval from 48 hours after a visit to 180 days before a future visit.
-- Bulk contact access creates a visible owner/admin security alert; resolving it
-  records the responsible owner or administrator in the audit log.
+- Contact access endpoints and audited contact RPCs are owner/administrator-only;
+  specialist requests are rejected before any contact data is returned.
 - Manual admin appointments show capacity overflow such as `10 из 8`, but remain
   permitted.
 

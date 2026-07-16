@@ -250,7 +250,7 @@ export function MediaPlacementEditor({ assets, onClose, onReplaced, placement }:
           {error ? <p className="admin-form-alert" role="alert">{error}</p> : null}
         </AdminDrawerBody>
         <AdminDrawerFooter>
-          <button disabled={isSaving} type="submit">{isSaving ? "Замена..." : "Применить к этому месту"}</button>
+          <button className="admin-primary-button" disabled={isSaving} type="submit">{isSaving ? "Замена..." : "Применить к этому месту"}</button>
           <CancelButton disabled={isSaving} onClose={onClose} />
         </AdminDrawerFooter>
       </form>

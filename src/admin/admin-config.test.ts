@@ -29,6 +29,11 @@ describe("admin config", () => {
     expect(ownerNavigation.map((item) => item.id)).toEqual(adminModules.map((item) => item.id));
   });
 
+  it("routes specialists directly to their own calendar", () => {
+    expect(getAdminNavigationForRole("specialist").map((item) => item.id)).toEqual(["calendar"]);
+    expect(resolveAdminSection("dashboard", "specialist")).toBe("calendar");
+  });
+
   it("redirects accountants away from forbidden sections", () => {
     expect(resolveAdminSection("clients", accountantRoleId)).toBe("finances");
     expect(resolveAdminSection("calendar", accountantRoleId)).toBe("finances");

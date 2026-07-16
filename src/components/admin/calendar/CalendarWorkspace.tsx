@@ -106,6 +106,7 @@ export type CalendarWorkspaceProps = {
   dailySlotCapacity: number;
   onCancelAppointment: (appointment: Appointment) => void;
   onCreateCalendarBlock?: (date: string) => void;
+  onCreateWalkIn?: () => void;
   onDeleteCalendarBlock?: (block: CalendarBlock) => void;
   onCalendarDateChange: (date: string) => void;
   onEditAppointment: (appointment: Appointment) => void;
@@ -267,6 +268,7 @@ export function CalendarWorkspace({
   dailySlotCapacity,
   onCancelAppointment,
   onCreateCalendarBlock,
+  onCreateWalkIn,
   onDeleteCalendarBlock,
   onCalendarDateChange,
   onEditAppointment,
@@ -779,6 +781,7 @@ export function CalendarWorkspace({
         }}
         onResize={resizeAppointment}
         onSelect={selectAppointment}
+        readOnly={role === "specialist"}
       />
     );
   }
@@ -796,9 +799,11 @@ export function CalendarWorkspace({
       <section className="admin-panel admin-calendar-panel" aria-labelledby="calendar-heading">
         <CalendarToolbar
           canManageBlocks={canManageBlocks}
+          canMarkWalkIn={role === "specialist"}
           heading={calendarHeading}
           mode={mode}
           onAddBlock={() => onCreateCalendarBlock?.(selectedDate)}
+          onMarkWalkIn={onCreateWalkIn}
           onDateChange={(date) =>
             selectDate(
               date,

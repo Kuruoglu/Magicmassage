@@ -86,6 +86,8 @@ describe("public booking API adapter", () => {
         date: "2026-07-20",
         time: "10:00",
         serviceSlug: "classic-massage",
+        specialistId: "specialist-natali",
+        specialistName: "Natalia Petrova",
         priceVariantId: "variant-60",
         priceCents: 5000,
         currency: "EUR",
@@ -106,7 +108,11 @@ describe("public booking API adapter", () => {
       locale: "en",
       selectionId: "11111111-1111-4111-8111-111111111111",
       selectionVersion: 1,
-    })).resolves.toMatchObject({ reference: "MMN-42", status: "confirmed" });
+    })).resolves.toMatchObject({
+      appointment: { specialistId: "specialist-natali", specialistName: "Natalia Petrova" },
+      reference: "MMN-42",
+      status: "confirmed",
+    });
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(new Headers(init.headers).get("Idempotency-Key")).toBe(

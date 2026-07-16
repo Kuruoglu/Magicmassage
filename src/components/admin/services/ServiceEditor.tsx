@@ -317,7 +317,7 @@ export function ServiceEditor({ initialService, onClose, onSave, suggestedOrder 
           </div>
         </AdminDrawerBody>
         <AdminDrawerFooter>
-          <button type="submit">Сохранить услугу</button>
+          <button className="admin-primary-button" type="submit">Сохранить услугу</button>
           <CancelButton onClose={onClose} />
         </AdminDrawerFooter>
       </form>

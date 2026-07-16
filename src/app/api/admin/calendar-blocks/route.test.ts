@@ -73,6 +73,70 @@ describe("admin calendar blocks API", () => {
     }));
   });
 
+  it("allows a specialist to mark only a current walk-in interval", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-20T09:07:00Z"));
+    routeMocks.authorization = {
+      mode: "supabase",
+      ok: true,
+      role: "specialist",
+      specialistId: "33333333-3333-4333-8333-333333333333",
+      userId: "11111111-1111-4111-8111-111111111111",
+    };
+
+    try {
+      const response = await POST(new Request("https://example.com/api/admin/calendar-blocks", {
+        body: JSON.stringify({
+          ...block,
+          intent: "walk-in",
+          internalNote: "Посетитель без записи",
+          kind: "other",
+        }),
+        headers: { authorization: "Bearer specialist-token" },
+        method: "POST",
+      }));
+
+      expect(response.status).toBe(200);
+      expect(routeMocks.rpc).toHaveBeenCalledWith("admin_mutate_specialist_calendar_block", expect.objectContaining({
+        p_action: "upsert",
+        p_specialist_id: "33333333-3333-4333-8333-333333333333",
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects arbitrary calendar-block management for a specialist", async () => {
+    routeMocks.authorization = {
+      mode: "supabase",
+      ok: true,
+      role: "specialist",
+      specialistId: "33333333-3333-4333-8333-333333333333",
+      userId: "11111111-1111-4111-8111-111111111111",
+    };
+
+    const createResponse = await POST(new Request("https://example.com/api/admin/calendar-blocks", {
+      body: JSON.stringify(block),
+      headers: { authorization: "Bearer specialist-token" },
+      method: "POST",
+    }));
+    const editResponse = await PATCH(new Request("https://example.com/api/admin/calendar-blocks", {
+      body: JSON.stringify({ ...block, version: 1 }),
+      headers: { authorization: "Bearer specialist-token" },
+      method: "PATCH",
+    }));
+    const deleteResponse = await DELETE(new Request("https://example.com/api/admin/calendar-blocks", {
+      body: JSON.stringify({ id: block.id, version: 1 }),
+      headers: { authorization: "Bearer specialist-token" },
+      method: "DELETE",
+    }));
+
+    expect(createResponse.status).toBe(403);
+    expect(editResponse.status).toBe(403);
+    expect(deleteResponse.status).toBe(403);
+    expect(routeMocks.rpc).not.toHaveBeenCalled();
+  });
+
   it("requires an id when editing a block", async () => {
     const payload = {
       blockDate: block.blockDate,

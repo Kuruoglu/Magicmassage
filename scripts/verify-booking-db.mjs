@@ -94,10 +94,11 @@ function appointmentRecord({
   };
 }
 
-async function createHold({ date, priceVariantId, sessionKeyHash, time, tokenHash }) {
-  return supabase.rpc("public_booking_create_hold_v4", {
+async function createHold({ date, priceVariantId, sessionKeyHash, specialistSlug = null, time, tokenHash }) {
+  return supabase.rpc("public_booking_create_hold_v6", {
     p_price_variant_id: priceVariantId,
     p_session_key_hash: sessionKeyHash,
+    p_specialist_slug: specialistSlug,
     p_starts_at: time,
     p_starts_on: date,
     p_token_hash: tokenHash,
@@ -251,7 +252,7 @@ async function cleanup() {
 let output;
 
 try {
-  const { data: options, error: optionsError } = await supabase.rpc("public_booking_get_options", {
+  const { data: options, error: optionsError } = await supabase.rpc("public_booking_get_options_v2", {
     p_locale: "en",
   });
   if (optionsError) throw optionsError;
@@ -281,8 +282,8 @@ try {
   assert(settingsResult.data.booking_min_lead_minutes === 30, "Public booking same-day lead must be 30 minutes.");
 
   const { data: availability, error: availabilityError } = await supabase.rpc(
-    "public_booking_get_availability",
-    { p_days: 31, p_from: sofiaToday(), p_price_variant_id: priceVariantId },
+    "public_booking_get_availability_v3",
+    { p_days: 31, p_from: sofiaToday(), p_price_variant_id: priceVariantId, p_specialist_slug: null },
   );
   if (availabilityError) throw availabilityError;
   const candidates = availability?.days?.filter(
@@ -338,11 +339,12 @@ try {
 
   const defaultSpecialist = await supabase
     .from("admin_specialists")
-    .select("id")
+    .select("id, public_slug")
     .eq("is_default", true)
     .single();
   if (defaultSpecialist.error) throw defaultSpecialist.error;
   const secondSpecialistId = randomUUID();
+  const secondSpecialistSlug = `booking-db-${runId.slice(0, 12)}`;
   specialistIds.add(secondSpecialistId);
   const secondSpecialist = await supabase.from("admin_specialists").insert({
     color: "#4f6ea8",
@@ -352,7 +354,7 @@ try {
     is_default: false,
     public_booking_enabled: false,
     public_daily_limit: publicDailyLimit === 8 ? 1 : 8,
-    public_slug: `booking-db-${runId.slice(0, 12)}`,
+    public_slug: secondSpecialistSlug,
     status: "active",
   });
   if (secondSpecialist.error) throw secondSpecialist.error;
@@ -426,7 +428,7 @@ try {
   }), "appointment.create", specialistUserId);
   const specialistArbitraryClientRejected = errorMatches(
     forbiddenSpecialistAppointment.error,
-    "appointment_client_forbidden",
+    "appointment_forbidden",
   );
 
   const specialistSeedAppointmentId = `appointment-booking-db-specialist-seed-${runId}`;
@@ -448,7 +450,10 @@ try {
     specialistId: specialistUserId,
     time: "04:30",
   }), "appointment.create", specialistUserId);
-  const specialistAssignedClientAllowed = !allowedSpecialistAppointment.error;
+  const specialistAssignedClientRejected = errorMatches(
+    allowedSpecialistAppointment.error,
+    "appointment_forbidden",
+  );
 
   const oldHoldResult = await supabase.rpc("public_booking_create_hold", {
     p_price_variant_id: priceVariantId,
@@ -1005,7 +1010,96 @@ try {
     && adjustedPublicAppointment.data.public_phone_snapshot === publicAppointment.data.public_phone_snapshot
     && adjustedPublicAppointment.data.service_name === publicAppointment.data.service_name;
 
+  const enableSecondSpecialist = await supabase
+    .from("admin_specialists")
+    .update({ public_booking_enabled: true })
+    .eq("id", secondSpecialistId);
+  if (enableSecondSpecialist.error) throw enableSecondSpecialist.error;
+
+  const [defaultAvailability, secondAvailability] = await Promise.all([
+    supabase.rpc("public_booking_get_availability_v3", {
+      p_days: 31,
+      p_from: sofiaToday(),
+      p_price_variant_id: priceVariantId,
+      p_specialist_slug: defaultSpecialist.data.public_slug,
+    }),
+    supabase.rpc("public_booking_get_availability_v3", {
+      p_days: 31,
+      p_from: sofiaToday(),
+      p_price_variant_id: priceVariantId,
+      p_specialist_slug: secondSpecialistSlug,
+    }),
+  ]);
+  if (defaultAvailability.error) throw defaultAvailability.error;
+  if (secondAvailability.error) throw secondAvailability.error;
+  const secondSlotsByDate = new Map(
+    secondAvailability.data.days.map((day) => [day.date, new Set(day.slots)]),
+  );
+  const sharedCandidate = defaultAvailability.data.days
+    .flatMap((day) => day.slots
+      .filter((slot) => secondSlotsByDate.get(day.date)?.has(slot))
+      .map((slot) => ({ date: day.date, time: slot })))
+    .at(0);
+  assert(sharedCandidate, "A slot shared by two public specialists is required for the DB smoke.");
+
+  const specificSession = opaqueHash(sessionHashes);
+  const fallbackSession = opaqueHash(sessionHashes);
+  const specificHold = await createHold({
+    date: sharedCandidate.date,
+    priceVariantId,
+    sessionKeyHash: specificSession,
+    specialistSlug: defaultSpecialist.data.public_slug,
+    time: sharedCandidate.time,
+    tokenHash: opaqueHash(tokenHashes),
+  });
+  if (specificHold.error) throw specificHold.error;
+  const occupiedSpecificSession = opaqueHash(sessionHashes);
+  const occupiedSpecificHold = await createHold({
+    date: sharedCandidate.date,
+    priceVariantId,
+    sessionKeyHash: occupiedSpecificSession,
+    specialistSlug: defaultSpecialist.data.public_slug,
+    time: sharedCandidate.time,
+    tokenHash: opaqueHash(tokenHashes),
+  });
+  const occupiedSpecificSpecialistRejected = errorMatches(
+    occupiedSpecificHold.error,
+    "slot_unavailable",
+  );
+  const fallbackHold = await createHold({
+    date: sharedCandidate.date,
+    priceVariantId,
+    sessionKeyHash: fallbackSession,
+    time: sharedCandidate.time,
+    tokenHash: opaqueHash(tokenHashes),
+  });
+  if (fallbackHold.error) throw fallbackHold.error;
+  const specificSpecialistPreserved = specificHold.data.specialistId === defaultSpecialist.data.public_slug;
+  const blockedSpecialistFallsBack = fallbackHold.data.specialistId !== defaultSpecialist.data.public_slug;
+  const publicSpecialistUuidHidden = options.services.every((service) =>
+    service.specialists.every((specialist) =>
+      typeof specialist.id === "string"
+      && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(specialist.id)
+    )
+  ) && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(specificHold.data.specialistId);
+  await expireSessions([specificSession, occupiedSpecificSession, fallbackSession]);
+
+  const parallelSpecialistSessions = [opaqueHash(sessionHashes), opaqueHash(sessionHashes)];
+  const parallelSpecialistHolds = await Promise.all(
+    parallelSpecialistSessions.map((sessionKeyHash) => createHold({
+      date: sharedCandidate.date,
+      priceVariantId,
+      sessionKeyHash,
+      time: sharedCandidate.time,
+      tokenHash: opaqueHash(tokenHashes),
+    })),
+  );
+  const parallelSpecialistsDistributed = parallelSpecialistHolds.every((result) => !result.error)
+    && new Set(parallelSpecialistHolds.map((result) => result.data.specialistId)).size === 2;
+  await expireSessions(parallelSpecialistSessions);
+
   output = {
+    blockedSpecialistFallsBack,
     contactRevealRateLimitSerialized,
     bookingSnapshotsPreserved,
     concurrentSlotSerialized,
@@ -1025,10 +1119,13 @@ try {
     newServiceAutoAssigned,
     obsoleteConfirmRpcRemoved,
     obsoleteHoldRpcRemoved,
+    occupiedSpecificSpecialistRejected,
     offGridStartRejected,
     personalBlockRemovesSlot,
     parallelSessionRestoresSerialized: parallelSessionRestoresSerialized
       && parallelSessionVersionsStable,
+    parallelSpecialistsDistributed,
+    publicSpecialistUuidHidden,
     publicConfirmationAfterManualOverflow,
     publicDurationAdjusted,
     securityAlertWarningCreated,
@@ -1040,7 +1137,8 @@ try {
     staleAppointmentVersionRejected,
     staleBlockVersionRejected,
     specialistArbitraryClientRejected,
-    specialistAssignedClientAllowed,
+    specialistAssignedClientRejected,
+    specificSpecialistPreserved,
   };
 
   for (const [name, passed] of Object.entries(output)) {

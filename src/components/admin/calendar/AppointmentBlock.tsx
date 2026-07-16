@@ -33,6 +33,7 @@ type AppointmentBlockProps = {
   onResizeInteractionChange?: (isResizing: boolean) => void;
   onResize: (appointment: Appointment, deltaMinutes: number) => void;
   onSelect: (appointment: Appointment) => void;
+  readOnly?: boolean;
 };
 
 export function clampAppointmentDurationToDay(appointment: Appointment, deltaMinutes: number) {
@@ -59,6 +60,7 @@ export function AppointmentBlock({
   onResizeInteractionChange,
   onResize,
   onSelect,
+  readOnly = false,
 }: AppointmentBlockProps) {
   const [resizePreviewDelta, setResizePreviewDelta] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
@@ -89,10 +91,10 @@ export function AppointmentBlock({
       aria-hidden={isDragPreview || undefined}
       className={className}
       aria-busy={isPending || undefined}
-      draggable={!isDragPreview && !isPending && !isResizing}
-      onDragEnd={isDragPreview ? undefined : onDragEnd}
+      draggable={!readOnly && !isDragPreview && !isPending && !isResizing}
+      onDragEnd={isDragPreview || readOnly ? undefined : onDragEnd}
       onDragStart={
-        isDragPreview
+        isDragPreview || readOnly
           ? undefined
           : (event) => {
               if (isResizing || Date.now() < suppressDragUntilRef.current) {
@@ -132,28 +134,30 @@ export function AppointmentBlock({
             {classification.overlap ? <small>Пересечение</small> : null}
             {classification.outsideWorkingHours ? <small>Вне рабочих часов</small> : null}
           </button>
-          <AppointmentResizeHandle
-            appointment={appointment}
-            disabled={isPending}
-            onActivate={() => onSelect(appointment)}
-            onInteractionChange={(active) => {
-              suppressDragUntilRef.current = active ? Number.POSITIVE_INFINITY : Date.now() + 700;
-              setIsResizing(active);
-              onResizeInteractionChange?.(active);
-            }}
-            onPreview={(deltaMinutes) => {
-              setResizePreviewDelta(
-                deltaMinutes === 0
-                  ? 0
-                  : clampAppointmentDurationToDay(appointment, deltaMinutes) - appointmentDuration,
-              );
-            }}
-            onResize={(resizedAppointment, deltaMinutes) => {
-              setResizePreviewDelta(0);
-              onResize(resizedAppointment, deltaMinutes);
-            }}
-            useWholeCardTarget={!compact && previewDuration <= 30}
-          />
+          {readOnly ? null : (
+            <AppointmentResizeHandle
+              appointment={appointment}
+              disabled={isPending}
+              onActivate={() => onSelect(appointment)}
+              onInteractionChange={(active) => {
+                suppressDragUntilRef.current = active ? Number.POSITIVE_INFINITY : Date.now() + 700;
+                setIsResizing(active);
+                onResizeInteractionChange?.(active);
+              }}
+              onPreview={(deltaMinutes) => {
+                setResizePreviewDelta(
+                  deltaMinutes === 0
+                    ? 0
+                    : clampAppointmentDurationToDay(appointment, deltaMinutes) - appointmentDuration,
+                );
+              }}
+              onResize={(resizedAppointment, deltaMinutes) => {
+                setResizePreviewDelta(0);
+                onResize(resizedAppointment, deltaMinutes);
+              }}
+              useWholeCardTarget={!compact && previewDuration <= 30}
+            />
+          )}
         </>
       )}
     </article>

@@ -27,6 +27,8 @@ vi.mock("@/booking/service", async (importOriginal) => {
       priceCents: 8000,
       selectionId: "11111111-1111-4111-8111-111111111111",
       selectionVersion: 1,
+      specialistId: "yana-public",
+      specialistName: "Яна",
       time: "10:00",
     })),
   };
@@ -93,6 +95,19 @@ describe("public booking holds route", () => {
     expect(response.status).toBe(428);
     await expect(response.json()).resolves.toEqual({ error: "booking_session_required" });
     expect(createPublicBookingHold).not.toHaveBeenCalled();
+  });
+
+  it("keeps the public specialist choice when creating the hold", async () => {
+    const specialistId = "yana-public";
+    const response = await POST(holdRequest({
+      date: "2026-08-01",
+      priceVariantId: "price-60",
+      specialistId,
+      time: "10:00",
+    }));
+
+    expect(response.status).toBe(201);
+    expect(createPublicBookingHold).toHaveBeenCalledWith(expect.objectContaining({ specialistId }));
   });
 
   it("rejects a forged booking session cookie", async () => {

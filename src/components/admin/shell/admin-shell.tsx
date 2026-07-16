@@ -99,6 +99,7 @@ import {
   type BlogArticleDraft,
   type BlogStatus as BlogEditorStatus,
 } from "@/components/admin/blog";
+
 import {
   certificateBelongsToClient,
   createAdminDemoRecords,
@@ -139,6 +140,24 @@ import {
   type SpecialistRecord,
   type StripeMode,
 } from "@/admin/domain";
+
+function getSofiaWalkInWindow(now = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      hour12: false,
+      minute: "2-digit",
+      timeZone: "Europe/Sofia",
+    }).formatToParts(now).map((part) => [part.type, part.value]),
+  );
+  const currentMinutes = (Number(parts.hour) % 24) * 60 + Number(parts.minute);
+  const startMinutes = Math.floor(currentMinutes / 15) * 15;
+  const endMinutes = Math.min(startMinutes + 60, 23 * 60 + 59);
+  const format = (minutes: number) =>
+    `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+  return { endsAt: format(endMinutes), startsAt: format(startMinutes) };
+}
 
 type AdminCalendarAction = "create";
 export type AdminShellProps = {
@@ -5485,6 +5504,7 @@ function Workspace({
   media,
   onCancelAppointment,
   onCreateCalendarBlock,
+  onCreateWalkIn,
   onDeleteCalendarBlock,
   onCalendarCreateIntent,
   onCalendarDateChange,
@@ -5555,6 +5575,7 @@ function Workspace({
   media: MediaRecord[];
   onCancelAppointment: (appointment: Appointment) => void;
   onCreateCalendarBlock: (date: string) => void;
+  onCreateWalkIn: () => void;
   onDeleteCalendarBlock: (block: CalendarBlock) => void;
   onCalendarCreateIntent: () => void;
   onCalendarDateChange: (date: string) => void;
@@ -5767,13 +5788,14 @@ function Workspace({
         appointments={appointments}
         bookingBufferMinutes={settings.bookingBufferMinutes}
         calendarBlocks={calendarBlocks}
-        canManageBlocks={role === "owner" || role === "administrator" || role === "specialist"}
+        canManageBlocks={role === "owner" || role === "administrator"}
         clients={clients}
         currentSpecialistId={currentSpecialistId}
         dailySlotCapacity={settings.publicBookingDailyLimit ?? settings.dailySlotCapacity}
         key={`${selectedCalendarDate ?? "default-calendar"}:${selectedClientName ?? "all-clients"}:${calendarAppointmentFocus?.appointmentKey ?? "default-focus"}`}
         onCancelAppointment={onCancelAppointment}
         onCreateCalendarBlock={onCreateCalendarBlock}
+        onCreateWalkIn={onCreateWalkIn}
         onDeleteCalendarBlock={onDeleteCalendarBlock}
         onCalendarDateChange={onCalendarDateChange}
         onEditAppointment={onEditAppointment}
@@ -5820,6 +5842,8 @@ export function AdminShell({
   const activeDescription = role === "specialist" && activeSection === "dashboard"
     ? "Ваши ближайшие записи и быстрый переход в личный календарь."
     : activeModule.description;
+  const canManageAppointments = role === "owner" || role === "administrator";
+  const canUsePrimaryAction = activeSection !== "calendar" || canManageAppointments;
   const initialRecords = useMemo(() => buildInitialAdminRecords(initialData), [initialData]);
   const initialFinanceRows = useMemo(() => buildInitialFinanceRows(initialData), [initialData]);
   const specialists = initialRecords.specialists ?? [];
@@ -5830,6 +5854,9 @@ export function AdminShell({
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
   const [editingCalendarBlock, setEditingCalendarBlock] = useState<CalendarBlock | undefined>();
   const [calendarBlockDate, setCalendarBlockDate] = useState("");
+  const [calendarBlockEndsAt, setCalendarBlockEndsAt] = useState<string>();
+  const [calendarBlockIntent, setCalendarBlockIntent] = useState<"block" | "walk-in">("block");
+  const [calendarBlockStartsAt, setCalendarBlockStartsAt] = useState<string>();
   const [isCalendarBlockDialogOpen, setIsCalendarBlockDialogOpen] = useState(false);
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() =>
     buildInitialCalendarAppointments(initialRecords),
@@ -5890,7 +5917,10 @@ export function AdminShell({
   const [isUserCreateOpen, setIsUserCreateOpen] = useState(false);
   const calendarActionKey = `${activeSection}:${role}:${calendarAction ?? "none"}:${selectedClientName ?? ""}`;
   const shouldOpenCalendarCreateDialog =
-    activeSection === "calendar" && calendarAction === "create" && dismissedCalendarActionKey !== calendarActionKey;
+    canManageAppointments
+    && activeSection === "calendar"
+    && calendarAction === "create"
+    && dismissedCalendarActionKey !== calendarActionKey;
   const isCalendarActionDialogOpen = activeSection === "calendar" && (isActionOpen || shouldOpenCalendarCreateDialog);
   const shouldPrefillCalendarClient = shouldOpenCalendarCreateDialog && !isActionOpen && !editingAppointment;
   const prefilledCalendarClient = shouldPrefillCalendarClient ? findClientByIdentity(clients, selectedClientName) : undefined;
@@ -5912,12 +5942,28 @@ export function AdminShell({
   function openCalendarBlockCreate(date: string) {
     setEditingCalendarBlock(undefined);
     setCalendarBlockDate(date);
+    setCalendarBlockEndsAt(undefined);
+    setCalendarBlockIntent("block");
+    setCalendarBlockStartsAt(undefined);
+    setIsCalendarBlockDialogOpen(true);
+  }
+
+  function openCurrentClientBlock() {
+    const window = getSofiaWalkInWindow();
+    setEditingCalendarBlock(undefined);
+    setCalendarBlockDate(getSofiaIsoDate());
+    setCalendarBlockEndsAt(window.endsAt);
+    setCalendarBlockIntent("walk-in");
+    setCalendarBlockStartsAt(window.startsAt);
     setIsCalendarBlockDialogOpen(true);
   }
 
   function openCalendarBlockEdit(block: CalendarBlock) {
     setEditingCalendarBlock(block);
     setCalendarBlockDate(block.blockDate);
+    setCalendarBlockEndsAt(undefined);
+    setCalendarBlockIntent("block");
+    setCalendarBlockStartsAt(undefined);
     setIsCalendarBlockDialogOpen(true);
   }
 
@@ -5938,7 +5984,7 @@ export function AdminShell({
 
     try {
       const response = await fetch("/api/admin/calendar-blocks", {
-        body: JSON.stringify(block),
+        body: JSON.stringify({ ...block, intent: calendarBlockIntent }),
         headers: await getAdminApiHeaders(),
         method: editingCalendarBlock ? "PATCH" : "POST",
       });
@@ -6146,6 +6192,8 @@ export function AdminShell({
 
   function openPrimaryAction() {
     setEditingAppointment(undefined);
+
+    if (!canUsePrimaryAction) return;
 
     if (activeSection === "clients") {
       setCancellingAppointment(undefined);
@@ -6868,7 +6916,7 @@ export function AdminShell({
             <h1 id="admin-page-title">{activeModule.title}</h1>
             <p>{activeDescription}</p>
           </div>
-          {activeModule.primaryAction ? (
+          {activeModule.primaryAction && canUsePrimaryAction ? (
             <button onClick={openPrimaryAction} type="button">
               {activeModule.primaryAction}
             </button>
@@ -6917,6 +6965,7 @@ export function AdminShell({
           media={media}
           onCancelAppointment={openAppointmentCancel}
           onCreateCalendarBlock={openCalendarBlockCreate}
+          onCreateWalkIn={openCurrentClientBlock}
           onDeleteCalendarBlock={deleteCalendarBlock}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
           onCalendarDateChange={updateActiveCalendarDate}
@@ -6994,7 +7043,10 @@ export function AdminShell({
             currentSpecialistId={initialData?.currentSpecialistId}
             initialBlock={editingCalendarBlock}
             initialDate={calendarBlockDate || activeCalendarDate}
-            key={editingCalendarBlock?.id ?? `new-block-${calendarBlockDate || activeCalendarDate}`}
+            initialEndsAt={calendarBlockEndsAt}
+            initialStartsAt={calendarBlockStartsAt}
+            intent={calendarBlockIntent}
+            key={editingCalendarBlock?.id ?? `new-${calendarBlockIntent}-${calendarBlockDate || activeCalendarDate}`}
             onClose={closeCalendarBlockDialog}
             onSave={saveCalendarBlock}
             role={role}

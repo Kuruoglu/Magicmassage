@@ -5,9 +5,15 @@ export type BookingVariant = {
   priceCents: number;
 };
 
+export type BookingSpecialist = {
+  displayName: string;
+  id: string;
+};
+
 export type BookingService = {
   category?: string;
   slug: string;
+  specialists: BookingSpecialist[];
   title: string;
   variants: BookingVariant[];
 };
@@ -46,6 +52,8 @@ export type BookingHold = {
   priceCents: number;
   selectionId: string;
   selectionVersion: number;
+  specialistId: string;
+  specialistName: string;
 };
 
 export type BookingConfirmation = {
@@ -56,7 +64,9 @@ export type BookingConfirmation = {
     priceCents: number;
     priceVariantId: string;
     serviceName: string;
-    serviceSlug: string;
+      serviceSlug: string;
+      specialistId?: string;
+      specialistName: string;
     time: string;
   };
   reference: string;
@@ -77,4 +87,4 @@ export type ActiveBookingHold = BookingHold & {
   idempotencyKey: string;
 };
 
-export type BookingStep = "service" | "variant" | "schedule" | "details" | "review";
+export type BookingStep = "service" | "variant" | "specialist" | "schedule" | "details" | "review";

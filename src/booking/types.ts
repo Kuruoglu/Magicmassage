@@ -11,9 +11,15 @@ export type PublicBookingPriceVariant = {
   priceCents: number;
 };
 
+export type PublicBookingSpecialist = {
+  displayName: string;
+  id: string;
+};
+
 export type PublicBookingService = {
   category: string;
   slug: string;
+  specialists: PublicBookingSpecialist[];
   title: string;
   variants: PublicBookingPriceVariant[];
 };
@@ -54,6 +60,8 @@ export type PublicBookingHold = {
   priceCents: number;
   selectionId: string;
   selectionVersion: number;
+  specialistId: string;
+  specialistName: string;
   time: string;
 };
 
@@ -70,6 +78,8 @@ export type PublicBookingConfirmation = {
   publicReference: string;
   serviceName: string;
   serviceSlug: string;
+  specialistId?: string;
+  specialistName: string;
   status: string;
   time: string;
 };
@@ -77,6 +87,7 @@ export type PublicBookingConfirmation = {
 export type CreatePublicBookingHoldInput = {
   date: string;
   priceVariantId: string;
+  specialistId?: string;
   time: string;
 };
 

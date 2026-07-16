@@ -52,4 +52,19 @@ describe("public booking availability route", () => {
     expect(response.status).toBe(400);
     expect(getPublicBookingAvailability).not.toHaveBeenCalled();
   });
+
+  it("passes an explicitly selected specialist to availability", async () => {
+    const specialistId = "yana-public";
+    const response = await GET(new Request(
+      `https://example.com/api/public/booking/availability?priceVariantId=price-60&from=2026-08-01&days=7&specialistId=${specialistId}`,
+    ));
+
+    expect(response.status).toBe(200);
+    expect(getPublicBookingAvailability).toHaveBeenCalledWith({
+      days: 7,
+      from: "2026-08-01",
+      priceVariantId: "price-60",
+      specialistId,
+    });
+  });
 });

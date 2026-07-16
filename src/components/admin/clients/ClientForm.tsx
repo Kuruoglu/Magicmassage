@@ -279,7 +279,7 @@ export function ClientForm({ clients, initialClient, onClose, onSave, role }: Cl
           </div>
         </AdminDrawerBody>
         <AdminDrawerFooter>
-          <button type="submit">{initialClient ? "Сохранить изменения" : "Сохранить клиента"}</button>
+          <button className="admin-primary-button" type="submit">{initialClient ? "Сохранить изменения" : "Сохранить клиента"}</button>
           <CancelButton onClose={onClose} />
         </AdminDrawerFooter>
       </form>

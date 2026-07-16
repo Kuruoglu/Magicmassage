@@ -88,7 +88,7 @@ function requireRecord<T>(value: unknown, requiredKeys: readonly string[]): T {
 }
 
 export async function getPublicBookingOptions(locale: PublicBookingLocale) {
-  const data = await callBookingRpc("public_booking_get_options", { p_locale: locale });
+  const data = await callBookingRpc("public_booking_get_options_v2", { p_locale: locale });
 
   return requireRecord<PublicBookingOptions>(data, ["enabled", "timezone", "services"]);
 }
@@ -97,11 +97,13 @@ export async function getPublicBookingAvailability(input: {
   days: number;
   from: string;
   priceVariantId: string;
+  specialistId?: string;
 }) {
-  const data = await callBookingRpc("public_booking_get_availability", {
+  const data = await callBookingRpc("public_booking_get_availability_v3", {
     p_days: input.days,
     p_from: input.from,
     p_price_variant_id: input.priceVariantId,
+    p_specialist_slug: input.specialistId ?? null,
   });
 
   return requireRecord<PublicBookingAvailability>(data, ["enabled", "timezone", "days"]);
@@ -111,11 +113,12 @@ export async function createPublicBookingHold(
   input: CreatePublicBookingHoldInput & { sessionToken: string },
 ): Promise<PublicBookingHold> {
   const holdToken = randomBytes(32).toString("base64url");
-  const data = await callBookingRpc("public_booking_create_hold_v4", {
+  const data = await callBookingRpc("public_booking_create_hold_v6", {
     p_price_variant_id: input.priceVariantId,
     p_session_key_hash: hashPublicBookingSecret(input.sessionToken),
     p_starts_at: input.time,
     p_starts_on: input.date,
+    p_specialist_slug: input.specialistId ?? null,
     p_token_hash: hashPublicBookingSecret(holdToken),
   });
   const hold = requireRecord<Omit<PublicBookingHold, "holdToken">>(data, [
@@ -128,6 +131,8 @@ export async function createPublicBookingHold(
     "expiresAt",
     "selectionId",
     "selectionVersion",
+    "specialistId",
+    "specialistName",
   ]);
 
   return { ...hold, holdToken };
@@ -137,7 +142,7 @@ export async function restorePublicBookingHold(
   sessionToken: string,
 ): Promise<PublicBookingRestoredHold | null> {
   const holdToken = randomBytes(32).toString("base64url");
-  const data = await callBookingRpc("public_booking_restore_session_hold_v4", {
+  const data = await callBookingRpc("public_booking_restore_session_hold_v6", {
     p_session_key_hash: hashPublicBookingSecret(sessionToken),
     p_token_hash: hashPublicBookingSecret(holdToken),
   });
@@ -154,6 +159,8 @@ export async function restorePublicBookingHold(
     "expiresAt",
     "selectionId",
     "selectionVersion",
+    "specialistId",
+    "specialistName",
   ]);
 
   return { ...hold, holdToken };
@@ -188,6 +195,7 @@ export async function confirmPublicBooking(
     "currency",
     "durationMinutes",
     "serviceName",
+    "specialistName",
   ]);
 }
 
@@ -210,6 +218,7 @@ export async function restorePublicBookingConfirmation(
     "durationMinutes",
     "priceCents",
     "currency",
+    "specialistName",
   ]);
 }
 

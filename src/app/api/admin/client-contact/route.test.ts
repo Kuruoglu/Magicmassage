@@ -22,8 +22,7 @@ describe("admin appointment contact reveal", () => {
     vi.mocked(authorizeSupabaseAdminAccess).mockResolvedValue({
       mode: "supabase",
       ok: true,
-      role: "specialist",
-      specialistId: "22222222-2222-4222-8222-222222222222",
+      role: "owner",
       userId: "11111111-1111-4111-8111-111111111111",
     });
   });
@@ -48,10 +47,20 @@ describe("admin appointment contact reveal", () => {
       p_appointment_id: "appointment-public-1",
       p_purpose: "Связаться по текущей записи",
     });
+    expect(authorizeSupabaseAdminAccess).toHaveBeenCalledWith(
+      expect.anything(),
+      "aal2-token",
+      { allowedRoles: ["owner", "administrator"] },
+    );
   });
 
-  it("does not return contact data when assignment validation fails", async () => {
-    rpc.mockResolvedValue({ data: null, error: { message: "contact_reveal_forbidden" } });
+  it("denies specialists before the contact RPC is called", async () => {
+    vi.mocked(authorizeSupabaseAdminAccess).mockResolvedValueOnce({
+      message: "Forbidden",
+      mode: "supabase",
+      ok: false,
+      statusCode: 403,
+    });
     const response = await POST(new Request("https://example.com/api/admin/client-contact", {
       body: JSON.stringify({ appointmentId: "appointment-public-1", purpose: "Связаться по записи" }),
       headers: { authorization: "Bearer aal2-token", "content-type": "application/json" },
@@ -60,5 +69,6 @@ describe("admin appointment contact reveal", () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

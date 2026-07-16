@@ -125,6 +125,7 @@ function renderCalendar({
   onCreateCalendarBlock = vi.fn(),
   onDeleteCalendarBlock = vi.fn(),
   onEditCalendarBlock = vi.fn(),
+  onCreateWalkIn = vi.fn(),
   onSaveAppointment = vi.fn(async () => ({ ok: true }) as CalendarAppointmentSaveResult),
   query = "",
   role = "owner",
@@ -138,6 +139,7 @@ function renderCalendar({
   onCreateCalendarBlock?: (date: string) => void;
   onDeleteCalendarBlock?: (block: CalendarBlock) => void;
   onEditCalendarBlock?: (block: CalendarBlock) => void;
+  onCreateWalkIn?: () => void;
   onSaveAppointment?: (
     appointment: Appointment,
     action?: Parameters<typeof CalendarWorkspace>[0]["onSaveAppointment"] extends (
@@ -164,6 +166,7 @@ function renderCalendar({
       dailySlotCapacity={4}
       onCancelAppointment={vi.fn()}
       onCreateCalendarBlock={onCreateCalendarBlock}
+      onCreateWalkIn={onCreateWalkIn}
       onDeleteCalendarBlock={onDeleteCalendarBlock}
       onCalendarDateChange={vi.fn()}
       onEditAppointment={vi.fn()}
@@ -234,6 +237,26 @@ describe("CalendarWorkspace", () => {
     expect(screen.queryByLabelText("Показать календарь специалиста")).not.toBeInTheDocument();
     expect(screen.queryByText("Анна Петрова")).not.toBeInTheDocument();
     expect(screen.getByText("Мария Иванова")).toBeVisible();
+  });
+
+  it("keeps appointments read-only while exposing the contact-free current-client action", async () => {
+    const user = userEvent.setup();
+    const onCreateWalkIn = vi.fn();
+    renderCalendar({
+      calendarAppointments: [appointments[0]],
+      canManageBlocks: false,
+      currentSpecialistId: "specialist-natali",
+      onCreateWalkIn,
+      role: "specialist",
+      specialistRecords: specialists,
+    });
+
+    const block = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
+    expect(block).toHaveAttribute("draggable", "false");
+    expect(block.querySelector(".admin-timed-appointment-resize")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Заблокировать время" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Клиент сейчас" }));
+    expect(onCreateWalkIn).toHaveBeenCalledTimes(1);
   });
 
   it("jumps to an exact date from the toolbar date picker", async () => {
@@ -457,7 +480,7 @@ describe("CalendarWorkspace", () => {
     expect(listItems[2].style.left).toBe("calc(66.6667% + 4px)");
   });
 
-  it.each<AdminRoleId>(["owner", "administrator", "specialist"])(
+  it.each<AdminRoleId>(["owner", "administrator"])(
     "shows calendar-block management controls for %s",
     async (role) => {
       const user = userEvent.setup();

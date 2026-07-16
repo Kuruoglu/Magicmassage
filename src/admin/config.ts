@@ -143,7 +143,7 @@ const roleAccess: Record<AdminRoleId, AdminSectionId[]> = {
     "blog",
     "finances",
   ],
-  specialist: ["dashboard", "calendar"],
+  specialist: ["calendar"],
   editor: ["dashboard", "services", "price", "media", "contacts", "blog"],
   accountant: ["finances"],
   viewer: ["dashboard", "clients", "certificates", "calendar", "services", "price", "media", "contacts", "blog"],

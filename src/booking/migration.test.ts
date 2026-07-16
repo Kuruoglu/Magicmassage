@@ -135,6 +135,18 @@ const specialistOffboardingMigrationPath = join(
 const multiSpecialistHardeningMigrationPath = join(
   process.cwd(), "supabase", "migrations", "20260716150000_harden_multi_specialist_security.sql",
 );
+const specialistChoiceMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716170000_specialist_choice_and_contact_lockdown.sql",
+);
+const specialistAppointmentLockMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716180000_lock_specialist_appointment_mutations.sql",
+);
+const contactRevealLimitsMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716190000_restore_owner_contact_reveal_limits.sql",
+);
+const publicSpecialistSlugsMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260716200000_public_specialist_slugs.sql",
+);
 
 function migrationSql() {
   return readFileSync(migrationPath, "utf8");
@@ -567,5 +579,60 @@ describe("public booking migration", () => {
     expect(sql).toContain("grant execute on function public.admin_resolve_security_alert(uuid, uuid) to authenticated, service_role");
     expect(sql).toContain("revoke all on table public.admin_security_alerts from anon, authenticated");
     expect(sql).toContain("grant select, insert, update, delete on table public.admin_security_alerts to service_role");
+  });
+
+  it("adds explicit public specialist choice and removes specialist contact access", () => {
+    const sql = readFileSync(specialistChoiceMigrationPath, "utf8");
+    const revealRpc = sql.slice(
+      sql.indexOf("create or replace function public.admin_reveal_appointment_contact"),
+      sql.indexOf("revoke all on function public.public_booking_get_availability_v2"),
+    );
+
+    expect(sql).toContain("'specialists'");
+    expect(sql).toContain("create function public.public_booking_get_availability_v2");
+    expect(sql).toContain("create function public.public_booking_create_hold_v5");
+    expect(sql).toContain("p_specialist_id uuid default null");
+    expect(sql).toContain("new.specialist_id is distinct from old.specialist_id");
+    expect(sql).toContain("(p_specialist_id is null or specialist.id = p_specialist_id)");
+    expect(revealRpc).toContain("profile.role::text in ('owner', 'administrator')");
+    expect(revealRpc).not.toContain("profile.role::text in ('owner', 'administrator', 'specialist')");
+  });
+
+  it("keeps appointment mutations owner and administrator only", () => {
+    const sql = readFileSync(specialistAppointmentLockMigrationPath, "utf8");
+
+    expect(sql).toContain("rename to admin_save_appointment_with_audit_internal");
+    expect(sql).toContain("profile.role::text in ('owner', 'administrator')");
+    expect(sql).toContain("message = 'appointment_forbidden'");
+    expect(sql).toContain("security definer");
+    expect(sql).toContain("revoke all on function public.admin_save_appointment_with_audit_internal");
+    expect(sql).toContain("to service_role");
+  });
+
+  it("restores serialized owner-only contact reveal limits", () => {
+    const sql = readFileSync(contactRevealLimitsMigrationPath, "utf8");
+
+    expect(sql).toContain("profile.role::text in ('owner', 'administrator')");
+    expect(sql).not.toContain("profile.role::text in ('owner', 'administrator', 'specialist')");
+    expect(sql).toContain("hashtextextended('admin-contact-reveal:' || p_actor_user_id::text, 0)");
+    expect(sql).toContain("recent_reveals >= 60");
+    expect(sql).toContain("recent_reveals >= 19");
+    expect(sql).toContain("'bulk_contact_reveal'");
+    expect(sql).toContain("'client.contact.reveal'");
+  });
+
+  it("keeps internal specialist UUIDs behind public slug RPCs", () => {
+    const sql = readFileSync(publicSpecialistSlugsMigrationPath, "utf8");
+
+    expect(sql).toContain("create function public.public_booking_get_options_v2");
+    expect(sql).toContain("jsonb_build_object('id', specialist_row.public_slug)");
+    expect(sql).toContain("create function public.public_booking_get_availability_v3");
+    expect(sql).toContain("create function public.public_booking_create_hold_v6");
+    expect(sql).toContain("create function public.public_booking_restore_session_hold_v6");
+    expect(sql).toContain("where specialist.public_slug = btrim(p_specialist_slug)");
+    expect(sql).toContain("result - 'specialistId'");
+    expect(sql).toContain("'specialistId', specialist_slug");
+    expect(sql).toContain("from public, anon, authenticated");
+    expect(sql).toContain("to service_role");
   });
 });

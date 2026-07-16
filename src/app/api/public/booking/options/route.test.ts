@@ -84,6 +84,8 @@ describe("public booking options route", () => {
       selectionId: "11111111-1111-4111-8111-111111111111",
       selectionVersion: 1,
       serviceSlug: "classic-massage",
+      specialistId: "yana-public",
+      specialistName: "Яна",
       time: "10:00",
     });
     vi.mocked(getPublicBookingOptions).mockResolvedValueOnce({
@@ -96,6 +98,7 @@ describe("public booking options route", () => {
       services: [{
         category: "massage",
         slug: "classic-massage",
+        specialists: [{ displayName: "Яна", id: "yana-public" }],
         title: "Classic massage",
         variants: [{ currency: "EUR", durationMinutes: 60, id: "price-60", priceCents: 7000 }],
       }],
@@ -132,6 +135,7 @@ describe("public booking options route", () => {
       publicReference: "MMN-20260801-A1B2C3D4E5F6",
       serviceName: "Classic massage",
       serviceSlug: "classic-massage",
+      specialistName: "Яна",
       status: "confirmed",
       time: "10:00",
     });

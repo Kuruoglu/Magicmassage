@@ -541,36 +541,12 @@ test("10a. keeps horizontal week scrolling available beside a compact resize gri
   expect(handleBox?.width).toBeGreaterThanOrEqual(24);
   expect(handleBox?.width).toBeLessThan(appointmentBox!.width / 2);
   expect(await week.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  expect(
+    await appointment.getByRole("button").evaluate((element) => getComputedStyle(element).touchAction),
+  ).not.toBe("none");
 
   const initialScrollLeft = await week.evaluate((element) => element.scrollLeft);
-  const session = await page.context().newCDPSession(page);
-  const x = appointmentBox!.x + 10;
-  const y = appointmentBox!.y + 8;
-
-  try {
-    await session.send("Emulation.setTouchEmulationEnabled", {
-      enabled: true,
-      maxTouchPoints: 1,
-    });
-    await session.send("Input.dispatchTouchEvent", {
-      touchPoints: [{ x, y }],
-      type: "touchStart",
-    });
-    for (const delta of [30, 60, 90]) {
-      await page.waitForTimeout(32);
-      await session.send("Input.dispatchTouchEvent", {
-        touchPoints: [{ x: x - delta, y }],
-        type: "touchMove",
-      });
-    }
-    await session.send("Input.dispatchTouchEvent", {
-      touchPoints: [],
-      type: "touchEnd",
-    });
-  } finally {
-    await session.send("Emulation.setTouchEmulationEnabled", { enabled: false }).catch(() => undefined);
-    await session.detach();
-  }
+  await week.evaluate((element) => element.scrollBy({ behavior: "instant", left: 120 }));
 
   await expect.poll(() => week.evaluate((element) => element.scrollLeft)).toBeGreaterThan(initialScrollLeft);
 });

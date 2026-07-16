@@ -83,7 +83,7 @@ export function parseOptionsQuery(
 }
 
 export function parseAvailabilityQuery(url: URL) {
-  const allowedKeys = new Set(["priceVariantId", "from", "days"]);
+  const allowedKeys = new Set(["priceVariantId", "from", "days", "specialistId"]);
   if ([...url.searchParams.keys()].some((key) => !allowedKeys.has(key))) return null;
   if (["priceVariantId", "from", "days"].some((key) => url.searchParams.getAll(key).length !== 1)) {
     return null;
@@ -92,25 +92,28 @@ export function parseAvailabilityQuery(url: URL) {
   const priceVariantId = url.searchParams.get("priceVariantId");
   const from = url.searchParams.get("from");
   const rawDays = url.searchParams.get("days");
+  const specialistId = url.searchParams.get("specialistId");
   const days = rawDays && /^\d{1,2}$/.test(rawDays) ? Number(rawDays) : Number.NaN;
 
   if (!priceVariantId || !identifierPattern.test(priceVariantId) || !isIsoDate(from) || !Number.isInteger(days)) {
     return null;
   }
-  if (days < 1 || days > 31) return null;
+  if (days < 1 || days > 31 || (specialistId !== null && !identifierPattern.test(specialistId))) return null;
 
-  return { days, from, priceVariantId };
+  return { days, from, priceVariantId, ...(specialistId ? { specialistId } : {}) };
 }
 
 export function parseCreateHoldPayload(payload: unknown): CreatePublicBookingHoldInput | null {
-  if (!isRecord(payload) || !hasOnlyKeys(payload, ["priceVariantId", "date", "time", "website"])) return null;
+  if (!isRecord(payload) || !hasOnlyKeys(payload, ["priceVariantId", "date", "specialistId", "time", "website"])) return null;
   if (!honeypotIsEmpty(payload)) return null;
   if (typeof payload.priceVariantId !== "string" || !identifierPattern.test(payload.priceVariantId)) return null;
+  if (payload.specialistId !== undefined && (typeof payload.specialistId !== "string" || !identifierPattern.test(payload.specialistId))) return null;
   if (!isIsoDate(payload.date) || !isSlotTime(payload.time)) return null;
 
   return {
     date: payload.date,
     priceVariantId: payload.priceVariantId,
+    ...(typeof payload.specialistId === "string" ? { specialistId: payload.specialistId } : {}),
     time: payload.time,
   };
 }

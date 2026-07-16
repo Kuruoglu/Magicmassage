@@ -10,9 +10,11 @@
 - Certificates: paid/manual certificates, PDF/email status, resend, redeem.
 
 Owner and administrator calendars can filter by specialist and assign manual
-appointments or personal blocks. A specialist receives only "My calendar" and
-cannot open the Clients or Certificates modules. Assigned client contacts remain
-masked until the specialist uses the audited reveal action on an appointment.
+appointments or personal blocks. A specialist receives only "My calendar",
+cannot change assigned appointments, and cannot open the Clients or Certificates
+modules. Client contacts and notes are never sent to the specialist. The
+"Клиент сейчас" action creates a contact-free block in the specialist's own
+calendar and removes that interval from public availability.
 The owner/administrator dashboard shows unresolved bulk-contact security alerts
 and lets an authorized user mark each alert as reviewed.
 

@@ -19,6 +19,9 @@ type CalendarBlockDialogProps = {
   currentSpecialistId?: string;
   initialBlock?: CalendarBlock;
   initialDate: string;
+  initialEndsAt?: string;
+  initialStartsAt?: string;
+  intent?: "block" | "walk-in";
   onClose: () => void;
   onSave: (block: CalendarBlock) => Promise<CalendarBlockSaveResult>;
   role?: AdminRoleId;
@@ -43,6 +46,9 @@ export function CalendarBlockDialog({
   currentSpecialistId,
   initialBlock,
   initialDate,
+  initialEndsAt,
+  initialStartsAt,
+  intent = "block",
   onClose,
   onSave,
   role = "owner",
@@ -51,10 +57,10 @@ export function CalendarBlockDialog({
   const dialogRef = useRef<HTMLElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [blockDate, setBlockDate] = useState(initialBlock?.blockDate ?? initialDate);
-  const [startsAt, setStartsAt] = useState(initialBlock?.startsAt ?? "12:00");
-  const [endsAt, setEndsAt] = useState(initialBlock?.endsAt ?? "13:00");
-  const [kind, setKind] = useState<CalendarBlockKind>(initialBlock?.kind ?? "personal");
-  const [internalNote, setInternalNote] = useState(initialBlock?.internalNote ?? "");
+  const [startsAt, setStartsAt] = useState(initialBlock?.startsAt ?? initialStartsAt ?? "12:00");
+  const [endsAt, setEndsAt] = useState(initialBlock?.endsAt ?? initialEndsAt ?? "13:00");
+  const [kind, setKind] = useState<CalendarBlockKind>(initialBlock?.kind ?? (intent === "walk-in" ? "other" : "personal"));
+  const [internalNote, setInternalNote] = useState(initialBlock?.internalNote ?? (intent === "walk-in" ? "Клиент сейчас" : ""));
   const activeSpecialists = specialists.filter((specialist) => specialist.status === "active");
   const defaultSpecialist =
     activeSpecialists.find((specialist) => specialist.id === currentSpecialistId) ??
@@ -165,7 +171,11 @@ export function CalendarBlockDialog({
           <div>
             <span className="admin-kicker">Календарь</span>
             <h2 id="calendar-block-dialog-title">
-              {initialBlock ? "Изменить недоступное время" : "Заблокировать время"}
+              {initialBlock
+                ? "Изменить недоступное время"
+                : intent === "walk-in"
+                  ? "Занять время клиентом"
+                  : "Заблокировать время"}
             </h2>
           </div>
           <button className="admin-secondary-button" disabled={isSaving} onClick={onClose} type="button">
@@ -208,7 +218,7 @@ export function CalendarBlockDialog({
             <input onChange={(event) => setBlockDate(event.target.value)} required type="date" value={blockDate} />
           </label>
 
-          <fieldset className="admin-settings-choice">
+          {intent === "walk-in" ? null : <fieldset className="admin-settings-choice">
             <legend>Тип</legend>
             <div className="admin-filter-row" aria-label="Тип недоступного времени">
               {kindOptions.map((option) => (
@@ -222,16 +232,16 @@ export function CalendarBlockDialog({
                 </button>
               ))}
             </div>
-          </fieldset>
+          </fieldset>}
 
-          <label className="admin-checkbox-field">
+          {intent === "walk-in" ? null : <label className="admin-checkbox-field">
             <input
               checked={isFullDay}
               onChange={(event) => setIsFullDay(event.target.checked)}
               type="checkbox"
             />
             <span>Весь день</span>
-          </label>
+          </label>}
 
           {!isFullDay ? (
             <div className="admin-calendar-block-time-grid">
@@ -247,18 +257,20 @@ export function CalendarBlockDialog({
           ) : null}
 
           <label>
-            Внутренняя заметка
+            {intent === "walk-in" ? "Имя или короткая пометка" : "Внутренняя заметка"}
             <textarea
               maxLength={2000}
               onChange={(event) => setInternalNote(event.target.value)}
-              placeholder="Например: личная встреча"
+              placeholder={intent === "walk-in" ? "Например: посетитель" : "Например: личная встреча"}
               rows={3}
               value={internalNote}
             />
           </label>
 
           <p className="admin-form-helper">
-            Это время исчезнет из публичной записи. Клиентские записи и дневной лимит не изменятся.
+            {intent === "walk-in"
+              ? "Интервал сразу станет занятым в вашем календаре и исчезнет из публичной записи. Телефон и карточка клиента не создаются."
+              : "Это время исчезнет из публичной записи. Клиентские записи и дневной лимит не изменятся."}
           </p>
           {error ? (
             <p className="admin-form-alert" role="alert">
@@ -267,7 +279,13 @@ export function CalendarBlockDialog({
           ) : null}
           <div className="admin-detail-actions">
             <button className="admin-primary-button" disabled={isSaving} type="submit">
-              {isSaving ? "Сохраняем..." : initialBlock ? "Сохранить" : "Заблокировать"}
+              {isSaving
+                ? "Сохраняем..."
+                : initialBlock
+                  ? "Сохранить"
+                  : intent === "walk-in"
+                    ? "Занять время"
+                    : "Заблокировать"}
             </button>
             <button className="admin-secondary-button" disabled={isSaving} onClick={onClose} type="button">
               Отмена

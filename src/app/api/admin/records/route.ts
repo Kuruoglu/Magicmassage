@@ -16,7 +16,7 @@ import {
 import { resolveAdminSupabaseEnv } from "@/admin/supabase-client";
 
 const recordWriteRoles: Record<AdminPersistInput["type"], AdminRoleId[]> = {
-  appointment: ["owner", "administrator", "specialist"],
+  appointment: ["owner", "administrator"],
   blogPost: ["owner", "administrator", "editor"],
   certificate: ["owner", "administrator"],
   client: ["owner", "administrator"],
@@ -417,6 +417,10 @@ export async function POST(request: Request) {
 
     if (!authorization.ok) {
       return NextResponse.json({ error: authorization.message }, { status: authorization.statusCode });
+    }
+
+    if (!recordWriteRoles[payload.type].includes(authorization.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     actor = {

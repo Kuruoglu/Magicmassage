@@ -2972,7 +2972,8 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
 .admin-export-actions button:hover,
 .admin-filter-row button:hover,
 .admin-filter-row span:first-child,
-.admin-filter-row button[aria-pressed="true"] {
+.admin-filter-row button[aria-pressed="true"],
+.admin-filter-row button[aria-selected="true"] {
   background: var(--admin-primary);
   color: #FFFFFF;
 }
@@ -3585,6 +3586,22 @@ button.admin-calendar-item[aria-pressed="true"] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.admin-filter-row .admin-calendar-walk-in-action {
+  background: #2f6f5d;
+  border-color: #2f6f5d;
+  color: #fff;
+  min-height: 44px;
+}
+
+.admin-filter-row .admin-calendar-walk-in-action:hover,
+.admin-filter-row .admin-calendar-walk-in-action:focus-visible {
+  background: #235647;
+  border-color: #235647;
+  color: #fff;
+  outline: 3px solid rgba(47, 111, 93, 0.2);
+  outline-offset: 2px;
 }
 
 .admin-split-view {
@@ -5267,6 +5284,29 @@ body.admin-calendar-resize-active {
 .admin-action-body {
   display: grid;
   gap: 12px;
+}
+
+.admin-form-readonly {
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.admin-form-readonly span {
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-form-readonly strong {
+  color: var(--admin-text);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .admin-certificate-form-grid,

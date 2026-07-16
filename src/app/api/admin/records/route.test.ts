@@ -873,7 +873,7 @@ describe("admin records persistence API route", () => {
     }));
   });
 
-  it("forces specialist appointment writes into the authorized specialist calendar", async () => {
+  it("rejects specialist appointment creation even when the authorization mock ignores allowedRoles", async () => {
     const authorizedSpecialistId = "22222222-2222-4222-8222-222222222222";
     const requestedSpecialistId = "11111111-1111-4111-8111-111111111111";
     const payload = {
@@ -911,13 +911,11 @@ describe("admin records persistence API route", () => {
       method: "POST",
     }));
 
-    expect(response.status).toBe(200);
-    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
-      record: expect.objectContaining({ specialistId: authorizedSpecialistId }),
-    }));
+    expect(response.status).toBe(403);
+    expect(persistAdminRecord).not.toHaveBeenCalled();
   });
 
-  it("does not read or classify another specialist's current appointment during HTTP preflight", async () => {
+  it("rejects specialist appointment updates before reading another specialist's appointment", async () => {
     const authorizedSpecialistId = "22222222-2222-4222-8222-222222222222";
     const otherSpecialistId = "11111111-1111-4111-8111-111111111111";
     const payload = {
@@ -957,13 +955,9 @@ describe("admin records persistence API route", () => {
       method: "POST",
     }));
 
-    expect(response.status).toBe(200);
-    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
-      audit: expect.objectContaining({ action: "appointment.create" }),
-      record: expect.objectContaining({
-        specialistId: authorizedSpecialistId,
-      }),
-    }));
+    expect(response.status).toBe(403);
+    expect(persistAdminRecord).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalled();
   });
 
   it("classifies saved working hours and stores the server-side booking buffer", async () => {

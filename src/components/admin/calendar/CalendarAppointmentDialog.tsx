@@ -522,7 +522,7 @@ export function CalendarAppointmentDialog({
         </AdminDrawerBody>
 
         <AdminDrawerFooter>
-          <button type="submit">{isEditing ? "Сохранить изменения" : "Сохранить запись"}</button>
+          <button className="admin-primary-button" type="submit">{isEditing ? "Сохранить изменения" : "Сохранить запись"}</button>
           <CalendarAppointmentCloseButton onClose={onClose} />
         </AdminDrawerFooter>
       </form>

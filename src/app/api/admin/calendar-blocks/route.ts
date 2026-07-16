@@ -11,6 +11,7 @@ type CalendarBlockPayload = {
   blockDate: string;
   endsAt: string;
   id?: string;
+  intent?: "block" | "walk-in";
   internalNote: string;
   kind: CalendarBlockKind;
   specialistId?: string;
@@ -29,7 +30,13 @@ type CalendarBlockRpcClient = {
 
 type CalendarBlockAccess =
   | { ok: false; response: NextResponse }
-  | { actorUserId: string; client: CalendarBlockRpcClient; ok: true; specialistId?: string };
+  | {
+      actorUserId: string;
+      client: CalendarBlockRpcClient;
+      ok: true;
+      role: "administrator" | "owner" | "specialist";
+      specialistId?: string;
+    };
 
 const allowedKinds = new Set<CalendarBlockKind>(["personal", "unavailable", "other"]);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -49,7 +56,7 @@ function isRealIsoDate(value: string) {
 function isCalendarBlockPayload(value: unknown, requireId: boolean): value is CalendarBlockPayload {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  const allowedKeys = ["blockDate", "endsAt", "id", "internalNote", "kind", "specialistId", "startsAt", "version"];
+  const allowedKeys = ["blockDate", "endsAt", "id", "intent", "internalNote", "kind", "specialistId", "startsAt", "version"];
 
   return (
     Object.keys(record).every((key) => allowedKeys.includes(key)) &&
@@ -64,12 +71,51 @@ function isCalendarBlockPayload(value: unknown, requireId: boolean): value is Ca
     allowedKinds.has(record.kind as CalendarBlockKind) &&
     typeof record.internalNote === "string" &&
     record.internalNote.length <= 2000 &&
+    (record.intent === undefined || record.intent === "block" || record.intent === "walk-in") &&
     (record.specialistId === undefined || (typeof record.specialistId === "string" && uuidPattern.test(record.specialistId))) &&
     (record.id === undefined || (typeof record.id === "string" && uuidPattern.test(record.id))) &&
     (record.version === undefined || (Number.isInteger(record.version) && (record.version as number) > 0)) &&
     (!requireId || typeof record.version === "number") &&
     (!requireId || typeof record.id === "string")
   );
+}
+
+function getSofiaDateAndMinutes(now = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
+      minute: "2-digit",
+      month: "2-digit",
+      timeZone: "Europe/Sofia",
+      year: "numeric",
+    }).formatToParts(now).map((part) => [part.type, part.value]),
+  );
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: Number(parts.hour) * 60 + Number(parts.minute),
+  };
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function isCurrentWalkIn(payload: CalendarBlockPayload) {
+  const now = getSofiaDateAndMinutes();
+  const startsAt = timeToMinutes(payload.startsAt);
+  const duration = timeToMinutes(payload.endsAt) - startsAt;
+
+  return payload.intent === "walk-in"
+    && payload.kind === "other"
+    && payload.blockDate === now.date
+    && startsAt <= now.minutes
+    && startsAt >= now.minutes - 15
+    && duration >= 15
+    && duration <= 180;
 }
 
 function mapCalendarBlock(data: Record<string, unknown>): CalendarBlock | null {
@@ -137,6 +183,7 @@ async function authorize(request: Request): Promise<CalendarBlockAccess> {
     actorUserId: authorization.userId,
     client: client as unknown as CalendarBlockRpcClient,
     ok: true,
+    role: authorization.role as "administrator" | "owner" | "specialist",
     specialistId: authorization.specialistId,
   };
 }
@@ -156,6 +203,9 @@ async function upsert(request: Request, requireId: boolean): Promise<NextRespons
   const payload = await parseJson(request);
   if (!isCalendarBlockPayload(payload, requireId)) {
     return errorResponse("Проверьте дату, время и тип блокировки.", 400);
+  }
+  if (access.role === "specialist" && (requireId || !isCurrentWalkIn(payload))) {
+    return errorResponse("Forbidden", 403);
   }
 
   const { data, error } = await access.client.rpc("admin_mutate_specialist_calendar_block", {
@@ -189,6 +239,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 export async function DELETE(request: Request): Promise<NextResponse> {
   const access = await authorize(request);
   if (!access.ok) return access.response;
+  if (access.role === "specialist") return errorResponse("Forbidden", 403);
 
   const payload = await parseJson(request);
   if (

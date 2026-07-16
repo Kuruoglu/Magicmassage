@@ -8,6 +8,7 @@ import type {
   BookingOptions,
   BookingRestoredHold,
   BookingService,
+  BookingSpecialist,
   BookingVariant,
 } from "./types";
 
@@ -54,15 +55,22 @@ function parseVariant(value: unknown): BookingVariant {
   };
 }
 
+function parseSpecialist(value: unknown): BookingSpecialist {
+  const row = asRecord(value);
+
+  return { displayName: asString(row.displayName), id: asString(row.id) };
+}
+
 function parseService(value: unknown): BookingService {
   const row = asRecord(value);
-  if (!Array.isArray(row.variants)) throw new BookingApiError(502);
+  if (!Array.isArray(row.variants) || !Array.isArray(row.specialists)) throw new BookingApiError(502);
 
   return {
     ...(typeof row.category === "string" && row.category.trim()
       ? { category: row.category.trim() }
       : {}),
     slug: asString(row.slug),
+    specialists: row.specialists.map(parseSpecialist),
     title: asString(row.title),
     variants: row.variants.map(parseVariant),
   };
@@ -85,6 +93,8 @@ function parseRestoredHold(value: unknown): BookingRestoredHold | null {
     selectionId: asString(row.selectionId),
     selectionVersion: asInteger(row.selectionVersion, 1, 2_147_483_647),
     serviceSlug: asString(row.serviceSlug),
+    specialistId: asString(row.specialistId),
+    specialistName: asString(row.specialistName),
     time: asString(row.time),
   };
 }
@@ -103,6 +113,10 @@ function parseConfirmation(value: unknown): BookingConfirmation | null {
       priceVariantId: asString(row.priceVariantId),
       serviceName: asString(row.serviceName),
       serviceSlug: asString(row.serviceSlug),
+      ...(typeof row.specialistId === "string" && row.specialistId.trim()
+        ? { specialistId: row.specialistId.trim() }
+        : {}),
+      specialistName: asString(row.specialistName),
       time: asString(row.time),
     },
     reference: asString(row.publicReference),
@@ -197,6 +211,7 @@ function parseAvailabilityDays(value: unknown): BookingAvailability["dates"] {
 export async function loadBookingAvailability(input: {
   horizonDays: number;
   signal?: AbortSignal;
+  specialistId?: string;
   variantId: string;
 }): Promise<BookingAvailability> {
   const horizonDays = asInteger(input.horizonDays, 1, 365);
@@ -210,6 +225,7 @@ export async function loadBookingAvailability(input: {
       from: addIsoDays(today, offset),
       priceVariantId: input.variantId,
     });
+    if (input.specialistId) search.set("specialistId", input.specialistId);
     const response = await requestJson(`/api/public/booking/availability?${search}`, {
       signal: input.signal,
     });
@@ -221,6 +237,7 @@ export async function loadBookingAvailability(input: {
 
 export async function createBookingHold(input: {
   date: string;
+  specialistId?: string;
   time: string;
   variantId: string;
 }): Promise<BookingHold> {
@@ -229,6 +246,7 @@ export async function createBookingHold(input: {
       body: JSON.stringify({
         date: input.date,
         priceVariantId: input.variantId,
+        ...(input.specialistId ? { specialistId: input.specialistId } : {}),
         time: input.time,
         website: "",
       }),
@@ -247,6 +265,8 @@ export async function createBookingHold(input: {
     priceCents: asInteger(row.priceCents, 0, 100_000_000),
     selectionId: asString(row.selectionId),
     selectionVersion: asInteger(row.selectionVersion, 1, 2_147_483_647),
+    specialistId: asString(row.specialistId),
+    specialistName: asString(row.specialistName),
   };
 }
 

@@ -39,16 +39,17 @@ test("public booking restores and confirms a session hold", async ({ context, pa
   const serviceClient = createClient(supabaseUrl!, secretKey!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const options = await serviceClient.rpc("public_booking_get_options", { p_locale: "en" });
+  const options = await serviceClient.rpc("public_booking_get_options_v2", { p_locale: "en" });
   if (options.error) throw options.error;
   const priceVariantId = options.data?.services?.[0]?.variants?.[0]?.id;
   test.skip(!options.data?.enabled || typeof priceVariantId !== "string", "Public booking is intentionally unavailable.");
 
   const today = sofiaToday();
-  const availability = await serviceClient.rpc("public_booking_get_availability", {
+  const availability = await serviceClient.rpc("public_booking_get_availability_v3", {
     p_days: 31,
     p_from: today,
     p_price_variant_id: priceVariantId,
+    p_specialist_slug: null,
   });
   if (availability.error) throw availability.error;
   const targetDay = availability.data?.days?.find(
@@ -81,6 +82,9 @@ test("public booking restores and confirms a session hold", async ({ context, pa
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("radio").first().check();
     await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "Choose a specialist" })).toBeVisible();
+    await page.getByRole("radio").first().check();
+    await page.getByRole("button", { name: "Continue" }).click();
 
     await page.setViewportSize({ width: 320, height: 740 });
     const calendarHasHorizontalOverflow = await page.evaluate(
@@ -109,8 +113,8 @@ test("public booking restores and confirms a session hold", async ({ context, pa
     await expect(page.getByRole("heading", { name: "Your contact details" })).toBeVisible();
     await expect(page.getByRole("timer")).toHaveCount(1);
 
-    const selectedDate = await page.getByRole("definition").nth(2).textContent();
-    const selectedTime = await page.getByRole("definition").nth(3).textContent();
+    const selectedDate = await page.getByRole("definition").nth(3).textContent();
+    const selectedTime = await page.getByRole("definition").nth(4).textContent();
 
     await page.goBack();
     await expect(page.getByRole("heading", { name: "Choose a date and time" })).toBeVisible();
@@ -120,8 +124,8 @@ test("public booking restores and confirms a session hold", async ({ context, pa
     await page.reload();
 
     await expect(page.getByRole("heading", { name: "Your contact details" })).toBeFocused();
-    await expect(page.getByRole("definition").nth(2)).toHaveText(selectedDate ?? "");
-    await expect(page.getByRole("definition").nth(3)).toHaveText(selectedTime ?? "");
+    await expect(page.getByRole("definition").nth(3)).toHaveText(selectedDate ?? "");
+    await expect(page.getByRole("definition").nth(4)).toHaveText(selectedTime ?? "");
     await expect(page.getByRole("timer")).toHaveCount(1);
 
     await page.goto("/ru/booking");

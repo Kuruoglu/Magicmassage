@@ -791,6 +791,63 @@ describe("admin Supabase repository", () => {
     ]);
   });
 
+  it("sends no client contacts, ids, or notes to a specialist calendar", async () => {
+    const client = new FakeSupabaseClient({
+      admin_appointments: [{
+        ...appointmentRows[0],
+        public_contact_preference_snapshot: "phone",
+        public_email_snapshot: "olena.k@example.com",
+        public_note: "Call +359873334411",
+        public_phone_snapshot: "+359873334411",
+        public_reference: "MMN-PRIVATE-REFERENCE",
+        post_visit_comment: "Private follow-up +359873334411",
+        post_visit_commented_at: "2026-07-09T10:00:00.000Z",
+        overlap_override_reason: "Private override reason",
+        overlap_overridden_at: "2026-07-09T10:00:00.000Z",
+        overlap_overridden_by: "11111111-1111-4111-8111-111111111111",
+        specialist_id: "22222222-2222-4222-8222-222222222222",
+      }],
+      admin_clients: clientRows,
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const records = await repository.loadDomainRecords("22222222-2222-4222-8222-222222222222");
+
+    expect(records.clients).toEqual([]);
+    expect(records.certificates).toEqual([]);
+    expect(records.appointments[0]).toEqual({
+      bufferMinutes: 15,
+      client: "Olena K.",
+      date: "2026-07-08",
+      durationMinutes: undefined,
+      id: "demo-3",
+      note: "",
+      service: "Deep tissue massage",
+      serviceSlug: undefined,
+      specialistId: "22222222-2222-4222-8222-222222222222",
+      specialistName: undefined,
+      status: "Подтверждена",
+      time: "15:00",
+      version: 1,
+    });
+    expect(client.operations.some((operation) => operation.table === "admin_clients")).toBe(false);
+    const appointmentSelect = client.operations.find((operation) => operation.table === "admin_appointments");
+    expect(appointmentSelect?.columns).toBe([
+      "id",
+      "buffer_minutes",
+      "client_name_snapshot",
+      "duration_minutes",
+      "service_slug",
+      "service_name",
+      "specialist_id",
+      "starts_at",
+      "starts_on",
+      "status",
+      "version",
+    ].join(", "));
+    expect(appointmentSelect?.columns).not.toMatch(/client_id|note|contact|email|phone|reference|overlap/);
+  });
+
   it("loads every client when Supabase returns more than one page", async () => {
     const rows = Array.from({ length: 1001 }, (_, index) => ({
       ...clientRows[0],
