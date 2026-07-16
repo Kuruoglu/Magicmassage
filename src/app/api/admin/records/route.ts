@@ -282,10 +282,7 @@ async function classifyAppointmentOnServer(
     throw new Error("appointment settings are invalid");
   }
   const currentAppointment = ((currentAppointmentResult.data ?? [])[0] ?? null) as CurrentAppointmentRow | null;
-  const isPublicAppointment = currentAppointment?.origin === "public";
-  const duration = isPublicAppointment && Number.isInteger(currentAppointment?.duration_minutes)
-    ? currentAppointment!.duration_minutes!
-    : (payload.record.durationMinutes ?? 60);
+  const duration = payload.record.durationMinutes ?? currentAppointment?.duration_minutes ?? 60;
   const start = timeToMinutes(payload.record.time);
   const buffer = currentAppointment && Number.isInteger(currentAppointment.buffer_minutes)
     ? currentAppointment!.buffer_minutes!
@@ -535,7 +532,7 @@ export async function POST(request: Request) {
           ? "This time is temporarily held by an online customer. Choose another time."
           : result.reason === "appointment_overlap_conflict"
             ? "Appointment overlaps another active appointment."
-            : "Public booking service, duration, and booking metadata cannot be changed.";
+            : "Public booking service and booking snapshots cannot be changed.";
 
     return NextResponse.json({ error: conflictMessage }, { status: 409 });
   }

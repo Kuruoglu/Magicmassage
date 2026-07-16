@@ -310,7 +310,7 @@ export function CalendarAppointmentDialog({
             <AdminDrawerSection title="Клиент и услуга">
               {isPublicBooking ? (
                 <div className="admin-form-alert" role="status">
-                  <p>Услуга и длительность зафиксированы клиентом при онлайн-записи.</p>
+                  <p>Услуга зафиксирована клиентом при онлайн-записи. Фактическую длительность можно изменить.</p>
                 </div>
               ) : null}
               <label>
@@ -428,7 +428,6 @@ export function CalendarAppointmentDialog({
               <label>
                 Длительность, минут
                 <input
-                  disabled={isPublicBooking}
                   min="15"
                   onChange={(event) => updateForm("durationMinutes", Number(event.target.value))}
                   step="15"

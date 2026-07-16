@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Appointment } from "@/admin/domain";
@@ -45,5 +45,50 @@ describe("AppointmentBlock", () => {
     expect(block).toHaveStyle({ top: "1710px" });
     expect(block.style.left).toBe("calc(50% + 4px)");
     expect(block.style.width).toBe("calc(50% - 8px)");
+  });
+
+  it("releases the resize interaction lock if the appointment unmounts mid-gesture", () => {
+    const onResizeInteractionChange = vi.fn();
+    const { unmount } = render(
+      <AppointmentBlock
+        appointment={{ ...appointment, time: "12:00" }}
+        classification={{ outsideWorkingHours: false, overlap: false }}
+        isSelected={false}
+        onDragEnd={vi.fn()}
+        onDragStart={vi.fn()}
+        onResize={vi.fn()}
+        onResizeInteractionChange={onResizeInteractionChange}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    fireEvent.pointerDown(screen.getByRole("slider"), { clientY: 100, pointerId: 1 });
+    expect(onResizeInteractionChange).toHaveBeenLastCalledWith(true);
+
+    unmount();
+
+    expect(onResizeInteractionChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("opens a short appointment when its whole-card target receives sub-snap touch movement", () => {
+    const onSelect = vi.fn();
+    render(
+      <AppointmentBlock
+        appointment={{ ...appointment, time: "12:00" }}
+        classification={{ outsideWorkingHours: false, overlap: false }}
+        isSelected={false}
+        onDragEnd={vi.fn()}
+        onDragStart={vi.fn()}
+        onResize={vi.fn()}
+        onSelect={onSelect}
+      />,
+    );
+    const slider = screen.getByRole("slider");
+
+    fireEvent.pointerDown(slider, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(slider, { clientY: 106, pointerId: 1 });
+    fireEvent.pointerUp(slider, { clientY: 106, pointerId: 1 });
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "end-of-day" }));
   });
 });

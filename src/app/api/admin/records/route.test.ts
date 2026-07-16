@@ -898,7 +898,7 @@ describe("admin records persistence API route", () => {
     }));
   });
 
-  it("preserves the duration and buffer captured by an existing public booking", async () => {
+  it("allows the owner to change duration while preserving a public booking buffer", async () => {
     const payload = {
       ...overlappingAppointmentPayload,
       audit: { action: "appointment.update", outsideWorkingHours: false, overlapOverride: false },
@@ -932,6 +932,48 @@ describe("admin records persistence API route", () => {
 
     expect(response.status).toBe(200);
     expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
+      audit: expect.objectContaining({ action: "appointment.resize" }),
+      record: expect.objectContaining({
+        bufferMinutes: 15,
+        durationMinutes: 60,
+      }),
+    }));
+  });
+
+  it("preserves the current public duration when an unrelated update omits it", async () => {
+    const payload = {
+      ...overlappingAppointmentPayload,
+      audit: { action: "appointment.update", outsideWorkingHours: false, overlapOverride: false },
+      record: {
+        ...overlappingAppointmentPayload.record,
+        durationMinutes: undefined,
+        overlapOverride: false,
+        overlapOverrideReason: "",
+      },
+    };
+    const { client } = createAppointmentRouteClient({
+      currentRows: [{
+        buffer_minutes: 15,
+        duration_minutes: 90,
+        id: payload.record.id,
+        origin: "public",
+        post_visit_comment: "",
+        starts_at: payload.record.time,
+        starts_on: payload.record.date,
+        status: "confirmed",
+      }],
+    });
+    supabaseAdminRouteMock.client = client;
+
+    const response = await POST(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer token" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(expect.objectContaining({
+      audit: expect.objectContaining({ action: "appointment.update" }),
       record: expect.objectContaining({
         bufferMinutes: 15,
         durationMinutes: 90,

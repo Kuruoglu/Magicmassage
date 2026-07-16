@@ -86,7 +86,7 @@ function renderAppointmentDialog(overrides: Partial<CalendarAppointmentDialogPro
 }
 
 describe("CalendarAppointmentDialog", () => {
-  it("keeps the booked service and duration immutable for public appointments", () => {
+  it("keeps the booked service immutable but allows actual duration changes", () => {
     renderAppointmentDialog({
       initialAppointment: {
         ...conflictingAppointment,
@@ -97,9 +97,9 @@ describe("CalendarAppointmentDialog", () => {
     const dialog = screen.getByRole("dialog");
 
     expect(within(dialog).getByLabelText("Услуга")).toBeDisabled();
-    expect(within(dialog).getByLabelText("Длительность, минут")).toBeDisabled();
+    expect(within(dialog).getByLabelText("Длительность, минут")).toBeEnabled();
     expect(within(dialog).getByRole("status")).toHaveTextContent(
-      "Услуга и длительность зафиксированы клиентом при онлайн-записи",
+      "Услуга зафиксирована клиентом при онлайн-записи. Фактическую длительность можно изменить",
     );
   });
 

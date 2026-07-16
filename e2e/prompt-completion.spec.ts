@@ -105,15 +105,18 @@ async function dragAppointmentTo(
 }
 
 async function resizeAppointmentBy(page: Page, appointment: Locator, deltaMinutes: number) {
-  const handle = appointment.getByRole("button", {
-    name: "Изменить длительность перетаскиванием вверх или вниз",
+  const handle = appointment.getByRole("slider", {
+    name: "Изменить длительность записи",
   });
   await handle.scrollIntoViewIfNeeded();
 
   const handleBox = await handle.boundingBox();
   expect(handleBox).not.toBeNull();
 
-  const x = handleBox!.x + handleBox!.width / 2;
+  const viewportWidth = page.viewportSize()?.width ?? handleBox!.x + handleBox!.width;
+  const visibleLeft = Math.max(0, handleBox!.x);
+  const visibleRight = Math.min(viewportWidth, handleBox!.x + handleBox!.width);
+  const x = (visibleLeft + visibleRight) / 2;
   const y = handleBox!.y + handleBox!.height / 2;
   const pixelDelta = (deltaMinutes / 60) * calendarHourHeight;
 
@@ -121,6 +124,49 @@ async function resizeAppointmentBy(page: Page, appointment: Locator, deltaMinute
   await page.mouse.down();
   await page.mouse.move(x, y + pixelDelta, { steps: 4 });
   await page.mouse.up();
+}
+
+async function resizeAppointmentByTouch(
+  page: Page,
+  appointment: Locator,
+  deltaMinutes: number,
+  onMove?: () => Promise<void>,
+) {
+  const handle = appointment.getByRole("slider", {
+    name: "Изменить длительность записи",
+  });
+  await handle.scrollIntoViewIfNeeded();
+
+  const handleBox = await handle.boundingBox();
+  expect(handleBox).not.toBeNull();
+
+  const viewportWidth = page.viewportSize()?.width ?? handleBox!.x + handleBox!.width;
+  const visibleLeft = Math.max(0, handleBox!.x);
+  const visibleRight = Math.min(viewportWidth, handleBox!.x + handleBox!.width);
+  const x = (visibleLeft + visibleRight) / 2;
+  const y = handleBox!.y + handleBox!.height / 2;
+  const pixelDelta = (deltaMinutes / 60) * calendarHourHeight;
+  const session = await page.context().newCDPSession(page);
+
+  try {
+    await session.send("Input.dispatchTouchEvent", {
+      touchPoints: [{ x, y }],
+      type: "touchStart",
+    });
+    for (let step = 1; step <= 4; step += 1) {
+      await session.send("Input.dispatchTouchEvent", {
+        touchPoints: [{ x, y: y + (pixelDelta * step) / 4 }],
+        type: "touchMove",
+      });
+    }
+    await onMove?.();
+    await session.send("Input.dispatchTouchEvent", {
+      touchPoints: [],
+      type: "touchEnd",
+    });
+  } finally {
+    await session.detach();
+  }
 }
 
 async function waitForSupabaseSave(page: Page) {
@@ -379,6 +425,64 @@ test("8. increases an appointment duration in day view", async ({ page }) => {
   await expect(appointment.getByLabel("Длительность 75 минут")).toBeVisible();
 });
 
+test("8a. resizes an appointment from its visible bottom edge on mobile", async ({ page }) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
+
+  const appointment = page.getByLabel("Расписание 6 июля").getByRole("listitem").filter({ hasText: "Анна Петрова" });
+  const handle = appointment.getByRole("slider", { name: "Изменить длительность записи" });
+  const timeGrid = page.locator(".admin-day-time-grid");
+  await handle.scrollIntoViewIfNeeded();
+
+  const [appointmentBox, handleBox] = await Promise.all([appointment.boundingBox(), handle.boundingBox()]);
+  expect(appointmentBox).not.toBeNull();
+  expect(handleBox).not.toBeNull();
+  expect(handleBox!.width).toBeGreaterThan(appointmentBox!.width - 8);
+  expect(Math.abs(handleBox!.y + handleBox!.height - (appointmentBox!.y + appointmentBox!.height))).toBeLessThan(2);
+  expect(handleBox!.x).toBeLessThan(390);
+  expect(appointmentBox!.x + appointmentBox!.width).toBeLessThanOrEqual(390);
+  await expect(appointment.getByRole("button", { name: /длительность на 15 минут/i })).toHaveCount(0);
+  const initialScrollTop = await timeGrid.evaluate((element) => element.scrollTop);
+  const initialWindowScrollY = await page.evaluate(() => window.scrollY);
+
+  await resizeAppointmentByTouch(page, appointment, 30, async () => {
+    await expect(timeGrid).toHaveClass(/is-resizing/);
+    await expect(appointment).toHaveAttribute("draggable", "false");
+    await expect(appointment.getByRole("button", { name: /10:00.*Анна Петрова/ })).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(initialWindowScrollY);
+  });
+
+  await expect(appointment.getByLabel("Длительность 90 минут")).toBeVisible();
+  await expect(page.locator(".admin-timed-appointment.is-drag-preview")).toHaveCount(0);
+  await expect(timeGrid).not.toHaveClass(/is-resizing/);
+  expect(await timeGrid.evaluate((element) => element.scrollTop)).toBe(initialScrollTop);
+  expect(await page.evaluate(() => window.scrollY)).toBe(initialWindowScrollY);
+  await expect(appointment.getByRole("button", { name: /10:00.*Анна Петрова/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
+test("8b. keeps a short mobile appointment openable above its resize edge", async ({ page }) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
+
+  const appointment = page.getByLabel("Расписание 6 июля").getByRole("listitem").filter({ hasText: "Анна Петрова" });
+  await appointment.getByRole("slider").focus();
+  await page.keyboard.press("Home");
+
+  await expect(appointment.getByLabel("Длительность 15 минут")).toBeVisible();
+  const [appointmentBox, handleBox] = await Promise.all([
+    appointment.boundingBox(),
+    appointment.getByRole("slider").boundingBox(),
+  ]);
+  expect(appointmentBox).not.toBeNull();
+  expect(handleBox?.height).toBeGreaterThanOrEqual(24);
+  expect(Math.abs(handleBox!.height - appointmentBox!.height)).toBeLessThanOrEqual(2);
+  expect(appointmentBox!.x + appointmentBox!.width).toBeLessThanOrEqual(390);
+
+  await appointment.getByRole("slider").click({ position: { x: 12, y: 6 } });
+  await expect(page.getByRole("dialog", { name: "Детали выбранной записи" })).toBeVisible();
+});
+
 test("9. moves a week-view appointment to another day", async ({ page }) => {
   await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Неделя" }).click();
@@ -407,6 +511,55 @@ test("10. increases an appointment duration in week view", async ({ page }) => {
   await resizeAppointmentBy(page, appointment, 15);
 
   await expect(appointment.getByLabel("Длительность 75 минут")).toBeVisible();
+});
+
+test("10a. keeps horizontal week scrolling available beside a compact resize grip", async ({ page }) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Неделя" }).click();
+
+  const week = page.getByLabel(/^Неделя 6 июл\. - 12 июл\.$/);
+  const appointment = week
+    .getByLabel("6 июля, 2 записи")
+    .getByRole("listitem")
+    .filter({ hasText: "Анна Петрова" });
+  const handle = appointment.getByRole("slider");
+  await handle.focus();
+  await page.keyboard.press("Home");
+  await expect(appointment.getByLabel("Длительность 15 минут")).toBeVisible();
+
+  const [appointmentBox, handleBox] = await Promise.all([
+    appointment.boundingBox(),
+    handle.boundingBox(),
+  ]);
+  expect(appointmentBox).not.toBeNull();
+  expect(handleBox?.width).toBeGreaterThanOrEqual(24);
+  expect(handleBox?.width).toBeLessThan(appointmentBox!.width / 2);
+  expect(await week.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  const initialScrollLeft = await week.evaluate((element) => element.scrollLeft);
+  const session = await page.context().newCDPSession(page);
+  const x = appointmentBox!.x + 10;
+  const y = appointmentBox!.y + 8;
+
+  try {
+    await session.send("Input.dispatchTouchEvent", {
+      touchPoints: [{ x, y }],
+      type: "touchStart",
+    });
+    await session.send("Input.dispatchTouchEvent", {
+      touchPoints: [{ x: x - 90, y }],
+      type: "touchMove",
+    });
+    await session.send("Input.dispatchTouchEvent", {
+      touchPoints: [],
+      type: "touchEnd",
+    });
+  } finally {
+    await session.detach();
+  }
+
+  await expect.poll(() => week.evaluate((element) => element.scrollLeft)).toBeGreaterThan(initialScrollLeft);
 });
 
 test("11. creates an appointment on Sunday", async ({ page }) => {

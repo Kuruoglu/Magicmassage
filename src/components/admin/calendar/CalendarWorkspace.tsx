@@ -315,13 +315,15 @@ export function CalendarWorkspace({
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
   const [isAppointmentDrawerOpen, setIsAppointmentDrawerOpen] = useState(Boolean(selectedAppointmentFocus));
   const [draggedAppointmentKey, setDraggedAppointmentKey] = useState("");
+  const [resizingAppointmentKey, setResizingAppointmentKey] = useState("");
   const [appointmentDragPreview, setAppointmentDragPreview] = useState<AppointmentDragPreview | null>(null);
   const appointmentDragGrabOffsetRef = useRef(0);
   const nativeDragImageRef = useRef<HTMLElement | null>(null);
+  const pendingAppointmentKeysRef = useRef(new Set<string>());
   const [selectedKey, setSelectedKey] = useState(
     () => selectedAppointmentFocus?.appointmentKey ?? appointmentKey(initialSelectedAppointment ?? fallbackAppointment),
   );
-  const [pendingAppointmentKey, setPendingAppointmentKey] = useState("");
+  const [pendingAppointmentKeys, setPendingAppointmentKeys] = useState<Set<string>>(() => new Set());
   const [calendarError, setCalendarError] = useState("");
   const [pendingConflict, setPendingConflict] = useState<PendingCalendarConflict | null>(null);
   const [overlapOverrideReason, setOverlapOverrideReason] = useState("");
@@ -359,6 +361,13 @@ export function CalendarWorkspace({
   const selectedDayFreeCount = selectedDayBlocks.some(isFullDayCalendarBlock)
     ? 0
     : freeSlotCount(selectedDayCapacityCount, dailySlotCapacity);
+
+  useEffect(() => {
+    if (!resizingAppointmentKey) return;
+
+    document.body.classList.add("admin-calendar-resize-active");
+    return () => document.body.classList.remove("admin-calendar-resize-active");
+  }, [resizingAppointmentKey]);
   const selectedDayManualOverflow = manualAppointmentOverflow(selectedDayCapacityCount, dailySlotCapacity);
   const confirmedListCount = listAppointments.filter((appointment) => appointment.status === "Подтверждена").length;
   const attentionListCount = listAppointments.filter(
@@ -514,7 +523,11 @@ export function CalendarWorkspace({
     action: "appointment.drag" | "appointment.resize",
   ) {
     const key = appointmentKey(originalAppointment);
-    setPendingAppointmentKey(key);
+
+    if (pendingAppointmentKeysRef.current.has(key)) return;
+
+    pendingAppointmentKeysRef.current.add(key);
+    setPendingAppointmentKeys((current) => new Set(current).add(key));
     setCalendarError("");
 
     try {
@@ -534,7 +547,12 @@ export function CalendarWorkspace({
       setSelectedKey(appointmentKey(originalAppointment));
       setCalendarError("Не удалось сохранить изменение записи. Исходное время восстановлено.");
     } finally {
-      setPendingAppointmentKey("");
+      pendingAppointmentKeysRef.current.delete(key);
+      setPendingAppointmentKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
     }
   }
 
@@ -581,6 +599,13 @@ export function CalendarWorkspace({
 
   function startAppointmentDrag(event: DragEvent<HTMLElement>, appointment: Appointment) {
     const key = appointmentKey(appointment);
+
+    if (resizingAppointmentKey || pendingAppointmentKeysRef.current.has(key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     const bounds = event.currentTarget.getBoundingClientRect();
     const clientY = Number.isFinite(event.clientY) ? event.clientY : bounds.top;
     appointmentDragGrabOffsetRef.current = Math.min(
@@ -707,12 +732,16 @@ export function CalendarWorkspace({
         compact={compact}
         isDragging={!isDragPreview && key === draggedAppointmentKey}
         isDragPreview={isDragPreview}
-        isPending={key === pendingAppointmentKey}
+        isPending={pendingAppointmentKeys.has(key)}
         isSelected={key === selectedAppointmentKey}
         key={isDragPreview ? `drag-preview-${appointmentDragPreview?.originalKey}` : key}
         layout={layout}
         onDragEnd={clearAppointmentDrag}
         onDragStart={startAppointmentDrag}
+        onResizeInteractionChange={(active) => {
+          if (active) clearAppointmentDrag();
+          setResizingAppointmentKey((current) => (active ? key : current === key ? "" : current));
+        }}
         onResize={resizeAppointment}
         onSelect={selectAppointment}
       />
@@ -762,7 +791,7 @@ export function CalendarWorkspace({
             : ""}
         </p>
 
-        {pendingAppointmentKey ? (
+        {pendingAppointmentKeys.size > 0 ? (
           <p className="admin-export-notice" role="status">
             Сохраняем изменение записи…
           </p>
@@ -903,6 +932,7 @@ export function CalendarWorkspace({
               appointments={filteredAppointments}
               dragPreview={appointmentDragPreview?.appointment}
               heading={calendarHeading}
+              isInteractionLocked={Boolean(resizingAppointmentKey)}
               onDragOverAppointment={previewAppointmentDrag}
               onDropAppointment={dropAppointment}
               onSelectDate={(date, dateAppointments) => selectDate(date, dateAppointments, "day")}
@@ -956,6 +986,7 @@ export function CalendarWorkspace({
               bookingBufferMinutes={bookingBufferMinutes}
               dragPreview={appointmentDragPreview?.appointment}
               freeSlotCount={selectedDayFreeCount}
+              isInteractionLocked={Boolean(resizingAppointmentKey)}
               onDragOverAppointment={previewAppointmentDrag}
               onDropAppointment={dropAppointment}
               renderAppointment={renderAppointment}

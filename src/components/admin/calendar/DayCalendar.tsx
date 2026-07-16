@@ -10,6 +10,7 @@ type DayCalendarProps = {
   bookingBufferMinutes: number;
   dragPreview?: Appointment;
   freeSlotCount: number;
+  isInteractionLocked?: boolean;
   onDragOverAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   renderAppointment: (
@@ -26,6 +27,7 @@ export function DayCalendar({
   bookingBufferMinutes,
   dragPreview,
   freeSlotCount,
+  isInteractionLocked = false,
   onDragOverAppointment,
   onDropAppointment,
   renderAppointment,
@@ -56,6 +58,7 @@ export function DayCalendar({
             date: selectedDate,
           },
         ]}
+        isInteractionLocked={isInteractionLocked}
         mode="day"
         onDragOverAppointment={onDragOverAppointment}
         onDropAppointment={onDropAppointment}

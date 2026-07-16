@@ -4486,7 +4486,20 @@ button.admin-calendar-item[aria-pressed="true"] {
   border: 1px solid var(--admin-border);
   border-radius: 8px;
   max-width: 100%;
+  overscroll-behavior: contain;
   overflow: auto;
+}
+
+.admin-calendar-time-grid.is-resizing {
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+body.admin-calendar-resize-active {
+  overscroll-behavior: none;
+  overflow: hidden;
+  touch-action: none;
 }
 
 .admin-week-grid-head {
@@ -4574,11 +4587,13 @@ button.admin-calendar-item[aria-pressed="true"] {
   border: 1px solid rgba(66, 120, 99, 0.42);
   border-left: 4px solid #427863;
   border-radius: 6px;
+  box-sizing: border-box;
   box-shadow: 0 4px 12px rgba(26, 20, 31, 0.08);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: block;
   left: 4px;
+  max-width: calc(100% - 8px);
   min-height: 28px;
+  min-width: 0;
   overflow: hidden;
   position: absolute;
   right: 4px;
@@ -4603,6 +4618,12 @@ button.admin-calendar-item[aria-pressed="true"] {
 
 .admin-timed-appointment.is-dragging {
   opacity: 0.32;
+}
+
+.admin-timed-appointment.is-resizing {
+  cursor: ns-resize;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .admin-timed-appointment.is-drag-preview {
@@ -4635,10 +4656,12 @@ button.admin-calendar-item[aria-pressed="true"] {
   color: var(--admin-text);
   display: grid;
   gap: 2px;
+  height: 100%;
   min-width: 0;
   overflow: hidden;
   padding: 6px 8px;
   text-align: left;
+  width: 100%;
 }
 
 .admin-timed-appointment time,
@@ -4663,27 +4686,71 @@ button.admin-calendar-item[aria-pressed="true"] {
 }
 
 .admin-timed-appointment-resize {
-  align-content: end;
-  display: grid;
-  gap: 2px;
-  padding: 3px;
+  bottom: 0;
+  height: 14px;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  z-index: 6;
 }
 
-.admin-timed-appointment-resize button {
+.admin-timed-appointment-resize-grip {
   align-items: center;
-  background: rgba(22, 17, 28, 0.08);
+  background: transparent;
   border: 0;
-  border-radius: 4px;
-  color: var(--admin-text);
+  bottom: 0;
+  cursor: ns-resize;
   display: flex;
-  height: 22px;
+  height: 14px;
   justify-content: center;
-  padding: 0;
-  width: 22px;
+  left: 0;
+  padding: 7px 8px 3px;
+  pointer-events: auto;
+  position: absolute;
+  right: 0;
+  touch-action: none;
 }
 
-.admin-timed-appointment.is-compact .admin-timed-appointment-resize {
-  display: none;
+.admin-timed-appointment-resize-grip > span {
+  background: rgba(66, 120, 99, 0.64);
+  border-radius: 2px;
+  display: block;
+  height: 4px;
+  width: 100%;
+}
+
+.admin-timed-appointment-resize-grip:hover > span,
+.admin-timed-appointment-resize-grip:focus-visible > span,
+.admin-timed-appointment-resize.is-resizing .admin-timed-appointment-resize-grip > span {
+  background: var(--admin-primary);
+}
+
+.admin-timed-appointment-resize-grip:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: -2px;
+}
+
+.admin-timed-appointment-resize-grip[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.admin-timed-appointment-resize output {
+  background: var(--admin-text);
+  border-radius: 4px;
+  bottom: 6px;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  left: 8px;
+  line-height: 1;
+  padding: 5px 6px;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+  z-index: 2;
 }
 
 .admin-day-timeline-row {
@@ -5793,6 +5860,46 @@ body.admin-drawer-open {
 
   .admin-calendar-panel {
     overflow: hidden;
+  }
+
+  .admin-day-time-grid {
+    grid-template-columns: 48px minmax(0, 1fr);
+    min-width: 0;
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  .admin-day-time-grid .admin-calendar-time-axis time {
+    right: 6px;
+  }
+
+  .admin-day-time-grid .admin-calendar-time-column {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-timed-appointment-resize,
+  .admin-timed-appointment-resize-grip {
+    height: 24px;
+  }
+
+  .admin-timed-appointment-resize-grip {
+    padding: 17px 7px 3px;
+    -webkit-touch-callout: none;
+  }
+
+  .admin-timed-appointment-resize.uses-whole-card-target,
+  .admin-timed-appointment-resize.uses-whole-card-target .admin-timed-appointment-resize-grip {
+    height: 100%;
+  }
+
+  .admin-timed-appointment-resize.uses-whole-card-target .admin-timed-appointment-resize-grip {
+    align-items: end;
+  }
+
+  .admin-timed-appointment.is-compact .admin-timed-appointment-resize {
+    left: auto;
+    width: 24px;
   }
 
   .admin-page-head {

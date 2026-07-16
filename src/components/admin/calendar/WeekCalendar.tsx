@@ -21,6 +21,7 @@ type WeekCalendarProps = {
   appointments: Appointment[];
   dragPreview?: Appointment;
   heading: string;
+  isInteractionLocked?: boolean;
   onDragOverAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onSelectDate: (date: string, appointments: Appointment[]) => void;
@@ -37,6 +38,7 @@ export function WeekCalendar({
   appointments,
   dragPreview,
   heading,
+  isInteractionLocked = false,
   onDragOverAppointment,
   onDropAppointment,
   onSelectDate,
@@ -67,7 +69,7 @@ export function WeekCalendar({
 
   return (
     <div
-      className="admin-calendar-time-grid"
+      className={`admin-calendar-time-grid${isInteractionLocked ? " is-resizing" : ""}`}
       aria-label={`Неделя ${heading}`}
       ref={weekScrollRef}
       style={{ maxHeight: "min(70vh, 860px)" }}
@@ -93,6 +95,7 @@ export function WeekCalendar({
       <TimeGrid
         days={timeGridDays}
         dragPreview={dragPreview}
+        isInteractionLocked={isInteractionLocked}
         mode="week"
         onDragOverAppointment={onDragOverAppointment}
         onDropAppointment={onDropAppointment}

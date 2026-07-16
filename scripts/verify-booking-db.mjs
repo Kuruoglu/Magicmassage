@@ -704,7 +704,7 @@ try {
   const publicAppointment = await supabase
     .from("admin_appointments")
     .select(
-      "id, client_id, buffer_minutes, currency_snapshot, duration_minutes, price_cents_snapshot, public_contact_preference_snapshot, public_email_snapshot, public_phone_snapshot",
+      "id, client_id, client_name_snapshot, starts_on, starts_at, service_name, status, buffer_minutes, currency_snapshot, duration_minutes, internal_note, overlap_override, overlap_override_reason, overlap_overridden_at, overlap_overridden_by, post_visit_comment, post_visit_commented_at, price_cents_snapshot, public_contact_preference_snapshot, public_email_snapshot, public_phone_snapshot, version",
     )
     .eq("public_booking_idempotency_key_hash", idempotencyKeyHash)
     .single();
@@ -740,6 +740,46 @@ try {
     && publicAppointment.data.public_contact_preference_snapshot === "email"
     && publicAppointment.data.public_email_snapshot === "submitted-booking@example.com"
     && publicAppointment.data.public_phone_snapshot === `+${phone}`;
+  const adjustedPublicDuration = publicAppointment.data.duration_minutes === 15
+    ? 30
+    : publicAppointment.data.duration_minutes - 15;
+  const publicDurationSave = await saveAppointment({
+    buffer_minutes: publicAppointment.data.buffer_minutes,
+    client_id: publicAppointment.data.client_id,
+    client_name_snapshot: publicAppointment.data.client_name_snapshot,
+    duration_minutes: adjustedPublicDuration,
+    id: publicAppointment.data.id,
+    internal_note: publicAppointment.data.internal_note,
+    overlap_override: publicAppointment.data.overlap_override,
+    overlap_override_reason: publicAppointment.data.overlap_override_reason,
+    overlap_overridden_at: publicAppointment.data.overlap_overridden_at,
+    overlap_overridden_by: publicAppointment.data.overlap_overridden_by,
+    post_visit_comment: publicAppointment.data.post_visit_comment,
+    post_visit_commented_at: publicAppointment.data.post_visit_commented_at,
+    service_name: publicAppointment.data.service_name,
+    starts_at: publicAppointment.data.starts_at,
+    starts_on: publicAppointment.data.starts_on,
+    status: publicAppointment.data.status,
+    version: publicAppointment.data.version,
+  }, "appointment.resize");
+  if (publicDurationSave.error) throw publicDurationSave.error;
+  const adjustedPublicAppointment = await supabase
+    .from("admin_appointments")
+    .select(
+      "buffer_minutes, currency_snapshot, duration_minutes, price_cents_snapshot, public_contact_preference_snapshot, public_email_snapshot, public_phone_snapshot, service_name",
+    )
+    .eq("id", publicAppointment.data.id)
+    .single();
+  if (adjustedPublicAppointment.error) throw adjustedPublicAppointment.error;
+  const publicDurationAdjusted = adjustedPublicAppointment.data.duration_minutes === adjustedPublicDuration
+    && adjustedPublicAppointment.data.buffer_minutes === publicAppointment.data.buffer_minutes
+    && adjustedPublicAppointment.data.currency_snapshot === publicAppointment.data.currency_snapshot
+    && adjustedPublicAppointment.data.price_cents_snapshot === publicAppointment.data.price_cents_snapshot
+    && adjustedPublicAppointment.data.public_contact_preference_snapshot
+      === publicAppointment.data.public_contact_preference_snapshot
+    && adjustedPublicAppointment.data.public_email_snapshot === publicAppointment.data.public_email_snapshot
+    && adjustedPublicAppointment.data.public_phone_snapshot === publicAppointment.data.public_phone_snapshot
+    && adjustedPublicAppointment.data.service_name === publicAppointment.data.service_name;
 
   output = {
     bookingSnapshotsPreserved,
@@ -762,6 +802,7 @@ try {
     parallelSessionRestoresSerialized: parallelSessionRestoresSerialized
       && parallelSessionVersionsStable,
     publicConfirmationAfterManualOverflow,
+    publicDurationAdjusted,
     sessionHoldRestored,
     sessionHoldReplaced,
     sessionConfirmationRestored,

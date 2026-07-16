@@ -318,7 +318,6 @@ describe("CalendarWorkspace", () => {
   });
 
   it("does not resize a 23:45 appointment past the end of the day", async () => {
-    const user = userEvent.setup();
     const lateAppointment = {
       ...appointments[0],
       durationMinutes: 15,
@@ -329,13 +328,38 @@ describe("CalendarWorkspace", () => {
     const appointmentBlock = screen
       .getByText(lateAppointment.client)
       .closest(".admin-timed-appointment") as HTMLElement;
-    const increaseDurationButton = appointmentBlock.querySelector(
-      ".admin-timed-appointment-resize button:last-child",
-    ) as HTMLButtonElement;
+    const resizeHandle = within(appointmentBlock).getByRole("slider", {
+      name: "Изменить длительность записи",
+    });
 
     expect(appointmentBlock).toHaveStyle({ top: "1710px" });
-    await user.click(increaseDurationButton);
+    fireEvent.keyDown(resizeHandle, { key: "ArrowUp" });
     expect(onSaveAppointment).not.toHaveBeenCalled();
+  });
+
+  it("does not shorten an appointment near midnight from a tap on the resize edge", () => {
+    const crossingMidnightAppointment = {
+      ...appointments[0],
+      durationMinutes: 60,
+      id: "appointment-crossing-midnight",
+      time: "23:30",
+    };
+    const { onSaveAppointment } = renderCalendar({
+      calendarAppointments: [crossingMidnightAppointment],
+    });
+    const appointmentBlock = screen
+      .getByText(crossingMidnightAppointment.client)
+      .closest(".admin-timed-appointment") as HTMLElement;
+    const resizeHandle = within(appointmentBlock).getByRole("slider", {
+      name: "Изменить длительность записи",
+    });
+
+    expect(resizeHandle).toHaveAttribute("aria-valuemax", "60");
+    fireEvent.pointerDown(resizeHandle, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerUp(resizeHandle, { clientY: 100, pointerId: 1 });
+
+    expect(onSaveAppointment).not.toHaveBeenCalled();
+    expect(appointmentBlock).toHaveStyle({ height: "72px" });
   });
 
   it("renders simultaneous appointments in separate deterministic columns", () => {
@@ -467,7 +491,10 @@ describe("CalendarWorkspace", () => {
     const { onSaveAppointment } = renderCalendar();
     const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment");
 
-    await user.click(within(annaBlock as HTMLElement).getByRole("button", { name: "Увеличить длительность на 15 минут" }));
+    fireEvent.keyDown(
+      within(annaBlock as HTMLElement).getByRole("slider", { name: "Изменить длительность записи" }),
+      { key: "ArrowUp" },
+    );
 
     expect(onSaveAppointment).not.toHaveBeenCalled();
     const conflict = screen.getByRole("region", { name: "Изменение пересекается с другой записью" });
@@ -495,12 +522,14 @@ describe("CalendarWorkspace", () => {
   });
 
   it("detects an overlap with an appointment hidden by search", async () => {
-    const user = userEvent.setup();
     const { onSaveAppointment } = renderCalendar({ query: "Анна" });
     const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
 
     expect(screen.queryByText("Мария Иванова")).not.toBeInTheDocument();
-    await user.click(within(annaBlock).getByRole("button", { name: "Увеличить длительность на 15 минут" }));
+    fireEvent.keyDown(
+      within(annaBlock).getByRole("slider", { name: "Изменить длительность записи" }),
+      { key: "ArrowUp" },
+    );
 
     expect(onSaveAppointment).not.toHaveBeenCalled();
     expect(screen.getByRole("region", { name: "Изменение пересекается с другой записью" })).toHaveTextContent(
@@ -518,19 +547,42 @@ describe("CalendarWorkspace", () => {
     );
     renderCalendar({ calendarAppointments: [appointments[0]], onSaveAppointment });
     const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
-    const grip = within(annaBlock).getByRole("button", {
-      name: "Изменить длительность перетаскиванием вверх или вниз",
+    const grip = within(annaBlock).getByRole("slider", {
+      name: "Изменить длительность записи",
     });
 
+    expect(grip).toHaveAttribute("aria-valuenow", "60");
+    expect(within(annaBlock).queryByRole("button", { name: /длительность на 15 минут/i })).not.toBeInTheDocument();
+    const timeGrid = annaBlock.closest(".admin-day-time-grid") as HTMLElement;
+
     fireEvent.pointerDown(grip, { clientY: 100, pointerId: 1 });
+    expect(grip).toHaveFocus();
+    expect(timeGrid).toHaveClass("is-resizing");
+    expect(document.body).toHaveClass("admin-calendar-resize-active");
+    expect(annaBlock).toHaveAttribute("draggable", "false");
+
+    const blockedDragStart = createEvent.dragStart(annaBlock, { dataTransfer: createDataTransfer() });
+    fireEvent(annaBlock, blockedDragStart);
+    expect(blockedDragStart.defaultPrevented).toBe(true);
+
     fireEvent.pointerMove(grip, { clientY: 118, pointerId: 1 });
+    expect(grip).toHaveAttribute("aria-valuenow", "75");
+    expect(grip).toHaveAttribute("aria-valuetext", "75 минут");
     fireEvent.pointerUp(grip, { clientY: 118, pointerId: 1 });
+
+    expect(timeGrid).not.toHaveClass("is-resizing");
+    expect(document.body).not.toHaveClass("admin-calendar-resize-active");
+
+    const suppressedDragStart = createEvent.dragStart(annaBlock, { dataTransfer: createDataTransfer() });
+    fireEvent(annaBlock, suppressedDragStart);
+    expect(suppressedDragStart.defaultPrevented).toBe(true);
 
     expect(onSaveAppointment).toHaveBeenCalledWith(
       expect.objectContaining({ durationMinutes: 75, id: "appointment-anna" }),
       "appointment.resize",
       expect.objectContaining({ durationMinutes: 60, id: "appointment-anna" }),
     );
+    expect(onSaveAppointment).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("status")).toHaveTextContent("Сохраняем изменение записи");
     expect(annaBlock).toHaveAttribute("aria-busy", "true");
 
@@ -538,5 +590,51 @@ describe("CalendarWorkspace", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Сервер отклонил изменение.");
     await waitFor(() => expect(annaBlock).not.toHaveAttribute("aria-busy"));
+  });
+
+  it("cancels the resize preview when pointer capture is lost", () => {
+    const { onSaveAppointment } = renderCalendar({ calendarAppointments: [appointments[0]] });
+    const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
+    const grip = within(annaBlock).getByRole("slider", {
+      name: "Изменить длительность записи",
+    });
+
+    fireEvent.pointerDown(grip, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(grip, { clientY: 118, pointerId: 1 });
+    expect(annaBlock).toHaveStyle({ height: "90px" });
+
+    fireEvent.lostPointerCapture(grip, { pointerId: 1 });
+
+    expect(annaBlock).toHaveStyle({ height: "72px" });
+    expect(onSaveAppointment).not.toHaveBeenCalled();
+  });
+
+  it("keeps each appointment pending until its own save completes", async () => {
+    const resolvers: Array<(result: CalendarAppointmentSaveResult) => void> = [];
+    const onSaveAppointment = vi.fn(
+      () =>
+        new Promise<CalendarAppointmentSaveResult>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    renderCalendar({ onSaveAppointment });
+    const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
+    const mariaBlock = screen.getByText("Мария Иванова").closest(".admin-timed-appointment") as HTMLElement;
+
+    fireEvent.keyDown(within(annaBlock).getByRole("slider"), { key: "ArrowDown" });
+    fireEvent.keyDown(within(mariaBlock).getByRole("slider"), { key: "ArrowDown" });
+
+    expect(onSaveAppointment).toHaveBeenCalledTimes(2);
+    expect(annaBlock).toHaveAttribute("aria-busy", "true");
+    expect(mariaBlock).toHaveAttribute("aria-busy", "true");
+
+    resolvers[0]?.({ ok: true });
+    await waitFor(() => expect(annaBlock).not.toHaveAttribute("aria-busy"));
+    expect(mariaBlock).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("Сохраняем изменение записи");
+
+    resolvers[1]?.({ ok: true });
+    await waitFor(() => expect(mariaBlock).not.toHaveAttribute("aria-busy"));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

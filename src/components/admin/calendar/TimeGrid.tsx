@@ -105,6 +105,7 @@ export type TimeGridDay = {
 type TimeGridProps = {
   days: TimeGridDay[];
   dragPreview?: Appointment;
+  isInteractionLocked?: boolean;
   mode: "day" | "week";
   onDragOverAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
@@ -170,6 +171,7 @@ function TimeColumn({
 export function TimeGrid({
   days,
   dragPreview,
+  isInteractionLocked = false,
   mode,
   onDragOverAppointment,
   onDropAppointment,
@@ -218,7 +220,7 @@ export function TimeGrid({
 
   return (
     <div
-      className="admin-calendar-time-grid admin-day-time-grid"
+      className={`admin-calendar-time-grid admin-day-time-grid${isInteractionLocked ? " is-resizing" : ""}`}
       ref={dayScrollRef}
       style={{ ...gridHeightStyle, maxHeight: "min(70vh, 860px)" }}
     >

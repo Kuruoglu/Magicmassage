@@ -45,6 +45,12 @@ const bookingDomainErrorCodeMigrationPath = join(
   "migrations",
   "20260715160000_admin_booking_domain_error_codes.sql",
 );
+const adminPublicDurationMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260715280000_allow_admin_public_appointment_duration.sql",
+);
 const bookingSessionHoldMigrationPath = join(
   process.cwd(),
   "supabase",
@@ -228,6 +234,16 @@ describe("public booking migration", () => {
     expect(sql).toContain("public_appointment_immutable");
     expect(sql).toContain("current_appointment.origin = 'public'");
     expect(sql).toContain("grant execute on function public.admin_save_appointment_with_audit");
+  });
+
+  it("allows admins to adjust public appointment duration without unlocking other booking snapshots", () => {
+    const sql = readFileSync(adminPublicDurationMigrationPath, "utf8");
+
+    expect(sql).toContain("admin_prepare_appointment_write()");
+    expect(sql).toContain("or new.duration_minutes is distinct from old.duration_minutes");
+    expect(sql).toContain("effective_duration_minutes := requested_duration_minutes;");
+    expect(sql).toContain("replace(prepare_definition, immutable_duration_clause, '')");
+    expect(sql).toContain("elsif position('effective_duration_minutes := requested_duration_minutes;'");
   });
 
   it("counts active holds toward public capacity without limiting manual admin writes", () => {

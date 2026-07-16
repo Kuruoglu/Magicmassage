@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from "react";
+import { useRef, useState, type DragEvent } from "react";
 
 import type { Appointment } from "@/admin/domain";
 
@@ -30,6 +30,7 @@ type AppointmentBlockProps = {
   layout?: AppointmentOverlapLayout;
   onDragEnd: () => void;
   onDragStart: (event: DragEvent<HTMLElement>, appointment: Appointment) => void;
+  onResizeInteractionChange?: (isResizing: boolean) => void;
   onResize: (appointment: Appointment, deltaMinutes: number) => void;
   onSelect: (appointment: Appointment) => void;
 };
@@ -55,12 +56,18 @@ export function AppointmentBlock({
   layout = { column: 0, columnCount: 1, leftPercentage: 0, widthPercentage: 100 },
   onDragEnd,
   onDragStart,
+  onResizeInteractionChange,
   onResize,
   onSelect,
 }: AppointmentBlockProps) {
   const [resizePreviewDelta, setResizePreviewDelta] = useState(0);
+  const [isResizing, setIsResizing] = useState(false);
+  const suppressDragUntilRef = useRef(0);
   const appointmentDuration = appointment.durationMinutes ?? 60;
-  const previewDuration = clampAppointmentDurationToDay(appointment, resizePreviewDelta);
+  const previewDuration =
+    resizePreviewDelta === 0
+      ? appointmentDuration
+      : clampAppointmentDurationToDay(appointment, resizePreviewDelta);
   const height = Math.max(28, durationToHeight(previewDuration, CALENDAR_HOUR_HEIGHT));
   const top = Math.max(0, timeToPosition(appointment.time, CALENDAR_DAY_START, CALENDAR_HOUR_HEIGHT));
   const className = [
@@ -72,6 +79,7 @@ export function AppointmentBlock({
     isDragging ? "is-dragging" : "",
     isDragPreview ? "is-drag-preview" : "",
     isPending ? "is-pending" : "",
+    isResizing ? "is-resizing" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -81,9 +89,21 @@ export function AppointmentBlock({
       aria-hidden={isDragPreview || undefined}
       className={className}
       aria-busy={isPending || undefined}
-      draggable={!isDragPreview && !isPending}
+      draggable={!isDragPreview && !isPending && !isResizing}
       onDragEnd={isDragPreview ? undefined : onDragEnd}
-      onDragStart={isDragPreview ? undefined : (event) => onDragStart(event, appointment)}
+      onDragStart={
+        isDragPreview
+          ? undefined
+          : (event) => {
+              if (isResizing || Date.now() < suppressDragUntilRef.current) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+
+              onDragStart(event, appointment);
+            }
+      }
       role={isDragPreview ? undefined : "listitem"}
       style={{
         height: `${height}px`,
@@ -113,13 +133,24 @@ export function AppointmentBlock({
           <AppointmentResizeHandle
             appointment={appointment}
             disabled={isPending}
-            onPreview={(deltaMinutes) =>
-              setResizePreviewDelta(clampAppointmentDurationToDay(appointment, deltaMinutes) - appointmentDuration)
-            }
+            onActivate={() => onSelect(appointment)}
+            onInteractionChange={(active) => {
+              suppressDragUntilRef.current = active ? Number.POSITIVE_INFINITY : Date.now() + 700;
+              setIsResizing(active);
+              onResizeInteractionChange?.(active);
+            }}
+            onPreview={(deltaMinutes) => {
+              setResizePreviewDelta(
+                deltaMinutes === 0
+                  ? 0
+                  : clampAppointmentDurationToDay(appointment, deltaMinutes) - appointmentDuration,
+              );
+            }}
             onResize={(resizedAppointment, deltaMinutes) => {
               setResizePreviewDelta(0);
               onResize(resizedAppointment, deltaMinutes);
             }}
+            useWholeCardTarget={!compact && previewDuration <= 30}
           />
         </>
       )}
