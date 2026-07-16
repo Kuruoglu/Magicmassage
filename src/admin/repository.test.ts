@@ -19,7 +19,7 @@ import {
 
 type QueryFilter = {
   column: string;
-  operator: "eq" | "gte" | "lte";
+  operator: "eq" | "gt" | "gte" | "lte";
   value: unknown;
 };
 
@@ -30,14 +30,17 @@ type QueryOperation = {
   functionName?: string;
   options?: unknown;
   order?: { ascending: boolean; column: string };
+  orders?: { ascending: boolean; column: string }[];
   parameters?: Record<string, unknown>;
+  range?: { from: number; to: number };
   table?: string;
   values?: unknown;
 };
 
 class FakeSelectQuery implements PromiseLike<{ data: unknown[] | null; error: { message: string } | null }> {
   private readonly filters: QueryFilter[] = [];
-  private orderBy?: { ascending: boolean; column: string };
+  private readonly orderBy: { ascending: boolean; column: string }[] = [];
+  private selectedRange?: { from: number; to: number };
 
   constructor(
     private readonly table: string,
@@ -45,6 +48,7 @@ class FakeSelectQuery implements PromiseLike<{ data: unknown[] | null; error: { 
     private readonly rows: unknown[],
     private readonly operations: QueryOperation[],
     private readonly error?: { message: string },
+    private readonly selectLimit?: number,
   ) {}
 
   eq(column: string, value: unknown) {
@@ -57,13 +61,23 @@ class FakeSelectQuery implements PromiseLike<{ data: unknown[] | null; error: { 
     return this;
   }
 
+  gt(column: string, value: unknown) {
+    this.filters.push({ column, operator: "gt", value });
+    return this;
+  }
+
   lte(column: string, value: unknown) {
     this.filters.push({ column, operator: "lte", value });
     return this;
   }
 
   order(column: string, options?: { ascending?: boolean }) {
-    this.orderBy = { ascending: options?.ascending ?? true, column };
+    this.orderBy.push({ ascending: options?.ascending ?? true, column });
+    return this;
+  }
+
+  range(from: number, to: number) {
+    this.selectedRange = { from, to };
     return this;
   }
 
@@ -71,16 +85,40 @@ class FakeSelectQuery implements PromiseLike<{ data: unknown[] | null; error: { 
     onfulfilled?: ((value: { data: unknown[] | null; error: { message: string } | null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ) {
-    this.operations.push({
+    const operation: QueryOperation = {
       action: "select",
       columns: this.columns,
       filters: [...this.filters],
-      order: this.orderBy,
+      order: this.orderBy[0],
       table: this.table,
-    });
+    };
+
+    if (this.orderBy.length > 1) {
+      operation.orders = [...this.orderBy];
+    }
+
+    if (this.selectedRange) {
+      operation.range = this.selectedRange;
+    }
+
+    this.operations.push(operation);
+
+    const filteredRows = this.rows.filter((row) =>
+      this.filters.every((filter) => {
+        if (filter.operator !== "gt" || typeof row !== "object" || row === null) {
+          return true;
+        }
+
+        return String((row as Record<string, unknown>)[filter.column]) > String(filter.value);
+      }),
+    );
+    const rangedRows = this.selectedRange
+      ? filteredRows.slice(this.selectedRange.from, this.selectedRange.to + 1)
+      : filteredRows;
+    const rows = this.selectLimit ? rangedRows.slice(0, this.selectLimit) : rangedRows;
 
     return Promise.resolve({
-      data: this.error ? null : this.rows,
+      data: this.error ? null : rows,
       error: this.error ?? null,
     }).then(onfulfilled, onrejected);
   }
@@ -92,6 +130,7 @@ class FakeSupabaseClient {
   constructor(
     private readonly rowsByTable: Record<string, unknown[]> = {},
     private readonly errorsByTable: Record<string, { message: string }> = {},
+    private readonly selectLimit?: number,
   ) {}
 
   from(table: string) {
@@ -101,7 +140,14 @@ class FakeSupabaseClient {
         return Promise.resolve({ data: null, error: this.errorsByTable[table] ?? null });
       },
       select: (columns: string) =>
-        new FakeSelectQuery(table, columns, this.rowsByTable[table] ?? [], this.operations, this.errorsByTable[table]),
+        new FakeSelectQuery(
+          table,
+          columns,
+          this.rowsByTable[table] ?? [],
+          this.operations,
+          this.errorsByTable[table],
+          this.selectLimit,
+        ),
       upsert: (values: unknown, options?: unknown) => {
         this.operations.push({ action: "upsert", filters: [], options, table, values });
         return Promise.resolve({ data: null, error: this.errorsByTable[table] ?? null });
@@ -725,11 +771,79 @@ describe("admin Supabase repository", () => {
       stripeId: "pi_3QMMN1023",
     });
     expect(client.operations.filter((operation) => operation.action === "select")).toEqual([
-      expect.objectContaining({ order: { ascending: true, column: "full_name" }, table: "admin_clients" }),
+      expect.objectContaining({
+        filters: [],
+        order: { ascending: true, column: "id" },
+        range: { from: 0, to: 999 },
+        table: "admin_clients",
+      }),
+      expect.objectContaining({
+        filters: [{ column: "id", operator: "gt", value: "client-359873334411" }],
+        order: { ascending: true, column: "id" },
+        range: { from: 0, to: 999 },
+        table: "admin_clients",
+      }),
       expect.objectContaining({ order: { ascending: true, column: "starts_on" }, table: "admin_appointments" }),
       expect.objectContaining({ order: { ascending: true, column: "block_date" }, table: "admin_calendar_blocks" }),
       expect.objectContaining({ order: { ascending: false, column: "paid_on" }, table: "admin_certificates" }),
     ]);
+  });
+
+  it("loads every client when Supabase returns more than one page", async () => {
+    const rows = Array.from({ length: 1001 }, (_, index) => ({
+      ...clientRows[0],
+      full_name: `Client ${String(index).padStart(4, "0")}`,
+      id: `client-${String(index).padStart(4, "0")}`,
+      phone: `+359 87 3${String(index).padStart(6, "0")}`,
+      phone_normalized: `359873${String(index).padStart(6, "0")}`,
+    }));
+    const client = new FakeSupabaseClient({ admin_clients: rows }, {}, 500);
+    const repository = createAdminSupabaseRepository(client);
+
+    const clients = await repository.listClients();
+
+    expect(clients).toHaveLength(1001);
+    expect(new Set(clients.map((clientRecord) => clientRecord.id)).size).toBe(1001);
+    expect(clients.at(0)?.id).toBe("client-0000");
+    expect(clients.at(-1)?.id).toBe("client-1000");
+    expect(client.operations).toEqual([
+      expect.objectContaining({
+        filters: [],
+        order: { ascending: true, column: "id" },
+        range: { from: 0, to: 999 },
+        table: "admin_clients",
+      }),
+      expect.objectContaining({
+        filters: [{ column: "id", operator: "gt", value: "client-0499" }],
+        range: { from: 0, to: 999 },
+        table: "admin_clients",
+      }),
+      expect.objectContaining({
+        filters: [{ column: "id", operator: "gt", value: "client-0999" }],
+        range: { from: 0, to: 999 },
+        table: "admin_clients",
+      }),
+      expect.objectContaining({
+        filters: [{ column: "id", operator: "gt", value: "client-1000" }],
+        range: { from: 0, to: 999 },
+        table: "admin_clients",
+      }),
+    ]);
+  });
+
+  it("advances keyset pagination when a row has an empty id", async () => {
+    const rows = [
+      { ...clientRows[0], id: "" },
+      { ...clientRows[0], id: "client-after-empty", phone_normalized: "359873334412" },
+    ];
+    const client = new FakeSupabaseClient({ admin_clients: rows }, {}, 1);
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.listClients()).resolves.toHaveLength(2);
+    expect(client.operations[1]).toMatchObject({
+      filters: [{ column: "id", operator: "gt", value: "" }],
+      table: "admin_clients",
+    });
   });
 
   it("loads Stripe sales for an accountant period export", async () => {

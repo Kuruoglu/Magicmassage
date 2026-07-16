@@ -79,8 +79,10 @@ export function runWithAdminRepositoryAuditContext<T>(
 type AdminSupabaseSelectQuery<T> = PromiseLike<SupabaseQueryResult<T>> & {
   eq(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   gte(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
+  gt(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   lte(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   order(column: string, options?: { ascending?: boolean }): AdminSupabaseSelectQuery<T>;
+  range(from: number, to: number): AdminSupabaseSelectQuery<T>;
 };
 
 type AdminSupabaseTable<T> = {
@@ -1319,6 +1321,41 @@ async function selectRows<T>(
   return data ?? [];
 }
 
+const SUPABASE_SELECT_PAGE_SIZE = 1000;
+
+async function selectAllRowsById<T extends { id: string }>(
+  client: AdminSupabaseClient,
+  table: string,
+  columns: string,
+) {
+  const rows: T[] = [];
+  let lastId: string | undefined;
+
+  for (;;) {
+    let query = client.from(table).select(columns) as AdminSupabaseSelectQuery<T>;
+
+    if (lastId !== undefined) {
+      query = query.gt("id", lastId);
+    }
+
+    query = query.order("id", { ascending: true }).range(0, SUPABASE_SELECT_PAGE_SIZE - 1);
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(`${table}: ${error.message}`);
+    }
+
+    const page = data ?? [];
+
+    if (page.length === 0) {
+      return rows;
+    }
+
+    rows.push(...page);
+    lastId = page[page.length - 1].id;
+  }
+}
+
 async function insertRow(client: AdminSupabaseClient, table: string, values: unknown) {
   const { error } = await client.from(table).insert(values);
 
@@ -1349,9 +1386,8 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function listClients() {
-    const rows = await selectRows<AdminClientDatabaseRow>(client, "admin_clients", clientColumns, (query) =>
-      query.order("full_name", { ascending: true }),
-    );
+    const rows = await selectAllRowsById<AdminClientDatabaseRow>(client, "admin_clients", clientColumns);
+    rows.sort((left, right) => left.full_name.localeCompare(right.full_name) || left.id.localeCompare(right.id));
 
     return rows.map(mapClientRow);
   }
