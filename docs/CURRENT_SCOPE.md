@@ -26,6 +26,10 @@ admin/CRM platform:
 - Public availability can be restricted to the specialist selected by the
   customer. The "any specialist" option is automatically distributed across
   active eligible specialists.
+  Each specialist has an owner-configured weekly schedule with independent
+  working days and start/end times. Public dates, slots, holds, and restored
+  holds are derived from that specialist schedule; there is no hardcoded start
+  of day.
   Each specialist uses the owner-configured public cap from 1 to 8 appointments
   per day (8 by default).
   An authorized owner may create a ninth, tenth, or later manual appointment;
@@ -33,8 +37,9 @@ admin/CRM platform:
 - Booking buffers are owner-configurable as 15 or 30 minutes and are snapshotted
   on each appointment. Public starts use a 30-minute grid with a 30-minute
   same-day lead time.
-- Natali can add full-day or timed personal blocks in the admin calendar. Blocks,
-  appointments, active holds, working hours, lead time, and the public daily cap
+- Natali can edit a specialist's weekly schedule and add full-day or timed
+  personal blocks in the admin calendar. Blocks, appointments, active holds,
+  specialist working hours, lead time, and the public daily cap
   all participate in public availability.
 - Gift certificates use an embedded Stripe Payment Element and remain guarded by
   the existing feature and live-payment flags.

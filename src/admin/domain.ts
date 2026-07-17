@@ -76,13 +76,22 @@ export type ClientRecord = {
   visits: number;
 };
 
+export type SpecialistScheduleDay = {
+  endsAt: string;
+  isWorking: boolean;
+  startsAt: string;
+  weekday: number;
+};
+
 export type SpecialistRecord = {
   color: string;
   displayName: string;
   displayOrder: number;
   id: string;
   publicBookingEnabled: boolean;
+  scheduleVersion: number;
   status: "active" | "inactive";
+  weeklySchedule: SpecialistScheduleDay[];
 };
 
 export type CertificateStatus = "Оплачено" | "Отправлен" | "Ожидает PDF" | "Погашен";
@@ -367,7 +376,9 @@ export type AdminSpecialistDatabaseRow = {
   display_order: number;
   id: string;
   public_booking_enabled: boolean;
+  schedule_version: number;
   status: "active" | "inactive";
+  weekly_schedule: SpecialistScheduleDay[];
 };
 
 export type AdminCertificateDatabaseRow = {

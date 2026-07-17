@@ -1,3 +1,5 @@
+import type { SpecialistRecord, SpecialistScheduleDay } from "@/admin/domain";
+
 import type { CalendarAppointmentTime, CalendarWorkingHours } from "./conflicts";
 import { isOutsideWorkingHours } from "./conflicts";
 import { getIsoDateInTimeZone, isoDateToUtcDate } from "./date";
@@ -13,6 +15,7 @@ export type CalendarWorkingSchedule = {
   timeZone: string;
   workingDays: ReadonlySet<number>;
   workingHours?: CalendarWorkingHours;
+  weeklyWorkingHours?: ReadonlyMap<number, CalendarWorkingHours | null>;
 };
 
 export type CalendarScheduleClassification = {
@@ -129,6 +132,49 @@ export function createCalendarWorkingSchedule(
   };
 }
 
+export function createSpecialistWorkingSchedule(
+  specialist: SpecialistRecord,
+  timeZone: string,
+): CalendarWorkingSchedule {
+  const weeklyWorkingHours = new Map<number, CalendarWorkingHours | null>();
+  const workingDays = new Set<number>();
+
+  for (const day of specialist.weeklySchedule ?? []) {
+    if (day.isWorking) {
+      workingDays.add(day.weekday);
+      weeklyWorkingHours.set(day.weekday, { end: day.endsAt, start: day.startsAt });
+    } else {
+      weeklyWorkingHours.set(day.weekday, null);
+    }
+  }
+
+  return {
+    timeZone: normalizeTimeZone(timeZone),
+    weeklyWorkingHours,
+    workingDays,
+  };
+}
+
+export function getIsoWeekday(isoDate: string) {
+  const utcWeekday = isoDateToUtcDate(isoDate).getUTCDay();
+  return utcWeekday === 0 ? 7 : utcWeekday;
+}
+
+export function getSpecialistScheduleDay(
+  specialist: SpecialistRecord | undefined,
+  isoDate: string,
+): SpecialistScheduleDay | undefined {
+  const weekday = getIsoWeekday(isoDate);
+  return specialist?.weeklySchedule?.find((day) => day.weekday === weekday);
+}
+
+export function hasScheduleEnvelope(value: {
+  workingDays?: unknown;
+  workingHours?: unknown;
+}): value is { workingDays: string; workingHours: string } {
+  return typeof value.workingDays === "string" && typeof value.workingHours === "string";
+}
+
 export function getCalendarIsoDate(
   schedule: CalendarWorkingSchedule,
   date = new Date(),
@@ -140,11 +186,13 @@ export function classifyAppointmentAgainstSchedule(
   appointment: CalendarAppointmentTime,
   schedule: CalendarWorkingSchedule,
 ): CalendarScheduleClassification {
-  const utcWeekday = isoDateToUtcDate(appointment.date).getUTCDay();
-  const weekday = utcWeekday === 0 ? 7 : utcWeekday;
+  const weekday = getIsoWeekday(appointment.date);
   const outsideWorkingDay = !schedule.workingDays.has(weekday);
-  const outsideDailyWorkingHours = schedule.workingHours
-    ? isOutsideWorkingHours(appointment, schedule.workingHours)
+  const workingHours = schedule.weeklyWorkingHours
+    ? schedule.weeklyWorkingHours.get(weekday)
+    : schedule.workingHours;
+  const outsideDailyWorkingHours = workingHours
+    ? isOutsideWorkingHours(appointment, workingHours)
     : true;
 
   return {

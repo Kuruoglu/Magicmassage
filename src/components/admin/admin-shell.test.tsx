@@ -112,7 +112,14 @@ describe("AdminShell", () => {
                 displayOrder: 1,
                 id: "specialist-codex",
                 publicBookingEnabled: true,
+                scheduleVersion: 1,
                 status: "active",
+                weeklySchedule: Array.from({ length: 7 }, (_, index) => ({
+                  endsAt: "19:00",
+                  isWorking: index < 6,
+                  startsAt: "10:00",
+                  weekday: index + 1,
+                })),
               },
             ],
           },
@@ -2813,8 +2820,9 @@ describe("AdminShell", () => {
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
     fireEvent.change(within(dialog).getByLabelText("Название бизнеса"), { target: { value: "Magic Massage Natali" } });
     fireEvent.change(within(dialog).getByLabelText("Часовой пояс"), { target: { value: "Europe/Sofia" } });
-    fireEvent.change(within(dialog).getByLabelText("Рабочие дни"), { target: { value: "Пн-Сб" } });
-    fireEvent.change(within(dialog).getByLabelText("Рабочие часы"), { target: { value: "10:00-19:00" } });
+    expect(within(dialog).getByLabelText("График специалистов")).toHaveTextContent(
+      "Изменяется в календаре отдельно для каждого специалиста",
+    );
     await user.click(within(dialog).getByRole("button", { name: "15 минут" }));
     fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "5" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar"), { target: { value: "Односторонняя" } });

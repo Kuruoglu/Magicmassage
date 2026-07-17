@@ -147,6 +147,18 @@ const contactRevealLimitsMigrationPath = join(
 const publicSpecialistSlugsMigrationPath = join(
   process.cwd(), "supabase", "migrations", "20260716200000_public_specialist_slugs.sql",
 );
+const specialistWeeklySchedulesMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260717100000_specialist_weekly_schedules.sql",
+);
+const specialistScheduleIntegrityMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260717120000_specialist_schedule_integrity.sql",
+);
+const specialistScheduleStaleErrorMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260717130000_specialist_schedule_stale_error.sql",
+);
+const specialistScheduleDeleteEnvelopeMigrationPath = join(
+  process.cwd(), "supabase", "migrations", "20260717140000_specialist_schedule_delete_envelope.sql",
+);
 
 function migrationSql() {
   return readFileSync(migrationPath, "utf8");
@@ -634,5 +646,103 @@ describe("public booking migration", () => {
     expect(sql).toContain("'specialistId', specialist_slug");
     expect(sql).toContain("from public, anon, authenticated");
     expect(sql).toContain("to service_role");
+  });
+
+  it("adds validated per-specialist schedules with secure audited saves and public enforcement", () => {
+    const sql = readFileSync(specialistWeeklySchedulesMigrationPath, "utf8");
+    const specialistChoiceSql = readFileSync(specialistChoiceMigrationPath, "utf8");
+    const validator = sql.slice(
+      sql.indexOf("create or replace function public.admin_specialist_weekly_schedule_is_valid"),
+      sql.indexOf("create or replace function public.admin_build_specialist_weekly_schedule"),
+    );
+    const backfill = sql.slice(
+      sql.indexOf("update public.admin_specialists specialist"),
+      sql.indexOf("create or replace function public.admin_initialize_specialist_weekly_schedule"),
+    );
+    const availabilityHelper = sql.slice(
+      sql.indexOf("create or replace function public.public_booking_specialist_available"),
+      sql.indexOf("create or replace function public.public_booking_restore_session_hold_v5"),
+    );
+    const restoreHelper = sql.slice(
+      sql.indexOf("create or replace function public.public_booking_restore_session_hold_v5"),
+      sql.indexOf("create or replace function public.admin_save_specialist_schedule"),
+    );
+    const saveRpc = sql.slice(
+      sql.indexOf("create or replace function public.admin_save_specialist_schedule"),
+      sql.indexOf("revoke all on function public.admin_specialist_weekly_schedule_is_valid"),
+    );
+    const availabilityRpc = specialistChoiceSql.slice(
+      specialistChoiceSql.indexOf("create function public.public_booking_get_availability_v2"),
+      specialistChoiceSql.indexOf("create function public.public_booking_create_hold_v5"),
+    );
+    const holdRpc = specialistChoiceSql.slice(
+      specialistChoiceSql.indexOf("create function public.public_booking_create_hold_v5"),
+      specialistChoiceSql.indexOf("create function public.public_booking_restore_session_hold_v5"),
+    );
+
+    expect(sql).toContain("add column if not exists weekly_schedule jsonb");
+    expect(validator).toContain("jsonb_array_length(p_schedule) <> 7");
+    expect(validator).toContain("array[1, 2, 3, 4, 5, 6, 7]");
+    expect(validator).toContain("'startsAt', '') !~ '^([01][0-9]|2[0-3]):(00|30)$'");
+    expect(validator).toContain("'endsAt', '') !~ '^([01][0-9]|2[0-3]):(00|30)$'");
+    expect(validator).toContain("starts_at >= ends_at");
+    expect(sql).toContain("admin_specialists_weekly_schedule_valid");
+
+    expect(backfill).toContain("settings.working_days");
+    expect(backfill).toContain("settings.working_hours");
+    expect(sql).toContain("public.public_booking_day_is_open");
+    expect(sql).toContain("public.public_booking_working_minutes");
+    expect(sql).toContain("create trigger initialize_specialist_weekly_schedule");
+    expect(sql).not.toContain("09:00");
+
+    expect(availabilityHelper).toContain("jsonb_array_elements(specialist.weekly_schedule)");
+    expect(availabilityHelper).toContain("schedule_day ->> 'isWorking'");
+    expect(availabilityHelper).toContain("schedule_day ->> 'startsAt'");
+    expect(availabilityHelper).toContain("schedule_day ->> 'endsAt'");
+    expect(availabilityHelper).toContain("p_excluded_hold_id");
+    expect(availabilityRpc).toContain("public.public_booking_specialist_available(");
+    expect(holdRpc).toContain("public.public_booking_specialist_available(");
+    expect(restoreHelper).toContain("public.public_booking_restore_session_hold_v4");
+    expect(restoreHelper).toContain("public.public_booking_specialist_available(");
+    expect(restoreHelper).toContain("hold.id");
+    expect(restoreHelper).toContain("set status = 'expired'");
+
+    expect(saveRpc).toContain("profile.role::text in ('owner', 'administrator')");
+    expect(saveRpc).toContain("for update");
+    expect(saveRpc).toContain("specialist.status = 'active'");
+    expect(saveRpc).toContain("specialist.public_booking_enabled");
+    expect(saveRpc).toContain("'specialist.schedule.update'");
+    expect(saveRpc).toContain("insert into public.admin_audit_log");
+    expect(saveRpc).toContain("working_days = coalesce(union_working_days, '')");
+    expect(saveRpc).toContain("working_hours = envelope_working_hours");
+
+    expect(sql).toContain("revoke all on function public.admin_save_specialist_schedule(uuid, uuid, jsonb)");
+    expect(sql).toContain("grant execute on function public.admin_save_specialist_schedule(uuid, uuid, jsonb)");
+    expect(sql).toContain("grant execute on function public.public_booking_restore_session_hold_v5(text, text)");
+    expect(sql).toContain("to service_role");
+  });
+
+  it("serializes public booking with versioned specialist schedules and a single settings envelope", () => {
+    const sql = readFileSync(specialistScheduleIntegrityMigrationPath, "utf8");
+    const staleErrorSql = readFileSync(specialistScheduleStaleErrorMigrationPath, "utf8");
+    const deleteEnvelopeSql = readFileSync(specialistScheduleDeleteEnvelopeMigrationPath, "utf8");
+
+    expect(sql).toContain("add column if not exists schedule_version integer not null default 1");
+    expect(sql).toContain("hashtextextended('specialist-schedule-envelope', 0)");
+    expect(sql).toContain("create trigger apply_specialist_schedule_envelope");
+    expect(sql).toContain("after update of weekly_schedule, status, public_booking_enabled");
+    expect(sql).toContain("create trigger guard_public_booking_hold_schedule");
+    expect(sql).toContain("create trigger guard_public_appointment_schedule");
+    expect(sql).toContain("hashtextextended('specialist-schedule:' || new.specialist_id::text, 0)");
+    expect(sql).toContain("create function public.admin_save_specialist_schedule_v2");
+    expect(sql).toContain("current_specialist.schedule_version <> p_expected_version");
+    expect(sql).toContain("errcode = 'P0001', message = 'stale_specialist_schedule'");
+    expect(staleErrorSql).toContain("errcode = 'P0001', message = 'stale_specialist_schedule'");
+    expect(staleErrorSql).not.toContain("errcode = '40001'");
+    expect(deleteEnvelopeSql).toContain("if tg_op = 'DELETE' then return old");
+    expect(deleteEnvelopeSql).toContain("after delete on public.admin_specialists");
+    expect(sql).toContain("revoke all on function public.admin_save_specialist_schedule(uuid, uuid, jsonb)");
+    expect(sql).toContain("grant execute on function public.admin_save_specialist_schedule_v2");
+    expect(sql).not.toContain("09:00");
   });
 });

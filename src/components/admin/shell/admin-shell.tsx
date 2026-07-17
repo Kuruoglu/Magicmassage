@@ -66,14 +66,17 @@ import {
   CalendarWorkspace,
   classifyAppointmentAgainstSchedule,
   createCalendarWorkingSchedule,
+  createSpecialistWorkingSchedule,
   formatCalendarDay,
   getSofiaIsoDate,
+  hasScheduleEnvelope,
   hasAppointmentOverlap,
   isIsoDate,
   sortAppointments,
   type CalendarAppointmentFocus,
   type CalendarAppointmentSaveResult,
   type CalendarBlockSaveResult,
+  type SpecialistScheduleSaveResult,
 } from "@/components/admin/calendar";
 import { getAdminAuthorizationHeader, signOutAdminBrowserSession } from "@/lib/supabase/browser";
 import { AdminMobileHeader, AdminMobileNavigation } from "@/components/admin/mobile";
@@ -138,6 +141,7 @@ import {
   type ServiceStatus,
   type SettingsRecord,
   type SpecialistRecord,
+  type SpecialistScheduleDay,
   type StripeMode,
 } from "@/admin/domain";
 
@@ -251,8 +255,6 @@ type SettingsFormState = {
   rolesPolicy: string;
   stripeMode: StripeMode;
   timezone: string;
-  workingDays: string;
-  workingHours: string;
 };
 type AdminUserFormState = {
   accessNote: string;
@@ -983,8 +985,6 @@ function buildSettingsFormState(settings: SettingsRecord): SettingsFormState {
     rolesPolicy: settings.rolesPolicy,
     stripeMode: settings.stripeMode,
     timezone: settings.timezone,
-    workingDays: settings.workingDays,
-    workingHours: settings.workingHours,
   };
 }
 
@@ -2326,8 +2326,8 @@ function SettingsDialog({
       stripeMode: form.stripeMode,
       timezone: form.timezone.trim(),
       updatedAt: getSofiaIsoDate(),
-      workingDays: form.workingDays.trim(),
-      workingHours: form.workingHours.trim(),
+      workingDays: settings.workingDays,
+      workingHours: settings.workingHours,
     });
   }
 
@@ -2383,14 +2383,10 @@ function SettingsDialog({
               Часовой пояс
               <input onChange={(event) => updateForm("timezone", event.target.value)} type="text" value={form.timezone} />
             </label>
-            <label>
-              Рабочие дни
-              <input onChange={(event) => updateForm("workingDays", event.target.value)} type="text" value={form.workingDays} />
-            </label>
-            <label>
-              Рабочие часы
-              <input onChange={(event) => updateForm("workingHours", event.target.value)} type="text" value={form.workingHours} />
-            </label>
+            <div className="admin-form-readonly admin-form-wide" aria-label="График специалистов">
+              <span>График специалистов</span>
+              <strong>Изменяется в календаре отдельно для каждого специалиста</strong>
+            </div>
             <fieldset className="admin-settings-choice">
               <legend>Перерыв между сеансами</legend>
               <div className="admin-filter-row" aria-label="Перерыв между сеансами">
@@ -5069,12 +5065,8 @@ function SettingsWorkspace({
         {selectedGroup.id === "booking" ? (
           <dl className="admin-detail-list">
             <div>
-              <dt>Рабочие дни</dt>
-              <dd>{settings.workingDays}</dd>
-            </div>
-            <div>
-              <dt>Рабочие часы</dt>
-              <dd>{settings.workingHours}</dd>
+              <dt>Рабочий график</dt>
+              <dd>Индивидуально для каждого специалиста; редактируется в календаре.</dd>
             </div>
             <div>
               <dt>Перерыв между сеансами</dt>
@@ -5531,6 +5523,7 @@ function Workspace({
   onSaveMedia,
   onSavePrice,
   onSaveService,
+  onSaveSpecialistSchedule,
   onSaveSettings,
   onUpdateCertificateStatus,
   prices,
@@ -5606,6 +5599,10 @@ function Workspace({
   onSaveMedia: (media: MediaRecord, originalId?: string, cleanupPath?: string) => Promise<void>;
   onSavePrice: (price: PriceRecord, originalId?: string) => void;
   onSaveService: (service: ServiceRecord, originalSlug?: string) => void;
+  onSaveSpecialistSchedule: (
+    specialistId: string,
+    weeklySchedule: SpecialistScheduleDay[],
+  ) => Promise<SpecialistScheduleSaveResult>;
   onSaveSettings: (settings: SettingsRecord) => void;
   onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
   prices: PriceRecord[];
@@ -5801,6 +5798,7 @@ function Workspace({
         onEditAppointment={onEditAppointment}
         onEditCalendarBlock={onEditCalendarBlock}
         onSaveAppointment={onSaveAppointment}
+        onSaveSpecialistSchedule={onSaveSpecialistSchedule}
         query={query}
         role={role}
         selectedAppointmentFocus={calendarAppointmentFocus}
@@ -5846,7 +5844,7 @@ export function AdminShell({
   const canUsePrimaryAction = activeSection !== "calendar" || canManageAppointments;
   const initialRecords = useMemo(() => buildInitialAdminRecords(initialData), [initialData]);
   const initialFinanceRows = useMemo(() => buildInitialFinanceRows(initialData), [initialData]);
-  const specialists = initialRecords.specialists ?? [];
+  const [specialists, setSpecialists] = useState<SpecialistRecord[]>(() => initialRecords.specialists ?? []);
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
@@ -6037,6 +6035,72 @@ export function AdminShell({
     }
   }
 
+  async function saveSpecialistSchedule(
+    specialistId: string,
+    weeklySchedule: SpecialistScheduleDay[],
+  ): Promise<SpecialistScheduleSaveResult> {
+    const specialist = specialists.find((candidate) => candidate.id === specialistId);
+    const expectedVersion = specialist?.scheduleVersion ?? 1;
+
+    if (!isSupabaseBacked) {
+      setSpecialists((current) => current.map((candidate) => (
+        candidate.id === specialistId
+          ? { ...candidate, scheduleVersion: expectedVersion + 1, weeklySchedule }
+          : candidate
+      )));
+      showPersistenceStatus("График сохранён в демо-режиме.", { autoDismiss: true });
+      return { ok: true };
+    }
+
+    try {
+      const response = await fetch("/api/admin/specialist-schedules", {
+        body: JSON.stringify({ expectedVersion, specialistId, weeklySchedule }),
+        headers: await getAdminApiHeaders(),
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            specialist?: {
+              id: string;
+              scheduleVersion: number;
+              weeklySchedule: SpecialistScheduleDay[];
+            };
+            workingDays?: string;
+            workingHours?: string;
+          }
+        | null;
+
+      if (!response.ok || !result?.specialist) {
+        return {
+          message: result?.error ?? "Не удалось сохранить график работы.",
+          ok: false,
+        };
+      }
+
+      setSpecialists((current) => current.map((specialist) => (
+        specialist.id === result.specialist?.id
+          ? {
+              ...specialist,
+              scheduleVersion: result.specialist.scheduleVersion,
+              weeklySchedule: result.specialist.weeklySchedule,
+            }
+          : specialist
+      )));
+      if (hasScheduleEnvelope(result)) {
+        setSettings((current) => ({
+          ...current,
+          workingDays: result.workingDays as string,
+          workingHours: result.workingHours as string,
+        }));
+      }
+      showPersistenceStatus("График сохранён. Онлайн-запись обновлена.", { autoDismiss: true });
+      return { ok: true };
+    } catch {
+      return { message: "Сервер недоступен. Повторите попытку.", ok: false };
+    }
+  }
+
   async function handleLogout() {
     await signOutAdminBrowserSession();
     await fetch("/api/admin/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -6139,9 +6203,15 @@ export function AdminShell({
           start: candidate.time,
         })),
     );
+    const appointmentSpecialist = specialists.find(
+      (specialist) => specialist.id === appointment.specialistId,
+    );
+    const appointmentSchedule = appointmentSpecialist
+      ? createSpecialistWorkingSchedule(appointmentSpecialist, settings.timezone)
+      : createCalendarWorkingSchedule(settings);
     const scheduleClassification = classifyAppointmentAgainstSchedule(
       appointmentTime,
-      createCalendarWorkingSchedule(settings),
+      appointmentSchedule,
     );
 
     const result = await persistAdminRecord({
@@ -6992,6 +7062,7 @@ export function AdminShell({
           onSaveMedia={saveMediaRecord}
           onSavePrice={savePriceRecord}
           onSaveService={saveServiceRecord}
+          onSaveSpecialistSchedule={saveSpecialistSchedule}
           onSaveSettings={saveSettingsRecord}
           onUpdateCertificateStatus={updateCertificateStatus}
           prices={prices}

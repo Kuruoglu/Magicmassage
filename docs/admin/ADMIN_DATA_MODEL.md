@@ -8,7 +8,8 @@ server-side validation, and auditability.
 - `admin_profiles`: user id, email, display name, role, status, optional linked
   specialist id, timestamps.
 - `admin_specialists`: business specialist identity, Auth link, public status,
-  public daily limit, display order, and calendar color.
+  public daily limit, display order, calendar color, and a validated seven-day
+  weekly schedule with an optimistic version for concurrent admin edits.
 - `admin_specialist_services`: services eligible for each specialist.
 - `admin_clients`: client profile, contact preferences, language, notes, tags.
 - `admin_appointments`: date/time, client link, service, status, internal note.
@@ -28,6 +29,9 @@ server-side validation, and auditability.
 - Reject unexpected payload keys at API boundaries.
 - Every appointment, calendar block, and public hold has a non-null specialist.
 - Active appointment overlap and public capacity are calculated per specialist.
+- Public availability, hold creation, and hold restoration enforce the selected
+  specialist's working day and start/end times. New specialist schedules inherit
+  the current booking settings; no fixed start hour is introduced by the schema.
 - `admin_site_settings.public_booking_daily_limit` is canonical and is mirrored
   to active specialists; the allowed owner-configured range is 1 to 8.
 - New services are assigned to all active publicly bookable specialists under

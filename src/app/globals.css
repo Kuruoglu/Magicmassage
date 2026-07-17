@@ -3320,6 +3320,7 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+  margin-top: 15px;
 }
 
 .admin-data-table {
@@ -4568,6 +4569,10 @@ button.admin-calendar-item[aria-pressed="true"] {
   margin-bottom: 14px;
 }
 
+.admin-day-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .admin-day-summary-card,
 .admin-appointment-summary-card {
   background: rgba(124, 77, 161, 0.06);
@@ -4720,11 +4725,138 @@ body.admin-calendar-resize-active {
   min-width: 0;
 }
 
+.admin-calendar-off-hours {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.admin-calendar-off-hours > span {
+  background: rgba(49, 43, 54, 0.055);
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+.admin-calendar-off-hours.is-closed {
+  align-items: center;
+  background: rgba(49, 43, 54, 0.07);
+  color: var(--admin-muted);
+  display: flex;
+  font-size: 0.74rem;
+  font-weight: 800;
+  justify-content: center;
+  text-transform: uppercase;
+}
+
+.admin-calendar-off-hours.is-closed > span {
+  background: transparent;
+  position: static;
+}
+
+.admin-calendar-hour-lines {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
 .admin-calendar-hour-lines span {
   border-top: 1px solid rgba(124, 77, 161, 0.12);
   left: 0;
   position: absolute;
   right: 0;
+}
+
+.admin-action-dialog.admin-specialist-schedule-dialog {
+  max-width: 720px;
+  width: min(720px, calc(100vw - 32px));
+}
+
+.admin-specialist-schedule-head,
+.admin-specialist-schedule-day {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) 120px 120px 84px;
+}
+
+.admin-specialist-schedule-head {
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0 2px;
+  text-transform: uppercase;
+}
+
+.admin-specialist-schedule-days {
+  border-bottom: 1px solid var(--admin-border);
+  border-top: 1px solid var(--admin-border);
+  display: grid;
+}
+
+.admin-specialist-schedule-day {
+  min-height: 58px;
+  padding: 8px 2px;
+}
+
+.admin-specialist-schedule-day + .admin-specialist-schedule-day {
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-specialist-schedule-day label {
+  min-width: 0;
+}
+
+.admin-specialist-schedule-input-label {
+  display: none;
+}
+
+.admin-specialist-schedule-day input[type="time"] {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-specialist-schedule-day .admin-checkbox-field input[type="checkbox"] {
+  flex: 0 0 20px;
+  height: 20px;
+  max-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  width: 20px;
+}
+
+.admin-specialist-schedule-day .admin-checkbox-field span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-specialist-schedule-closed {
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.admin-specialist-schedule-copy {
+  justify-self: start;
+}
+
+.admin-appointment-feed-statuses {
+  align-items: flex-end;
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+}
+
+.admin-calendar-outside-schedule-badge {
+  background: #fff2cf;
+  border: 1px solid #e3c26f;
+  border-radius: 999px;
+  color: #80570a;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 3px 7px;
 }
 
 .admin-day-time-grid {
@@ -6108,6 +6240,42 @@ body.admin-drawer-open {
 
   .admin-route-context-actions {
     justify-content: flex-start;
+  }
+
+  .admin-route-context-actions .admin-secondary-button {
+    width: 100%;
+  }
+
+  .admin-action-dialog.admin-specialist-schedule-dialog {
+    max-width: calc(100vw - 16px);
+    width: min(100%, calc(100vw - 16px));
+  }
+
+  .admin-specialist-schedule-head {
+    display: none;
+  }
+
+  .admin-specialist-schedule-day {
+    align-items: end;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .admin-specialist-schedule-day > .admin-checkbox-field,
+  .admin-specialist-schedule-closed {
+    grid-column: 1 / -1;
+  }
+
+  .admin-specialist-schedule-day > .admin-checkbox-field {
+    min-height: 44px;
+  }
+
+  .admin-specialist-schedule-input-label {
+    color: var(--admin-muted);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+    text-transform: uppercase;
   }
 
   .admin-topbar {

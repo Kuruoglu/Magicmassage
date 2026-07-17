@@ -1418,4 +1418,42 @@ describe("admin Supabase repository", () => {
 
     await expect(repository.listClients()).rejects.toThrow("admin_clients: permission denied");
   });
+
+  it("selects and maps each specialist weekly schedule", async () => {
+    const weeklySchedule = Array.from({ length: 7 }, (_, index) => ({
+      endsAt: "19:00",
+      isWorking: index < 6,
+      startsAt: "10:00",
+      weekday: index + 1,
+    }));
+    const client = new FakeSupabaseClient({
+      admin_specialists: [{
+        color: "#3f7d6c",
+        display_name: "Natali",
+        display_order: 0,
+        id: "00000000-0000-4000-8000-000000000001",
+        public_booking_enabled: true,
+        schedule_version: 3,
+        status: "active",
+        weekly_schedule: weeklySchedule,
+      }],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    await expect(repository.listSpecialists()).resolves.toEqual([{
+      color: "#3f7d6c",
+      displayName: "Natali",
+      displayOrder: 0,
+      id: "00000000-0000-4000-8000-000000000001",
+      publicBookingEnabled: true,
+      scheduleVersion: 3,
+      status: "active",
+      weeklySchedule,
+    }]);
+    expect(client.operations[0]).toMatchObject({
+      columns: expect.stringMatching(/schedule_version[\s\S]*weekly_schedule/),
+      order: { ascending: true, column: "display_order" },
+      table: "admin_specialists",
+    });
+  });
 });

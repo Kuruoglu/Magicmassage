@@ -42,6 +42,13 @@ const clients: ClientRecord[] = [
   },
 ];
 
+const weeklySchedule = Array.from({ length: 7 }, (_, index) => ({
+  endsAt: "19:00",
+  isWorking: index < 6,
+  startsAt: "10:00",
+  weekday: index + 1,
+}));
+
 const specialists: SpecialistRecord[] = [
   {
     color: "#7c4d9d",
@@ -49,7 +56,9 @@ const specialists: SpecialistRecord[] = [
     displayOrder: 1,
     id: "specialist-natali",
     publicBookingEnabled: true,
+    scheduleVersion: 1,
     status: "active",
+    weeklySchedule,
   },
   {
     color: "#2f7d6d",
@@ -57,7 +66,9 @@ const specialists: SpecialistRecord[] = [
     displayOrder: 2,
     id: "specialist-yana",
     publicBookingEnabled: true,
+    scheduleVersion: 1,
     status: "active",
+    weeklySchedule,
   },
 ];
 
@@ -127,6 +138,7 @@ function renderCalendar({
   onEditCalendarBlock = vi.fn(),
   onCreateWalkIn = vi.fn(),
   onSaveAppointment = vi.fn(async () => ({ ok: true }) as CalendarAppointmentSaveResult),
+  onSaveSpecialistSchedule,
   query = "",
   role = "owner",
   scheduleSettings = siteSettings,
@@ -149,6 +161,7 @@ function renderCalendar({
       ? T
       : never,
   ) => Promise<CalendarAppointmentSaveResult>;
+  onSaveSpecialistSchedule?: Parameters<typeof CalendarWorkspace>[0]["onSaveSpecialistSchedule"];
   role?: AdminRoleId;
   query?: string;
   scheduleSettings?: typeof siteSettings;
@@ -172,6 +185,7 @@ function renderCalendar({
       onEditAppointment={vi.fn()}
       onEditCalendarBlock={onEditCalendarBlock}
       onSaveAppointment={onSaveAppointment}
+      onSaveSpecialistSchedule={onSaveSpecialistSchedule}
       query={query}
       role={role}
       selectedCalendarDate="2026-07-06"
@@ -562,10 +576,101 @@ describe("CalendarWorkspace", () => {
     expect(screen.queryByText("Мария Иванова")).not.toBeInTheDocument();
   });
 
-  it("marks appointments outside the saved site working hours", () => {
+  it("counts only specialists who work on the selected day in day and month capacity", async () => {
+    const user = userEvent.setup();
+    renderCalendar({
+      calendarAppointments: [],
+      specialistRecords: [
+        specialists[0],
+        {
+          ...specialists[1],
+          weeklySchedule: weeklySchedule.map((day) => (
+            day.weekday === 1 ? { ...day, isWorking: false } : day
+          )),
+        },
+      ],
+    });
+
+    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
+    expect(screen.queryByText("8 свободных слотов")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    expect(screen.getByRole("button", { name: /6 июля, 0 записей, 4 свободных слота/ })).toBeInTheDocument();
+  });
+
+  it("keeps another working specialist available when one calendar is blocked all day", () => {
+    renderCalendar({
+      calendarAppointments: [],
+      calendarBlocks: [fullDayCalendarBlock],
+      specialistRecords: specialists,
+    });
+
+    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
+  });
+
+  it("does not let public-disabled appointments consume or close another specialist capacity", async () => {
+    const user = userEvent.setup();
+    renderCalendar({
+      calendarAppointments: Array.from({ length: 5 }, (_, index) => ({
+          ...appointments[0],
+          client: `Клиент Яны ${index + 1}`,
+          id: `appointment-yana-disabled-${index + 1}`,
+          specialistId: specialists[1].id,
+          specialistName: specialists[1].displayName,
+          time: `${String(10 + index).padStart(2, "0")}:00`,
+        })),
+      specialistRecords: [
+        specialists[0],
+        { ...specialists[1], publicBookingEnabled: false },
+      ],
+    });
+
+    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
+    expect(screen.queryByText("8 свободных слотов")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Онлайн-запись на этот день закрыта/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    expect(screen.getByRole("button", { name: /6 июля, 5 записей, 4 свободных слота/ })).toBeInTheDocument();
+  });
+
+  it("uses the compatibility schedule only when no specialist records exist", () => {
+    renderCalendar({ calendarAppointments: [], specialistRecords: [] });
+
+    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
+  });
+
+  it("applies daily limits per specialist before aggregating all-specialist availability", async () => {
+    const user = userEvent.setup();
+    renderCalendar({
+      calendarAppointments: Array.from({ length: 5 }, (_, index) => ({
+        ...appointments[0],
+        client: `Ручная запись ${index + 1}`,
+        id: `appointment-natali-overflow-${index + 1}`,
+        time: `${String(10 + index).padStart(2, "0")}:00`,
+      })),
+      specialistRecords: specialists,
+    });
+
+    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("1 запись добавлена вручную");
+    expect(screen.getByRole("status")).toHaveTextContent("Онлайн доступно: 4 свободных слота");
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    expect(screen.getByRole("button", {
+      name: /6 июля, 5 записей, 4 свободных слота; \+1 вручную/,
+    })).toBeInTheDocument();
+  });
+
+  it("marks appointments outside the assigned specialist working hours", () => {
     renderCalendar({
       calendarAppointments: [appointments[0]],
-      scheduleSettings: { ...siteSettings, workingHours: "12:00-18:00" },
+      specialistRecords: [{
+        ...specialists[0],
+        weeklySchedule: weeklySchedule.map((day) => ({
+          ...day,
+          startsAt: "12:00",
+        })),
+      }],
     });
 
     const appointmentBlock = screen.getByText(appointments[0].client).closest(".admin-timed-appointment");
@@ -573,15 +678,47 @@ describe("CalendarWorkspace", () => {
     expect(appointmentBlock).toHaveTextContent("Вне рабочих часов");
   });
 
-  it("marks appointments on a saved non-working day", () => {
+  it("marks appointments on a specialist non-working day", () => {
     renderCalendar({
       calendarAppointments: [appointments[0]],
-      scheduleSettings: { ...siteSettings, workingDays: "Вт-Сб" },
+      specialistRecords: [{
+        ...specialists[0],
+        weeklySchedule: weeklySchedule.map((day) => (
+          day.weekday === 1 ? { ...day, isWorking: false } : day
+        )),
+      }],
     });
 
     expect(screen.getByText(appointments[0].client).closest(".admin-timed-appointment")).toHaveClass(
       "is-outside-hours",
     );
+  });
+
+  it("lets an owner edit the selected specialist schedule from the calendar", async () => {
+    const user = userEvent.setup();
+    const onSaveSpecialistSchedule = vi.fn().mockResolvedValue({ ok: true });
+    renderCalendar({
+      onSaveSpecialistSchedule,
+      specialistRecords: specialists,
+    });
+
+    await user.selectOptions(
+      screen.getByLabelText("Показать календарь специалиста"),
+      "specialist-natali",
+    );
+    expect(screen.getByText("На выбранную дату: 10:00 - 19:00")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "График работы" }));
+    fireEvent.change(screen.getByLabelText("Начало: Понедельник"), {
+      target: { value: "09:30" },
+    });
+    await user.click(screen.getByRole("button", { name: "Сохранить график" }));
+
+    await waitFor(() => expect(onSaveSpecialistSchedule).toHaveBeenCalledWith(
+      "specialist-natali",
+      expect.arrayContaining([
+        expect.objectContaining({ startsAt: "09:30", weekday: 1 }),
+      ]),
+    ));
   });
 
   it("requires an explicit authorized override before saving an overlapping resize", async () => {

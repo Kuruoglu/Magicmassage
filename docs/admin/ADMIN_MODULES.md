@@ -10,7 +10,8 @@
 - Certificates: paid/manual certificates, PDF/email status, resend, redeem.
 
 Owner and administrator calendars can filter by specialist and assign manual
-appointments or personal blocks. A specialist receives only "My calendar",
+appointments or personal blocks. They also manage each specialist's weekly
+schedule, which controls public booking availability. A specialist receives only "My calendar",
 cannot change assigned appointments, and cannot open the Clients or Certificates
 modules. Client contacts and notes are never sent to the specialist. The
 "Клиент сейчас" action creates a contact-free block in the specialist's own

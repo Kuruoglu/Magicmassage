@@ -5,6 +5,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CalendarBlockDialog } from "./CalendarBlockDialog";
 
+const weeklySchedule = Array.from({ length: 7 }, (_, index) => ({
+  endsAt: "19:00",
+  isWorking: index < 6,
+  startsAt: "10:00",
+  weekday: index + 1,
+}));
+
 const specialists = [
   {
     color: "#7c4d9d",
@@ -12,7 +19,9 @@ const specialists = [
     displayOrder: 1,
     id: "specialist-natali",
     publicBookingEnabled: true,
+    scheduleVersion: 1,
     status: "active" as const,
+    weeklySchedule,
   },
   {
     color: "#2f7d6d",
@@ -20,7 +29,9 @@ const specialists = [
     displayOrder: 2,
     id: "specialist-yana",
     publicBookingEnabled: true,
+    scheduleVersion: 1,
     status: "active" as const,
+    weeklySchedule,
   },
 ];
 

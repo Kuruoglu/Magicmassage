@@ -2,6 +2,7 @@ import type { DragEvent, ReactNode } from "react";
 
 import type { Appointment } from "@/admin/domain";
 
+import type { CalendarWorkingHours } from "./conflicts";
 import { appointmentCountLabel, formatCalendarDay, freeSlotLabel } from "./format";
 import { TimeGrid, type AppointmentOverlapLayout } from "./TimeGrid";
 
@@ -19,7 +20,9 @@ type DayCalendarProps = {
     layout?: AppointmentOverlapLayout,
     isDragPreview?: boolean,
   ) => ReactNode;
+  scheduleLabel?: string;
   selectedDate: string;
+  workingHours?: CalendarWorkingHours | null;
 };
 
 export function DayCalendar({
@@ -31,7 +34,9 @@ export function DayCalendar({
   onDragOverAppointment,
   onDropAppointment,
   renderAppointment,
+  scheduleLabel,
   selectedDate,
+  workingHours,
 }: DayCalendarProps) {
   return (
     <>
@@ -48,6 +53,12 @@ export function DayCalendar({
           <span>Буфер</span>
           <strong>{bookingBufferMinutes} минут</strong>
         </div>
+        {scheduleLabel ? (
+          <div className="admin-day-summary-card">
+            <span>График</span>
+            <strong>{scheduleLabel}</strong>
+          </div>
+        ) : null}
       </div>
       <TimeGrid
         dragPreview={dragPreview}
@@ -56,6 +67,7 @@ export function DayCalendar({
             appointments,
             ariaLabel: `Расписание ${formatCalendarDay(selectedDate)}`,
             date: selectedDate,
+            workingHours,
           },
         ]}
         isInteractionLocked={isInteractionLocked}

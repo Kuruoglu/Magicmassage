@@ -3,6 +3,7 @@ import { useEffect, useRef, type CSSProperties, type DragEvent, type ReactNode }
 import type { Appointment } from "@/admin/domain";
 import { appointmentKey } from "@/components/admin/lib/links";
 
+import type { CalendarWorkingHours } from "./conflicts";
 import {
   CALENDAR_DAY_END,
   CALENDAR_DAY_START,
@@ -100,6 +101,7 @@ export type TimeGridDay = {
   ariaLabel: string;
   className?: string;
   date: string;
+  workingHours?: CalendarWorkingHours | null;
 };
 
 type TimeGridProps = {
@@ -145,6 +147,17 @@ function TimeColumn({
   renderAppointment: TimeGridProps["renderAppointment"];
 }) {
   const laidOutAppointments = layoutDayAppointments(day.appointments);
+  const dayStartMinutes = timeToMinutes(CALENDAR_DAY_START);
+  const dayEndMinutes = timeToMinutes(CALENDAR_DAY_END);
+  const workingStartMinutes = day.workingHours
+    ? Math.max(dayStartMinutes, timeToMinutes(day.workingHours.start))
+    : dayStartMinutes;
+  const workingEndMinutes = day.workingHours
+    ? Math.min(dayEndMinutes, timeToMinutes(day.workingHours.end))
+    : dayEndMinutes;
+  const beforeHeight = ((workingStartMinutes - dayStartMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
+  const afterTop = ((workingEndMinutes - dayStartMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
+  const afterHeight = ((dayEndMinutes - workingEndMinutes) / 60) * CALENDAR_HOUR_HEIGHT;
 
   return (
     <section
@@ -154,6 +167,16 @@ function TimeColumn({
       onDrop={(event) => onDropAppointment(event, day.date)}
       role="list"
     >
+      {day.workingHours === null ? (
+        <div className="admin-calendar-off-hours is-closed" aria-hidden="true">
+          <span>Выходной</span>
+        </div>
+      ) : day.workingHours ? (
+        <div className="admin-calendar-off-hours" aria-hidden="true">
+          {beforeHeight > 0 ? <span style={{ height: `${beforeHeight}px`, top: 0 }} /> : null}
+          {afterHeight > 0 ? <span style={{ height: `${afterHeight}px`, top: `${afterTop}px` }} /> : null}
+        </div>
+      ) : null}
       <div className="admin-calendar-hour-lines" aria-hidden="true">
         {CALENDAR_HOUR_LABELS.map((hour) => (
           <span

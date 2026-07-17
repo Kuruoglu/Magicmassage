@@ -16,6 +16,9 @@ The admin UI is a quiet operational CRM, not a marketing page.
 - Normal `Create appointment` starts with an empty client field and uses search
   or autocomplete.
 - Month cells summarize counts and availability.
+- Owners and administrators edit the selected specialist's weekly working days
+  and half-hour start/end times from the calendar. Day and week views distinguish
+  working time, off-hours, and days off.
 - Large selectors should be searchable.
 - Mode-specific views should show only actions relevant to that mode and role.
 

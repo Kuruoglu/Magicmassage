@@ -46,6 +46,13 @@ const clients: ClientRecord[] = [
   },
 ];
 
+const weeklySchedule = Array.from({ length: 7 }, (_, index) => ({
+  endsAt: "19:00",
+  isWorking: index < 6,
+  startsAt: "10:00",
+  weekday: index + 1,
+}));
+
 const specialists: SpecialistRecord[] = [
   {
     color: "#7c4d9d",
@@ -53,7 +60,9 @@ const specialists: SpecialistRecord[] = [
     displayOrder: 1,
     id: "specialist-natali",
     publicBookingEnabled: true,
+    scheduleVersion: 1,
     status: "active",
+    weeklySchedule,
   },
   {
     color: "#2f7d6d",
@@ -61,7 +70,9 @@ const specialists: SpecialistRecord[] = [
     displayOrder: 2,
     id: "specialist-yana",
     publicBookingEnabled: true,
+    scheduleVersion: 1,
     status: "active",
+    weeklySchedule,
   },
 ];
 
@@ -195,14 +206,23 @@ describe("CalendarAppointmentDialog", () => {
     const user = userEvent.setup();
     const { onSave } = renderAppointmentDialog({
       prefillClient: clients[0],
-      siteSettings: { ...siteSettings, workingHours: "12:00-18:00" },
+      specialists: specialists.map((specialist) => specialist.id === "specialist-natali"
+        ? {
+            ...specialist,
+            weeklySchedule: specialist.weeklySchedule.map((day) => ({
+              ...day,
+              endsAt: "18:00",
+              startsAt: "12:00",
+            })),
+          }
+        : specialist),
     });
     const dialog = screen.getByRole("dialog", { name: "Новая запись" });
 
     fireEvent.change(within(dialog).getByLabelText("Время"), { target: { value: "11:00" } });
 
     expect(within(dialog).getByRole("status")).toHaveTextContent(
-      "Время находится вне рабочих часов согласно настройкам сайта",
+      "Время находится вне графика специалиста",
     );
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
     expect(onSave).toHaveBeenCalledTimes(1);
@@ -217,7 +237,7 @@ describe("CalendarAppointmentDialog", () => {
     const dialog = screen.getByRole("dialog", { name: "Новая запись" });
 
     expect(within(dialog).getByRole("status")).toHaveTextContent(
-      "Выбран нерабочий день согласно настройкам сайта. Сохранение разрешено.",
+      "Выбран нерабочий день по графику специалиста. Сохранение разрешено.",
     );
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
 

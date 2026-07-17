@@ -13,6 +13,7 @@ import {
   type CalendarBlock,
   type ClientRecord,
   type SpecialistRecord,
+  type SpecialistScheduleDay,
 } from "@/admin/domain";
 import type { AdminAuditAction } from "@/admin/persistence";
 import { matchesSearch } from "@/components/admin/lib/filters";
@@ -58,9 +59,16 @@ import type { AppointmentOverlapLayout } from "./TimeGrid";
 import {
   classifyAppointmentAgainstSchedule,
   createCalendarWorkingSchedule,
+  createSpecialistWorkingSchedule,
   getCalendarIsoDate,
+  getIsoWeekday,
+  getSpecialistScheduleDay,
   type CalendarScheduleSettings,
 } from "./schedule";
+import {
+  SpecialistScheduleDialog,
+  type SpecialistScheduleSaveResult,
+} from "./SpecialistScheduleDialog";
 import {
   CALENDAR_SNAP_MINUTES,
   MIN_APPOINTMENT_DURATION_MINUTES,
@@ -116,6 +124,10 @@ export type CalendarWorkspaceProps = {
     action?: AdminAuditAction,
     originalAppointment?: Appointment,
   ) => Promise<CalendarAppointmentSaveResult>;
+  onSaveSpecialistSchedule?: (
+    specialistId: string,
+    weeklySchedule: SpecialistScheduleDay[],
+  ) => Promise<SpecialistScheduleSaveResult>;
   query: string;
   role: AdminRoleId;
   selectedAppointmentFocus?: CalendarAppointmentFocus;
@@ -146,8 +158,9 @@ function monthAvailabilityLabels(
   blocks: CalendarBlock[],
   freeCount: number,
   manualOverflow: number,
+  fullyUnavailable: boolean,
 ) {
-  if (blocks.some(isFullDayCalendarBlock)) {
+  if (fullyUnavailable) {
     return { compact: "Недоступно", full: "Недоступно весь день" };
   }
 
@@ -155,11 +168,14 @@ function monthAvailabilityLabels(
     if (blocks.length > 0) {
       return {
         compact: "Ограничено",
-        full: `Ограничено: ${calendarBlockCountLabel(blocks.length)}; +${manualOverflow} вручную`,
+        full: `Ограничено: ${calendarBlockCountLabel(blocks.length)}; ${freeSlotLabel(freeCount)}; +${manualOverflow} вручную`,
       };
     }
 
-    return { compact: `+${manualOverflow} ручн.`, full: `+${manualOverflow} вручную` };
+    return {
+      compact: `${compactFreeSlotLabel(freeCount)} · +${manualOverflow} ручн.`,
+      full: `${freeSlotLabel(freeCount)}; +${manualOverflow} вручную`,
+    };
   }
 
   if (blocks.length > 0) {
@@ -274,6 +290,7 @@ export function CalendarWorkspace({
   onEditAppointment,
   onEditCalendarBlock,
   onSaveAppointment,
+  onSaveSpecialistSchedule,
   query,
   role,
   selectedAppointmentFocus,
@@ -294,6 +311,10 @@ export function CalendarWorkspace({
       .filter((specialist) => specialist.status === "active")
       .sort((first, second) => first.displayOrder - second.displayOrder),
     [specialists],
+  );
+  const publicBookableSpecialists = useMemo(
+    () => activeSpecialists.filter((specialist) => specialist.publicBookingEnabled),
+    [activeSpecialists],
   );
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(
     role === "specialist" ? (currentSpecialistId ?? activeSpecialists[0]?.id ?? "all") : "all",
@@ -356,6 +377,7 @@ export function CalendarWorkspace({
   );
   const [pendingAppointmentKeys, setPendingAppointmentKeys] = useState<Set<string>>(() => new Set());
   const [calendarError, setCalendarError] = useState("");
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [pendingConflict, setPendingConflict] = useState<PendingCalendarConflict | null>(null);
   const [overlapOverrideReason, setOverlapOverrideReason] = useState("");
   const selectedDayAppointments = sortAppointments(
@@ -364,11 +386,6 @@ export function CalendarWorkspace({
   const selectedDayBlocks = specialistScopedBlocks
     .filter((block) => block.blockDate === selectedDate)
     .sort((first, second) => first.startsAt.localeCompare(second.startsAt));
-  const selectedDayCapacityCount = specialistScopedAppointments.filter(
-    (appointment) => appointment.date === selectedDate,
-  ).filter(
-    (appointment) => appointment.status !== "Отменена",
-  ).length;
   const listAppointments = sortAppointments(filteredAppointments);
   const visibleAppointments = mode === "day" ? selectedDayAppointments : listAppointments;
   const appointmentDetailPool = mode === "day" ? selectedDayAppointments : listAppointments;
@@ -389,12 +406,88 @@ export function CalendarWorkspace({
     date: addDays(weekStart, index),
     day: Number(addDays(weekStart, index).slice(-2)),
   }));
-  const specialistCapacity = effectiveSpecialistId === "all"
-    ? dailySlotCapacity * Math.max(activeSpecialists.length, 1)
-    : dailySlotCapacity;
-  const selectedDayFreeCount = selectedDayBlocks.some(isFullDayCalendarBlock)
-    ? 0
-    : freeSlotCount(selectedDayCapacityCount, specialistCapacity);
+  const selectedScheduleDay = getSpecialistScheduleDay(selectedSpecialist, selectedDate);
+  function specialistCapacityScopeForDate(date: string) {
+    const fullDayBlocks = calendarBlocks.filter(
+      (block) => block.blockDate === date && isFullDayCalendarBlock(block),
+    );
+
+    if (effectiveSpecialistId === "all") {
+      if (specialists.length === 0) {
+        const isWorkingDay = workingSchedule.workingDays.has(getIsoWeekday(date));
+        return {
+          capacity: isWorkingDay && fullDayBlocks.length === 0 ? dailySlotCapacity : 0,
+          eligibleSpecialistIds: null,
+        };
+      }
+      if (fullDayBlocks.some((block) => !block.specialistId)) {
+        return { capacity: 0, eligibleSpecialistIds: new Set<string>() };
+      }
+      const eligibleSpecialistIds = new Set(publicBookableSpecialists.filter((specialist) => {
+        const scheduleDay = getSpecialistScheduleDay(specialist, date);
+        const isWorking = scheduleDay?.isWorking
+          ?? workingSchedule.workingDays.has(getIsoWeekday(date));
+        return isWorking
+          && !fullDayBlocks.some((block) => block.specialistId === specialist.id);
+      }).map((specialist) => specialist.id));
+      return {
+        capacity: dailySlotCapacity * eligibleSpecialistIds.size,
+        eligibleSpecialistIds,
+      };
+    }
+
+    if (
+      !selectedSpecialist?.publicBookingEnabled
+      || fullDayBlocks.some((block) => !block.specialistId)
+    ) {
+      return { capacity: 0, eligibleSpecialistIds: new Set<string>() };
+    }
+    const scheduleDay = getSpecialistScheduleDay(selectedSpecialist, date);
+    const isSelectedSpecialistWorking = scheduleDay?.isWorking
+      ?? workingSchedule.workingDays.has(getIsoWeekday(date));
+    const isAvailable = isSelectedSpecialistWorking
+      && !fullDayBlocks.some((block) => block.specialistId === effectiveSpecialistId);
+    return {
+      capacity: isAvailable ? dailySlotCapacity : 0,
+      eligibleSpecialistIds: isAvailable
+        ? new Set([effectiveSpecialistId])
+        : new Set<string>(),
+    };
+  }
+  function onlineCapacityMetricsForDate(date: string) {
+    const scope = specialistCapacityScopeForDate(date);
+    const appointmentsOnDate = specialistScopedAppointments.filter(
+      (appointment) => appointment.date === date && appointment.status !== "Отменена",
+    );
+
+    if (scope.eligibleSpecialistIds === null) {
+      const appointmentCount = appointmentsOnDate.length;
+      return {
+        appointmentCount,
+        capacity: scope.capacity,
+        freeCount: freeSlotCount(appointmentCount, scope.capacity),
+        manualOverflow: manualAppointmentOverflow(appointmentCount, scope.capacity),
+      };
+    }
+
+    let appointmentCount = 0;
+    let freeCount = 0;
+    let manualOverflow = 0;
+    for (const specialistId of scope.eligibleSpecialistIds) {
+      const specialistAppointmentCount = appointmentsOnDate.filter(
+        (appointment) => appointment.specialistId === specialistId,
+      ).length;
+      appointmentCount += specialistAppointmentCount;
+      freeCount += freeSlotCount(specialistAppointmentCount, dailySlotCapacity);
+      manualOverflow += manualAppointmentOverflow(specialistAppointmentCount, dailySlotCapacity);
+    }
+
+    return { appointmentCount, capacity: scope.capacity, freeCount, manualOverflow };
+  }
+  const selectedDayCapacityMetrics = onlineCapacityMetricsForDate(selectedDate);
+  const selectedDayCapacity = selectedDayCapacityMetrics.capacity;
+  const selectedDayOnlineAppointmentCount = selectedDayCapacityMetrics.appointmentCount;
+  const selectedDayFreeCount = selectedDayCapacityMetrics.freeCount;
 
   useEffect(() => {
     if (!resizingAppointmentKey) return;
@@ -402,12 +495,33 @@ export function CalendarWorkspace({
     document.body.classList.add("admin-calendar-resize-active");
     return () => document.body.classList.remove("admin-calendar-resize-active");
   }, [resizingAppointmentKey]);
-  const selectedDayManualOverflow = manualAppointmentOverflow(selectedDayCapacityCount, specialistCapacity);
+  const selectedDayManualOverflow = selectedDayCapacityMetrics.manualOverflow;
   const confirmedListCount = listAppointments.filter((appointment) => appointment.status === "Подтверждена").length;
   const attentionListCount = listAppointments.filter(
     (appointment) => appointment.status !== "Подтверждена" && appointment.status !== "Отменена",
   ).length;
   const canOverrideOverlap = role === "owner" || role === "administrator";
+  const selectedWorkingHours = selectedScheduleDay
+    ? (selectedScheduleDay.isWorking
+        ? { end: selectedScheduleDay.endsAt, start: selectedScheduleDay.startsAt }
+        : null)
+    : undefined;
+  const selectedScheduleLabel = selectedScheduleDay
+    ? (selectedScheduleDay.isWorking
+        ? `${selectedScheduleDay.startsAt} - ${selectedScheduleDay.endsAt}`
+        : "Выходной")
+    : undefined;
+  const weekWorkingHoursByDate = Object.fromEntries(
+    weekDays.map((day) => {
+      const scheduleDay = getSpecialistScheduleDay(selectedSpecialist, day.date);
+      const hours = scheduleDay
+        ? (scheduleDay.isWorking
+            ? { end: scheduleDay.endsAt, start: scheduleDay.startsAt }
+            : null)
+        : undefined;
+      return [day.date, hours];
+    }),
+  );
 
   useEffect(() => {
     const targets =
@@ -489,6 +603,13 @@ export function CalendarWorkspace({
   }
 
   function classificationFor(appointment: Appointment, ignoredAppointmentKey = appointmentKey(appointment)) {
+    const appointmentSpecialist = specialists.find(
+      (specialist) => specialist.id === appointment.specialistId,
+    );
+    const appointmentSchedule = appointmentSpecialist
+      ? createSpecialistWorkingSchedule(appointmentSpecialist, siteSettings.timezone)
+      : workingSchedule;
+
     if (!isSchedulingBlockingStatus(appointment.status)) {
       return {
         outsideWorkingHours: classifyAppointmentAgainstSchedule(
@@ -497,7 +618,7 @@ export function CalendarWorkspace({
             duration: appointment.durationMinutes ?? 60,
             start: appointment.time,
           },
-          workingSchedule,
+          appointmentSchedule,
         ).outsideWorkingHours,
         overlap: false,
       };
@@ -510,7 +631,7 @@ export function CalendarWorkspace({
     };
 
     return {
-      ...classifyAppointmentAgainstSchedule(candidate, workingSchedule),
+      ...classifyAppointmentAgainstSchedule(candidate, appointmentSchedule),
       overlap: hasAppointmentOverlap(
         { ...candidate, specialistId: appointment.specialistId },
         specialistScopedAppointments
@@ -833,6 +954,14 @@ export function CalendarWorkspace({
                 ))}
               </select>
             </label>
+            {selectedSpecialist && onSaveSpecialistSchedule ? (
+              <div className="admin-route-context-actions">
+                <span>{selectedScheduleLabel ? `На выбранную дату: ${selectedScheduleLabel}` : "График не задан"}</span>
+                <button className="admin-secondary-button" onClick={() => setIsScheduleDialogOpen(true)} type="button">
+                  График работы
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : role === "specialist" ? (
           <div className="admin-route-context" aria-label="Текущий календарь специалиста">
@@ -944,15 +1073,15 @@ export function CalendarWorkspace({
                 const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
                 const dayBlocks = specialistScopedBlocks.filter((block) => block.blockDate === day.date);
                 const dayBlockCount = dayBlocks.length;
-                const capacityAppointmentCount = specialistScopedAppointments.filter(
-                  (appointment) => appointment.date === day.date,
-                ).filter(
-                  (appointment) => appointment.status !== "Отменена",
-                ).length;
                 const countLabel = appointmentCountLabel(dayAppointments.length);
-                const freeCount = freeSlotCount(capacityAppointmentCount, specialistCapacity);
-                const manualOverflow = manualAppointmentOverflow(capacityAppointmentCount, specialistCapacity);
-                const availabilityLabels = monthAvailabilityLabels(dayBlocks, freeCount, manualOverflow);
+                const dayCapacityMetrics = onlineCapacityMetricsForDate(day.date);
+                const dayCapacity = dayCapacityMetrics.capacity;
+                const freeCount = dayCapacityMetrics.freeCount;
+                const manualOverflow = dayCapacityMetrics.manualOverflow;
+                const specialistScheduleDay = getSpecialistScheduleDay(selectedSpecialist, day.date);
+                const availabilityLabels = specialistScheduleDay && !specialistScheduleDay.isWorking
+                  ? { compact: "Выходной", full: "Выходной по графику" }
+                  : monthAvailabilityLabels(dayBlocks, freeCount, manualOverflow, dayCapacity === 0);
                 const freeLabel = availabilityLabels.full;
                 const compactCountLabel = compactAppointmentCountLabel(dayAppointments.length);
                 const compactFreeLabel = availabilityLabels.compact;
@@ -993,7 +1122,7 @@ export function CalendarWorkspace({
               <dl className="admin-detail-list">
                 <div>
                   <dt>Расчет слотов</dt>
-                  <dd>{slotCountLabel(specialistCapacity)} в день</dd>
+                  <dd>{slotCountLabel(selectedDayCapacity)} в день</dd>
                 </div>
                 <div>
                   <dt>Буфер между сеансами</dt>
@@ -1014,6 +1143,7 @@ export function CalendarWorkspace({
               onSelectDate={(date, dateAppointments) => selectDate(date, dateAppointments, "day")}
               renderAppointment={renderAppointment}
               weekDays={weekDays}
+              workingHoursByDate={weekWorkingHoursByDate}
             />
             {renderCalendarBlockOverlays(weekDays, true)}
           </div>
@@ -1050,11 +1180,13 @@ export function CalendarWorkspace({
             {selectedDayManualOverflow > 0 ? (
               <div className="admin-calendar-capacity-note" role="status">
                 <strong>
-                  {selectedDayCapacityCount} из {specialistCapacity}
+                  {selectedDayOnlineAppointmentCount} из {selectedDayCapacity}
                 </strong>
                 <span>
                   {selectedDayManualOverflow} {selectedDayManualOverflow === 1 ? "запись добавлена" : "записи добавлены"} вручную.
-                  Онлайн-запись на этот день закрыта.
+                  {selectedDayFreeCount > 0
+                    ? ` Онлайн доступно: ${freeSlotLabel(selectedDayFreeCount)}.`
+                    : " Онлайн-запись на этот день закрыта."}
                 </span>
               </div>
             ) : null}
@@ -1067,7 +1199,9 @@ export function CalendarWorkspace({
               onDragOverAppointment={previewAppointmentDrag}
               onDropAppointment={dropAppointment}
               renderAppointment={renderAppointment}
+              scheduleLabel={selectedScheduleLabel}
               selectedDate={selectedDate}
+              workingHours={selectedWorkingHours}
             />
             {renderCalendarBlockOverlays([{ date: selectedDate }], false)}
           </div>
@@ -1090,6 +1224,7 @@ export function CalendarWorkspace({
             <div className="admin-appointment-feed" aria-label="Лента всех записей">
               {listAppointments.map((appointment) => {
                 const key = appointmentKey(appointment);
+                const classification = classificationFor(appointment);
 
                 return (
                   <button
@@ -1108,7 +1243,12 @@ export function CalendarWorkspace({
                       </small>
                       {appointment.note ? <small>{appointment.note}</small> : null}
                     </span>
-                    <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                    <span className="admin-appointment-feed-statuses">
+                      {classification.outsideWorkingHours ? (
+                        <span className="admin-calendar-outside-schedule-badge">Вне графика</span>
+                      ) : null}
+                      <span className={statusClass(appointment.status)}>{appointment.status}</span>
+                    </span>
                   </button>
                 );
               })}
@@ -1129,6 +1269,13 @@ export function CalendarWorkspace({
           onEditAppointment={onEditAppointment}
           onSaveAppointment={onSaveAppointment}
           role={role}
+        />
+      ) : null}
+      {isScheduleDialogOpen && selectedSpecialist && onSaveSpecialistSchedule ? (
+        <SpecialistScheduleDialog
+          onClose={() => setIsScheduleDialogOpen(false)}
+          onSave={onSaveSpecialistSchedule}
+          specialist={selectedSpecialist}
         />
       ) : null}
     </div>

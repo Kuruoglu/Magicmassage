@@ -28,6 +28,7 @@ import { isIsoDate } from "./date";
 import {
   classifyAppointmentAgainstSchedule,
   createCalendarWorkingSchedule,
+  createSpecialistWorkingSchedule,
   getCalendarIsoDate,
   type CalendarScheduleSettings,
 } from "./schedule";
@@ -160,12 +161,18 @@ export function CalendarAppointmentDialog({
           start: appointment.time,
         })),
     );
+    const appointmentSpecialist = specialists.find(
+      (specialist) => specialist.id === form.specialistId,
+    );
+    const appointmentSchedule = appointmentSpecialist
+      ? createSpecialistWorkingSchedule(appointmentSpecialist, siteSettings.timezone)
+      : workingSchedule;
 
     return {
-      ...classifyAppointmentAgainstSchedule(candidate, workingSchedule),
+      ...classifyAppointmentAgainstSchedule(candidate, appointmentSchedule),
       overlap,
     };
-  }, [appointments, form, workingSchedule]);
+  }, [appointments, form, siteSettings.timezone, specialists, workingSchedule]);
   const conflictingAppointment = useMemo(() => {
     if (!isIsoDate(form.date) || !/^\d{2}:\d{2}$/.test(form.time)) {
       return undefined;
@@ -435,9 +442,9 @@ export function CalendarAppointmentDialog({
                 <div className="admin-form-alert" role="status">
                   {schedulingClassification.outsideWorkingHours ? (
                     schedulingClassification.outsideWorkingDay ? (
-                      <p>Выбран нерабочий день согласно настройкам сайта. Сохранение разрешено.</p>
+                      <p>Выбран нерабочий день по графику специалиста. Сохранение разрешено.</p>
                     ) : (
-                      <p>Время находится вне рабочих часов согласно настройкам сайта. Сохранение разрешено.</p>
+                      <p>Время находится вне графика специалиста. Сохранение разрешено.</p>
                     )
                   ) : null}
                   {schedulingClassification.overlap ? (

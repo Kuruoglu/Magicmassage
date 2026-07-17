@@ -2,6 +2,7 @@ import { useEffect, useRef, type DragEvent, type ReactNode } from "react";
 
 import type { Appointment } from "@/admin/domain";
 
+import type { CalendarWorkingHours } from "./conflicts";
 import {
   CALENDAR_DAY_START,
   CALENDAR_HOUR_HEIGHT,
@@ -32,6 +33,7 @@ type WeekCalendarProps = {
     isDragPreview?: boolean,
   ) => ReactNode;
   weekDays: CalendarWeekDay[];
+  workingHoursByDate?: Record<string, CalendarWorkingHours | null | undefined>;
 };
 
 export function WeekCalendar({
@@ -44,6 +46,7 @@ export function WeekCalendar({
   onSelectDate,
   renderAppointment,
   weekDays,
+  workingHoursByDate = {},
 }: WeekCalendarProps) {
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const timeGridDays = weekDays.map((day, index) => {
@@ -54,6 +57,7 @@ export function WeekCalendar({
       ariaLabel: `${formatCalendarDay(day.date)}, ${appointmentCountLabel(dayAppointments.length)}`,
       className: index === 6 ? "is-sunday" : undefined,
       date: day.date,
+      workingHours: workingHoursByDate[day.date],
     };
   });
 

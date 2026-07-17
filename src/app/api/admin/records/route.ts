@@ -120,8 +120,15 @@ const auditActionByRecordType: Record<Exclude<AdminPersistInput["type"], "appoin
 type AppointmentSettingsRow = {
   booking_buffer_minutes: number;
   timezone: string;
-  working_days: string;
-  working_hours: string;
+};
+
+type SpecialistScheduleRow = {
+  weekly_schedule: Array<{
+    endsAt: string;
+    isWorking: boolean;
+    startsAt: string;
+    weekday: number;
+  }>;
 };
 
 type PublicationMediaRow = {
@@ -136,50 +143,42 @@ function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
-function parseWorkingDays(value: string) {
-  const days = new Set<number>();
-  const segments = value.toLowerCase().replace(/[\s\u00a0]/g, "").replace(/[\u2013\u2014]/g, "-").split(",");
-
-  for (const segment of segments) {
-    if (!segment) continue;
-    const [startToken, endToken, extra] = segment.split("-");
-    const start = weekdayByToken[startToken];
-
-    if (start === undefined || extra !== undefined) throw new Error("invalid working days");
-    if (endToken === undefined) {
-      days.add(start);
-      continue;
-    }
-
-    const end = weekdayByToken[endToken];
-    if (end === undefined) throw new Error("invalid working days");
-    for (let day = start; ; day = (day + 1) % 7) {
-      days.add(day);
-      if (day === end) break;
-    }
-  }
-
-  if (days.size === 0) throw new Error("invalid working days");
-  return days;
-}
-
-function parseWorkingHours(value: string) {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)\s*[-\u2013\u2014]\s*([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
-  if (!match) throw new Error("invalid working hours");
-  const start = Number(match[1]) * 60 + Number(match[2]);
-  const end = Number(match[3]) * 60 + Number(match[4]);
-  if (end <= start) throw new Error("invalid working hours");
-
-  return { end, start };
-}
-
 function weekdayInTimeZone(date: string, timeZone: string) {
   const label = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" })
     .format(new Date(`${date}T12:00:00Z`));
   const day = weekdayByToken[label.toLowerCase()];
   if (day === undefined) throw new Error("invalid appointment timezone");
 
-  return day;
+  return day === 0 ? 7 : day;
+}
+
+function isOutsideSpecialistSchedule(
+  schedule: SpecialistScheduleRow["weekly_schedule"],
+  date: string,
+  start: number,
+  duration: number,
+  timeZone: string,
+) {
+  if (!Array.isArray(schedule)) throw new Error("specialist schedule is invalid");
+
+  const day = schedule.find((candidate) => candidate.weekday === weekdayInTimeZone(date, timeZone));
+  if (
+    !day ||
+    typeof day.isWorking !== "boolean" ||
+    typeof day.startsAt !== "string" ||
+    typeof day.endsAt !== "string"
+  ) {
+    throw new Error("specialist schedule is invalid");
+  }
+  if (!day.isWorking) return true;
+
+  const startsAt = timeToMinutes(day.startsAt);
+  const endsAt = timeToMinutes(day.endsAt);
+  if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt) || endsAt <= startsAt) {
+    throw new Error("specialist schedule is invalid");
+  }
+
+  return start < startsAt || start + duration > endsAt;
 }
 
 function localDateTimeInTimeZone(date: Date, timeZone: string) {
@@ -282,7 +281,7 @@ async function classifyAppointmentOnServer(
     currentAppointmentQuery,
     client
       .from("admin_site_settings")
-      .select("booking_buffer_minutes, timezone, working_days, working_hours")
+      .select("booking_buffer_minutes, timezone")
       .eq("id", "site"),
   ]);
 
@@ -300,6 +299,15 @@ async function classifyAppointmentOnServer(
     currentAppointment?.specialist_id ??
     nataliSpecialistId;
   const duration = payload.record.durationMinutes ?? currentAppointment?.duration_minutes ?? 60;
+  const specialistResult = await client
+    .from("admin_specialists")
+    .select("weekly_schedule")
+    .eq("id", effectiveSpecialistId);
+  if (specialistResult.error) {
+    throw new Error("appointment specialist schedule verification failed");
+  }
+  const specialistSchedule = ((specialistResult.data ?? [])[0] ?? null) as SpecialistScheduleRow | null;
+  if (!specialistSchedule) throw new Error("appointment specialist schedule is missing");
   const start = timeToMinutes(payload.record.time);
   const buffer = currentAppointment && Number.isInteger(currentAppointment.buffer_minutes)
     ? currentAppointment!.buffer_minutes!
@@ -321,12 +329,13 @@ async function classifyAppointmentOnServer(
 
     return start < blockEnd && blockStart < start + duration + buffer;
   });
-  const workingDays = parseWorkingDays(settings.working_days);
-  const workingHours = parseWorkingHours(settings.working_hours);
-  const outsideWorkingHours =
-    !workingDays.has(weekdayInTimeZone(payload.record.date, settings.timezone)) ||
-    start < workingHours.start ||
-    start + duration > workingHours.end;
+  const outsideWorkingHours = isOutsideSpecialistSchedule(
+    specialistSchedule.weekly_schedule,
+    payload.record.date,
+    start,
+    duration,
+    settings.timezone,
+  );
   const previousComment = currentAppointment?.post_visit_comment?.trim() ?? "";
   const nextComment = payload.record.postVisitComment?.trim() ?? "";
   const appointmentStart = currentAppointment

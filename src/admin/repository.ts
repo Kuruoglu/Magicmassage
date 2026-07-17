@@ -228,7 +228,9 @@ const specialistColumns = [
   "display_order",
   "id",
   "public_booking_enabled",
+  "schedule_version",
   "status",
+  "weekly_schedule",
 ].join(", ");
 
 const certificateColumns = [
@@ -883,7 +885,9 @@ function mapSpecialistRow(row: AdminSpecialistDatabaseRow): SpecialistRecord {
     displayOrder: row.display_order,
     id: row.id,
     publicBookingEnabled: row.public_booking_enabled,
+    scheduleVersion: row.schedule_version,
     status: row.status,
+    weeklySchedule: row.weekly_schedule.map((day) => ({ ...day })),
   };
 }
 

@@ -238,6 +238,26 @@ async function cleanup() {
   if (specialistIds.size > 0) {
     const result = await supabase.from("admin_specialists").delete().in("id", [...specialistIds]);
     if (result.error) cleanupErrors.push(result.error);
+
+    const [envelopeResult, settingsResult] = await Promise.all([
+      supabase.rpc("admin_get_specialist_schedule_envelope"),
+      supabase
+        .from("admin_site_settings")
+        .select("working_days, working_hours")
+        .eq("id", "site")
+        .single(),
+    ]);
+    if (envelopeResult.error) cleanupErrors.push(envelopeResult.error);
+    if (settingsResult.error) cleanupErrors.push(settingsResult.error);
+    if (!envelopeResult.error && !settingsResult.error) {
+      const specialistDeleteEnvelopeSynchronized =
+        settingsResult.data.working_days === envelopeResult.data.working_days
+        && settingsResult.data.working_hours === envelopeResult.data.working_hours;
+      if (output) output.specialistDeleteEnvelopeSynchronized = specialistDeleteEnvelopeSynchronized;
+      if (!specialistDeleteEnvelopeSynchronized) {
+        cleanupErrors.push(new Error("Specialist deletion did not recompute the booking envelope."));
+      }
+    }
   }
   if (serviceSlugs.size > 0) {
     const result = await supabase.from("admin_services").delete().in("slug", [...serviceSlugs]);
@@ -370,6 +390,113 @@ try {
     specialist_id: secondSpecialistId,
   });
   if (assignment.error) throw assignment.error;
+
+  const secondScheduleSnapshot = await supabase
+    .from("admin_specialists")
+    .select("schedule_version, weekly_schedule")
+    .eq("id", secondSpecialistId)
+    .single();
+  if (secondScheduleSnapshot.error) throw secondScheduleSnapshot.error;
+  const capacityWeekday = new Date(`${capacityDay.date}T12:00:00Z`).getUTCDay() || 7;
+  const originalCapacityDaySchedule = secondScheduleSnapshot.data.weekly_schedule.find(
+    (day) => day.weekday === capacityWeekday,
+  );
+  assert(originalCapacityDaySchedule?.isWorking, "The schedule smoke needs a working capacity day.");
+  const delayedStart = addMinutes(capacityDay.slots[0], 30);
+  assert(
+    delayedStart < originalCapacityDaySchedule.endsAt,
+    "The schedule smoke needs room to delay the first slot by 30 minutes.",
+  );
+  const delayedSchedule = secondScheduleSnapshot.data.weekly_schedule.map((day) =>
+    day.weekday === capacityWeekday ? { ...day, isWorking: true, startsAt: delayedStart } : day
+  );
+  const delayedScheduleSave = await supabase.rpc("admin_save_specialist_schedule_v2", {
+    p_actor_user_id: adminUserId,
+    p_expected_version: secondScheduleSnapshot.data.schedule_version,
+    p_specialist_id: secondSpecialistId,
+    p_weekly_schedule: delayedSchedule,
+  });
+  if (delayedScheduleSave.error) throw delayedScheduleSave.error;
+  const scheduleVersionAdvanced = delayedScheduleSave.data.specialist.schedule_version
+    === secondScheduleSnapshot.data.schedule_version + 1;
+
+  const enableScheduleSmokeSpecialist = await supabase
+    .from("admin_specialists")
+    .update({ public_booking_enabled: true })
+    .eq("id", secondSpecialistId);
+  if (enableScheduleSmokeSpecialist.error) throw enableScheduleSmokeSpecialist.error;
+
+  const rejectedScheduleSession = opaqueHash(sessionHashes);
+  const rejectedScheduleHold = await createHold({
+    date: capacityDay.date,
+    priceVariantId,
+    sessionKeyHash: rejectedScheduleSession,
+    specialistSlug: secondSpecialistSlug,
+    time: capacityDay.slots[0],
+    tokenHash: opaqueHash(tokenHashes),
+  });
+  const specialistScheduleRejectsClosedSlot = errorMatches(
+    rejectedScheduleHold.error,
+    "slot_unavailable",
+  );
+
+  const restoredScheduleSave = await supabase.rpc("admin_save_specialist_schedule_v2", {
+    p_actor_user_id: adminUserId,
+    p_expected_version: delayedScheduleSave.data.specialist.schedule_version,
+    p_specialist_id: secondSpecialistId,
+    p_weekly_schedule: secondScheduleSnapshot.data.weekly_schedule,
+  });
+  if (restoredScheduleSave.error) throw restoredScheduleSave.error;
+
+  const restoredScheduleSession = opaqueHash(sessionHashes);
+  const restoredScheduleHold = await createHold({
+    date: capacityDay.date,
+    priceVariantId,
+    sessionKeyHash: restoredScheduleSession,
+    specialistSlug: secondSpecialistSlug,
+    time: capacityDay.slots[0],
+    tokenHash: opaqueHash(tokenHashes),
+  });
+  if (restoredScheduleHold.error) throw restoredScheduleHold.error;
+  const specialistScheduleAllowsRestoredSlot = restoredScheduleHold.data.specialistId
+    === secondSpecialistSlug;
+  await expireSessions([rejectedScheduleSession, restoredScheduleSession]);
+
+  const staleScheduleSave = await supabase.rpc("admin_save_specialist_schedule_v2", {
+    p_actor_user_id: adminUserId,
+    p_expected_version: delayedScheduleSave.data.specialist.schedule_version,
+    p_specialist_id: secondSpecialistId,
+    p_weekly_schedule: delayedSchedule,
+  });
+  const staleSpecialistScheduleRejected = staleScheduleSave.error?.code === "40001"
+    || errorMatches(staleScheduleSave.error, "stale_specialist_schedule");
+
+  const envelopeBeforeStaleSettings = await supabase
+    .from("admin_site_settings")
+    .select("working_days, working_hours")
+    .eq("id", "site")
+    .single();
+  if (envelopeBeforeStaleSettings.error) throw envelopeBeforeStaleSettings.error;
+  const staleSettingsWrite = await supabase
+    .from("admin_site_settings")
+    .update({ working_days: "Sun", working_hours: "23:00-23:30" })
+    .eq("id", "site");
+  if (staleSettingsWrite.error) throw staleSettingsWrite.error;
+  const envelopeAfterStaleSettings = await supabase
+    .from("admin_site_settings")
+    .select("working_days, working_hours")
+    .eq("id", "site")
+    .single();
+  if (envelopeAfterStaleSettings.error) throw envelopeAfterStaleSettings.error;
+  const settingsCannotOverwriteScheduleEnvelope =
+    envelopeAfterStaleSettings.data.working_days === envelopeBeforeStaleSettings.data.working_days
+    && envelopeAfterStaleSettings.data.working_hours === envelopeBeforeStaleSettings.data.working_hours;
+
+  const disableScheduleSmokeSpecialist = await supabase
+    .from("admin_specialists")
+    .update({ public_booking_enabled: false })
+    .eq("id", secondSpecialistId);
+  if (disableScheduleSmokeSpecialist.error) throw disableScheduleSmokeSpecialist.error;
 
   const eligibleSpecialists = await supabase
     .from("admin_specialists")
@@ -1129,6 +1256,7 @@ try {
     publicConfirmationAfterManualOverflow,
     publicDurationAdjusted,
     securityAlertWarningCreated,
+    scheduleVersionAdvanced,
     sessionHoldRestored,
     sessionHoldReplaced,
     sessionConfirmationRestored,
@@ -1136,9 +1264,13 @@ try {
     staleSelectionVersionRejected,
     staleAppointmentVersionRejected,
     staleBlockVersionRejected,
+    staleSpecialistScheduleRejected,
+    specialistScheduleAllowsRestoredSlot,
+    specialistScheduleRejectsClosedSlot,
     specialistArbitraryClientRejected,
     specialistAssignedClientRejected,
     specificSpecialistPreserved,
+    settingsCannotOverwriteScheduleEnvelope,
   };
 
   for (const [name, passed] of Object.entries(output)) {

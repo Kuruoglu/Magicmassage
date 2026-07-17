@@ -44,7 +44,11 @@ export type {
 export {
   classifyAppointmentAgainstSchedule,
   createCalendarWorkingSchedule,
+  createSpecialistWorkingSchedule,
   getCalendarIsoDate,
+  getIsoWeekday,
+  getSpecialistScheduleDay,
+  hasScheduleEnvelope,
 } from "./schedule";
 export type {
   CalendarScheduleClassification,
@@ -88,6 +92,8 @@ export { CalendarAppointmentDialog } from "./CalendarAppointmentDialog";
 export type { CalendarAppointmentDialogProps } from "./CalendarAppointmentDialog";
 export { CalendarBlockDialog } from "./CalendarBlockDialog";
 export type { CalendarBlockSaveResult } from "./CalendarBlockDialog";
+export { SpecialistScheduleDialog } from "./SpecialistScheduleDialog";
+export type { SpecialistScheduleSaveResult } from "./SpecialistScheduleDialog";
 export { CalendarToolbar } from "./CalendarToolbar";
 export { CalendarWorkspace } from "./CalendarWorkspace";
 export type {

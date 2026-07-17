@@ -229,6 +229,7 @@ type AppointmentRouteClientOptions = {
   blockRows?: Record<string, unknown>[];
   currentRows?: Record<string, unknown>[];
   scheduleRows?: Record<string, unknown>[];
+  specialistSchedule?: Record<string, unknown>[];
   settings?: Record<string, unknown>;
 };
 
@@ -236,6 +237,14 @@ function createAppointmentRouteClient({
   blockRows = [],
   currentRows = [],
   scheduleRows = [],
+  specialistSchedule = [{
+    weekly_schedule: Array.from({ length: 7 }, (_, index) => ({
+      endsAt: "19:00",
+      isWorking: index < 6,
+      startsAt: "10:00",
+      weekday: index + 1,
+    })),
+  }],
   settings = {
     booking_buffer_minutes: 30,
     timezone: "Europe/Sofia",
@@ -281,6 +290,14 @@ function createAppointmentRouteClient({
       return {
         select: vi.fn(() => ({
           eq: vi.fn(async () => ({ data: blockRows, error: null })),
+        })),
+      };
+    }
+
+    if (table === "admin_specialists") {
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ data: specialistSchedule, error: null })),
         })),
       };
     }
@@ -809,6 +826,14 @@ describe("admin records persistence API route", () => {
         starts_at: "10:30:00",
         status: "confirmed",
       }],
+      specialistSchedule: [{
+        weekly_schedule: Array.from({ length: 7 }, (_, index) => ({
+          endsAt: "20:00",
+          isWorking: index < 6,
+          startsAt: "08:00",
+          weekday: index + 1,
+        })),
+      }],
       settings: {
         booking_buffer_minutes: 30,
         timezone: "Europe/Sofia",
@@ -960,7 +985,7 @@ describe("admin records persistence API route", () => {
     expect(client.from).not.toHaveBeenCalled();
   });
 
-  it("classifies saved working hours and stores the server-side booking buffer", async () => {
+  it("classifies the selected specialist schedule and stores the server-side booking buffer", async () => {
     const payload = {
       ...overlappingAppointmentPayload,
       audit: { action: "appointment.update", outsideWorkingHours: true, overlapOverride: false },
@@ -997,7 +1022,7 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     expect(persistAdminRecord).toHaveBeenCalledWith({
       ...payload,
-      audit: { ...payload.audit, outsideWorkingHours: false },
+      audit: { ...payload.audit, outsideWorkingHours: true },
       record: { ...payload.record, bufferMinutes: 45 },
     });
   });

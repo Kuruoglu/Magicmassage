@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { createTotpCode } from "../test/totp";
 
@@ -154,6 +154,22 @@ async function elevateAdminSession(
 
 const adminAuthEnvironment = resolveAdminAuthEnvironment();
 
+async function signInAdminThroughBrowser(page: Page) {
+  if (!adminAuthEnvironment.credentials || !adminAuthEnvironment.totpSecret) {
+    throw new Error("Admin browser credentials and TOTP secret are required.");
+  }
+
+  await page.goto("/admin/login");
+  await page.getByLabel("Email").fill(adminAuthEnvironment.credentials.email);
+  await page.getByLabel("Password").fill(adminAuthEnvironment.credentials.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel("Код").fill(createTotpCode(adminAuthEnvironment.totpSecret));
+  await Promise.all([
+    page.waitForURL(/\/admin$/),
+    page.getByRole("button", { exact: true, name: "Войти" }).click(),
+  ]);
+}
+
 test.describe("real admin authentication", () => {
   test.skip(
     !adminAuthEnvironment.publicSupabase,
@@ -290,15 +306,7 @@ test.describe("real admin authentication", () => {
       "Set E2E admin credentials, a run-scoped alert, and its TOTP secret for the browser MFA flow.",
     );
 
-    await page.goto("/admin/login");
-    await page.getByLabel("Email").fill(adminAuthEnvironment.credentials!.email);
-    await page.getByLabel("Password").fill(adminAuthEnvironment.credentials!.password);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.getByLabel("Код").fill(createTotpCode(adminAuthEnvironment.totpSecret!));
-    await Promise.all([
-      page.waitForURL(/\/admin$/),
-      page.getByRole("button", { exact: true, name: "Войти" }).click(),
-    ]);
+    await signInAdminThroughBrowser(page);
 
     const alertRow = page.locator(
       `[data-security-alert-id="${adminAuthEnvironment.securityAlertId}"]`,
@@ -313,5 +321,35 @@ test.describe("real admin authentication", () => {
     await page.screenshot({ fullPage: true, path: "test-results/admin-security-alerts-mobile.png" });
     await alertRow.getByRole("button", { name: "Просмотрено" }).click();
     await expect(alertRow).toHaveCount(0);
+  });
+
+  test("shows the selected specialist schedule on desktop and mobile", async ({ page }) => {
+    test.skip(
+      !adminAuthEnvironment.credentials || !adminAuthEnvironment.totpSecret,
+      "Set E2E admin credentials and its TOTP secret for the specialist schedule flow.",
+    );
+
+    await signInAdminThroughBrowser(page);
+    await page.goto("/admin?section=calendar&role=administrator&date=2026-07-20");
+    await expect(page.getByRole("heading", { name: "Календарь" })).toBeVisible();
+    await page.getByLabel("Показать календарь специалиста").selectOption({ label: "Natali" });
+    await page.getByRole("button", { name: "График работы" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Natali" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Свободное время на сайте рассчитывается по этому графику.")).toBeVisible();
+    await expect(dialog.getByLabel("Начало: Понедельник")).toHaveValue(/^\d{2}:(?:00|30)$/);
+    await expect(dialog.getByLabel("Конец: Понедельник")).toHaveValue(/^\d{2}:(?:00|30)$/);
+    await page.screenshot({ fullPage: true, path: "test-results/admin-specialist-schedule.png" });
+
+    await page.setViewportSize({ height: 844, width: 390 });
+    const mobileLabels = dialog.locator(".admin-specialist-schedule-input-label");
+    await expect(mobileLabels.filter({ hasText: /^Начало$/ }).first()).toBeVisible();
+    await expect(mobileLabels.filter({ hasText: /^Конец$/ }).first()).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await page.screenshot({ fullPage: true, path: "test-results/admin-specialist-schedule-mobile.png" });
+
+    await dialog.getByRole("button", { name: "Отмена" }).click();
+    await expect(dialog).toHaveCount(0);
   });
 });
