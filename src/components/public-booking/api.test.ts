@@ -97,6 +97,7 @@ describe("public booking API adapter", () => {
 
     await expect(confirmPublicBooking({
       contact: {
+        careEmailOptIn: true,
         contactPreference: "telegram",
         email: "anna@example.com",
         name: "Anna Petrova",
@@ -119,6 +120,7 @@ describe("public booking API adapter", () => {
       "6d10a4aa-babb-42bd-9e5c-ae5cb87c3320",
     );
     expect(JSON.parse(String(init.body))).toEqual({
+      careEmailOptIn: true,
       contactPreference: "telegram",
       email: "anna@example.com",
       fullName: "Anna Petrova",

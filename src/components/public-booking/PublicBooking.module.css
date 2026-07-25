@@ -632,6 +632,32 @@
   text-underline-offset: 3px;
 }
 
+.optionalConsent {
+  background: #f6f2f8;
+  border: 1px solid #ded5e3;
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+}
+
+.optionalConsent small {
+  color: #655d69;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding-left: 31px;
+}
+
+.optionalConsent input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.optionalConsent:has(input:focus-visible) {
+  outline: 3px solid rgba(110, 74, 139, 0.28);
+  outline-offset: 2px;
+}
+
 .policyNotice {
   border-left: 3px solid #c38318;
   color: #5f5962;

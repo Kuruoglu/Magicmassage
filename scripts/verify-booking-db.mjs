@@ -138,8 +138,16 @@ async function mutateBlock({
   });
 }
 
-async function confirmBooking({ idempotencyKeyHash, phone, selectionId, selectionVersion, sessionKeyHash }) {
-  return supabase.rpc("public_booking_confirm_session_v4", {
+async function confirmBooking({
+  careEmailOptIn = false,
+  idempotencyKeyHash,
+  phone,
+  selectionId,
+  selectionVersion,
+  sessionKeyHash,
+}) {
+  return supabase.rpc("public_booking_confirm_session_v5", {
+    p_care_email_opt_in: careEmailOptIn,
     p_contact_preference: "email",
     p_email: "submitted-booking@example.com",
     p_full_name: "Submitted Booking Name",
@@ -1033,6 +1041,7 @@ try {
       && result.data?.selectionVersion === capacitySelectionVersion,
   );
   const firstConfirmation = await confirmBooking({
+    careEmailOptIn: true,
     idempotencyKeyHash,
     phone,
     selectionId: capacityHold.data.selectionId,
@@ -1043,6 +1052,7 @@ try {
     throw new Error(`First session confirmation failed: ${firstConfirmation.error.message}`);
   }
   const secondConfirmation = await confirmBooking({
+    careEmailOptIn: true,
     idempotencyKeyHash,
     phone,
     selectionId: capacityHold.data.selectionId,
@@ -1070,7 +1080,9 @@ try {
 
   const preservedClient = await supabase
     .from("admin_clients")
-    .select("email, full_name, locale, notes, phone, preferred_contact")
+    .select(
+      "care_email_consent_at, care_email_consent_email_hash, care_email_consent_source, care_email_withdrawn_at, email, full_name, locale, notes, phone, preferred_contact",
+    )
     .eq("id", clientId)
     .single();
   if (preservedClient.error) throw preservedClient.error;
@@ -1088,6 +1100,10 @@ try {
     && preservedClient.data.notes === "Existing CRM note"
     && preservedClient.data.phone === `+${phone}`
     && preservedClient.data.preferred_contact === "telegram";
+  const careEmailConsentBoundToSnapshot = preservedClient.data.care_email_consent_at !== null
+    && preservedClient.data.care_email_consent_source === "public_booking"
+    && preservedClient.data.care_email_consent_email_hash === hash("submitted-booking@example.com")
+    && preservedClient.data.care_email_withdrawn_at === null;
   const bookingSnapshotsPreserved = publicAppointment.data.buffer_minutes
     === heldSnapshot.data.buffer_minutes
     && publicAppointment.data.currency_snapshot === heldSnapshot.data.currency
@@ -1227,6 +1243,7 @@ try {
 
   output = {
     blockedSpecialistFallsBack,
+    careEmailConsentBoundToSnapshot,
     contactRevealRateLimitSerialized,
     bookingSnapshotsPreserved,
     concurrentSlotSerialized,

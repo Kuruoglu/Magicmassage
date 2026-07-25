@@ -44,18 +44,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly" as const,
         priority: 0.8,
       })),
-      {
-        url: `${siteUrl}${getBlogPath(locale)}`,
-        ...(latestBlogUpdate ? { lastModified: latestBlogUpdate } : {}),
-        changeFrequency: "weekly" as const,
-        priority: 0.75,
-      },
-      ...posts.map((post) => ({
-        url: `${siteUrl}${getBlogPostPath(locale, post.slug)}`,
-        lastModified: post.updatedAt,
-        changeFrequency: "monthly" as const,
-        priority: 0.7,
-      })),
+      ...(shell.blogEnabled
+        ? [
+            {
+              url: `${siteUrl}${getBlogPath(locale)}`,
+              ...(latestBlogUpdate ? { lastModified: latestBlogUpdate } : {}),
+              changeFrequency: "weekly" as const,
+              priority: 0.75,
+            },
+            ...posts.map((post) => ({
+              url: `${siteUrl}${getBlogPostPath(locale, post.slug)}`,
+              lastModified: post.updatedAt,
+              changeFrequency: "monthly" as const,
+              priority: 0.7,
+            })),
+          ]
+        : []),
     ];
   });
 }

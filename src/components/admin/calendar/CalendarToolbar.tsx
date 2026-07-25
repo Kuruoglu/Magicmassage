@@ -40,6 +40,7 @@ export function CalendarToolbar({
           </button>
           <input
             aria-label="Выбрать дату"
+            className="admin-calendar-control admin-calendar-date-input"
             onChange={(event) => {
               if (event.target.value) onDateChange(event.target.value);
             }}

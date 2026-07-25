@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { cloneBusinessHoursSchedule } from "@/lib/business-hours";
 
 import type {
   Appointment,
@@ -12,7 +13,12 @@ import type {
   ServiceRecord,
   SettingsRecord,
 } from "./domain";
-import { isAdminPersistInput, persistAdminRecord } from "./persistence";
+import {
+  deleteAdminRecord,
+  isAdminDeleteInput,
+  isAdminPersistInput,
+  persistAdminRecord,
+} from "./persistence";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
 
 const clientRecord: ClientRecord = {
@@ -115,6 +121,7 @@ const contactSettingsRecord: ContactSettingsRecord = {
   phone: "+359 87 333 4411",
   seoArea: "Burgas, Bulgaria",
   workingHours: "Пн-Сб 10:00-19:00",
+  workingSchedule: cloneBusinessHoursSchedule(),
 };
 
 const blogPostRecord: BlogPostRecord = {
@@ -124,13 +131,14 @@ const blogPostRecord: BlogPostRecord = {
   coverImage: "/media/blog/prepare-for-massage.jpg",
   excerpt: "Короткая памятка перед первым визитом.",
   id: "blog-prepare-for-massage",
-  locales: ["ru", "bg"],
+  locales: ["ru"],
   publishedAt: "2026-07-20",
   seoTitle: "Как подготовиться к массажу в Бургасе",
   slug: "prepare-for-massage",
   status: "Черновик",
   tags: ["подготовка", "массаж"],
   title: "Как подготовиться к массажу",
+  translationKey: "prepare-for-massage",
   updatedAt: "2026-07-09",
 };
 
@@ -164,9 +172,11 @@ const settingsRecord: SettingsRecord = {
 type PersistRepositoryMethods = Pick<
   AdminRepository,
   | "saveAppointment"
+  | "saveBlogVisibility"
   | "saveBlogPost"
   | "saveCertificate"
   | "saveClient"
+  | "loadDomainRecords"
   | "saveContactChannel"
   | "saveContactSettings"
   | "saveMedia"
@@ -179,10 +189,14 @@ function buildRepository(
   overrides: Partial<PersistRepositoryMethods> = {},
 ) {
   return {
+    loadDomainRecords: async () => {
+      throw new Error("loadDomainRecords was not expected");
+    },
     saveAppointment: async () => undefined,
+    saveBlogVisibility: async () => undefined,
     saveBlogPost: async () => undefined,
     saveCertificate: async () => undefined,
-    saveClient: async () => undefined,
+    saveClient: async (client) => client,
     saveContactChannel: async () => undefined,
     saveContactSettings: async () => undefined,
     saveMedia: async () => undefined,
@@ -194,6 +208,62 @@ function buildRepository(
 }
 
 describe("admin persistence", () => {
+  it("validates discriminated deletion payloads", () => {
+    expect(isAdminDeleteInput({ id: "appointment-1", type: "appointment", version: 3 })).toBe(true);
+    expect(isAdminDeleteInput({ id: "client-1", type: "client" })).toBe(true);
+    expect(isAdminDeleteInput({ id: "appointment-1", type: "appointment" })).toBe(false);
+    expect(isAdminDeleteInput({ id: "appointment-1", type: "appointment", version: 0 })).toBe(false);
+    expect(isAdminDeleteInput({ id: "client-1", type: "client", version: 1 })).toBe(false);
+    expect(isAdminDeleteInput({ id: "", type: "client" })).toBe(false);
+  });
+
+  it("deletes appointments and clients through the repository", async () => {
+    const deleted: string[] = [];
+    const dependencies = {
+      createClient: () => ({}) as AdminSupabaseClient,
+      createRepository: () => ({
+        deleteAppointment: async (id: string, version: number) => {
+          deleted.push(`appointment:${id}:v${version}`);
+        },
+        deleteClient: async (id: string) => {
+          deleted.push(`client:${id}`);
+        },
+      }),
+    };
+
+    await expect(deleteAdminRecord(
+      { id: "appointment-1", type: "appointment", version: 3 },
+      dependencies,
+    )).resolves.toEqual({ mode: "supabase", ok: true });
+    await expect(deleteAdminRecord(
+      { id: "client-1", type: "client" },
+      dependencies,
+    )).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(deleted).toEqual(["appointment:appointment-1:v3", "client:client-1"]);
+  });
+
+  it.each([
+    "appointment_concurrent_update",
+    "appointment_email_delivery_in_progress",
+    "client_has_appointments",
+    "record_not_found",
+  ] as const)("maps %s deletion failures", async (reason) => {
+    const result = await deleteAdminRecord(
+      { id: "client-1", type: "client" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () => ({
+          deleteAppointment: async () => undefined,
+          deleteClient: async () => {
+            throw new Error(reason);
+          },
+        }),
+      },
+    );
+
+    expect(result).toMatchObject({ mode: "supabase", ok: false, reason });
+  });
+
   it("rejects admin payloads with unexpected keys", () => {
     expect(
       isAdminPersistInput({
@@ -202,6 +272,17 @@ describe("admin persistence", () => {
           unexpected: "do not persist",
         },
         type: "client",
+      }),
+    ).toBe(false);
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...contactChannelRecord,
+          id: "contact-phone",
+          type: "Мессенджер",
+          value: "+359 89 677 8308",
+        },
+        type: "contactChannel",
       }),
     ).toBe(false);
   });
@@ -232,6 +313,34 @@ describe("admin persistence", () => {
           bookingUrl: "javascript:alert(1)",
         },
         type: "contactSettings",
+      }),
+    ).toBe(false);
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...contactSettingsRecord,
+          phone: "+123 456 789 012 345 6",
+        },
+        type: "contactSettings",
+      }),
+    ).toBe(false);
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...contactSettingsRecord,
+          workingSchedule: cloneBusinessHoursSchedule().map((day) => ({ ...day, isOpen: false })),
+        },
+        type: "contactSettings",
+      }),
+    ).toBe(false);
+    expect(
+      isAdminPersistInput({
+        record: {
+          ...contactChannelRecord,
+          type: "Телефон",
+          value: "not-a-phone",
+        },
+        type: "contactChannel",
       }),
     ).toBe(false);
   });
@@ -274,12 +383,13 @@ describe("admin persistence", () => {
           buildRepository({
             saveClient: async (client) => {
               savedClients.push(client);
+              return client;
             },
           }),
       },
     );
 
-    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(result).toEqual({ mode: "supabase", ok: true, record: clientRecord });
     expect(savedClients).toEqual([clientRecord]);
   });
 
@@ -443,6 +553,30 @@ describe("admin persistence", () => {
     expect(savedPosts).toEqual([blogPostRecord]);
   });
 
+  it("persists the narrow blog visibility record through the repository", async () => {
+    const savedVisibility: boolean[] = [];
+
+    const result = await persistAdminRecord(
+      {
+        audit: { action: "site.blog_visibility" },
+        record: { enabled: false },
+        type: "blogVisibility",
+      },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            saveBlogVisibility: async (enabled) => {
+              savedVisibility.push(enabled);
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({ mode: "supabase", ok: true });
+    expect(savedVisibility).toEqual([false]);
+  });
+
   it("persists site settings through the repository", async () => {
     const savedSettings: SettingsRecord[] = [];
 
@@ -508,8 +642,63 @@ describe("admin persistence", () => {
     });
   });
 
+  it("returns the current server client after an optimistic consent conflict", async () => {
+    const currentClient = {
+      ...clientRecord,
+      careEmailConsentAt: "2026-07-25T10:15:00.000Z",
+      careEmailConsentSource: "public_booking" as const,
+      careEmailWithdrawnAt: undefined,
+    };
+    const result = await persistAdminRecord(
+      { record: clientRecord, type: "client" },
+      {
+        createClient: () => ({}) as AdminSupabaseClient,
+        createRepository: () =>
+          buildRepository({
+            loadDomainRecords: async () => ({
+              appointments: [],
+              blogPosts: [],
+              certificates: [],
+              clients: [currentClient],
+              contactChannels: [],
+              contactSettings: null,
+              emailNotificationStatuses: [],
+              media: [],
+              prices: [],
+              services: [],
+              settings: null,
+              specialists: [],
+            }),
+            saveClient: async () => {
+              throw new Error("admin_save_record_with_audit: care_email_consent_conflict");
+            },
+          }),
+      },
+    );
+
+    expect(result).toEqual({
+      message: "Unable to persist admin record.",
+      mode: "supabase",
+      ok: false,
+      reason: "care_email_consent_conflict",
+      record: currentClient,
+    });
+  });
+
   it("validates API persistence payloads by type and record shape", () => {
     expect(isAdminPersistInput({ record: clientRecord, type: "client" })).toBe(true);
+    expect(isAdminPersistInput({
+      record: {
+        ...clientRecord,
+        careEmailConsentAt: "2026-07-19T10:00:00.000Z",
+        careEmailConsentSource: "admin_recorded",
+        careEmailExpectedConsentAt: null,
+        careEmailExpectedConsentSource: null,
+        careEmailExpectedWithdrawnAt: null,
+        careEmailWithdrawnAt: undefined,
+      },
+      type: "client",
+    })).toBe(true);
     expect(isAdminPersistInput({ audit: { action: "appointment.update" }, record: appointmentRecord, type: "appointment" })).toBe(true);
     expect(isAdminPersistInput({ record: certificateRecord, type: "certificate" })).toBe(true);
     expect(isAdminPersistInput({ audit: { action: "service.visibility" }, record: serviceRecord, type: "service" })).toBe(true);
@@ -518,7 +707,45 @@ describe("admin persistence", () => {
     expect(isAdminPersistInput({ record: contactChannelRecord, type: "contactChannel" })).toBe(true);
     expect(isAdminPersistInput({ record: contactSettingsRecord, type: "contactSettings" })).toBe(true);
     expect(isAdminPersistInput({ audit: { action: "blog.publication" }, record: blogPostRecord, type: "blogPost" })).toBe(true);
+    expect(isAdminPersistInput({
+      audit: { action: "blog.publication" },
+      record: { ...blogPostRecord, translationKey: undefined },
+      type: "blogPost",
+    })).toBe(false);
+    expect(isAdminPersistInput({
+      audit: { action: "blog.publication" },
+      record: { ...blogPostRecord, translationKey: "Invalid key" },
+      type: "blogPost",
+    })).toBe(false);
+    expect(isAdminPersistInput({
+      audit: { action: "blog.publication" },
+      record: { ...blogPostRecord, locales: ["ru", "en"] },
+      type: "blogPost",
+    })).toBe(false);
+    expect(isAdminPersistInput({ audit: { action: "site.blog_visibility" }, record: { enabled: false }, type: "blogVisibility" })).toBe(true);
+    expect(isAdminPersistInput({ audit: { action: "site.blog_visibility" }, record: { enabled: "false" }, type: "blogVisibility" })).toBe(false);
     expect(isAdminPersistInput({ audit: { action: "site.gift_certificates" }, record: settingsRecord, type: "settings" })).toBe(true);
+    expect(isAdminPersistInput({
+      audit: { action: "appointment.update", notifyClient: false },
+      record: appointmentRecord,
+      type: "appointment",
+    })).toBe(true);
+    expect(isAdminPersistInput({
+      audit: { action: "site.gift_certificates" },
+      record: { ...settingsRecord, careEmailsEnabled: true, emailReviewUrl: "" },
+      type: "settings",
+    })).toBe(false);
+    expect(isAdminPersistInput({
+      audit: { action: "site.gift_certificates" },
+      record: {
+        ...settingsRecord,
+        careEmailsEnabled: true,
+        emailReviewUrl: "https://reviews.example.com/magic-massage",
+        ownerNotificationEmail: "natali@example.com",
+        ownerNotificationsEnabled: true,
+      },
+      type: "settings",
+    })).toBe(true);
     expect(isAdminPersistInput({ record: null, type: "client" })).toBe(false);
     expect(isAdminPersistInput({ record: clientRecord, type: "certificate" })).toBe(false);
     expect(isAdminPersistInput({ record: serviceRecord, type: "price" })).toBe(false);

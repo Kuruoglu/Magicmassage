@@ -65,18 +65,47 @@ function bookingClient(): BookingRpcClient {
   return client as unknown as BookingRpcClient;
 }
 
-async function callBookingRpc(functionName: string, parameters: Record<string, unknown>) {
-  const { data, error } = await bookingClient().rpc(functionName, parameters);
-  if (!error) return data;
-
+function throwBookingRpcError(error: BookingRpcError, operation: string): never {
   const knownCode = errorCodeFromRpc(error);
   if (knownCode) throw new PublicBookingServiceError(knownCode);
 
   console.error("Public booking RPC failed", {
     code: error.code ?? "unknown",
-    operation: functionName,
+    operation,
   });
   throw new PublicBookingServiceError("booking_unavailable");
+}
+
+async function callBookingRpc(functionName: string, parameters: Record<string, unknown>) {
+  const { data, error } = await bookingClient().rpc(functionName, parameters);
+  if (!error) return data;
+
+  return throwBookingRpcError(error, functionName);
+}
+
+async function callBookingRpcWithMissingFunctionFallback(input: {
+  allowFallback: boolean;
+  fallbackFunctionName: string;
+  fallbackParameters: Record<string, unknown>;
+  functionName: string;
+  parameters: Record<string, unknown>;
+}) {
+  const client = bookingClient();
+  const primaryResult = await client.rpc(input.functionName, input.parameters);
+  if (!primaryResult.error) return primaryResult.data;
+
+  if (primaryResult.error.code !== "PGRST202" || !input.allowFallback) {
+    return throwBookingRpcError(primaryResult.error, input.functionName);
+  }
+
+  console.warn("Public booking RPC compatibility fallback", {
+    fallbackOperation: input.fallbackFunctionName,
+    operation: input.functionName,
+  });
+  const fallbackResult = await client.rpc(input.fallbackFunctionName, input.fallbackParameters);
+  if (!fallbackResult.error) return fallbackResult.data;
+
+  return throwBookingRpcError(fallbackResult.error, input.fallbackFunctionName);
 }
 
 function requireRecord<T>(value: unknown, requiredKeys: readonly string[]): T {
@@ -169,7 +198,7 @@ export async function restorePublicBookingHold(
 export async function confirmPublicBooking(
   input: ConfirmPublicBookingInput & { sessionToken: string },
 ) {
-  const data = await callBookingRpc("public_booking_confirm_session_v4", {
+  const confirmationParameters = {
     p_contact_preference: input.contactPreference,
     p_email: input.email,
     p_full_name: input.fullName,
@@ -182,6 +211,16 @@ export async function confirmPublicBooking(
     p_selection_id: input.selectionId,
     p_selection_version: input.selectionVersion,
     p_session_key_hash: hashPublicBookingSecret(input.sessionToken),
+  };
+  const data = await callBookingRpcWithMissingFunctionFallback({
+    allowFallback: !input.careEmailOptIn,
+    fallbackFunctionName: "public_booking_confirm_session_v4",
+    fallbackParameters: confirmationParameters,
+    functionName: "public_booking_confirm_session_v5",
+    parameters: {
+      p_care_email_opt_in: input.careEmailOptIn,
+      ...confirmationParameters,
+    },
   });
 
   return requireRecord<PublicBookingConfirmation>(data, [

@@ -1,4 +1,5 @@
 export { BlogArticleEditor, type BlogArticleEditorProps } from "./BlogArticleEditor";
+export { BlogLocaleTabs, type BlogLocaleTabsProps } from "./BlogLocaleTabs";
 export { BlogEditor, type BlogEditorProps } from "./BlogEditor";
 export {
   BlogEditorToolbar,
@@ -19,6 +20,14 @@ export {
   serializeArticleDraft,
   validateArticleDraft,
 } from "./article-safety";
+export {
+  BLOG_ADMIN_LOCALE_ORDER,
+  BLOG_LOCALE_LABELS,
+  getBlogPostLocale,
+  getBlogTranslationStatusLabel,
+  groupLocalizedBlogArticles,
+  type LocalizedBlogArticle,
+} from "./localized-articles";
 export {
   BLOG_LOCALES,
   BLOG_STATUSES,

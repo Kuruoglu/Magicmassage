@@ -38,6 +38,7 @@ export default async function ContactsPage({ params }: ContactsPageProps) {
   return (
     <PublicPageShell locale={locale} currentPage="contacts" content={getHomeContent(locale)} {...shellRuntime}>
       <ContactsPageView
+        businessDetails={shellRuntime.businessDetails}
         locale={locale}
         content={getPublicPagesContent(locale).contacts}
         mediaPlacements={shellRuntime.mediaPlacements}

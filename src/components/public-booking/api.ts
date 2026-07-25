@@ -281,6 +281,7 @@ export async function confirmPublicBooking(input: {
   const row = asRecord(
     await requestJson("/api/public/booking/confirm", {
       body: JSON.stringify({
+        careEmailOptIn: input.contact.careEmailOptIn,
         contactPreference: input.contact.contactPreference,
         email: input.contact.email,
         fullName: input.contact.name,

@@ -1,5 +1,6 @@
 import type {
   Appointment,
+  BlogVisibilityRecord,
   BlogPostRecord,
   CertificateRecord,
   ClientRecord,
@@ -14,6 +15,7 @@ import { serviceLocales, type ServiceLocale, type ServiceTranslationRecord } fro
 import { createAdminSupabaseRepository, type AdminRepository, type AdminSupabaseClient } from "./repository";
 import { createAdminSupabaseClient, type AdminSupabaseEnvSource } from "./supabase-client";
 import { getArticleText, sanitizeArticleHtml } from "@/components/admin/blog/article-safety";
+import { isBusinessHoursSchedule } from "@/lib/business-hours";
 
 const appointmentStatuses = new Set([
   "\u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0430",
@@ -47,10 +49,42 @@ export type AdminAuditAction =
   | "blog.publication"
   | "media.asset"
   | "service.visibility"
+  | "site.blog_visibility"
   | "site.gift_certificates";
+
+export type AdminDeleteInput =
+  | {
+      id: string;
+      type: "appointment";
+      version: number;
+    }
+  | {
+      id: string;
+      type: "client";
+    };
+
+export type AdminDeleteFailureReason =
+  | "appointment_concurrent_update"
+  | "appointment_email_delivery_in_progress"
+  | "client_has_appointments"
+  | "record_not_found";
+
+export type AdminDeleteResult =
+  | {
+      mode: "supabase";
+      ok: true;
+      record?: ClientRecord;
+    }
+  | {
+      message: string;
+      mode: "demo" | "supabase";
+      ok: false;
+      reason?: AdminDeleteFailureReason;
+    };
 
 export type AdminAuditContext = {
   action: AdminAuditAction;
+  notifyClient?: boolean;
   outsideWorkingHours?: boolean;
   overlapOverride?: boolean;
 };
@@ -59,6 +93,10 @@ type AdminPersistRecordInput =
   | {
       record: Appointment;
       type: "appointment";
+    }
+  | {
+      record: BlogVisibilityRecord;
+      type: "blogVisibility";
     }
   | {
       record: BlogPostRecord;
@@ -105,12 +143,14 @@ export type AdminPersistResult =
   | {
       mode: "supabase";
       ok: true;
+      record?: ClientRecord;
     }
   | {
       message: string;
       mode: "demo" | "supabase";
       ok: false;
       reason?: AdminPersistFailureReason;
+      record?: ClientRecord;
     };
 
 export type AdminPersistFailureReason =
@@ -118,6 +158,11 @@ export type AdminPersistFailureReason =
   | "appointment_concurrent_update"
   | "appointment_overlap_conflict"
   | "appointment_public_hold_conflict"
+  | "blog_locale_immutable"
+  | "blog_locale_slug_conflict"
+  | "blog_translation_key_immutable"
+  | "blog_translation_locale_conflict"
+  | "care_email_consent_conflict"
   | "public_appointment_immutable";
 
 const adminPersistFailureReasons = new Set<AdminPersistFailureReason>([
@@ -125,6 +170,11 @@ const adminPersistFailureReasons = new Set<AdminPersistFailureReason>([
   "appointment_concurrent_update",
   "appointment_overlap_conflict",
   "appointment_public_hold_conflict",
+  "blog_locale_immutable",
+  "blog_locale_slug_conflict",
+  "blog_translation_key_immutable",
+  "blog_translation_locale_conflict",
+  "care_email_consent_conflict",
   "public_appointment_immutable",
 ]);
 
@@ -145,9 +195,11 @@ type AdminPersistDependencies = {
   ) => Pick<
     AdminRepository,
     | "saveAppointment"
+    | "saveBlogVisibility"
     | "saveBlogPost"
     | "saveCertificate"
     | "saveClient"
+    | "loadDomainRecords"
     | "saveContactChannel"
     | "saveContactSettings"
     | "saveMedia"
@@ -155,6 +207,14 @@ type AdminPersistDependencies = {
     | "saveService"
     | "saveSettings"
   >;
+  env?: AdminSupabaseEnvSource;
+};
+
+type AdminDeleteDependencies = {
+  createClient?: (env?: AdminSupabaseEnvSource) => AdminSupabaseClient | null;
+  createRepository?: (
+    client: AdminSupabaseClient,
+  ) => Pick<AdminRepository, "deleteAppointment" | "deleteClient">;
   env?: AdminSupabaseEnvSource;
 };
 
@@ -247,7 +307,14 @@ function isEmail(value: unknown) {
 }
 
 function isPhone(value: unknown) {
-  return typeof value === "string" && /^\+?[0-9\s().-]{7,24}$/.test(value.trim()) && value.replace(/\D/g, "").length >= 7;
+  if (
+    typeof value !== "string" ||
+    value !== value.trim() ||
+    !/^\+?[0-9 ().-]{7,24}$/.test(value)
+  ) return false;
+
+  const digitCount = value.replace(/\D/g, "").length;
+  return digitCount >= 7 && digitCount <= 15;
 }
 
 function isHttpUrl(value: unknown) {
@@ -272,6 +339,12 @@ function isClientRecordShape(record: Record<string, unknown>) {
   return (
     hasOnlyKeys(record, [
       "email",
+      "careEmailConsentAt",
+      "careEmailConsentSource",
+      "careEmailExpectedConsentAt",
+      "careEmailExpectedConsentSource",
+      "careEmailExpectedWithdrawnAt",
+      "careEmailWithdrawnAt",
       "history",
       "id",
       "language",
@@ -287,6 +360,19 @@ function isClientRecordShape(record: Record<string, unknown>) {
       "visits",
     ]) &&
     (record.email === "" || isEmail(record.email)) &&
+    isOptionalIsoTimestamp(record.careEmailConsentAt) &&
+    (record.careEmailConsentSource === undefined ||
+      record.careEmailConsentSource === "admin_recorded" ||
+      record.careEmailConsentSource === "public_booking") &&
+    (record.careEmailExpectedConsentAt === null ||
+      isOptionalIsoTimestamp(record.careEmailExpectedConsentAt)) &&
+    (record.careEmailExpectedConsentSource === null ||
+      record.careEmailExpectedConsentSource === undefined ||
+      record.careEmailExpectedConsentSource === "admin_recorded" ||
+      record.careEmailExpectedConsentSource === "public_booking") &&
+    (record.careEmailExpectedWithdrawnAt === null ||
+      isOptionalIsoTimestamp(record.careEmailExpectedWithdrawnAt)) &&
+    isOptionalIsoTimestamp(record.careEmailWithdrawnAt) &&
     hasArray(record, "history") &&
     hasString(record, "id") &&
     hasString(record, "language") &&
@@ -564,6 +650,13 @@ function isMediaRecordShape(record: Record<string, unknown>) {
 }
 
 function isContactChannelRecordShape(record: Record<string, unknown>) {
+  const reservedType = {
+    "contact-email": "Email",
+    "contact-map": "Карта",
+    "contact-phone": "Телефон",
+    "contact-studio24": "Бронирование",
+  }[String(record.id)];
+
   return (
     hasOnlyKeys(record, ["id", "name", "note", "status", "type", "usage", "value"]) &&
     hasString(record, "id") &&
@@ -572,13 +665,18 @@ function isContactChannelRecordShape(record: Record<string, unknown>) {
     hasString(record, "status") &&
     hasString(record, "type") &&
     hasStringArray(record, "usage") &&
-    hasString(record, "value")
+    hasString(record, "value") &&
+    (!reservedType || record.type === reservedType) &&
+    (record.type !== "Телефон" || isPhone(record.value)) &&
+    (record.type !== "Email" || isEmail(record.value)) &&
+    (record.type !== "Карта" || isHttpUrl(record.value)) &&
+    (record.type !== "Бронирование" || isHttpUrl(record.value))
   );
 }
 
 function isContactSettingsRecordShape(record: Record<string, unknown>) {
   return (
-    hasOnlyKeys(record, ["address", "bookingUrl", "businessName", "email", "mapUrl", "phone", "seoArea", "workingHours"]) &&
+    hasOnlyKeys(record, ["address", "bookingUrl", "businessName", "email", "mapUrl", "phone", "seoArea", "workingHours", "workingSchedule"]) &&
     hasString(record, "address") &&
     isHttpUrl(record.bookingUrl) &&
     hasString(record, "businessName") &&
@@ -586,7 +684,8 @@ function isContactSettingsRecordShape(record: Record<string, unknown>) {
     isHttpUrl(record.mapUrl) &&
     isPhone(record.phone) &&
     hasString(record, "seoArea") &&
-    hasString(record, "workingHours")
+    hasString(record, "workingHours") &&
+    isBusinessHoursSchedule(record.workingSchedule)
   );
 }
 
@@ -617,6 +716,7 @@ function isBlogPostRecordShape(record: Record<string, unknown>) {
       "status",
       "tags",
       "title",
+      "translationKey",
       "updatedAt",
     ]) &&
     hasString(record, "author") &&
@@ -630,6 +730,7 @@ function isBlogPostRecordShape(record: Record<string, unknown>) {
     isOptionalStringRecord(record.hreflang) &&
     hasString(record, "id") &&
     isPublicLocaleArray(record.locales) &&
+    record.locales.length === 1 &&
     isOptionalString(record.ogDescription) &&
     isOptionalString(record.ogTitle) &&
     isOptionalIsoDate(record.publishedAt) &&
@@ -642,6 +743,8 @@ function isBlogPostRecordShape(record: Record<string, unknown>) {
     blogStatuses.has(record.status) &&
     hasStringArray(record, "tags") &&
     hasString(record, "title") &&
+    hasString(record, "translationKey") &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(record.translationKey as string) &&
     isIsoDate(record.updatedAt);
 
   if (!hasValidShape || (record.status !== publishedStatus && record.status !== scheduledStatus)) {
@@ -665,10 +768,16 @@ function isBlogPostRecordShape(record: Record<string, unknown>) {
   );
 }
 
+function isBlogVisibilityRecordShape(record: Record<string, unknown>) {
+  return hasOnlyKeys(record, ["enabled"]) && typeof record.enabled === "boolean";
+}
+
 function isSettingsRecordShape(record: Record<string, unknown>) {
   return (
     hasOnlyKeys(record, [
       "auditLogRetentionDays",
+      "blogEnabled",
+      "bookingCustomerEmailsEnabled",
       "bookingBufferMinutes",
       "bookingHoldMinutes",
       "bookingHorizonDays",
@@ -681,11 +790,15 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
       "defaultLocale",
       "defaultSeoTitle",
       "emailSender",
+      "emailReviewUrl",
+      "careEmailsEnabled",
       "googleCalendarId",
       "googleCalendarMode",
       "giftCertificatesEnabled",
       "publicBookingDailyLimit",
       "publicBookingEnabled",
+      "ownerNotificationEmail",
+      "ownerNotificationsEnabled",
       "reminderTemplate",
       "rolesPolicy",
       "stripeMode",
@@ -695,6 +808,8 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
       "workingHours",
     ]) &&
     hasNumber(record, "auditLogRetentionDays") &&
+    (record.blogEnabled === undefined || typeof record.blogEnabled === "boolean") &&
+    (record.bookingCustomerEmailsEnabled === undefined || typeof record.bookingCustomerEmailsEnabled === "boolean") &&
     hasNumber(record, "bookingBufferMinutes") &&
     [15, 30].includes(record.bookingBufferMinutes as number) &&
     hasNumber(record, "bookingHoldMinutes") &&
@@ -713,6 +828,13 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     hasString(record, "defaultLocale") &&
     hasString(record, "defaultSeoTitle") &&
     isEmail(record.emailSender) &&
+    (record.emailReviewUrl === undefined || record.emailReviewUrl === "" ||
+      (isHttpUrl(record.emailReviewUrl) && String(record.emailReviewUrl).startsWith("https://"))) &&
+    (record.careEmailsEnabled === undefined || typeof record.careEmailsEnabled === "boolean") &&
+    (record.careEmailsEnabled !== true ||
+      (typeof record.emailReviewUrl === "string" &&
+        record.emailReviewUrl.startsWith("https://") &&
+        isHttpUrl(record.emailReviewUrl))) &&
     hasString(record, "googleCalendarId") &&
     hasString(record, "googleCalendarMode") &&
     (record.giftCertificatesEnabled === undefined || typeof record.giftCertificatesEnabled === "boolean") &&
@@ -720,6 +842,9 @@ function isSettingsRecordShape(record: Record<string, unknown>) {
     Number(record.publicBookingDailyLimit) >= 1 &&
     Number(record.publicBookingDailyLimit) <= 8 &&
     typeof record.publicBookingEnabled === "boolean" &&
+    (record.ownerNotificationEmail === undefined || record.ownerNotificationEmail === "" || isEmail(record.ownerNotificationEmail)) &&
+    (record.ownerNotificationsEnabled === undefined || typeof record.ownerNotificationsEnabled === "boolean") &&
+    (record.ownerNotificationsEnabled !== true || isEmail(record.ownerNotificationEmail)) &&
     hasString(record, "reminderTemplate") &&
     hasString(record, "rolesPolicy") &&
     hasString(record, "stripeMode") &&
@@ -739,6 +864,7 @@ const auditActionsByType: Record<AdminPersistInput["type"], readonly AdminAuditA
     "appointment.resize",
     "appointment.update",
   ],
+  blogVisibility: ["site.blog_visibility"],
   blogPost: ["blog.publication"],
   certificate: [],
   client: [],
@@ -752,17 +878,18 @@ const auditActionsByType: Record<AdminPersistInput["type"], readonly AdminAuditA
 
 function isAdminAuditContext(value: unknown, type: AdminPersistInput["type"]) {
   if (value === undefined) return auditActionsByType[type].length === 0;
-  if (!isObjectRecord(value) || !hasOnlyKeys(value, ["action", "outsideWorkingHours", "overlapOverride"])) {
+  if (!isObjectRecord(value) || !hasOnlyKeys(value, ["action", "notifyClient", "outsideWorkingHours", "overlapOverride"])) {
     return false;
   }
 
   return (
     typeof value.action === "string" &&
     auditActionsByType[type].includes(value.action as AdminAuditAction) &&
+    (value.notifyClient === undefined || typeof value.notifyClient === "boolean") &&
     (value.outsideWorkingHours === undefined || typeof value.outsideWorkingHours === "boolean") &&
     (value.overlapOverride === undefined || typeof value.overlapOverride === "boolean") &&
     (type === "appointment" ||
-      (value.outsideWorkingHours === undefined && value.overlapOverride === undefined))
+      (value.notifyClient === undefined && value.outsideWorkingHours === undefined && value.overlapOverride === undefined))
   );
 }
 
@@ -784,6 +911,10 @@ export function isAdminPersistInput(input: unknown): input is AdminPersistInput 
 
   if (input.type === "blogPost") {
     return isBlogPostRecordShape(input.record);
+  }
+
+  if (input.type === "blogVisibility") {
+    return isBlogVisibilityRecordShape(input.record);
   }
 
   if (input.type === "certificate") {
@@ -821,6 +952,66 @@ export function isAdminPersistInput(input: unknown): input is AdminPersistInput 
   return false;
 }
 
+export function isAdminDeleteInput(input: unknown): input is AdminDeleteInput {
+  if (!isObjectRecord(input) || !isNonBlankString(input.id)) return false;
+
+  if (input.type === "appointment") {
+    return hasOnlyKeys(input, ["id", "type", "version"]) &&
+      typeof input.version === "number" &&
+      Number.isInteger(input.version) &&
+      input.version > 0;
+  }
+
+  return input.type === "client" && hasOnlyKeys(input, ["id", "type"]);
+}
+
+function getAdminDeleteFailureReason(error: unknown): AdminDeleteFailureReason | undefined {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message.includes("appointment_concurrent_update")) return "appointment_concurrent_update";
+  if (message.includes("appointment_email_delivery_in_progress")) return "appointment_email_delivery_in_progress";
+  if (message.includes("client_has_appointments")) return "client_has_appointments";
+  if (message.includes("record_not_found")) return "record_not_found";
+  return undefined;
+}
+
+export async function deleteAdminRecord(
+  input: AdminDeleteInput,
+  {
+    createClient = createAdminSupabaseClient,
+    createRepository = createAdminSupabaseRepository,
+    env = process.env,
+  }: AdminDeleteDependencies = {},
+): Promise<AdminDeleteResult> {
+  const client = createClient(env);
+
+  if (!client) {
+    return {
+      message: "Supabase is not configured.",
+      mode: "demo",
+      ok: false,
+    };
+  }
+
+  try {
+    const repository = createRepository(client);
+    if (input.type === "appointment") await repository.deleteAppointment(input.id, input.version);
+    else await repository.deleteClient(input.id);
+
+    return { mode: "supabase", ok: true };
+  } catch (error) {
+    console.error("Unable to delete admin record", error);
+    const reason = getAdminDeleteFailureReason(error);
+
+    return {
+      message: "Unable to delete admin record.",
+      mode: "supabase",
+      ok: false,
+      ...(reason ? { reason } : {}),
+    };
+  }
+}
+
 export async function persistAdminRecord(
   input: AdminPersistInput,
   {
@@ -839,11 +1030,14 @@ export async function persistAdminRecord(
     };
   }
 
+  const repository = createRepository(client);
   try {
-    const repository = createRepository(client);
+    let savedClient: ClientRecord | undefined;
 
-    if (input.type === "client") {
-      await repository.saveClient(input.record);
+    if (input.type === "blogVisibility") {
+      await repository.saveBlogVisibility(input.record.enabled);
+    } else if (input.type === "client") {
+      savedClient = await repository.saveClient(input.record);
     } else if (input.type === "blogPost") {
       await repository.saveBlogPost({ ...input.record, body: sanitizeArticleHtml(input.record.body) });
     } else if (input.type === "certificate") {
@@ -867,16 +1061,29 @@ export async function persistAdminRecord(
     return {
       mode: "supabase",
       ok: true,
+      ...(savedClient ? { record: savedClient } : {}),
     };
   } catch (error) {
     console.error("Unable to persist admin record", error);
     const reason = getAdminPersistFailureReason(error);
+
+    let currentClient: ClientRecord | undefined;
+    if (reason === "care_email_consent_conflict" && input.type === "client") {
+      try {
+        currentClient = (await repository.loadDomainRecords()).clients.find(
+          (clientRecord) => clientRecord.id === input.record.id,
+        );
+      } catch {
+        currentClient = undefined;
+      }
+    }
 
     return {
       message: "Unable to persist admin record.",
       mode: "supabase",
       ok: false,
       ...(reason ? { reason } : {}),
+      ...(currentClient ? { record: currentClient } : {}),
     };
   }
 }

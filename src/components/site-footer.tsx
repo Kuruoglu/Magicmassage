@@ -3,18 +3,28 @@ import {
   messengerLinks,
   telegramUsername,
 } from "@/config/messengers";
-import { businessFacts } from "@/config/business";
 import type { HomeContent } from "@/content/home";
 import type { Locale } from "@/i18n/config";
+import { localizeBusinessHoursSchedule, toPhoneHref } from "@/lib/business-hours";
+import type { PublicBusinessDetails } from "@/lib/public-content";
 import { getPublicPagePath } from "@/navigation/public-routes";
 import { MessengerIcon } from "./messenger-icon";
 
 type SiteFooterProps = {
+  businessDetails?: PublicBusinessDetails;
   content: HomeContent;
   locale: Locale;
 };
 
-export function SiteFooter({ content, locale }: SiteFooterProps) {
+export function SiteFooter({ businessDetails, content, locale }: SiteFooterProps) {
+  const address = businessDetails?.address ?? content.contact.address;
+  const phone = businessDetails?.phone ?? content.contact.phone;
+  const phoneHref = toPhoneHref(phone);
+  const hoursSchedule = businessDetails
+    ? localizeBusinessHoursSchedule(locale, businessDetails.workingSchedule)
+    : content.contact.hoursSchedule;
+  const viberHref = `viber://chat?number=${encodeURIComponent(phoneHref)}`;
+
   return (
     <footer className="site-footer" id="contact">
       <div className="site-footer-inner" data-testid="site-footer-inner">
@@ -25,11 +35,11 @@ export function SiteFooter({ content, locale }: SiteFooterProps) {
         <dl>
           <div>
             <dt>{content.contact.addressLabel}</dt>
-            <dd>{content.contact.address}</dd>
+            <dd>{address}</dd>
           </div>
           <div>
             <dt>{content.contact.phoneLabel}</dt>
-            <dd><a href={`tel:${businessFacts.phone.tel}`}>{content.contact.phone}</a></dd>
+            <dd><a href={`tel:${phoneHref}`}>{phone}</a></dd>
           </div>
           <div className="footer-hours">
             <dt>
@@ -43,7 +53,7 @@ export function SiteFooter({ content, locale }: SiteFooterProps) {
             </dt>
             <dd>
               <ul className="footer-hours-list" aria-label={content.contact.hoursLabel}>
-                {content.contact.hoursSchedule.map((item) => (
+                {hoursSchedule.map((item) => (
                   <li key={item.day}>
                     <span>{item.day}</span>
                     <span>{item.time}</span>
@@ -68,14 +78,14 @@ export function SiteFooter({ content, locale }: SiteFooterProps) {
           </a>
           <a
             className="messenger-link messenger-link-viber"
-            href={messengerLinks.viber.href}
+            href={viberHref}
             {...externalMessengerLinkProps}
           >
             <span aria-hidden="true">
               <MessengerIcon name="viber" />
             </span>
             <strong>Viber</strong>
-            <small>{content.contact.phone}</small>
+            <small>{phone}</small>
           </a>
         </div>
         <div className="footer-bottom">

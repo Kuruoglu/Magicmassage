@@ -30,8 +30,13 @@ export default async function BlogPostLayout({ children, params }: BlogPostLayou
     [locale, getBlogPostPath(locale, slug)],
   ]);
 
+  if (!shellRuntime.blogEnabled) {
+    notFound();
+  }
+
   return (
     <PublicPageShell
+      currentPage="blog"
       locale={locale}
       content={getHomeContent(locale)}
       localePaths={localePaths}

@@ -43,6 +43,16 @@ admin/CRM platform:
   all participate in public availability.
 - Gift certificates use an embedded Stripe Payment Element and remain guarded by
   the existing feature and live-payment flags.
+- Transactional booking and certificate email uses a Supabase outbox processed
+  by a protected Resend worker every five minutes. Booking confirmation,
+  reschedule, cancellation, 24-hour reminder, opted-in post-visit care, owner
+  booking alerts, and paid-certificate delivery are independent, deduplicated
+  notifications. All email feature flags start disabled.
+- Customer email remains optional. When supplied, it may receive operational
+  booking messages regardless of the preferred phone or messaging channel.
+- Post-visit care email requires a separate affirmative consent and provides a
+  confirmation page plus a POST-only withdrawal action. Recipient payloads are
+  redacted 90 days after a final delivery state.
 - Google Maps may load only after cookie consent or through another privacy-safe
   pattern.
 
@@ -78,7 +88,7 @@ Important booking invariants:
 ## Explicitly Out Of Scope
 
 - Customer accounts, self-service cancellation, and self-service rescheduling.
-- Booking emails, reminders, and Telegram automation.
+- Telegram booking automation and bulk marketing campaigns.
 - Online deposits or massage payments outside the gift-certificate flow.
 - Waiting lists, packages, loyalty, and promotion codes.
 - Two-way Google Calendar synchronization.

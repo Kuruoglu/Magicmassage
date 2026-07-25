@@ -92,6 +92,7 @@ export type CreatePublicBookingHoldInput = {
 };
 
 export type ConfirmPublicBookingInput = {
+  careEmailOptIn: boolean;
   contactPreference: PublicBookingContactPreference;
   email: string | null;
   fullName: string;

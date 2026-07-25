@@ -30,16 +30,26 @@ import {
 } from "@/admin/demo-data";
 import type { AdminShellInitialData } from "@/admin/data-source";
 import type { AdminUserActionInput, AdminUserActionResult } from "@/admin/admin-user-actions";
-import type { AdminAuditAction, AdminPersistInput } from "@/admin/persistence";
+import type { AdminAuditAction, AdminDeleteInput, AdminPersistInput } from "@/admin/persistence";
+import { normalizeMediaStatus } from "@/admin/media-status";
 import { businessFacts, businessMapUrls } from "@/config/business";
+import {
+  cloneBusinessHoursSchedule,
+  defaultBusinessHoursSchedule,
+  formatBusinessHoursSummary,
+  isBusinessHoursSchedule,
+  type BusinessHoursDay,
+} from "@/lib/business-hours";
 import { matchesSearch, isValidEmail, parseCommaList } from "@/components/admin/lib/filters";
 import { formatCurrency, isPositiveInteger, statusClass } from "@/components/admin/lib/formatters";
 import { useTransientStatus } from "@/components/admin/lib/use-transient-status";
 import {
   AdminDrawer,
   AdminDrawerBody,
+  AdminDrawerFooter,
   AdminDrawerHeader,
   AdminDrawerSection,
+  useAdminDrawerClose,
 } from "@/components/admin/drawer";
 import {
   adminSectionHref,
@@ -63,9 +73,11 @@ import {
   CalendarAppointmentCancelDialog,
   CalendarAppointmentDialog,
   CalendarBlockDialog,
+  CalendarTimeSelectionDialog,
   CalendarWorkspace,
   classifyAppointmentAgainstSchedule,
   createCalendarWorkingSchedule,
+  createCalendarBlockMutationPayload,
   createSpecialistWorkingSchedule,
   formatCalendarDay,
   getSofiaIsoDate,
@@ -76,11 +88,15 @@ import {
   type CalendarAppointmentFocus,
   type CalendarAppointmentSaveResult,
   type CalendarBlockSaveResult,
+  type CalendarTimeSelection,
   type SpecialistScheduleSaveResult,
 } from "@/components/admin/calendar";
 import { getAdminAuthorizationHeader, signOutAdminBrowserSession } from "@/lib/supabase/browser";
 import { AdminMobileHeader, AdminMobileNavigation } from "@/components/admin/mobile";
 import { AdminSecurityAlerts } from "@/components/admin/security-alerts";
+import { AdminRecordDeleteDialog } from "@/components/admin/AdminRecordDeleteDialog";
+import { EmailNotificationStatusList, EmailTemplatePreview } from "@/components/admin/email-notifications";
+import { GiftCertificateReconciliationList } from "@/components/admin/certificates/GiftCertificateReconciliationList";
 import {
   MediaDetail,
   MediaGrid,
@@ -95,11 +111,20 @@ import {
   ClientForm,
   ClientNotes,
   ClientVisitHistory,
+  PostVisitCommentQueue,
 } from "@/components/admin/clients";
 import {
+  BLOG_LOCALES,
+  BLOG_LOCALE_LABELS,
   BlogArticleEditor,
+  BlogLocaleTabs,
   createEmptyBlogArticle,
+  getBlogPostLocale,
+  getBlogTranslationStatusLabel,
+  groupLocalizedBlogArticles,
+  serializeArticleDraft,
   type BlogArticleDraft,
+  type BlogLocale,
   type BlogStatus as BlogEditorStatus,
 } from "@/components/admin/blog";
 
@@ -107,6 +132,7 @@ import {
   certificateBelongsToClient,
   createAdminDemoRecords,
   findAppointmentClient,
+  getAppointmentNotificationEmail,
   findCertificateClient,
   findClientAppointments,
   findClientByIdentity,
@@ -161,6 +187,40 @@ function getSofiaWalkInWindow(now = new Date()) {
     `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
   return { endsAt: format(endMinutes), startsAt: format(startMinutes) };
+}
+
+function getLocalDateTimeKey(now: Date, timeZone: string) {
+  const formatInTimeZone = (resolvedTimeZone: string) => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        day: "2-digit",
+        hour: "2-digit",
+        hourCycle: "h23",
+        minute: "2-digit",
+        month: "2-digit",
+        second: "2-digit",
+        timeZone: resolvedTimeZone,
+        year: "numeric",
+      }).formatToParts(now).map((part) => [part.type, part.value]),
+    );
+
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+  };
+
+  try {
+    return formatInTimeZone(timeZone);
+  } catch {
+    return formatInTimeZone("Europe/Sofia");
+  }
+}
+
+function isUpcomingAppointment(appointment: Appointment, currentDateTimeKey: string) {
+  if (appointment.status === "Отменена") {
+    return false;
+  }
+
+  const appointmentDateTimeKey = `${appointment.date}T${appointment.time.slice(0, 5)}:00`;
+  return appointmentDateTimeKey > currentDateTimeKey;
 }
 
 type AdminCalendarAction = "create";
@@ -238,6 +298,7 @@ type ContactChannelFormState = {
 };
 type SettingsFormState = {
   auditLogRetentionDays: string;
+  bookingCustomerEmailsEnabled: boolean;
   bookingBufferMinutes: string;
   businessName: string;
   cookiePrivacyMode: string;
@@ -246,9 +307,13 @@ type SettingsFormState = {
   defaultLocale: string;
   defaultSeoTitle: string;
   emailSender: string;
+  emailReviewUrl: string;
   googleCalendarId: string;
   googleCalendarMode: CalendarSyncMode;
   giftCertificatesEnabled: boolean;
+  careEmailsEnabled: boolean;
+  ownerNotificationEmail: string;
+  ownerNotificationsEnabled: boolean;
   publicBookingDailyLimit: string;
   publicBookingEnabled: boolean;
   reminderTemplate: string;
@@ -329,8 +394,22 @@ const adminRolePermissionSummary: Record<AdminRoleId, { items: string[]; scope: 
 const certificateStatusOptions: CertificateStatus[] = ["Оплачено", "Отправлен", "Ожидает PDF", "Погашен"];
 const priceStatusOptions: PriceStatus[] = ["Активна", "Скрыта"];
 const mediaTypeOptions: MediaType[] = ["Фото", "Документ"];
-const mediaStatusOptions: MediaStatus[] = ["Готово", "Требует alt", "Черновик"];
 const contactChannelTypeOptions: ContactChannelType[] = ["Телефон", "Email", "Мессенджер", "Соцсеть", "Карта", "Бронирование"];
+const reservedContactChannelTypes: Partial<Record<string, ContactChannelType>> = {
+  "contact-email": "Email",
+  "contact-map": "Карта",
+  "contact-phone": "Телефон",
+  "contact-studio24": "Бронирование",
+};
+const businessHoursDayLabels = [
+  "Понедельник",
+  "Вторник",
+  "Среда",
+  "Четверг",
+  "Пятница",
+  "Суббота",
+  "Воскресенье",
+] as const;
 const contactStatusOptions: ContactStatus[] = ["Активен", "Черновик", "Скрыт"];
 const calendarSyncModeOptions: CalendarSyncMode[] = ["Отключена", "Внутренний календарь главный", "Односторонняя", "Двусторонняя позже"];
 const stripeModeOptions: StripeMode[] = ["Тестовый", "Live после подтверждения"];
@@ -355,8 +434,8 @@ const settingsGroups: Array<{ id: SettingsGroupId; status: string; summary: stri
   },
   {
     id: "email",
-    status: "Черновик",
-    summary: "Email отправителя и шаблоны будущих уведомлений.",
+    status: "Готово",
+    summary: "Транзакционные письма клиентам, уведомления Натали и письмо после визита.",
     title: "Email",
   },
   {
@@ -495,6 +574,7 @@ const initialContactSettings: ContactSettingsRecord = {
   phone: businessFacts.phone.display,
   seoArea: "Burgas, Bulgaria",
   workingHours: "Пн-Сб 10:00-19:00",
+  workingSchedule: cloneBusinessHoursSchedule(defaultBusinessHoursSchedule),
 };
 const initialContactChannels: ContactChannelRecord[] = [
   {
@@ -567,6 +647,7 @@ const initialBlogPostRows: BlogPostRecord[] = [
     status: "Опубликована",
     tags: ["подготовка", "первый визит"],
     title: "Подготовка к первому массажу",
+    translationKey: "blog-first-massage-preparation",
     updatedAt: "2026-07-07",
   },
   {
@@ -583,6 +664,7 @@ const initialBlogPostRows: BlogPostRecord[] = [
     status: "Черновик",
     tags: ["лимфодренаж", "услуги"],
     title: "Лимфодренаж: когда он уместен",
+    translationKey: "blog-lymphatic-draft",
     updatedAt: "2026-07-07",
   },
   {
@@ -599,11 +681,14 @@ const initialBlogPostRows: BlogPostRecord[] = [
     status: "Запланирована",
     tags: ["сертификат", "подарок"],
     title: "Подарочный сертификат без стресса",
+    translationKey: "blog-gift-certificate",
     updatedAt: "2026-07-07",
   },
 ];
 const initialSettingsRecord: SettingsRecord = {
   auditLogRetentionDays: 180,
+  blogEnabled: true,
+  bookingCustomerEmailsEnabled: false,
   bookingBufferMinutes: 30,
   bookingHoldMinutes: 5,
   bookingHorizonDays: 60,
@@ -616,9 +701,13 @@ const initialSettingsRecord: SettingsRecord = {
   defaultLocale: "bg",
   defaultSeoTitle: "Magic Massage Natali - массаж в Бургасе",
   emailSender: businessFacts.email,
+  emailReviewUrl: "",
   googleCalendarId: "",
   googleCalendarMode: "Внутренний календарь главный",
   giftCertificatesEnabled: true,
+  careEmailsEnabled: false,
+  ownerNotificationEmail: "",
+  ownerNotificationsEnabled: false,
   publicBookingDailyLimit: 8,
   publicBookingEnabled: false,
   reminderTemplate: "Напоминание за 24 часа до записи после запуска email-провайдера.",
@@ -754,6 +843,7 @@ function buildInitialPriceRows(initialData?: AdminShellInitialData): PriceRecord
 function buildInitialMediaRows(initialData?: AdminShellInitialData): MediaRecord[] {
   return (initialData?.media ?? initialMediaRows).map((item) => ({
     ...item,
+    status: normalizeMediaStatus(item.status, item.altText),
     usage: [...item.usage],
   }));
 }
@@ -862,7 +952,7 @@ function buildMediaFormState(media?: MediaRecord): MediaFormState {
     name: media?.name ?? "",
     publicationConsent: media?.publicationConsent ?? "unknown",
     size: media?.size ?? "",
-    status: media?.status ?? "Черновик",
+    status: media ? normalizeMediaStatus(media.status, media.altText) : "Черновик",
     type: media?.type ?? "Фото",
     uploadedAt: media?.uploadedAt ?? "2026-07-07",
     url: media?.url ?? "",
@@ -882,7 +972,10 @@ function buildContactChannelFormState(channel?: ContactChannelRecord): ContactCh
 }
 
 function buildContactSettingsFormState(settings: ContactSettingsRecord): ContactSettingsRecord {
-  return { ...settings };
+  return {
+    ...settings,
+    workingSchedule: cloneBusinessHoursSchedule(settings.workingSchedule),
+  };
 }
 
 const blogEditorStatusByStatus: Record<BlogStatus, BlogEditorStatus> = {
@@ -932,6 +1025,7 @@ function editorDraftToBlogPost(
   draft: BlogArticleDraft,
   original?: BlogPostRecord,
   draftRecordId?: string,
+  translationKey?: string,
 ): BlogPostRecord {
   const id = original?.id ?? draftRecordId ?? `blog-${crypto.randomUUID()}`;
   const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft.slug)
@@ -961,6 +1055,7 @@ function editorDraftToBlogPost(
     status: blogStatusByEditorStatus[draft.status],
     tags: [...draft.tags],
     title: draft.title,
+    translationKey: original?.translationKey ?? translationKey ?? id,
     updatedAt: getSofiaIsoDate(),
   };
 }
@@ -968,6 +1063,7 @@ function editorDraftToBlogPost(
 function buildSettingsFormState(settings: SettingsRecord): SettingsFormState {
   return {
     auditLogRetentionDays: String(settings.auditLogRetentionDays),
+    bookingCustomerEmailsEnabled: settings.bookingCustomerEmailsEnabled ?? false,
     bookingBufferMinutes: String(settings.bookingBufferMinutes),
     businessName: settings.businessName,
     cookiePrivacyMode: settings.cookiePrivacyMode,
@@ -976,9 +1072,13 @@ function buildSettingsFormState(settings: SettingsRecord): SettingsFormState {
     defaultLocale: settings.defaultLocale,
     defaultSeoTitle: settings.defaultSeoTitle,
     emailSender: settings.emailSender,
+    emailReviewUrl: settings.emailReviewUrl ?? "",
     googleCalendarId: settings.googleCalendarId,
     googleCalendarMode: settings.googleCalendarMode,
     giftCertificatesEnabled: settings.giftCertificatesEnabled !== false,
+    careEmailsEnabled: settings.careEmailsEnabled ?? false,
+    ownerNotificationEmail: settings.ownerNotificationEmail ?? "",
+    ownerNotificationsEnabled: settings.ownerNotificationsEnabled ?? false,
     publicBookingDailyLimit: String(settings.publicBookingDailyLimit ?? settings.dailySlotCapacity),
     publicBookingEnabled: settings.publicBookingEnabled ?? false,
     reminderTemplate: settings.reminderTemplate,
@@ -1743,9 +1843,19 @@ function MediaFormDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState("");
   const isEditing = Boolean(initialMedia);
+  const readinessStatus = normalizeMediaStatus("Готово", form.altText);
+  const mediaStatusOptions: MediaStatus[] = [readinessStatus, "Черновик"];
 
   function updateForm<Field extends keyof MediaFormState>(field: Field, value: MediaFormState[Field]) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+
+      if (field === "altText" && current.status !== "Черновик") {
+        next.status = normalizeMediaStatus("Готово", String(value));
+      }
+
+      return next;
+    });
     setError("");
   }
 
@@ -1847,7 +1957,7 @@ function MediaFormDialog({
         placements: initialMedia?.placements,
         publicationConsent: form.publicationConsent,
         size: form.size.trim(),
-        status: form.status,
+        status: normalizeMediaStatus(form.status, form.altText),
         type: form.type,
         uploadedAt: form.uploadedAt,
         url,
@@ -2025,17 +2135,36 @@ function ContactSettingsDialog({
 }) {
   const [form, setForm] = useState<ContactSettingsRecord>(() => buildContactSettingsFormState(settings));
   const [error, setError] = useState("");
+  const phoneDigitCount = form.phone.replace(/\D/g, "").length;
+  const hasInvalidPhone = (
+    !/^\+?[0-9 ().-]{7,24}$/.test(form.phone.trim()) ||
+    phoneDigitCount < 7 ||
+    phoneDigitCount > 15
+  );
+  const hasInvalidSchedule = !isBusinessHoursSchedule(form.workingSchedule);
 
   function updateForm<Field extends keyof ContactSettingsRecord>(field: Field, value: ContactSettingsRecord[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
     setError("");
   }
 
+  function updateScheduleDay(weekday: number, patch: Partial<BusinessHoursDay>) {
+    updateForm(
+      "workingSchedule",
+      form.workingSchedule.map((day) => (day.weekday === weekday ? { ...day, ...patch } : day)),
+    );
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!form.businessName.trim() || !form.phone.trim() || !form.address.trim()) {
-      setError("Укажите название, телефон и адрес салона.");
+    if (
+      !form.businessName.trim() ||
+      hasInvalidPhone ||
+      !form.address.trim() ||
+      hasInvalidSchedule
+    ) {
+      setError("Укажите название, корректный телефон, адрес и график хотя бы с одним рабочим днём.");
       return;
     }
 
@@ -2047,7 +2176,8 @@ function ContactSettingsDialog({
       mapUrl: form.mapUrl.trim(),
       phone: form.phone.trim(),
       seoArea: form.seoArea.trim(),
-      workingHours: form.workingHours.trim(),
+      workingHours: formatBusinessHoursSummary(form.workingSchedule),
+      workingSchedule: cloneBusinessHoursSchedule(form.workingSchedule),
     });
   }
 
@@ -2079,7 +2209,8 @@ function ContactSettingsDialog({
             <label>
               Телефон
               <input
-                aria-invalid={error && !form.phone.trim() ? "true" : undefined}
+                aria-describedby={error && hasInvalidPhone ? "contact-settings-error" : undefined}
+                aria-invalid={error && hasInvalidPhone ? "true" : undefined}
                 autoComplete="tel"
                 onChange={(event) => updateForm("phone", event.target.value)}
                 required
@@ -2088,7 +2219,7 @@ function ContactSettingsDialog({
               />
             </label>
             {error ? (
-              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+              <p className="admin-form-alert admin-form-alert-wide" id="contact-settings-error" role="alert">
                 {error}
               </p>
             ) : null}
@@ -2107,10 +2238,56 @@ function ContactSettingsDialog({
               Email
               <input autoComplete="email" onChange={(event) => updateForm("email", event.target.value)} type="email" value={form.email} />
             </label>
-            <label>
-              Часы работы
-              <input onChange={(event) => updateForm("workingHours", event.target.value)} type="text" value={form.workingHours} />
-            </label>
+            <fieldset
+              aria-describedby={error && hasInvalidSchedule ? "contact-settings-error" : undefined}
+              aria-invalid={error && hasInvalidSchedule ? "true" : undefined}
+              className="admin-business-hours-fieldset admin-form-wide"
+            >
+              <legend>График работы в футере</legend>
+              <p>Отметьте рабочие дни и укажите время, которое будет показано на всех языковых версиях сайта.</p>
+              <div className="admin-business-hours-list">
+                {form.workingSchedule.map((day) => {
+                  const dayLabel = businessHoursDayLabels[day.weekday - 1];
+
+                  return (
+                    <div className="admin-business-hours-row" key={day.weekday}>
+                      <label className="admin-business-hours-toggle">
+                        <input
+                          aria-label={`${dayLabel}: рабочий день`}
+                          checked={day.isOpen}
+                          onChange={(event) => updateScheduleDay(day.weekday, { isOpen: event.target.checked })}
+                          type="checkbox"
+                        />
+                        <span>{dayLabel}</span>
+                      </label>
+                      <label>
+                        <span>Открытие</span>
+                        <input
+                          aria-label={`${dayLabel}: открытие`}
+                          disabled={!day.isOpen}
+                          onChange={(event) => updateScheduleDay(day.weekday, { opensAt: event.target.value })}
+                          step={1800}
+                          type="time"
+                          value={day.opensAt}
+                        />
+                      </label>
+                      <label>
+                        <span>Закрытие</span>
+                        <input
+                          aria-label={`${dayLabel}: закрытие`}
+                          disabled={!day.isOpen}
+                          onChange={(event) => updateScheduleDay(day.weekday, { closesAt: event.target.value })}
+                          step={1800}
+                          type="time"
+                          value={day.closesAt}
+                        />
+                      </label>
+                      {!day.isOpen ? <span className="admin-business-hours-closed">Выходной</span> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
             <label className="admin-form-wide">
               Studio24 URL
               <input onChange={(event) => updateForm("bookingUrl", event.target.value)} type="url" value={form.bookingUrl} />
@@ -2149,6 +2326,23 @@ function ContactChannelDialog({
   const [form, setForm] = useState<ContactChannelFormState>(() => buildContactChannelFormState(initialChannel));
   const [error, setError] = useState("");
   const isEditing = Boolean(initialChannel);
+  const reservedType = initialChannel ? reservedContactChannelTypes[initialChannel.id] : undefined;
+  const phoneDigitCount = form.value.replace(/\D/g, "").length;
+  const hasInvalidPhone = form.type === "Телефон" && (
+    !/^\+?[0-9 ().-]{7,24}$/.test(form.value.trim()) ||
+    phoneDigitCount < 7 ||
+    phoneDigitCount > 15
+  );
+  const hasInvalidEmail = form.type === "Email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.trim());
+  const hasInvalidUrl = (form.type === "Карта" || form.type === "Бронирование") && (() => {
+    try {
+      const url = new URL(form.value.trim());
+      return url.protocol !== "http:" && url.protocol !== "https:";
+    } catch {
+      return true;
+    }
+  })();
+  const hasInvalidTypedValue = hasInvalidPhone || hasInvalidEmail || hasInvalidUrl;
 
   function updateForm<Field extends keyof ContactChannelFormState>(field: Field, value: ContactChannelFormState[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -2161,8 +2355,16 @@ function ContactChannelDialog({
     const name = form.name.trim();
     const value = form.value.trim();
 
-    if (!name || !value) {
-      setError("Укажите название и значение контакта.");
+    if (!name || !value || hasInvalidTypedValue) {
+      setError(
+        hasInvalidPhone
+          ? "Укажите корректный номер телефона."
+          : hasInvalidEmail
+            ? "Укажите корректный email."
+            : hasInvalidUrl
+              ? "Укажите ссылку, которая начинается с http:// или https://."
+              : "Укажите название и значение контакта.",
+      );
       return;
     }
 
@@ -2207,7 +2409,11 @@ function ContactChannelDialog({
             </label>
             <label>
               Тип
-              <select onChange={(event) => updateForm("type", event.target.value as ContactChannelType)} value={form.type}>
+              <select
+                disabled={Boolean(reservedType)}
+                onChange={(event) => updateForm("type", event.target.value as ContactChannelType)}
+                value={form.type}
+              >
                 {contactChannelTypeOptions.map((type) => (
                   <option key={type} value={type}>
                     {type}
@@ -2233,7 +2439,7 @@ function ContactChannelDialog({
             <label className="admin-form-wide">
               Значение
               <input
-                aria-invalid={error && !form.value.trim() ? "true" : undefined}
+                aria-invalid={error && (!form.value.trim() || hasInvalidTypedValue) ? "true" : undefined}
                 onChange={(event) => updateForm("value", event.target.value)}
                 required
                 type="text"
@@ -2262,6 +2468,20 @@ function ContactChannelDialog({
   );
 }
 
+function SettingsCancelButton({ onClose }: { onClose: () => void }) {
+  const requestClose = useAdminDrawerClose() ?? onClose;
+
+  return <button className="admin-secondary-button" onClick={requestClose} type="button">Отмена</button>;
+}
+
+function isValidHttpsUrl(value: string) {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function SettingsDialog({
   onClose,
   onSave,
@@ -2271,13 +2491,17 @@ function SettingsDialog({
   onSave: (settings: SettingsRecord) => void;
   settings: SettingsRecord;
 }) {
+  const auditLogRetentionRef = useRef<HTMLInputElement>(null);
+  const businessNameRef = useRef<HTMLInputElement>(null);
+  const ownerNotificationEmailRef = useRef<HTMLInputElement>(null);
+  const publicBookingDailyLimitRef = useRef<HTMLInputElement>(null);
+  const reviewUrlRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const [form, setForm] = useState<SettingsFormState>(() => buildSettingsFormState(settings));
+  const [initialForm] = useState<SettingsFormState>(() => buildSettingsFormState(settings));
+  const [form, setForm] = useState<SettingsFormState>(initialForm);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    titleRef.current?.focus();
-  }, []);
+  const hasUnsavedChanges = (Object.keys(initialForm) as Array<keyof SettingsFormState>)
+    .some((field) => form[field] !== initialForm[field]);
 
   function updateForm<Field extends keyof SettingsFormState>(field: Field, value: SettingsFormState[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -2290,20 +2514,47 @@ function SettingsDialog({
     const bookingBufferMinutes = Number(form.bookingBufferMinutes);
     const publicBookingDailyLimit = Number(form.publicBookingDailyLimit);
     const auditLogRetentionDays = Number(form.auditLogRetentionDays);
+    const hasInvalidAuditRetention = !isPositiveInteger(auditLogRetentionDays);
+    const hasInvalidBusinessName = !form.businessName.trim();
+    const hasInvalidOwnerEmail = form.ownerNotificationsEnabled && !isValidEmail(form.ownerNotificationEmail.trim());
+    const hasInvalidPublicLimit = !isPositiveInteger(publicBookingDailyLimit) || publicBookingDailyLimit > 8;
+    const hasInvalidReviewUrl = form.careEmailsEnabled && !isValidHttpsUrl(form.emailReviewUrl.trim());
 
     if (
-      !form.businessName.trim() ||
+      hasInvalidBusinessName ||
+      hasInvalidOwnerEmail ||
       ![15, 30].includes(bookingBufferMinutes) ||
-      !isPositiveInteger(publicBookingDailyLimit) ||
-      publicBookingDailyLimit > 8 ||
-      !isPositiveInteger(auditLogRetentionDays)
+      hasInvalidPublicLimit ||
+      hasInvalidAuditRetention ||
+      hasInvalidReviewUrl
     ) {
-      setError("Укажите название, буфер 15 или 30 минут, публичный лимит до 8 записей и срок хранения audit log.");
+      setError(
+        hasInvalidOwnerEmail
+          ? "Чтобы включить письма Натали, укажите корректный email получателя."
+          : hasInvalidReviewUrl
+            ? "Чтобы включить письмо после визита, укажите публичную HTTPS-ссылку для отзыва."
+            : "Укажите название, буфер 15 или 30 минут, публичный лимит до 8 записей и срок хранения audit log.",
+      );
+      const firstInvalidField = hasInvalidBusinessName
+        ? businessNameRef.current
+        : hasInvalidPublicLimit
+          ? publicBookingDailyLimitRef.current
+          : hasInvalidOwnerEmail
+            ? ownerNotificationEmailRef.current
+            : hasInvalidReviewUrl
+              ? reviewUrlRef.current
+          : hasInvalidAuditRetention
+            ? auditLogRetentionRef.current
+            : null;
+      firstInvalidField?.focus();
+      firstInvalidField?.scrollIntoView?.({ block: "center" });
       return;
     }
 
     onSave({
       auditLogRetentionDays,
+      blogEnabled: settings.blogEnabled !== false,
+      bookingCustomerEmailsEnabled: form.bookingCustomerEmailsEnabled,
       bookingBufferMinutes,
       bookingHoldMinutes: settings.bookingHoldMinutes ?? 5,
       bookingHorizonDays: settings.bookingHorizonDays ?? 60,
@@ -2316,9 +2567,13 @@ function SettingsDialog({
       defaultLocale: form.defaultLocale,
       defaultSeoTitle: form.defaultSeoTitle.trim(),
       emailSender: form.emailSender.trim(),
+      emailReviewUrl: form.emailReviewUrl.trim(),
       googleCalendarId: form.googleCalendarId.trim(),
       googleCalendarMode: form.googleCalendarMode,
       giftCertificatesEnabled: form.giftCertificatesEnabled,
+      careEmailsEnabled: form.careEmailsEnabled,
+      ownerNotificationEmail: form.ownerNotificationEmail.trim(),
+      ownerNotificationsEnabled: form.ownerNotificationsEnabled,
       publicBookingDailyLimit,
       publicBookingEnabled: form.publicBookingEnabled,
       reminderTemplate: form.reminderTemplate.trim(),
@@ -2332,33 +2587,32 @@ function SettingsDialog({
   }
 
   return (
-    <div className="admin-action-backdrop">
-      <section
-        aria-labelledby="settings-action-title"
-        aria-modal="true"
-        className="admin-action-dialog admin-service-form-dialog"
-        onKeyDown={trapDialogFocus}
-        role="dialog"
-      >
-        <div className="admin-panel-head">
-          <div>
-            <span className="admin-kicker">Настройки</span>
-            <h2 id="settings-action-title" ref={titleRef} tabIndex={-1}>
-              Настройки админки
-            </h2>
-          </div>
-          <button className="admin-icon-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
-        </div>
-
-        <form noValidate onSubmit={handleSubmit}>
-          <div className="admin-action-body admin-content-form-grid">
+    <AdminDrawer
+      ariaLabelledBy="settings-action-title"
+      className="admin-settings-drawer"
+      hasUnsavedChanges={hasUnsavedChanges}
+      initialFocusRef={titleRef}
+      onClose={onClose}
+    >
+      <form autoComplete="off" className="admin-drawer-form" noValidate onSubmit={handleSubmit}>
+        <AdminDrawerHeader
+          kicker="Настройки"
+          onClose={onClose}
+          title="Настройки админки"
+          titleId="settings-action-title"
+          titleRef={titleRef}
+          titleTabIndex={-1}
+        />
+        <AdminDrawerBody>
+          <div className="admin-action-body admin-content-form-grid admin-settings-form-grid">
             <label>
               Название бизнеса
               <input
+                aria-describedby={error && !form.businessName.trim() ? "settings-form-error" : undefined}
                 aria-invalid={error && !form.businessName.trim() ? "true" : undefined}
+                autoComplete="off"
                 onChange={(event) => updateForm("businessName", event.target.value)}
+                ref={businessNameRef}
                 required
                 type="text"
                 value={form.businessName}
@@ -2375,13 +2629,13 @@ function SettingsDialog({
               </select>
             </label>
             {error ? (
-              <p className="admin-form-alert admin-form-alert-wide" role="alert">
+              <p className="admin-form-alert admin-form-alert-wide" id="settings-form-error" role="alert">
                 {error}
               </p>
             ) : null}
             <label>
               Часовой пояс
-              <input onChange={(event) => updateForm("timezone", event.target.value)} type="text" value={form.timezone} />
+              <input autoComplete="off" onChange={(event) => updateForm("timezone", event.target.value)} type="text" value={form.timezone} />
             </label>
             <div className="admin-form-readonly admin-form-wide" aria-label="График специалистов">
               <span>График специалистов</span>
@@ -2405,6 +2659,11 @@ function SettingsDialog({
             <label>
               Лимит онлайн-записей в день
               <input
+                aria-describedby={
+                  error && (!isPositiveInteger(Number(form.publicBookingDailyLimit)) || Number(form.publicBookingDailyLimit) > 8)
+                    ? "settings-form-error"
+                    : undefined
+                }
                 aria-invalid={
                   error &&
                   (!isPositiveInteger(Number(form.publicBookingDailyLimit)) || Number(form.publicBookingDailyLimit) > 8)
@@ -2414,13 +2673,14 @@ function SettingsDialog({
                 max={8}
                 min={1}
                 onChange={(event) => updateForm("publicBookingDailyLimit", event.target.value)}
+                ref={publicBookingDailyLimitRef}
                 required
                 step={1}
                 type="number"
                 value={form.publicBookingDailyLimit}
               />
             </label>
-            <label className="admin-checkbox-field">
+            <label className="admin-checkbox-field admin-form-wide">
               <input
                 checked={form.publicBookingEnabled}
                 onChange={(event) => updateForm("publicBookingEnabled", event.target.checked)}
@@ -2440,7 +2700,7 @@ function SettingsDialog({
             </label>
             <label>
               Google Calendar ID
-              <input onChange={(event) => updateForm("googleCalendarId", event.target.value)} type="text" value={form.googleCalendarId} />
+              <input autoComplete="off" onChange={(event) => updateForm("googleCalendarId", event.target.value)} type="text" value={form.googleCalendarId} />
             </label>
             <label>
               Валюта
@@ -2458,24 +2718,96 @@ function SettingsDialog({
                 ))}
               </select>
             </label>
-            <label className="admin-checkbox-label admin-form-wide">
+            <label className="admin-checkbox-field admin-form-wide">
               <input
                 checked={form.giftCertificatesEnabled}
                 onChange={(event) => updateForm("giftCertificatesEnabled", event.target.checked)}
                 type="checkbox"
               />
-              Показывать подарочные сертификаты на публичном сайте
+              <span>Показывать подарочные сертификаты на публичном сайте</span>
             </label>
-            <label>
-              Email отправителя
-              <input onChange={(event) => updateForm("emailSender", event.target.value)} type="email" value={form.emailSender} />
-            </label>
+            <fieldset className="admin-form-section admin-form-wide admin-email-settings-section">
+              <legend>Email-уведомления</legend>
+              <p className="admin-form-helper">
+                Все новые типы писем по умолчанию выключены. Включайте их после проверки домена Resend и тестовой отправки.
+              </p>
+              <label className="admin-checkbox-field admin-form-wide">
+                <input
+                  checked={form.bookingCustomerEmailsEnabled}
+                  onChange={(event) => updateForm("bookingCustomerEmailsEnabled", event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Письма клиентам о записях</span>
+              </label>
+              <label className="admin-checkbox-field admin-form-wide">
+                <input
+                  checked={form.ownerNotificationsEnabled}
+                  onChange={(event) => updateForm("ownerNotificationsEnabled", event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Письма Натали о новых онлайн-записях и сертификатах</span>
+              </label>
+              <label>
+                Email Натали для уведомлений
+                <input
+                  aria-describedby="settings-owner-email-helper"
+                  aria-invalid={error && form.ownerNotificationsEnabled && !isValidEmail(form.ownerNotificationEmail.trim()) ? "true" : undefined}
+                  autoComplete="email"
+                  onChange={(event) => updateForm("ownerNotificationEmail", event.target.value)}
+                  ref={ownerNotificationEmailRef}
+                  type="email"
+                  value={form.ownerNotificationEmail}
+                />
+              </label>
+              <p className="admin-form-helper" id="settings-owner-email-helper">
+                Обязателен только при включённых внутренних уведомлениях. Контакты и заметки клиента в эти письма не попадают.
+              </p>
+              <label className="admin-checkbox-field admin-form-wide">
+                <input
+                  aria-describedby="settings-care-email-helper"
+                  checked={form.careEmailsEnabled}
+                  onChange={(event) => updateForm("careEmailsEnabled", event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Письмо после визита клиентам с отдельным согласием</span>
+              </label>
+              <p className="admin-form-helper" id="settings-care-email-helper">
+                Отправляется на следующий день в 10:00 Europe/Sofia. Скидки и массовые рассылки не используются.
+              </p>
+              <label>
+                HTTPS-ссылка для отзыва
+                <input
+                  aria-describedby="settings-review-url-helper"
+                  aria-invalid={error && form.careEmailsEnabled && !isValidHttpsUrl(form.emailReviewUrl.trim()) ? "true" : undefined}
+                  autoComplete="url"
+                  onChange={(event) => updateForm("emailReviewUrl", event.target.value)}
+                  ref={reviewUrlRef}
+                  type="url"
+                  value={form.emailReviewUrl}
+                />
+              </label>
+              <p className="admin-form-helper" id="settings-review-url-helper">
+                Нужна валидная публичная HTTPS-ссылка. Без неё письма после визита нельзя включить.
+              </p>
+              <div className="admin-form-readonly admin-form-wide" aria-label="Проверенный отправитель">
+                <span>Отправитель</span>
+                <strong>{settings.verifiedEmailSender || "RESEND_FROM_EMAIL не настроен"}</strong>
+                <small>Берётся из проверенного RESEND_FROM_EMAIL и не редактируется в админке.</small>
+              </div>
+              <div className="admin-form-readonly admin-form-wide" aria-label="Расписание email-уведомлений">
+                <span>Фиксированное расписание</span>
+                <strong>Подтверждение: до 5 минут · перенос: через 2 минуты · напоминание: за 24 часа</strong>
+              </div>
+              <EmailTemplatePreview />
+            </fieldset>
             <label>
               Хранение audit log
               <input
+                aria-describedby={error && !isPositiveInteger(Number(form.auditLogRetentionDays)) ? "settings-form-error" : undefined}
                 aria-invalid={error && !isPositiveInteger(Number(form.auditLogRetentionDays)) ? "true" : undefined}
                 min={1}
                 onChange={(event) => updateForm("auditLogRetentionDays", event.target.value)}
+                ref={auditLogRetentionRef}
                 step={1}
                 type="number"
                 value={form.auditLogRetentionDays}
@@ -2490,24 +2822,17 @@ function SettingsDialog({
               <textarea onChange={(event) => updateForm("cookiePrivacyMode", event.target.value)} rows={3} value={form.cookiePrivacyMode} />
             </label>
             <label className="admin-form-wide">
-              Шаблон напоминания
-              <textarea onChange={(event) => updateForm("reminderTemplate", event.target.value)} rows={3} value={form.reminderTemplate} />
-            </label>
-            <label className="admin-form-wide">
               Политика ролей
               <textarea onChange={(event) => updateForm("rolesPolicy", event.target.value)} rows={3} value={form.rolesPolicy} />
             </label>
           </div>
-
-          <div className="admin-action-footer">
-            <button type="submit">Сохранить настройки</button>
-            <button className="admin-secondary-button" onClick={onClose} type="button">
-              Отмена
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
+        </AdminDrawerBody>
+        <AdminDrawerFooter>
+          <button className="admin-primary-button" type="submit">Сохранить настройки</button>
+          <SettingsCancelButton onClose={onClose} />
+        </AdminDrawerFooter>
+      </form>
+    </AdminDrawer>
   );
 }
 
@@ -2559,22 +2884,38 @@ function DashboardWorkspace({
   appointments,
   certificates,
   clients,
+  hasLoadError,
+  onSaveAppointment,
   query,
   role,
+  timeZone,
 }: {
   appointments: Appointment[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
+  hasLoadError: boolean;
+  onSaveAppointment: (
+    appointment: Appointment,
+    action?: AdminAuditAction,
+    originalAppointment?: Appointment,
+  ) => Promise<CalendarAppointmentSaveResult>;
   query: string;
   role: AdminRoleId;
+  timeZone: string;
 }) {
-  const filteredAppointments = appointments.filter((appointment) =>
-    matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
+  const currentDateTimeKey = getLocalDateTimeKey(new Date(), timeZone);
+  const filteredAppointments = sortAppointments(
+    appointments.filter(
+      (appointment) =>
+        isUpcomingAppointment(appointment, currentDateTimeKey) &&
+        matchesSearch([appointment.time, appointment.client, appointment.service, appointment.status], query),
+    ),
   );
   const filteredCertificates = certificates.filter((certificate) =>
     matchesSearch([certificate.code, certificate.buyer, certificate.clientName, certificate.recipient, certificate.status], query),
   );
   const isSpecialist = role === "specialist";
+  const canManagePostVisitComments = role === "owner" || role === "administrator";
   const visibleMetrics = isSpecialist
     ? [
         { label: "Мои записи", tone: "primary", value: String(appointments.length) },
@@ -2596,6 +2937,23 @@ function DashboardWorkspace({
           </article>
         ))}
       </section>
+
+      {canManagePostVisitComments ? (
+        <PostVisitCommentQueue
+          appointments={appointments}
+          clients={clients}
+          hasLoadError={hasLoadError}
+          onSaveComment={(appointment, originalAppointment) =>
+            onSaveAppointment(
+              appointment,
+              "appointment.post_visit_comment",
+              originalAppointment,
+            )
+          }
+          query={query}
+          role={role}
+        />
+      ) : null}
 
       <section className="admin-panel admin-panel-large" aria-labelledby="appointments-heading">
         <div className="admin-panel-head">
@@ -2647,7 +3005,11 @@ function DashboardWorkspace({
             </tbody>
           </table>
         </div>
-        {filteredAppointments.length === 0 ? <EmptyState label="По этому запросу записей нет." /> : null}
+        {filteredAppointments.length === 0 ? (
+          <EmptyState
+            label={query.trim() ? "Среди будущих записей ничего не найдено." : "Будущих записей пока нет."}
+          />
+        ) : null}
       </section>
 
       {!isSpecialist ? <section className="admin-panel" aria-labelledby="certificate-heading">
@@ -2687,6 +3049,7 @@ function ClientDetailCard({
   client,
   onCalendarCreateIntent,
   onClose,
+  onDeleteClient,
   onEditClient,
   onIssueCertificate,
   onSaveAppointment,
@@ -2698,6 +3061,7 @@ function ClientDetailCard({
   client: ClientRecord;
   onCalendarCreateIntent: () => void;
   onClose: () => void;
+  onDeleteClient: (client: ClientRecord) => void;
   onEditClient: (client: ClientRecord) => void;
   onIssueCertificate: (client: ClientRecord) => void;
   onSaveAppointment: (appointment: Appointment) => Promise<CalendarAppointmentSaveResult>;
@@ -2727,6 +3091,7 @@ function ClientDetailCard({
     (shouldShowVisits && client.history.length > 0) ||
     (shouldShowCertificates && certificates.length > 0) ||
     (shouldShowNotes && Boolean(client.note));
+  const hasCareEmailConsent = Boolean(client.careEmailConsentAt && !client.careEmailWithdrawnAt);
 
   function startNoteEdit() {
     setDraftNote(client.note);
@@ -2773,6 +3138,24 @@ function ClientDetailCard({
         <AdminDrawerSection title="Контактные данные">
           <ClientContacts client={client} />
         </AdminDrawerSection>
+
+        {role === "owner" || role === "administrator" ? (
+          <AdminDrawerSection title="Email после визита">
+            <div className="admin-client-consent-status">
+              <span className="admin-email-status" data-status={hasCareEmailConsent ? "delivered" : "blocked"}>
+                {hasCareEmailConsent ? "Согласие зафиксировано" : "Согласия нет"}
+              </span>
+              <p>
+                {hasCareEmailConsent
+                  ? `Источник: ${client.careEmailConsentSource === "public_booking" ? "онлайн-запись" : "администратор"}.`
+                  : "Письмо после визита не будет отправлено без отдельного явного согласия клиента."}
+              </p>
+              <button className="admin-outline-action" onClick={() => onEditClient(client)} type="button">
+                Изменить согласие
+              </button>
+            </div>
+          </AdminDrawerSection>
+        ) : null}
 
         <AdminDrawerSection title="Быстрые действия">
           <div className="admin-client-actions" aria-label="Быстрые действия клиента">
@@ -3051,6 +3434,17 @@ function ClientDetailCard({
           ))}
         </div>
       </AdminDrawerSection>
+      {role === "owner" || role === "administrator" ? (
+        <AdminDrawerSection
+          className="admin-danger-zone"
+          description="Профиль можно удалить только после удаления всех связанных записей."
+          title="Опасная зона"
+        >
+          <button className="admin-danger-button" onClick={() => onDeleteClient(client)} type="button">
+            Удалить клиента
+          </button>
+        </AdminDrawerSection>
+      ) : null}
     </ClientDetail>
   );
 }
@@ -3062,6 +3456,7 @@ function ClientsWorkspace({
   isClientCreateOpen,
   onCalendarCreateIntent,
   onCloseClientCreate,
+  onDeleteClient,
   onSaveCertificate,
   onSaveAppointment,
   onSaveClient,
@@ -3076,6 +3471,7 @@ function ClientsWorkspace({
   isClientCreateOpen: boolean;
   onCalendarCreateIntent: () => void;
   onCloseClientCreate: () => void;
+  onDeleteClient: (client: ClientRecord) => Promise<CalendarAppointmentSaveResult>;
   onSaveCertificate: (certificate: CertificateRecord, originalCode?: string) => void;
   onSaveAppointment: (
     appointment: Appointment,
@@ -3093,6 +3489,7 @@ function ClientsWorkspace({
   const [isClientDrawerOpen, setIsClientDrawerOpen] = useState(Boolean(selectedClientName));
   const [editingClient, setEditingClient] = useState<ClientRecord | undefined>();
   const [certificateDraft, setCertificateDraft] = useState<CertificateRecord | undefined>();
+  const [deletingClient, setDeletingClient] = useState<ClientRecord | undefined>();
   const [clientFilter, setClientFilter] = useState<ClientFilterId>("all");
   const filteredClients = clients.filter(
     (client) =>
@@ -3115,6 +3512,12 @@ function ClientsWorkspace({
   const selectedClient = findClientByIdentity(clients, selectedClientKey) ?? filteredClients[0] ?? clients[0];
   const selectedClientAppointments = findClientAppointments(appointments, selectedClient, clients);
   const selectedClientCertificates = findClientCertificates(certificates, selectedClient, clients);
+  const deletingClientAppointments = deletingClient
+    ? findClientAppointments(appointments, deletingClient, clients)
+    : [];
+  const deletingClientCertificates = deletingClient
+    ? findClientCertificates(certificates, deletingClient, clients)
+    : [];
   const isClientFormOpen = isClientCreateOpen || Boolean(editingClient);
 
   function openClient(clientKey: string) {
@@ -3153,6 +3556,15 @@ function ClientsWorkspace({
     setSelectedClientKey(client.id);
     setIsClientDrawerOpen(true);
     closeClientForm();
+  }
+
+  async function deleteSelectedClient(client: ClientRecord) {
+    const result = await onDeleteClient(client);
+    if (!result.ok) return result;
+
+    setIsClientDrawerOpen(false);
+    setSelectedClientKey(clients.find((candidate) => candidate.id !== client.id)?.id ?? "");
+    return result;
   }
 
   if (!selectedClient) {
@@ -3262,6 +3674,7 @@ function ClientsWorkspace({
           client={selectedClient}
           onCalendarCreateIntent={onCalendarCreateIntent}
           onClose={() => setIsClientDrawerOpen(false)}
+          onDeleteClient={setDeletingClient}
           onEditClient={openClientEdit}
           onIssueCertificate={openClientCertificateDraft}
           onSaveAppointment={(appointment) => onSaveAppointment(appointment, "appointment.post_visit_comment")}
@@ -3286,6 +3699,26 @@ function ClientsWorkspace({
           key={certificateDraft.code}
           onClose={closeClientCertificateDraft}
           onSave={saveClientCertificate}
+        />
+      ) : null}
+      {deletingClient ? (
+        <AdminRecordDeleteDialog
+          blockedReason={deletingClientAppointments.length > 0
+            ? `У клиента есть ${deletingClientAppointments.length} записей. Сначала удалите их из календаря.`
+            : undefined}
+          confirmLabel="Удалить клиента"
+          confirmationText={deletingClient.name}
+          description="Профиль будет удалён без возможности восстановления. Связанные сертификаты сохранятся без привязки к профилю."
+          kicker="Клиенты"
+          onClose={() => setDeletingClient(undefined)}
+          onConfirm={() => deleteSelectedClient(deletingClient)}
+          subject={deletingClient.name}
+          summaryItems={[
+            deletingClient.phone || "Телефон не указан",
+            `${deletingClientAppointments.length} записей`,
+            `${deletingClientCertificates.length} сертификатов`,
+          ]}
+          title="Удалить клиента?"
         />
       ) : null}
     </div>
@@ -3335,6 +3768,7 @@ function CertificatesWorkspace({
   role,
   selectedCertificateCode,
   selectedClientName,
+  showGiftReconciliation,
 }: {
   certificates: CertificateRecord[];
   clients: ClientRecord[];
@@ -3346,6 +3780,7 @@ function CertificatesWorkspace({
   role: AdminRoleId;
   selectedCertificateCode?: string;
   selectedClientName?: string;
+  showGiftReconciliation: boolean;
 }) {
   const selectedClientFilter = findClientByIdentity(clients, selectedClientName);
   const selectedClientFilterName = selectedClientFilter?.name;
@@ -3429,6 +3864,7 @@ function CertificatesWorkspace({
         <div className="admin-panel-head">
           <h2 id="certificates-heading">Сертификаты</h2>
         </div>
+        {showGiftReconciliation ? <GiftCertificateReconciliationList role={role} /> : null}
         <EmptyState label="Сертификаты пока не заведены." />
         {isCertificateFormOpen ? (
           <CertificateFormDialog
@@ -3474,6 +3910,8 @@ function CertificatesWorkspace({
             </div>
           </div>
         ) : null}
+
+        {showGiftReconciliation ? <GiftCertificateReconciliationList role={role} /> : null}
 
         <div className="admin-metric-row admin-certificate-summary" aria-label="Сводка сертификатов">
           <article className="admin-metric admin-metric-success">
@@ -3610,6 +4048,13 @@ function CertificatesWorkspace({
             <dd>{selectedCertificate.note || "Заметка по сертификату пока пустая."}</dd>
           </div>
         </dl>
+
+        {role === "owner" || role === "administrator" ? (
+          <section className="admin-client-section" aria-labelledby="certificate-email-status-title">
+            <h3 id="certificate-email-status-title">Email-уведомления</h3>
+            <EmailNotificationStatusList aggregateId={selectedCertificate.code} aggregateType="certificate" />
+          </section>
+        ) : null}
 
         {linkedClient ? (
           <section className="admin-client-section admin-linked-client-actions" aria-label="Связанные действия клиента">
@@ -4648,31 +5093,54 @@ function ContactsWorkspace({
 }
 
 function BlogWorkspace({
+  blogEnabled,
   blogPosts,
+  canManageBlogPosts,
+  canManageBlogVisibility,
   isBlogCreateOpen,
   media,
   onCloseBlogCreate,
+  onSaveBlogVisibility,
   onSaveBlogPost,
   query,
   role,
   selectedBlogPostId,
 }: {
+  blogEnabled: boolean;
   blogPosts: BlogPostRecord[];
+  canManageBlogPosts: boolean;
+  canManageBlogVisibility: boolean;
   isBlogCreateOpen: boolean;
   media: MediaRecord[];
   onCloseBlogCreate: () => void;
+  onSaveBlogVisibility: (enabled: boolean) => Promise<boolean>;
   onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => Promise<void>;
   query: string;
   role: AdminRoleId;
   selectedBlogPostId?: string;
 }) {
-  const initialSelectedBlogPost = selectedBlogPostId ? blogPosts.find((post) => post.id === selectedBlogPostId) : undefined;
-  const [selectedId, setSelectedId] = useState(initialSelectedBlogPost?.id ?? blogPosts[0]?.id ?? "");
-  const [isBlogDrawerOpen, setIsBlogDrawerOpen] = useState(Boolean(initialSelectedBlogPost));
-  const [editingPost, setEditingPost] = useState<BlogPostRecord | undefined>();
-  const [editorDraft, setEditorDraft] = useState<BlogArticleDraft>();
-  const newDraftRecordId = useRef<string | undefined>(undefined);
+  const groupedArticles = useMemo(() => groupLocalizedBlogArticles(blogPosts), [blogPosts]);
+  const initialSelectedArticle = selectedBlogPostId
+    ? groupedArticles.find(
+        (article) => article.key === selectedBlogPostId || Object.values(article.translations).some((post) => post?.id === selectedBlogPostId),
+      )
+    : undefined;
+  const initialSelectedPost = selectedBlogPostId ? blogPosts.find((post) => post.id === selectedBlogPostId) : undefined;
+  const [selectedTranslationKey, setSelectedTranslationKey] = useState(initialSelectedArticle?.key ?? groupedArticles[0]?.key ?? "");
+  const [detailLocale, setDetailLocale] = useState<BlogLocale>(
+    initialSelectedPost ? getBlogPostLocale(initialSelectedPost) : initialSelectedArticle ? getBlogPostLocale(initialSelectedArticle.primaryPost) : "ru",
+  );
+  const [isBlogDrawerOpen, setIsBlogDrawerOpen] = useState(Boolean(initialSelectedArticle));
+  const [editingTranslationKey, setEditingTranslationKey] = useState<string | undefined>();
+  const [activeEditorLocale, setActiveEditorLocale] = useState<BlogLocale>("bg");
+  const [editorDrafts, setEditorDrafts] = useState<Partial<Record<BlogLocale, BlogArticleDraft>>>({});
+  const [savedEditorDrafts, setSavedEditorDrafts] = useState<Partial<Record<BlogLocale, BlogArticleDraft>>>({});
+  const editorRecordIds = useRef<Partial<Record<BlogLocale, string>>>({});
+  const editorSaveVersions = useRef<Partial<Record<BlogLocale, number>>>({});
+  const newTranslationKey = useRef<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<"all" | BlogStatus>("all");
+  const [isSavingVisibility, setIsSavingVisibility] = useState(false);
+  const [visibilityNotice, setVisibilityNotice] = useState("");
   const blogMediaOptions = media
     .filter(
       (item) =>
@@ -4682,84 +5150,213 @@ function BlogWorkspace({
         ["granted", "not_required"].includes(item.publicationConsent ?? "unknown"),
     )
     .map((item) => ({ alt: item.altText, label: `${item.name} · ${item.folder}`, url: item.url }));
-  const filteredPosts = blogPosts
-    .filter((post) => statusFilter === "all" || post.status === statusFilter)
-    .filter((post) =>
+  const filteredArticles = groupedArticles
+    .filter((article) => statusFilter === "all" || Object.values(article.translations).some((post) => post?.status === statusFilter))
+    .filter((article) =>
       matchesSearch(
-        [
-          post.title,
-          post.slug,
-          post.category,
-          post.status,
-          post.author,
-          post.seoTitle,
-          post.excerpt,
-          post.body,
-          post.tags.join(" "),
-          post.locales.join(" "),
-        ],
+        Object.values(article.translations).flatMap((post) =>
+          post
+            ? [
+                post.title,
+                post.slug,
+                post.category,
+                post.status,
+                post.author,
+                post.seoTitle,
+                post.excerpt,
+                post.body,
+                post.tags.join(" "),
+                post.locales.join(" "),
+              ]
+            : [],
+        ),
         query,
       ),
     )
-    .sort((first, second) => first.publishedAt.localeCompare(second.publishedAt));
-  const selectedPost =
-    filteredPosts.find((post) => post.id === selectedId) ??
-    filteredPosts[0] ??
-    blogPosts.find((post) => post.id === selectedId) ??
-    blogPosts[0];
-  const isBlogFormOpen = isBlogCreateOpen || Boolean(editingPost);
+    .sort((first, second) => second.primaryPost.updatedAt.localeCompare(first.primaryPost.updatedAt));
+  const selectedArticle =
+    filteredArticles.find((article) => article.key === selectedTranslationKey) ??
+    filteredArticles[0] ??
+    groupedArticles.find((article) => article.key === selectedTranslationKey) ??
+    groupedArticles[0];
+  const selectedPost = selectedArticle?.translations[detailLocale] ?? selectedArticle?.primaryPost;
+  const isBlogFormOpen = isBlogCreateOpen || Boolean(editingTranslationKey);
+  const publishedCount = groupedArticles.filter((article) =>
+    Object.values(article.translations).some((post) => post?.status === "Опубликована"),
+  ).length;
+  const visibilityControl = (
+    <div className="admin-blog-visibility" aria-busy={isSavingVisibility || undefined}>
+      <label className="admin-checkbox-field">
+        <input
+          aria-describedby="blog-visibility-description"
+          checked={blogEnabled}
+          disabled={!canManageBlogVisibility || isSavingVisibility}
+          onChange={async (event) => {
+            const enabled = event.target.checked;
+            setIsSavingVisibility(true);
+            setVisibilityNotice("");
+            const saved = await onSaveBlogVisibility(enabled);
+            setVisibilityNotice(
+              saved
+                ? enabled
+                  ? "Блог виден на сайте."
+                  : "Блог скрыт на сайте; статьи сохранены в админке."
+                : "Не удалось изменить видимость блога. Исходное состояние восстановлено.",
+            );
+            setIsSavingVisibility(false);
+          }}
+          role="switch"
+          type="checkbox"
+        />
+        <span>{isSavingVisibility ? "Сохраняем видимость блога…" : "Показывать блог на сайте"}</span>
+      </label>
+      <p id="blog-visibility-description">
+        {blogEnabled
+          ? `Пункт меню, страница блога и ${publishedCount} опубликованных статей доступны посетителям.`
+          : `Пункт меню, страница блога и ${publishedCount} опубликованных статей скрыты. Материалы остаются в админке.`}
+        {!canManageBlogVisibility ? " Изменить видимость может редактор, администратор или владелец." : ""}
+      </p>
+      {visibilityNotice ? (
+        <p className="admin-export-notice" role={visibilityNotice.startsWith("Не удалось") ? "alert" : "status"}>
+          {visibilityNotice}
+        </p>
+      ) : null}
+    </div>
+  );
 
-  function openPost(post: BlogPostRecord) {
-    setSelectedId(post.id);
+  function openArticle(article: (typeof groupedArticles)[number]) {
+    setSelectedTranslationKey(article.key);
+    setDetailLocale(getBlogPostLocale(article.primaryPost));
     setIsBlogDrawerOpen(true);
   }
 
-  function openPostEdit(post: BlogPostRecord) {
+  function openArticleEdit(article: (typeof groupedArticles)[number], locale = detailLocale) {
     onCloseBlogCreate();
-    newDraftRecordId.current = undefined;
-    setEditingPost(post);
-    setEditorDraft(blogPostToEditorDraft(post));
+    const drafts = Object.fromEntries(
+      Object.entries(article.translations).map(([translationLocale, post]) => [
+        translationLocale,
+        blogPostToEditorDraft(post),
+      ]),
+    ) as Partial<Record<BlogLocale, BlogArticleDraft>>;
+    const recordIds = Object.fromEntries(
+      Object.entries(article.translations).map(([translationLocale, post]) => [translationLocale, post?.id]),
+    ) as Partial<Record<BlogLocale, string>>;
+    const nextLocale = article.translations[locale] ? locale : getBlogPostLocale(article.primaryPost);
+
+    editorRecordIds.current = recordIds;
+    editorSaveVersions.current = {};
+    newTranslationKey.current = undefined;
+    setEditingTranslationKey(article.key);
+    setActiveEditorLocale(nextLocale);
+    setEditorDrafts(drafts);
+    setSavedEditorDrafts(drafts);
+    setIsBlogDrawerOpen(false);
   }
 
   function closeBlogForm() {
-    setEditingPost(undefined);
-    setEditorDraft(undefined);
-    newDraftRecordId.current = undefined;
+    const shouldRestoreDetails = Boolean(editingTranslationKey && groupedArticles.some((article) => article.key === editingTranslationKey));
+    setEditingTranslationKey(undefined);
+    setEditorDrafts({});
+    setSavedEditorDrafts({});
+    editorRecordIds.current = {};
+    editorSaveVersions.current = {};
+    newTranslationKey.current = undefined;
     onCloseBlogCreate();
+    if (shouldRestoreDetails) setIsBlogDrawerOpen(true);
   }
 
-  async function savePostForm(post: BlogPostRecord, originalId?: string) {
-    await onSaveBlogPost(post, originalId);
-    setSelectedId(post.id);
-    setIsBlogDrawerOpen(true);
-    closeBlogForm();
+  function editorStatusLabel(status: BlogEditorStatus) {
+    return blogStatusByEditorStatus[status];
+  }
+
+  function getEditorTranslationKey() {
+    if (editingTranslationKey) return editingTranslationKey;
+    if (!newTranslationKey.current) newTranslationKey.current = `blog-${crypto.randomUUID()}`;
+    return newTranslationKey.current;
+  }
+
+  function getEditorRecordId(locale: BlogLocale, translationKey: string) {
+    const existingId = editorRecordIds.current[locale];
+    if (existingId) return existingId;
+
+    const isFirstNewTranslation = !editingTranslationKey && Object.keys(editorRecordIds.current).length === 0;
+    const nextId = isFirstNewTranslation ? translationKey : `${translationKey}-${locale}`;
+    editorRecordIds.current[locale] = nextId;
+    return nextId;
+  }
+
+  async function saveEditorLocale(draft: BlogArticleDraft) {
+    const saveVersion = (editorSaveVersions.current[draft.locale] ?? 0) + 1;
+    editorSaveVersions.current[draft.locale] = saveVersion;
+    const translationKey = getEditorTranslationKey();
+    const article = groupedArticles.find((candidate) => candidate.key === translationKey);
+    const original = article?.translations[draft.locale];
+    const recordId = getEditorRecordId(draft.locale, translationKey);
+    const post = editorDraftToBlogPost(draft, original, recordId, translationKey);
+
+    await onSaveBlogPost(post, original?.id);
+    if (editorSaveVersions.current[draft.locale] !== saveVersion) return;
+    setEditingTranslationKey(translationKey);
+    setSelectedTranslationKey(translationKey);
+    setDetailLocale(draft.locale);
+    setEditorDrafts((current) => {
+      const currentDraft = current[draft.locale];
+      return currentDraft && serializeArticleDraft(currentDraft) !== serializeArticleDraft(draft)
+        ? current
+        : { ...current, [draft.locale]: draft };
+    });
+    setSavedEditorDrafts((current) => ({ ...current, [draft.locale]: draft }));
   }
 
   if (isBlogFormOpen) {
-    const value = editorDraft ?? blogPostToEditorDraft(editingPost);
-    const savedValue = blogPostToEditorDraft(editingPost);
-    const getDraftRecordId = () => {
-      if (!newDraftRecordId.current) newDraftRecordId.current = `blog-${crypto.randomUUID()}`;
-      return newDraftRecordId.current;
-    };
+    const value = editorDrafts[activeEditorLocale] ?? createEmptyBlogArticle(activeEditorLocale);
+    const savedValue = savedEditorDrafts[activeEditorLocale];
+    const dirtyLocales = new Set(
+      BLOG_LOCALES.filter((locale) => {
+        const draft = editorDrafts[locale];
+        const savedDraft = savedEditorDrafts[locale];
+        return Boolean(draft && (!savedDraft || serializeArticleDraft(draft) !== serializeArticleDraft(savedDraft)));
+      }),
+    );
+    const statusByLocale = Object.fromEntries(
+      BLOG_LOCALES.map((locale) => {
+        const draft = editorDrafts[locale];
+        const article = groupedArticles.find((candidate) => candidate.key === editingTranslationKey);
+        const post = article?.translations[locale];
+        return [locale, draft ? editorStatusLabel(draft.status) : getBlogTranslationStatusLabel(post)];
+      }),
+    ) as Partial<Record<BlogLocale, string>>;
 
     return (
       <BlogArticleEditor
         authorOptions={["Natali"]}
+        cancelLabel="К списку"
         categoryOptions={["Советы", "Услуги", "Сертификаты", "Студия"]}
+        key={`${editingTranslationKey ?? "new"}:${activeEditorLocale}`}
+        localeLocked
+        localeNavigation={
+          <BlogLocaleTabs
+            activeLocale={activeEditorLocale}
+            dirtyLocales={dirtyLocales}
+            onSelect={setActiveEditorLocale}
+            statusByLocale={statusByLocale}
+          />
+        }
         mediaOptions={blogMediaOptions}
         onCancel={({ hasUnsavedChanges }) => {
-          if (hasUnsavedChanges && !window.confirm("Есть несохраненные изменения. Закрыть редактор?")) return;
+          const unsavedLocales = new Set(dirtyLocales);
+          if (hasUnsavedChanges) unsavedLocales.add(activeEditorLocale);
+          if (
+            unsavedLocales.size > 0 &&
+            !window.confirm(`Есть несохраненные изменения: ${[...unsavedLocales].map((locale) => BLOG_LOCALE_LABELS[locale]).join(", ")}. Закрыть редактор?`)
+          ) return;
           closeBlogForm();
         }}
-        onChange={setEditorDraft}
-        onAutosave={(draft) =>
-          onSaveBlogPost(editorDraftToBlogPost(draft, editingPost, getDraftRecordId()), editingPost?.id)
-        }
-        onSave={(draft) =>
-          savePostForm(editorDraftToBlogPost(draft, editingPost, getDraftRecordId()), editingPost?.id)
-        }
+        onChange={(draft) => setEditorDrafts((current) => ({ ...current, [activeEditorLocale]: draft }))}
+        onAutosave={saveEditorLocale}
+        onSave={saveEditorLocale}
         savedValue={savedValue}
+        saveLabel={`Сохранить ${BLOG_LOCALE_LABELS[activeEditorLocale]}`}
         value={value}
       />
     );
@@ -4769,8 +5366,12 @@ function BlogWorkspace({
     return (
       <section className="admin-panel admin-panel-large" aria-labelledby="blog-heading">
         <div className="admin-panel-head">
-          <h2 id="blog-heading">Контент-план блога</h2>
+          <div>
+            <h2 id="blog-heading">Контент-план блога</h2>
+            <p>Статьи сайта, категории, теги, SEO, локали, обложки и статус публикации.</p>
+          </div>
         </div>
+        {visibilityControl}
         <EmptyState label="Статьи пока не заведены." />
       </section>
     );
@@ -4800,6 +5401,8 @@ function BlogWorkspace({
           </div>
         </div>
 
+        {visibilityControl}
+
         <div className="admin-table-scroll">
           <table className="admin-data-table">
             <thead>
@@ -4807,30 +5410,46 @@ function BlogWorkspace({
                 <th>Статья</th>
                 <th>Категория</th>
                 <th>Статус</th>
-                <th>Дата</th>
-                <th>Локали</th>
+                <th>Обновлено</th>
+                <th>Языковые версии</th>
               </tr>
             </thead>
             <tbody>
-              {filteredPosts.map((post) => (
-                <tr aria-selected={isBlogDrawerOpen && post.id === selectedPost.id} key={post.id}>
+              {filteredArticles.map((article) => (
+                <tr aria-selected={isBlogDrawerOpen && article.key === selectedArticle?.key} key={article.key}>
                   <td>
-                    <Link className="admin-row-action admin-row-link" href={blogDetailHref(post.id, role)} onClick={() => openPost(post)}>
-                      {post.title}
+                    <Link
+                      className="admin-row-action admin-row-link"
+                      href={blogDetailHref(article.primaryPost.id, role)}
+                      onClick={() => openArticle(article)}
+                    >
+                      {article.primaryPost.title}
                     </Link>
                   </td>
-                  <td>{post.category}</td>
+                  <td>{article.primaryPost.category}</td>
                   <td>
-                    <span className={statusClass(post.status)}>{post.status}</span>
+                    <span className={statusClass(article.status)}>{article.status}</span>
                   </td>
-                  <td className="admin-tabular">{post.publishedAt}</td>
-                  <td>{post.locales.join(", ")}</td>
+                  <td className="admin-tabular">{article.primaryPost.updatedAt}</td>
+                  <td>
+                    <div className="admin-blog-locale-badges" aria-label="Статусы языковых версий">
+                      {BLOG_LOCALES.map((locale) => {
+                        const translation = article.translations[locale];
+                        return (
+                          <span data-missing={translation ? undefined : "true"} key={locale}>
+                            <strong>{BLOG_LOCALE_LABELS[locale]}</strong>
+                            <small>{translation ? translation.status : "Нет"}</small>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {filteredPosts.length === 0 ? <EmptyState label="Статьи не найдены." /> : null}
+        {filteredArticles.length === 0 ? <EmptyState label="Статьи не найдены." /> : null}
       </section>
 
       {isBlogDrawerOpen ? (
@@ -4843,9 +5462,11 @@ function BlogWorkspace({
         >
         <div className="admin-detail-heading">
           <div className="admin-detail-actions">
-            <button className="admin-text-action" onClick={() => openPostEdit(selectedPost)} type="button">
-              Редактировать
-            </button>
+            {canManageBlogPosts ? (
+              <button className="admin-text-action" onClick={() => selectedArticle && openArticleEdit(selectedArticle, detailLocale)} type="button">
+                Редактировать
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -4877,8 +5498,25 @@ function BlogWorkspace({
             <dd>{selectedPost.updatedAt}</dd>
           </div>
           <div>
-            <dt>Локали</dt>
-            <dd>{selectedPost.locales.join(", ")}</dd>
+            <dt>Языковые версии</dt>
+            <dd>
+              <div className="admin-blog-detail-locales" aria-label="Выбрать языковую версию">
+                {BLOG_LOCALES.map((locale) => {
+                  const translation = selectedArticle?.translations[locale];
+                  return (
+                    <button
+                      aria-pressed={detailLocale === locale}
+                      disabled={!translation}
+                      key={locale}
+                      onClick={() => setDetailLocale(locale)}
+                      type="button"
+                    >
+                      {BLOG_LOCALE_LABELS[locale]} · {translation?.status ?? "Нет перевода"}
+                    </button>
+                  );
+                })}
+              </div>
+            </dd>
           </div>
           <div>
             <dt>SEO title</dt>
@@ -5115,12 +5753,32 @@ function SettingsWorkspace({
         {selectedGroup.id === "email" ? (
           <dl className="admin-detail-list">
             <div>
-              <dt>Email отправителя</dt>
-              <dd>{settings.emailSender}</dd>
+              <dt>Письма клиентам о записях</dt>
+              <dd>{settings.bookingCustomerEmailsEnabled ? "Включены" : "Выключены"}</dd>
             </div>
             <div>
-              <dt>Шаблон напоминания</dt>
-              <dd>{settings.reminderTemplate}</dd>
+              <dt>Уведомления Натали</dt>
+              <dd>
+                {settings.ownerNotificationsEnabled
+                  ? `Включены · ${settings.ownerNotificationEmail || "email не задан"}`
+                  : "Выключены"}
+              </dd>
+            </div>
+            <div>
+              <dt>Письма после визита</dt>
+              <dd>{settings.careEmailsEnabled ? "Включены" : "Выключены"}</dd>
+            </div>
+            <div>
+              <dt>Ссылка для отзыва</dt>
+              <dd>{settings.emailReviewUrl || "Не задана"}</dd>
+            </div>
+            <div>
+              <dt>Проверенный отправитель</dt>
+              <dd>{settings.verifiedEmailSender || "RESEND_FROM_EMAIL не настроен"}</dd>
+            </div>
+            <div>
+              <dt>Расписание</dt>
+              <dd>До 5 минут · перенос через 2 минуты · напоминание за 24 часа</dd>
             </div>
           </dl>
         ) : null}
@@ -5473,6 +6131,7 @@ function GenericWorkspace({ query, section }: { query: string; section: AdminSec
 }
 
 function Workspace({
+  activeTimeSelection,
   actorUserId,
   adminUsers,
   appointments,
@@ -5484,6 +6143,7 @@ function Workspace({
   contactChannels,
   contactSettings,
   financeRows,
+  hasLoadError,
   isBlogCreateOpen,
   isCertificateCreateOpen,
   isClientCreateOpen,
@@ -5498,6 +6158,8 @@ function Workspace({
   onCreateCalendarBlock,
   onCreateWalkIn,
   onDeleteCalendarBlock,
+  onDeleteAppointment,
+  onDeleteClient,
   onCalendarCreateIntent,
   onCalendarDateChange,
   onCloseBlogCreate,
@@ -5511,7 +6173,9 @@ function Workspace({
   onCloseUserCreate,
   onEditAppointment,
   onEditCalendarBlock,
+  onAppointmentPublicEmailCorrected,
   onSaveAppointment,
+  onSaveBlogVisibility,
   onOpenSettingsEdit,
   onSaveBlogPost,
   onSaveAdminUser,
@@ -5524,6 +6188,7 @@ function Workspace({
   onSavePrice,
   onSaveService,
   onSaveSpecialistSchedule,
+  onSelectTimeRange,
   onSaveSettings,
   onUpdateCertificateStatus,
   prices,
@@ -5542,9 +6207,11 @@ function Workspace({
   selectedSettingsGroupId,
   services,
   settings,
+  showGiftReconciliation,
   specialists,
   currentSpecialistId,
 }: {
+  activeTimeSelection?: CalendarTimeSelection;
   actorUserId?: string;
   adminUsers: AdminUserRecord[];
   appointments: Appointment[];
@@ -5556,6 +6223,7 @@ function Workspace({
   contactChannels: ContactChannelRecord[];
   contactSettings: ContactSettingsRecord;
   financeRows: FinanceRow[];
+  hasLoadError: boolean;
   isBlogCreateOpen: boolean;
   isCertificateCreateOpen: boolean;
   isClientCreateOpen: boolean;
@@ -5570,6 +6238,8 @@ function Workspace({
   onCreateCalendarBlock: (date: string) => void;
   onCreateWalkIn: () => void;
   onDeleteCalendarBlock: (block: CalendarBlock) => void;
+  onDeleteAppointment: (appointment: Appointment) => void;
+  onDeleteClient: (client: ClientRecord) => Promise<CalendarAppointmentSaveResult>;
   onCalendarCreateIntent: () => void;
   onCalendarDateChange: (date: string) => void;
   onCloseBlogCreate: () => void;
@@ -5583,11 +6253,13 @@ function Workspace({
   onCloseUserCreate: () => void;
   onEditAppointment: (appointment: Appointment) => void;
   onEditCalendarBlock: (block: CalendarBlock) => void;
+  onAppointmentPublicEmailCorrected: (appointmentId: string, email: string) => void;
   onSaveAppointment: (
     appointment: Appointment,
     action?: AdminAuditAction,
     originalAppointment?: Appointment,
   ) => Promise<CalendarAppointmentSaveResult>;
+  onSaveBlogVisibility: (enabled: boolean) => Promise<boolean>;
   onOpenSettingsEdit: () => void;
   onSaveAdminUser: (user: AdminUserRecord, originalId?: string) => void;
   onSaveBlogPost: (post: BlogPostRecord, originalId?: string) => Promise<void>;
@@ -5603,6 +6275,7 @@ function Workspace({
     specialistId: string,
     weeklySchedule: SpecialistScheduleDay[],
   ) => Promise<SpecialistScheduleSaveResult>;
+  onSelectTimeRange: (selection: CalendarTimeSelection) => void;
   onSaveSettings: (settings: SettingsRecord) => void;
   onUpdateCertificateStatus: (certificateCode: string, status: CertificateStatus, historyEntry: string) => void;
   prices: PriceRecord[];
@@ -5621,11 +6294,23 @@ function Workspace({
   selectedSettingsGroupId?: string;
   services: ServiceRecord[];
   settings: SettingsRecord;
+  showGiftReconciliation: boolean;
   specialists: SpecialistRecord[];
   currentSpecialistId?: string;
 }) {
   if (section === "dashboard") {
-    return <DashboardWorkspace appointments={appointments} certificates={certificates} clients={clients} query={query} role={role} />;
+    return (
+      <DashboardWorkspace
+        appointments={appointments}
+        certificates={certificates}
+        clients={clients}
+        hasLoadError={hasLoadError}
+        onSaveAppointment={onSaveAppointment}
+        query={query}
+        role={role}
+        timeZone={settings.timezone}
+      />
+    );
   }
 
   if (section === "clients") {
@@ -5638,6 +6323,7 @@ function Workspace({
         key={selectedClientName ?? "default-client"}
         onCalendarCreateIntent={onCalendarCreateIntent}
         onCloseClientCreate={onCloseClientCreate}
+        onDeleteClient={onDeleteClient}
         onSaveCertificate={onSaveCertificate}
         onSaveAppointment={onSaveAppointment}
         onSaveClient={onSaveClient}
@@ -5663,6 +6349,7 @@ function Workspace({
         role={role}
         selectedCertificateCode={selectedCertificateCode}
         selectedClientName={selectedClientName}
+        showGiftReconciliation={showGiftReconciliation}
       />
     );
   }
@@ -5734,10 +6421,14 @@ function Workspace({
   if (section === "blog") {
     return (
       <BlogWorkspace
+        blogEnabled={settings.blogEnabled !== false}
         blogPosts={blogPosts}
+        canManageBlogPosts={role === "owner" || role === "administrator" || role === "editor"}
+        canManageBlogVisibility={role === "owner" || role === "administrator" || role === "editor"}
         isBlogCreateOpen={isBlogCreateOpen}
         key={selectedBlogPostId ?? "default-blog"}
         onCloseBlogCreate={onCloseBlogCreate}
+        onSaveBlogVisibility={onSaveBlogVisibility}
         onSaveBlogPost={onSaveBlogPost}
         media={media}
         query={query}
@@ -5781,6 +6472,7 @@ function Workspace({
   if (section === "calendar") {
     return (
       <CalendarWorkspace
+        activeTimeSelection={activeTimeSelection}
         actorUserId={actorUserId}
         appointments={appointments}
         bookingBufferMinutes={settings.bookingBufferMinutes}
@@ -5794,11 +6486,14 @@ function Workspace({
         onCreateCalendarBlock={onCreateCalendarBlock}
         onCreateWalkIn={onCreateWalkIn}
         onDeleteCalendarBlock={onDeleteCalendarBlock}
+        onDeleteAppointment={onDeleteAppointment}
         onCalendarDateChange={onCalendarDateChange}
         onEditAppointment={onEditAppointment}
         onEditCalendarBlock={onEditCalendarBlock}
+        onAppointmentPublicEmailCorrected={onAppointmentPublicEmailCorrected}
         onSaveAppointment={onSaveAppointment}
         onSaveSpecialistSchedule={onSaveSpecialistSchedule}
+        onSelectTimeRange={onSelectTimeRange}
         query={query}
         role={role}
         selectedAppointmentFocus={calendarAppointmentFocus}
@@ -5841,21 +6536,28 @@ export function AdminShell({
     ? "Ваши ближайшие записи и быстрый переход в личный календарь."
     : activeModule.description;
   const canManageAppointments = role === "owner" || role === "administrator";
-  const canUsePrimaryAction = activeSection !== "calendar" || canManageAppointments;
+  const canManageBlogPosts = role === "owner" || role === "administrator" || role === "editor";
+  const canUsePrimaryAction =
+    (activeSection !== "calendar" || canManageAppointments) &&
+    (activeSection !== "blog" || canManageBlogPosts);
   const initialRecords = useMemo(() => buildInitialAdminRecords(initialData), [initialData]);
   const initialFinanceRows = useMemo(() => buildInitialFinanceRows(initialData), [initialData]);
   const [specialists, setSpecialists] = useState<SpecialistRecord[]>(() => initialRecords.specialists ?? []);
   const [query, setQuery] = useState("");
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [cancellingAppointment, setCancellingAppointment] = useState<Appointment | undefined>();
+  const [deletingAppointment, setDeletingAppointment] = useState<Appointment | undefined>();
   const [dismissedCalendarActionKey, setDismissedCalendarActionKey] = useState("");
   const [editingAppointment, setEditingAppointment] = useState<Appointment | undefined>();
   const [editingCalendarBlock, setEditingCalendarBlock] = useState<CalendarBlock | undefined>();
   const [calendarBlockDate, setCalendarBlockDate] = useState("");
   const [calendarBlockEndsAt, setCalendarBlockEndsAt] = useState<string>();
   const [calendarBlockIntent, setCalendarBlockIntent] = useState<"block" | "walk-in">("block");
+  const [calendarBlockSpecialistId, setCalendarBlockSpecialistId] = useState<string>();
   const [calendarBlockStartsAt, setCalendarBlockStartsAt] = useState<string>();
   const [isCalendarBlockDialogOpen, setIsCalendarBlockDialogOpen] = useState(false);
+  const [calendarTimeSelection, setCalendarTimeSelection] = useState<CalendarTimeSelection>();
+  const [appointmentCreateSelection, setAppointmentCreateSelection] = useState<CalendarTimeSelection>();
   const [calendarAppointments, setCalendarAppointments] = useState<Appointment[]>(() =>
     buildInitialCalendarAppointments(initialRecords),
   );
@@ -5924,6 +6626,8 @@ export function AdminShell({
   const prefilledCalendarClient = shouldPrefillCalendarClient ? findClientByIdentity(clients, selectedClientName) : undefined;
   const calendarDialogKey = editingAppointment
     ? `edit-${appointmentKey(editingAppointment)}`
+    : appointmentCreateSelection
+      ? `selection-${appointmentCreateSelection.date}-${appointmentCreateSelection.startsAt}-${appointmentCreateSelection.durationMinutes}-${appointmentCreateSelection.specialistId ?? "choose"}`
     : shouldPrefillCalendarClient
       ? `prefill-${calendarActionKey}`
       : "new-empty-appointment";
@@ -5937,13 +6641,36 @@ export function AdminShell({
     };
   }
 
-  function openCalendarBlockCreate(date: string) {
+  function openCalendarBlockCreate(date: string, selection?: CalendarTimeSelection) {
     setEditingCalendarBlock(undefined);
     setCalendarBlockDate(date);
-    setCalendarBlockEndsAt(undefined);
+    setCalendarBlockEndsAt(selection?.endsAt);
     setCalendarBlockIntent("block");
-    setCalendarBlockStartsAt(undefined);
+    setCalendarBlockSpecialistId(selection?.specialistId);
+    setCalendarBlockStartsAt(selection?.startsAt);
     setIsCalendarBlockDialogOpen(true);
+  }
+
+  function openCalendarTimeSelection(selection: CalendarTimeSelection) {
+    setEditingAppointment(undefined);
+    setAppointmentCreateSelection(undefined);
+    setIsActionOpen(false);
+    setIsCalendarBlockDialogOpen(false);
+    setCalendarTimeSelection(selection);
+  }
+
+  function createBlockFromTimeSelection(selection: CalendarTimeSelection) {
+    setCalendarTimeSelection(undefined);
+    openCalendarBlockCreate(selection.date, selection);
+  }
+
+  function createAppointmentFromTimeSelection(selection: CalendarTimeSelection) {
+    setCalendarTimeSelection(undefined);
+    setCancellingAppointment(undefined);
+    setEditingAppointment(undefined);
+    setAppointmentCreateSelection(selection);
+    updateActiveCalendarDate(selection.date);
+    setIsActionOpen(true);
   }
 
   function openCurrentClientBlock() {
@@ -5952,6 +6679,7 @@ export function AdminShell({
     setCalendarBlockDate(getSofiaIsoDate());
     setCalendarBlockEndsAt(window.endsAt);
     setCalendarBlockIntent("walk-in");
+    setCalendarBlockSpecialistId(undefined);
     setCalendarBlockStartsAt(window.startsAt);
     setIsCalendarBlockDialogOpen(true);
   }
@@ -5961,6 +6689,7 @@ export function AdminShell({
     setCalendarBlockDate(block.blockDate);
     setCalendarBlockEndsAt(undefined);
     setCalendarBlockIntent("block");
+    setCalendarBlockSpecialistId(block.specialistId);
     setCalendarBlockStartsAt(undefined);
     setIsCalendarBlockDialogOpen(true);
   }
@@ -5968,6 +6697,7 @@ export function AdminShell({
   function closeCalendarBlockDialog() {
     setIsCalendarBlockDialogOpen(false);
     setEditingCalendarBlock(undefined);
+    setCalendarBlockSpecialistId(undefined);
   }
 
   async function saveCalendarBlock(block: CalendarBlock): Promise<CalendarBlockSaveResult> {
@@ -5982,7 +6712,11 @@ export function AdminShell({
 
     try {
       const response = await fetch("/api/admin/calendar-blocks", {
-        body: JSON.stringify({ ...block, intent: calendarBlockIntent }),
+        body: JSON.stringify(createCalendarBlockMutationPayload(
+          block,
+          calendarBlockIntent,
+          Boolean(editingCalendarBlock),
+        )),
         headers: await getAdminApiHeaders(),
         method: editingCalendarBlock ? "PATCH" : "POST",
       });
@@ -6119,19 +6853,53 @@ export function AdminShell({
         method: "POST",
       });
       const result = (await response.json().catch(() => null)) as
-        | { error?: string; message?: string; ok?: boolean; version?: number }
+        | {
+            error?: string;
+            message?: string;
+            ok?: boolean;
+            record?: ClientRecord;
+            version?: number;
+          }
         | null;
 
       if (!response.ok || result?.ok === false) {
         const message = result?.message ?? result?.error ?? "Supabase не подтвердил изменение. Исходные данные восстановлены.";
         showPersistenceStatus(message, { variant: "error" });
-        return { message, ok: false };
+        return { client: result?.record, message, ok: false };
       }
 
       showPersistenceStatus("Изменение сохранено в Supabase.", { autoDismiss: true });
-      return { ok: true, version: result?.version };
+      return { client: result?.record, ok: true, version: result?.version };
     } catch {
       const message = "Supabase недоступен. Исходные данные восстановлены.";
+      showPersistenceStatus(message, { variant: "error" });
+      return { message, ok: false };
+    }
+  }
+
+  async function persistAdminDelete(input: AdminDeleteInput): Promise<CalendarAppointmentSaveResult> {
+    if (!isSupabaseBacked) return { ok: true };
+
+    try {
+      const response = await fetch("/api/admin/records", {
+        body: JSON.stringify(input),
+        headers: await getAdminApiHeaders(),
+        method: "DELETE",
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string; message?: string; ok?: boolean }
+        | null;
+
+      if (!response.ok || result?.ok === false) {
+        const message = result?.error ?? result?.message ?? "Не удалось удалить запись.";
+        showPersistenceStatus(message, { variant: "error" });
+        return { message, ok: false };
+      }
+
+      showPersistenceStatus("Удаление сохранено в Supabase.", { autoDismiss: true });
+      return { ok: true };
+    } catch {
+      const message = "Сервер недоступен. Запись не удалена.";
       showPersistenceStatus(message, { variant: "error" });
       return { message, ok: false };
     }
@@ -6172,6 +6940,7 @@ export function AdminShell({
     appointment: Appointment,
     action: AdminAuditAction,
     originalAppointment: Appointment = appointment,
+    options: { notifyClient: boolean } = { notifyClient: true },
   ): Promise<CalendarAppointmentSaveResult> {
     if (!appointment.clientId) {
       if (isSupabaseBacked) {
@@ -6214,12 +6983,14 @@ export function AdminShell({
       appointmentSchedule,
     );
 
+    const audit = {
+      action,
+      notifyClient: options.notifyClient,
+      outsideWorkingHours: scheduleClassification.outsideWorkingHours,
+      overlapOverride: overlap,
+    };
     const result = await persistAdminRecord({
-      audit: {
-        action,
-        outsideWorkingHours: scheduleClassification.outsideWorkingHours,
-        overlapOverride: overlap,
-      },
+      audit,
       record: appointment,
       type: "appointment",
     });
@@ -6253,6 +7024,14 @@ export function AdminShell({
     );
   }
 
+  function handleAppointmentPublicEmailCorrected(appointmentId: string, email: string) {
+    setCalendarAppointments((current) =>
+      current.map((appointment) =>
+        appointment.id === appointmentId ? { ...appointment, publicEmail: email } : appointment,
+      ),
+    );
+  }
+
   function updateActiveCalendarDate(date: string) {
     setCalendarSelection({
       date,
@@ -6262,6 +7041,7 @@ export function AdminShell({
 
   function openPrimaryAction() {
     setEditingAppointment(undefined);
+    setAppointmentCreateSelection(undefined);
 
     if (!canUsePrimaryAction) return;
 
@@ -6424,10 +7204,12 @@ export function AdminShell({
     setIsSettingsEditOpen(false);
     setIsUserCreateOpen(false);
     setEditingAppointment(appointment);
+    setAppointmentCreateSelection(undefined);
     setIsActionOpen(true);
   }
 
   function openAppointmentCancel(appointment: Appointment) {
+    setDeletingAppointment(undefined);
     setEditingAppointment(undefined);
     setIsActionOpen(false);
     setIsCertificateCreateOpen(false);
@@ -6442,10 +7224,18 @@ export function AdminShell({
     setCancellingAppointment(appointment);
   }
 
+  function openAppointmentDelete(appointment: Appointment) {
+    setCancellingAppointment(undefined);
+    setEditingAppointment(undefined);
+    setIsActionOpen(false);
+    setDeletingAppointment(appointment);
+  }
+
   function prepareCalendarCreateFromClient() {
     setDismissedCalendarActionKey("");
     setCancellingAppointment(undefined);
     setEditingAppointment(undefined);
+    setAppointmentCreateSelection(undefined);
     setIsCertificateCreateOpen(false);
     setIsClientCreateOpen(false);
     setIsContactSettingsOpen(false);
@@ -6471,13 +7261,21 @@ export function AdminShell({
     setIsSettingsEditOpen(false);
     setIsUserCreateOpen(false);
     setEditingAppointment(undefined);
+    setAppointmentCreateSelection(undefined);
   }
 
   function closeCancelDialog() {
     setCancellingAppointment(undefined);
   }
 
-  async function saveCalendarAppointment(appointment: Appointment): Promise<CalendarAppointmentSaveResult> {
+  function closeAppointmentDeleteDialog() {
+    setDeletingAppointment(undefined);
+  }
+
+  async function saveCalendarAppointment(
+    appointment: Appointment,
+    options: { notifyClient: boolean },
+  ): Promise<CalendarAppointmentSaveResult> {
     let persistedAppointment = appointment;
     const previousAppointment = editingAppointment;
 
@@ -6498,6 +7296,7 @@ export function AdminShell({
       persistedAppointment,
       previousAppointment ? "appointment.update" : "appointment.create",
       previousAppointment ?? persistedAppointment,
+      options,
     );
 
     if (!result.ok) {
@@ -6522,12 +7321,18 @@ export function AdminShell({
     appointment: Appointment,
     action: AdminAuditAction = "appointment.update",
     originalAppointment?: Appointment,
+    options: { notifyClient: boolean } = { notifyClient: true },
   ): Promise<CalendarAppointmentSaveResult> {
     const previousAppointment =
       originalAppointment ??
       calendarAppointments.find((candidate) => appointmentKey(candidate) === appointmentKey(appointment));
     handleAppointmentUpdate(appointment, appointmentKey(previousAppointment ?? appointment));
-    const result = await persistAppointmentRecord(appointment, action, previousAppointment ?? appointment);
+    const result = await persistAppointmentRecord(
+      appointment,
+      action,
+      previousAppointment ?? appointment,
+      options,
+    );
 
     if (!result.ok && previousAppointment) {
       handleAppointmentUpdate(previousAppointment, appointmentKey(appointment));
@@ -6538,10 +7343,13 @@ export function AdminShell({
     return result;
   }
 
-  async function cancelCalendarAppointment(appointment: Appointment): Promise<CalendarAppointmentSaveResult> {
+  async function cancelCalendarAppointment(
+    appointment: Appointment,
+    options: { notifyClient: boolean },
+  ): Promise<CalendarAppointmentSaveResult> {
     const cancelledAppointment = { ...appointment, status: "Отменена" as const };
     handleAppointmentUpdate(cancelledAppointment);
-    const result = await persistAppointmentRecord(cancelledAppointment, "appointment.cancel", appointment);
+    const result = await persistAppointmentRecord(cancelledAppointment, "appointment.cancel", appointment, options);
 
     if (!result.ok) {
       handleAppointmentUpdate(appointment, appointmentKey(cancelledAppointment));
@@ -6549,6 +7357,39 @@ export function AdminShell({
       handleAppointmentUpdate({ ...cancelledAppointment, version: result.version });
     }
 
+    return result;
+  }
+
+  async function deleteCalendarAppointment(
+    appointment: Appointment,
+  ): Promise<CalendarAppointmentSaveResult> {
+    if (!appointment.id) {
+      return { message: "Запись без идентификатора нельзя удалить.", ok: false };
+    }
+
+    const result = await persistAdminDelete({
+      id: appointment.id,
+      type: "appointment",
+      version: appointment.version ?? 1,
+    });
+    if (!result.ok) return result;
+
+    setCalendarAppointments((current) =>
+      current.filter((candidate) => appointmentKey(candidate) !== appointmentKey(appointment)),
+    );
+    return result;
+  }
+
+  async function deleteClientRecord(client: ClientRecord): Promise<CalendarAppointmentSaveResult> {
+    const result = await persistAdminDelete({ id: client.id, type: "client" });
+    if (!result.ok) return result;
+
+    setClients((current) => current.filter((candidate) => candidate.id !== client.id));
+    setCertificates((current) => current.map((certificate) => (
+      certificate.clientId === client.id
+        ? { ...certificate, clientId: undefined }
+        : certificate
+    )));
     return result;
   }
 
@@ -6560,14 +7401,44 @@ export function AdminShell({
     );
 
     if (updatedClient) {
-      void persistAdminRecord({ record: { ...updatedClient, note }, type: "client" }).then((result) => {
-        if (!result.ok) setClients(previousClients);
+      const clientNoteRecord = { ...updatedClient, note };
+      delete clientNoteRecord.careEmailConsentAt;
+      delete clientNoteRecord.careEmailConsentSource;
+      delete clientNoteRecord.careEmailExpectedConsentAt;
+      delete clientNoteRecord.careEmailExpectedConsentSource;
+      delete clientNoteRecord.careEmailExpectedWithdrawnAt;
+      delete clientNoteRecord.careEmailWithdrawnAt;
+      void persistAdminRecord({ record: clientNoteRecord, type: "client" }).then((result) => {
+        const serverClient = result.client;
+        if (!result.ok) {
+          setClients(
+            serverClient
+              ? previousClients.map((client) =>
+                  client.id === serverClient.id ? serverClient : client,
+                )
+              : previousClients,
+          );
+        } else if (serverClient) {
+          setClients((current) =>
+            current.map((client) =>
+              client.id === serverClient.id ? serverClient : client,
+            ),
+          );
+        }
       });
     }
   }
 
   function saveClientRecord(client: ClientRecord, originalClientIdentity?: string) {
     const previousClients = clients;
+    const hasCareEmailConsentMutation =
+      client.careEmailExpectedConsentAt !== undefined ||
+      client.careEmailExpectedConsentSource !== undefined ||
+      client.careEmailExpectedWithdrawnAt !== undefined;
+    const clientForState = { ...client };
+    delete clientForState.careEmailExpectedConsentAt;
+    delete clientForState.careEmailExpectedConsentSource;
+    delete clientForState.careEmailExpectedWithdrawnAt;
     setClients((current) => {
       const uniqueCurrent = [...new Map(current.map((currentClient) => [currentClient.id, currentClient])).values()];
       const nextPhone = normalizeClientPhone(client.phone);
@@ -6584,13 +7455,38 @@ export function AdminShell({
       });
 
       if (existingIndex === -1) {
-        return [...uniqueCurrent, client];
+        return [...uniqueCurrent, clientForState];
       }
 
-      return uniqueCurrent.map((currentClient, index) => (index === existingIndex ? client : currentClient));
+      return uniqueCurrent.map((currentClient, index) => {
+        if (index !== existingIndex) return currentClient;
+        if (hasCareEmailConsentMutation) return clientForState;
+
+        return {
+          ...clientForState,
+          careEmailConsentAt: currentClient.careEmailConsentAt,
+          careEmailConsentSource: currentClient.careEmailConsentSource,
+          careEmailWithdrawnAt: currentClient.careEmailWithdrawnAt,
+        };
+      });
     });
     void persistAdminRecord({ record: client, type: "client" }).then((result) => {
-      if (!result.ok) setClients(previousClients);
+      const serverClient = result.client;
+      if (!result.ok) {
+        setClients(
+          serverClient
+            ? previousClients.map((currentClient) =>
+                currentClient.id === serverClient.id ? serverClient : currentClient,
+              )
+            : previousClients,
+        );
+      } else if (serverClient) {
+        setClients((current) =>
+          current.map((currentClient) =>
+            currentClient.id === serverClient.id ? serverClient : currentClient,
+          ),
+        );
+      }
     });
   }
 
@@ -6763,22 +7659,21 @@ export function AdminShell({
     setContactSettings(settings);
     setContactChannels(nextContactChannels);
     setIsContactSettingsOpen(false);
-    void Promise.all([
-      persistAdminRecord({ record: settings, type: "contactSettings" }),
-      ...nextContactChannels
-        .filter((channel) => linkedChannelValues.has(channel.id))
-        .map((channel) => persistAdminRecord({ record: channel, type: "contactChannel" })),
-    ]).then((results) => {
-      if (results.some((result) => !result.ok)) {
+    void persistAdminRecord({ record: settings, type: "contactSettings" }).then((result) => {
+      if (!result.ok) {
         setContactChannels(previousContactChannels);
         setContactSettings(previousContactSettings);
-        showPersistenceStatus("Не удалось полностью сохранить контакты. Исходные данные восстановлены.");
+        showPersistenceStatus("Не удалось сохранить контакты. Исходные данные восстановлены.");
+      } else {
+        showPersistenceStatus("Контакты и график сохранены. Публичный сайт обновлён.");
       }
     });
   }
 
   function saveContactChannelRecord(channel: ContactChannelRecord, originalId?: string) {
     const previousContactChannels = contactChannels;
+    const previousContactSettings = contactSettings;
+    const updatesPrimaryPhone = channel.id === "contact-phone" && channel.type === "Телефон";
     setContactChannels((current) => {
       const originalKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(channel.id);
@@ -6796,22 +7691,33 @@ export function AdminShell({
 
       return current.map((currentChannel, index) => (index === existingIndex ? channel : currentChannel));
     });
+    if (updatesPrimaryPhone) {
+      setContactSettings((current) => ({ ...current, phone: channel.value }));
+    }
     void persistAdminRecord({ record: channel, type: "contactChannel" }).then((result) => {
-      if (!result.ok) setContactChannels(previousContactChannels);
+      if (!result.ok) {
+        setContactChannels(previousContactChannels);
+        setContactSettings(previousContactSettings);
+      } else if (updatesPrimaryPhone) {
+        showPersistenceStatus("Телефон сохранён. Публичный сайт обновлён.");
+      }
     });
   }
 
   async function saveBlogPostRecord(post: BlogPostRecord, originalId?: string) {
-    const previousBlogPosts = blogPosts;
+    const originalKey = normalizeSearch(originalId ?? post.id);
+    const previousPost = blogPosts.find(
+      (currentPost) => normalizeSearch(currentPost.id) === originalKey,
+    );
     setBlogPosts((current) => {
-      const originalKey = originalId ? normalizeSearch(originalId) : "";
+      const priorKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(post.id);
       const existingIndex = current.findIndex((currentPost) => {
-        if (originalKey) {
-          return normalizeSearch(currentPost.id) === originalKey;
+        if (priorKey) {
+          return normalizeSearch(currentPost.id) === priorKey;
         }
 
-        return normalizeSearch(currentPost.id) === nextKey || normalizeSearch(currentPost.slug) === normalizeSearch(post.slug);
+        return normalizeSearch(currentPost.id) === nextKey;
       });
 
       if (existingIndex === -1) {
@@ -6822,7 +7728,24 @@ export function AdminShell({
     });
     const result = await persistAdminRecord({ audit: { action: "blog.publication" }, record: post, type: "blogPost" });
     if (!result.ok) {
-      setBlogPosts(previousBlogPosts);
+      const failedPostSnapshot = JSON.stringify(post);
+      setBlogPosts((current) => {
+        const failedIndex = current.findIndex(
+          (currentPost) => normalizeSearch(currentPost.id) === normalizeSearch(post.id),
+        );
+        if (
+          failedIndex === -1 ||
+          JSON.stringify(current[failedIndex]) !== failedPostSnapshot
+        ) {
+          return current;
+        }
+        if (!previousPost) {
+          return current.filter((_, index) => index !== failedIndex);
+        }
+        return current.map((currentPost, index) =>
+          index === failedIndex ? previousPost : currentPost,
+        );
+      });
       throw new Error(result.message);
     }
   }
@@ -6902,6 +7825,23 @@ export function AdminShell({
     void persistAdminRecord({ audit: { action: "site.gift_certificates" }, record: nextSettings, type: "settings" }).then((result) => {
       if (!result.ok) setSettings(previousSettings);
     });
+  }
+
+  async function saveBlogVisibility(enabled: boolean) {
+    const previousSettings = settings;
+    setSettings((current) => ({ ...current, blogEnabled: enabled }));
+    const result = await persistAdminRecord({
+      audit: { action: "site.blog_visibility" },
+      record: { enabled },
+      type: "blogVisibility",
+    });
+
+    if (!result.ok) {
+      setSettings(previousSettings);
+      return false;
+    }
+
+    return true;
   }
 
   return (
@@ -7011,6 +7951,7 @@ export function AdminShell({
         />
 
         <Workspace
+          activeTimeSelection={calendarTimeSelection}
           actorUserId={actorUserId}
           adminUsers={adminUsers}
           appointments={calendarAppointments}
@@ -7023,6 +7964,7 @@ export function AdminShell({
           contactChannels={contactChannels}
           contactSettings={contactSettings}
           financeRows={stripeSales}
+          hasLoadError={Boolean(initialData?.loadError)}
           isBlogCreateOpen={isBlogCreateOpen}
           isCertificateCreateOpen={isCertificateCreateOpen}
           isClientCreateOpen={isClientCreateOpen}
@@ -7037,6 +7979,8 @@ export function AdminShell({
           onCreateCalendarBlock={openCalendarBlockCreate}
           onCreateWalkIn={openCurrentClientBlock}
           onDeleteCalendarBlock={deleteCalendarBlock}
+          onDeleteAppointment={openAppointmentDelete}
+          onDeleteClient={deleteClientRecord}
           onCalendarCreateIntent={prepareCalendarCreateFromClient}
           onCalendarDateChange={updateActiveCalendarDate}
           onCloseBlogCreate={() => setIsBlogCreateOpen(false)}
@@ -7050,10 +7994,12 @@ export function AdminShell({
           onCloseUserCreate={() => setIsUserCreateOpen(false)}
           onEditAppointment={openAppointmentEdit}
           onEditCalendarBlock={openCalendarBlockEdit}
+          onAppointmentPublicEmailCorrected={handleAppointmentPublicEmailCorrected}
           onSaveAppointment={saveCalendarAppointmentInline}
           onOpenSettingsEdit={() => setIsSettingsEditOpen(true)}
           onSaveAdminUser={saveAdminUserRecord}
           onSaveBlogPost={saveBlogPostRecord}
+          onSaveBlogVisibility={saveBlogVisibility}
           onSaveCertificate={saveCertificateRecord}
           onSaveClient={saveClientRecord}
           onSaveClientNote={saveClientNote}
@@ -7063,6 +8009,7 @@ export function AdminShell({
           onSavePrice={savePriceRecord}
           onSaveService={saveServiceRecord}
           onSaveSpecialistSchedule={saveSpecialistSchedule}
+          onSelectTimeRange={openCalendarTimeSelection}
           onSaveSettings={saveSettingsRecord}
           onUpdateCertificateStatus={updateCertificateStatus}
           prices={prices}
@@ -7081,13 +8028,26 @@ export function AdminShell({
           selectedSettingsGroupId={selectedSettingsGroupId}
           services={services}
           settings={settings}
+          showGiftReconciliation={
+            isSupabaseBacked && (role === "owner" || role === "administrator")
+          }
           specialists={specialists}
         />
+
+        {calendarTimeSelection ? (
+          <CalendarTimeSelectionDialog
+            onChooseAppointment={createAppointmentFromTimeSelection}
+            onChooseBlock={createBlockFromTimeSelection}
+            onClose={() => setCalendarTimeSelection(undefined)}
+            selection={calendarTimeSelection}
+          />
+        ) : null}
 
         {isCalendarActionDialogOpen ? (
           <CalendarAppointmentDialog
             appointments={calendarAppointments}
             bookingBufferMinutes={settings.bookingBufferMinutes}
+            calendarBlocks={calendarBlocks}
             clients={clients}
             currentSpecialistId={initialData?.currentSpecialistId}
             initialAppointment={editingAppointment}
@@ -7096,7 +8056,15 @@ export function AdminShell({
             onSave={saveCalendarAppointment}
             prefillClient={prefilledCalendarClient}
             prefillClientName={shouldPrefillCalendarClient ? selectedClientName : undefined}
-            prefillDate={editingAppointment ? undefined : activeCalendarDate}
+            prefillDate={editingAppointment ? undefined : appointmentCreateSelection?.date ?? activeCalendarDate}
+            prefillDurationMinutes={editingAppointment ? undefined : appointmentCreateSelection?.durationMinutes}
+            prefillSpecialistId={editingAppointment ? undefined : appointmentCreateSelection?.specialistId}
+            prefillTime={editingAppointment ? undefined : appointmentCreateSelection?.startsAt}
+            requireSpecialistSelection={Boolean(
+              appointmentCreateSelection
+              && !appointmentCreateSelection.specialistId
+              && specialists.filter((specialist) => specialist.status === "active").length > 1
+            )}
             role={role}
             siteSettings={settings}
             specialists={specialists}
@@ -7111,24 +8079,46 @@ export function AdminShell({
 
         {isCalendarBlockDialogOpen ? (
           <CalendarBlockDialog
+            appointments={calendarAppointments}
+            bookingBufferMinutes={settings.bookingBufferMinutes}
+            calendarBlocks={calendarBlocks}
             currentSpecialistId={initialData?.currentSpecialistId}
             initialBlock={editingCalendarBlock}
             initialDate={calendarBlockDate || activeCalendarDate}
             initialEndsAt={calendarBlockEndsAt}
+            initialSpecialistId={calendarBlockSpecialistId}
             initialStartsAt={calendarBlockStartsAt}
             intent={calendarBlockIntent}
             key={editingCalendarBlock?.id ?? `new-${calendarBlockIntent}-${calendarBlockDate || activeCalendarDate}`}
             onClose={closeCalendarBlockDialog}
             onSave={saveCalendarBlock}
             role={role}
+            requireSpecialistSelection={Boolean(
+              calendarBlockStartsAt
+              && !calendarBlockSpecialistId
+              && specialists.filter((specialist) => specialist.status === "active").length > 1
+            )}
             specialists={specialists}
           />
         ) : null}
         {cancellingAppointment ? (
           <CalendarAppointmentCancelDialog
             appointment={cancellingAppointment}
+            clientEmail={getAppointmentNotificationEmail(clients, cancellingAppointment)}
             onClose={closeCancelDialog}
             onConfirm={cancelCalendarAppointment}
+          />
+        ) : null}
+        {deletingAppointment ? (
+          <AdminRecordDeleteDialog
+            confirmLabel="Удалить запись"
+            description="Это не отмена: CRM-запись будет удалена без возможности восстановления. Отдельное письмо об удалении не отправляется, а ожидающие уведомления будут отменены."
+            kicker="Календарь"
+            onClose={closeAppointmentDeleteDialog}
+            onConfirm={() => deleteCalendarAppointment(deletingAppointment)}
+            subject={`${deletingAppointment.client}, ${formatCalendarDay(deletingAppointment.date)} в ${deletingAppointment.time}`}
+            summaryItems={[deletingAppointment.service, deletingAppointment.status]}
+            title="Удалить запись?"
           />
         ) : null}
       </main>

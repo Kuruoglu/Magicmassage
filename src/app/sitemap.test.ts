@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/content/public-content-runtime", () => ({
   getPublicShellRuntime: vi.fn(async (locale: string) => ({
+    blogEnabled: locale !== "en",
     giftCertificatesEnabled: locale !== "en",
     publicBookingEnabled: locale === "bg",
     mediaPlacements: [],
@@ -26,7 +27,7 @@ describe("sitemap", () => {
   it("contains every localized public page and published blog URL", async () => {
     const urls = (await sitemap()).map((entry) => entry.url);
 
-    expect(urls).toHaveLength(48);
+    expect(urls).toHaveLength(46);
     expect(urls).toContain("https://magicmassagenatali.bg/bg");
     expect(urls).toContain("https://magicmassagenatali.bg/bg/services");
     expect(urls).toContain("https://magicmassagenatali.bg/bg/gift-certificates");
@@ -48,7 +49,8 @@ describe("sitemap", () => {
     expect(urls).toContain("https://magicmassagenatali.bg/bg/blog");
     expect(urls).toContain("https://magicmassagenatali.bg/ru/blog/recovery-guide");
     expect(urls).toContain("https://magicmassagenatali.bg/ua/blog/recovery-guide");
-    expect(urls).toContain("https://magicmassagenatali.bg/en/blog/recovery-guide");
+    expect(urls).not.toContain("https://magicmassagenatali.bg/en/blog");
+    expect(urls).not.toContain("https://magicmassagenatali.bg/en/blog/recovery-guide");
   });
 
   it("uses stable static dates and published timestamps instead of generation time", async () => {

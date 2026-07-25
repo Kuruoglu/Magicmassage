@@ -2,12 +2,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { persistAdminRecord } from "@/admin/persistence";
+import { deleteAdminRecord, persistAdminRecord } from "@/admin/persistence";
 import { runWithAdminRepositoryAuditContext } from "@/admin/repository";
+import { cloneBusinessHoursSchedule } from "@/lib/business-hours";
 import { authorizeSupabaseAdminAccess } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
-import { POST } from "./route";
+import { DELETE, POST } from "./route";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
@@ -146,6 +147,7 @@ const contactSettingsPayload = {
     mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
     phone: "+359 87 333 4411",
     seoArea: "Burgas, Bulgaria",
+    workingSchedule: cloneBusinessHoursSchedule(),
     workingHours: "Пн-Сб 10:00-19:00",
   },
   type: "contactSettings",
@@ -160,16 +162,23 @@ const blogPostPayload = {
     coverImage: "/media/blog/prepare-for-massage.jpg",
     excerpt: "Короткая памятка перед первым визитом.",
     id: "blog-prepare-for-massage",
-    locales: ["ru", "bg"],
+    locales: ["ru"],
     publishedAt: "2026-07-20",
     seoTitle: "Как подготовиться к массажу в Бургасе",
     slug: "prepare-for-massage",
     status: "Черновик",
     tags: ["подготовка", "массаж"],
     title: "Как подготовиться к массажу",
+    translationKey: "prepare-for-massage",
     updatedAt: "2026-07-09",
   },
   type: "blogPost",
+} as const;
+
+const blogVisibilityPayload = {
+  audit: { action: "site.blog_visibility" },
+  record: { enabled: false },
+  type: "blogVisibility",
 } as const;
 
 const overlappingAppointmentPayload = {
@@ -340,6 +349,7 @@ vi.mock("@/admin/persistence", async (importOriginal) => {
 
   return {
     ...actual,
+    deleteAdminRecord: vi.fn(async () => ({ mode: "supabase", ok: true })),
     persistAdminRecord: vi.fn(async () => ({ mode: "supabase", ok: true })),
   };
 });
@@ -354,6 +364,78 @@ describe("admin records persistence API route", () => {
       userId: "11111111-1111-4111-8111-111111111111",
     };
     supabaseAdminRouteMock.client = null;
+  });
+
+  it("deletes an appointment with a versioned audited operation", async () => {
+    supabaseAdminRouteMock.client = {};
+    const payload = { id: "appointment-1", type: "appointment", version: 3 } as const;
+    const response = await DELETE(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      headers: { authorization: "Bearer test-token" },
+      method: "DELETE",
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
+    expect(authorizeSupabaseAdminAccess).toHaveBeenCalledWith(
+      supabaseAdminRouteMock.client,
+      "test-token",
+      { allowedRoles: ["owner", "administrator"] },
+    );
+    expect(runWithAdminRepositoryAuditContext).toHaveBeenCalledWith(
+      {
+        action: "appointment.delete",
+        actorUserId: "11111111-1111-4111-8111-111111111111",
+        metadata: { recordType: "appointment", role: "administrator" },
+      },
+      expect.any(Function),
+    );
+    expect(deleteAdminRecord).toHaveBeenCalledWith(payload);
+  });
+
+  it("rejects malformed and unauthorized deletion requests", async () => {
+    const malformed = await DELETE(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify({ id: "appointment-1", type: "appointment" }),
+      method: "DELETE",
+    }));
+    expect(malformed.status).toBe(400);
+
+    supabaseAdminRouteMock.client = {};
+    supabaseAdminRouteMock.authorizationResult = {
+      message: "Forbidden",
+      ok: false,
+      statusCode: 403,
+    };
+    const forbidden = await DELETE(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify({ id: "client-1", type: "client" }),
+      method: "DELETE",
+    }));
+    expect(forbidden.status).toBe(403);
+    expect(deleteAdminRecord).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["client_has_appointments", 409, "Сначала удалите записи"],
+    ["appointment_concurrent_update", 409, "Запись изменилась"],
+    ["appointment_email_delivery_in_progress", 409, "уже отправляется"],
+    ["record_not_found", 404, "не найдена"],
+  ] as const)("maps %s deletion failures to HTTP %s", async (reason, status, message) => {
+    vi.mocked(deleteAdminRecord).mockResolvedValueOnce({
+      message: "Unable to delete admin record.",
+      mode: "supabase",
+      ok: false,
+      reason,
+    });
+    const payload = reason.startsWith("appointment_")
+      ? { id: "appointment-1", type: "appointment" as const, version: 2 }
+      : { id: "client-1", type: "client" as const };
+    const response = await DELETE(new Request("https://example.com/api/admin/records", {
+      body: JSON.stringify(payload),
+      method: "DELETE",
+    }));
+
+    expect(response.status).toBe(status);
+    await expect(response.json()).resolves.toEqual({ error: expect.stringContaining(message) });
   });
 
   it("persists valid admin record payloads", async () => {
@@ -529,6 +611,10 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
     expect(persistAdminRecord).toHaveBeenCalledWith(contactSettingsPayload);
+    expect(revalidatePath).toHaveBeenCalledWith("/bg/contacts");
+    expect(revalidatePath).toHaveBeenCalledWith("/ru/contacts");
+    expect(revalidatePath).toHaveBeenCalledWith("/ua/contacts");
+    expect(revalidatePath).toHaveBeenCalledWith("/en/contacts");
   });
 
   it("persists valid blog post payloads", async () => {
@@ -542,6 +628,23 @@ describe("admin records persistence API route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ mode: "supabase", ok: true });
     expect(persistAdminRecord).toHaveBeenCalledWith(blogPostPayload);
+  });
+
+  it("persists blog visibility and revalidates every public blog surface", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(blogVisibilityPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(persistAdminRecord).toHaveBeenCalledWith(blogVisibilityPayload);
+    expect(revalidatePath).toHaveBeenCalledWith("/[locale]/blog/[slug]", "layout");
+    expect(revalidatePath).toHaveBeenCalledWith("/sitemap.xml");
+    for (const locale of ["bg", "ru", "ua", "en"]) {
+      expect(revalidatePath).toHaveBeenCalledWith(`/${locale}/blog`);
+    }
   });
 
   it("persists valid settings payloads", async () => {
@@ -620,6 +723,33 @@ describe("admin records persistence API route", () => {
     });
   });
 
+  it("returns the current client with HTTP 409 after a consent conflict", async () => {
+    const currentClient = {
+      ...clientPayload.record,
+      careEmailConsentAt: "2026-07-25T10:15:00.000Z",
+      careEmailConsentSource: "public_booking" as const,
+      history: [...clientPayload.record.history],
+      tags: [...clientPayload.record.tags],
+    };
+    vi.mocked(persistAdminRecord).mockResolvedValueOnce({
+      message: "Unable to persist admin record.",
+      mode: "supabase",
+      ok: false,
+      reason: "care_email_consent_conflict",
+      record: currentClient,
+    });
+
+    const response = await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(clientPayload),
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ record: currentClient });
+  });
+
   it("uses the documented operation-only specialist and owner-only settings matrix", async () => {
     const insert = vi.fn(async () => ({ error: null }));
     supabaseAdminRouteMock.client = { from: vi.fn(() => ({ insert })) };
@@ -644,6 +774,17 @@ describe("admin records persistence API route", () => {
     );
     expect(authorizeSupabaseAdminAccess).toHaveBeenLastCalledWith(expect.anything(), "token", {
       allowedRoles: ["owner"],
+    });
+
+    await POST(
+      new Request("https://example.com/api/admin/records", {
+        body: JSON.stringify(blogVisibilityPayload),
+        headers: { authorization: "Bearer token" },
+        method: "POST",
+      }),
+    );
+    expect(authorizeSupabaseAdminAccess).toHaveBeenLastCalledWith(expect.anything(), "token", {
+      allowedRoles: ["owner", "administrator", "editor"],
     });
   });
 

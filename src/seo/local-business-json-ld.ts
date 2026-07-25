@@ -3,6 +3,8 @@ import { getPublicPagesContent } from "@/content/public-pages";
 import { businessFacts } from "@/config/business";
 import type { Locale } from "@/i18n/config";
 import { siteUrl } from "@/seo/site-url";
+import type { PublicBusinessDetails } from "@/lib/public-content";
+import { toPhoneHref } from "@/lib/business-hours";
 
 const descriptions: Record<Locale, string> = {
   bg: "Масажно студио в Бургас за индивидуален класически, релаксиращ, дълбокотъканен и антицелулитен масаж.",
@@ -11,30 +13,46 @@ const descriptions: Record<Locale, string> = {
   en: "Massage studio in Burgas for individual classic, relaxing, deep tissue and anti-cellulite massage.",
 };
 
-export function createLocalBusinessJsonLd(locale: Locale, content: HomeContent) {
+export function createLocalBusinessJsonLd(
+  locale: Locale,
+  content: HomeContent,
+  businessDetails?: PublicBusinessDetails,
+) {
   const services = getPublicPagesContent(locale).services.items;
+  const phone = businessDetails?.phone ?? businessFacts.phone.display;
+  const address = businessDetails?.address ?? businessFacts.address.streetAddress;
+  const locality = businessDetails?.seoArea.split(",")[0]?.trim() || businessFacts.address.locality;
+  const openingHoursSpecification = businessDetails?.workingSchedule
+    .filter((day) => day.isOpen)
+    .map((day) => ({
+      "@type": "OpeningHoursSpecification",
+      closes: day.closesAt,
+      dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][day.weekday - 1],
+      opens: day.opensAt,
+    }));
 
   return {
     "@context": "https://schema.org",
     "@type": "HealthAndBeautyBusiness",
     "@id": `${siteUrl}/#business`,
-    name: businessFacts.name,
+    name: businessDetails?.businessName ?? businessFacts.name,
     description: descriptions[locale],
     url: `${siteUrl}/${locale}`,
     image: `${siteUrl}/media/hero/hero-massage-session.jpg`,
-    telephone: businessFacts.phone.display,
+    telephone: phone,
     priceRange: "$$",
     address: {
       "@type": "PostalAddress",
-      streetAddress: businessFacts.address.streetAddress,
-      addressLocality: businessFacts.address.locality,
+      streetAddress: address,
+      addressLocality: locality,
       addressCountry: businessFacts.address.countryCode,
     },
     areaServed: {
       "@type": "City",
-      name: businessFacts.address.locality,
+      name: locality,
     },
     availableLanguage: ["Bulgarian", "Russian", "Ukrainian", "English"],
+    ...(openingHoursSpecification ? { openingHoursSpecification } : {}),
     makesOffer: services.map((service) => ({
       "@type": "Offer",
       itemOffered: {
@@ -45,7 +63,7 @@ export function createLocalBusinessJsonLd(locale: Locale, content: HomeContent) 
     })),
     potentialAction: {
       "@type": "ReserveAction",
-      target: `tel:${content.contact.phone.replace(/[^\d+]/g, "")}`,
+      target: `tel:${toPhoneHref(phone)}`,
     },
   };
 }

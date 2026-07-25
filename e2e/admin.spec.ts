@@ -23,7 +23,10 @@ test("dashboard links to connected admin workspaces", async ({ page }) => {
     "/admin?section=calendar&role=owner",
   );
 
-  await page.getByRole("link", { name: "Анна Петрова" }).click();
+  await page
+    .getByLabel("Комментарии после визита")
+    .getByRole("link", { exact: true, name: "Анна Петрова" })
+    .click();
   await expect(page).toHaveURL(/section=clients/);
   await expect(page.getByRole("dialog", { name: "Карточка клиента" }).getByRole("heading", { name: "Анна Петрова" })).toBeVisible();
 
@@ -33,24 +36,27 @@ test("dashboard links to connected admin workspaces", async ({ page }) => {
   await expect(page.getByLabel("Детали сертификата").getByRole("heading", { name: "MMN-2407-1023" })).toBeVisible();
 });
 
-test("dashboard calendar row link opens the exact appointment", async ({ page }) => {
+test("dashboard appointment link opens the exact calendar record", async ({ page }) => {
   await page.goto("/admin", { waitUntil: "networkidle" });
 
-  await page.getByRole("row", { name: /17:30 Светлана/ }).getByRole("link", { name: "Календарь" }).click();
+  await page
+    .getByLabel("Комментарии после визита")
+    .getByRole("link", { name: "Открыть запись: Olena K., 8 июля 15:00" })
+    .click();
 
   await expect(page).toHaveURL(/section=calendar/);
-  await expect(page).toHaveURL(/date=2026-07-10/);
-  await expect(page).toHaveURL(/client=%D0%A1%D0%B2%D0%B5%D1%82%D0%BB%D0%B0%D0%BD%D0%B0/);
-  await expect(page).toHaveURL(/appointment=demo-4/);
-  await expect(page.getByRole("heading", { name: "10 июля" })).toBeVisible();
+  await expect(page).toHaveURL(/date=2026-07-08/);
+  await expect(page).toHaveURL(/client=client-359873334411/);
+  await expect(page).toHaveURL(/appointment=demo-3/);
+  await expect(page.getByRole("heading", { name: "8 июля" })).toBeVisible();
   await expect(page.getByRole("button", { name: "День" })).toHaveAttribute("aria-pressed", "true");
   const focusedAppointment = page.getByLabel("Детали выбранной записи");
-  await expect(focusedAppointment.getByRole("heading", { name: "Светлана" })).toBeVisible();
-  await expect(focusedAppointment.getByText("SPA процедура")).toBeVisible();
-  await expect(focusedAppointment.getByText("17:30")).toBeVisible();
+  await expect(focusedAppointment.getByRole("heading", { name: "Olena K." })).toBeVisible();
+  await expect(focusedAppointment.getByText("Deep tissue massage")).toBeVisible();
+  await expect(focusedAppointment.getByText("15:00")).toBeVisible();
   await focusedAppointment.getByRole("button", { name: "Закрыть" }).click();
   await expect(focusedAppointment).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Светлана/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Olena K./ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 });
 
@@ -119,7 +125,7 @@ test("calendar month view is selectable", async ({ page }) => {
 
 test("calendar month view uses compact labels on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
 
   await page.getByRole("button", { name: "Месяц" }).click();
 
@@ -155,7 +161,7 @@ test("calendar month view uses compact labels on mobile", async ({ page }) => {
 
 test("calendar appointment details open as a right drawer and leave the calendar wide", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("dialog", { name: "Детали выбранной записи" })).toHaveCount(0);
   const panelBox = await page.locator(".admin-calendar-panel").boundingBox();
@@ -354,7 +360,7 @@ test("admin record drawers expose linked client workspaces", async ({ page }) =>
 });
 
 test("calendar week and list modes are distinct", async ({ page }) => {
-  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
 
   await expect(page.getByRole("heading", { name: "6 июля" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Olena K./ })).toHaveCount(0);
@@ -373,11 +379,12 @@ test("calendar week and list modes are distinct", async ({ page }) => {
 });
 
 test("calendar day timeline and appointment list use different layouts", async ({ page }) => {
-  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
 
   await expect(page.locator(".admin-day-time-grid")).toBeVisible();
   await expect(page.locator(".admin-appointment-feed")).toHaveCount(0);
-  await expect(page.getByLabel("Сводка дня 6 июля").getByText("30 минут")).toBeVisible();
+  await expect(page.getByLabel("Сводка дня 6 июля")).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Расписание 6 июля" })).toBeVisible();
 
   await page.getByRole("button", { name: "Список" }).click();
 
@@ -402,7 +409,7 @@ test("calendar day timeline and appointment list use different layouts", async (
 
 test("calendar week view uses dense desktop columns", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
 
   await page.getByRole("button", { name: "Неделя" }).click();
 
@@ -442,7 +449,7 @@ test("calendar can create a new appointment", async ({ page }) => {
   await page.getByRole("button", { name: "Создать запись" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Новая запись" });
-  await dialog.getByLabel("Клиент").fill("Ирина Тестова");
+  await dialog.getByLabel("Клиент", { exact: true }).fill("Ирина Тестова");
   await dialog.getByLabel("Услуга").selectOption("SPA процедура");
   await dialog.getByLabel("Дата").fill("2026-07-12");
   await dialog.getByLabel("Время").fill("11:15");
@@ -477,16 +484,16 @@ test("calendar creation resets client field and suggests existing clients", asyn
   await page.getByRole("button", { name: "Создать запись" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Новая запись" });
-  await expect(dialog.getByLabel("Клиент")).toHaveValue("");
+  await expect(dialog.getByLabel("Клиент", { exact: true })).toHaveValue("");
 
-  await dialog.getByLabel("Клиент").fill("ole");
+  await dialog.getByLabel("Клиент", { exact: true }).fill("ole");
 
   const suggestions = dialog.getByRole("listbox", { name: "Найденные клиенты" });
   await expect(suggestions.getByRole("option", { name: /Olena K./ })).toBeVisible();
   await expect(suggestions.getByRole("option", { name: /Анна Петрова/ })).toHaveCount(0);
 
   await suggestions.getByRole("option", { name: /Olena K./ }).click();
-  await expect(dialog.getByLabel("Клиент")).toHaveValue("Olena K.");
+  await expect(dialog.getByLabel("Клиент", { exact: true })).toHaveValue("Olena K.");
 });
 
 test("calendar can edit and reschedule an appointment", async ({ page }) => {
@@ -497,7 +504,7 @@ test("calendar can edit and reschedule an appointment", async ({ page }) => {
   await page.getByLabel("Детали выбранной записи").getByRole("button", { name: "Редактировать" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Редактировать запись" });
-  await expect(dialog.getByLabel("Клиент")).toHaveValue("Olena K.");
+  await expect(dialog.getByLabel("Клиент", { exact: true })).toHaveValue("Olena K.");
   await dialog.getByLabel("Дата").fill("2026-07-13");
   await dialog.getByLabel("Время").fill("16:45");
   await dialog.getByLabel("Статус").selectOption("Ожидает");
@@ -519,7 +526,7 @@ test("calendar can cancel an appointment after confirmation", async ({ page }) =
   await page.getByRole("button", { name: /Olena K./ }).click();
 
   const details = page.getByLabel("Детали выбранной записи");
-  await details.getByRole("button", { name: "Отменить" }).click();
+  await details.getByRole("button", { name: "Отменить запись" }).click();
 
   const firstDialog = page.getByRole("dialog", { name: "Отменить запись" });
   await expect(firstDialog.getByText("Olena K.")).toBeVisible();
@@ -528,13 +535,32 @@ test("calendar can cancel an appointment after confirmation", async ({ page }) =
   await expect(firstDialog).toHaveCount(0);
   await expect(details.getByText("Подтверждена")).toBeVisible();
 
-  await details.getByRole("button", { name: "Отменить" }).click();
+  await details.getByRole("button", { name: "Отменить запись" }).click();
   const confirmationDialog = page.getByRole("dialog", { name: "Отменить запись" });
-  await confirmationDialog.getByRole("button", { name: "Подтвердить отмену" }).click();
+  await confirmationDialog.getByRole("button", { name: "Отменить запись" }).click();
 
   await expect(confirmationDialog).toHaveCount(0);
   await expect(details.getByText("Отменена")).toBeVisible();
   await expect(page.getByRole("button", { name: /Olena K./ }).getByText("Отменена")).toBeVisible();
+
+  await details.getByRole("button", { name: "Закрыть" }).click();
+  await page.getByRole("button", { exact: true, name: "День" }).click();
+  await expect(page.getByRole("button", { name: /Olena K./ })).toHaveCount(0);
+});
+
+test("calendar can permanently delete an appointment after a separate warning", async ({ page }) => {
+  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Список" }).click();
+  await page.getByRole("button", { name: /Olena K./ }).click();
+
+  const details = page.getByLabel("Детали выбранной записи");
+  await details.getByRole("button", { name: "Удалить запись" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Удалить запись?" });
+  await expect(dialog.getByText(/Это не отмена/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Удалить запись" }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Olena K./ })).toHaveCount(0);
 });
 
 test("calendar links an appointment to the matching client profile", async ({ page }) => {
@@ -731,7 +757,8 @@ test("client profile opens filtered record workspaces", async ({ page }) => {
     "href",
     "/admin?section=clients&role=owner&client=client-359873334411",
   );
-  await expect(page.getByRole("heading", { name: "8 июля" })).toBeVisible();
+  await page.getByRole("button", { name: "Список" }).click();
+  await expect(page.getByRole("heading", { name: "Список записей" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Olena K.*Deep tissue massage/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Анна Петрова/ })).toHaveCount(0);
 
@@ -850,7 +877,7 @@ test("certificate workspace can issue, send, redeem and edit a certificate", asy
   const createDialog = page.getByRole("dialog", { name: "Новый сертификат" });
   await createDialog.getByLabel("Код").fill("MMN-2407-1999");
   await createDialog.getByLabel("Покупатель").fill("Ирина Тестова");
-  await createDialog.getByLabel("Клиент").fill("Ирина Тестова");
+  await createDialog.getByLabel("Клиент", { exact: true }).fill("Ирина Тестова");
   await createDialog.getByLabel("Получатель").fill("Self");
   await createDialog.getByLabel("Сумма").fill("90 €");
   await createDialog.getByLabel("Статус").selectOption("Оплачено");
@@ -1073,19 +1100,21 @@ test("media workspace can upload, filter and edit an asset", async ({ page }) =>
 
   await details.getByRole("button", { name: "Редактировать" }).click();
   const editDialog = page.getByRole("dialog", { name: "Редактировать медиа" });
-  await editDialog.getByLabel("Статус").selectOption("Требует alt");
+  await editDialog.getByLabel("Alt-текст").fill("");
+  await expect(editDialog.getByLabel("Статус")).toHaveValue("Требует alt");
   await editDialog.getByLabel("Alt-текст").fill("Нужно уточнить alt перед публикацией");
+  await expect(editDialog.getByLabel("Статус")).toHaveValue("Готово");
   await editDialog.getByRole("button", { name: "Сохранить изменения" }).click();
 
   await expect(editDialog).toHaveCount(0);
-  await expect(details.getByText("Требует alt", { exact: true })).toBeVisible();
+  await expect(details.getByText("Готово", { exact: true })).toBeVisible();
   await expect(details.getByText("Нужно уточнить alt перед публикацией").first()).toBeVisible();
 
   await details.getByRole("button", { name: "Закрыть" }).click();
   await expect(details).toHaveCount(0);
   await page.getByRole("button", { name: "Требует alt" }).click();
   await expect(page.getByRole("button", { name: "Требует alt" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("link", { name: /Арома обложка.*services.*Требует alt/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Фото кабинета.*gallery.*Требует alt/ })).toBeVisible();
 });
 
 test("contacts workspace edits site settings and contact channels", async ({ page }) => {
@@ -1100,6 +1129,10 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
   const contactDetails = page.getByRole("dialog", { name: "Детали контакта" });
   await expect(page).toHaveURL(/contact=contact-phone/);
   await expect(contactDetails.getByRole("heading", { name: "Телефон салона" })).toBeVisible();
+  await contactDetails.getByRole("button", { name: "Редактировать" }).click();
+  const primaryChannelDialog = page.getByRole("dialog", { name: "Редактировать контакт" });
+  await expect(primaryChannelDialog.getByLabel("Тип")).toBeDisabled();
+  await primaryChannelDialog.getByRole("button", { name: "Отмена" }).click();
   await contactDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(contactDetails).toHaveCount(0);
 
@@ -1108,11 +1141,14 @@ test("contacts workspace edits site settings and contact channels", async ({ pag
   const settingsDialog = page.getByRole("dialog", { name: "Контактные настройки" });
   await settingsDialog.getByLabel("Телефон").fill("+359 87 555 0000");
   await settingsDialog.getByLabel("Адрес").fill("ул. Места 49, Бургас");
+  await expect(settingsDialog.getByLabel("Воскресенье: открытие")).toBeDisabled();
+  await settingsDialog.getByLabel("Суббота: закрытие").fill("17:00");
   await settingsDialog.getByRole("button", { name: "Сохранить контакты" }).click();
 
   await expect(settingsDialog).toHaveCount(0);
   await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("+359 87 555 0000")).toBeVisible();
   await expect(page.getByLabel("Контактные настройки", { exact: true }).getByText("ул. Места 49, Бургас")).toBeVisible();
+  await expect(page.getByLabel("Контактные настройки", { exact: true })).toContainText("Суббота: 10:00 - 17:00");
   await page.getByRole("table").getByRole("link", { name: "Телефон салона" }).click();
   await expect(contactDetails.getByText("+359 87 555 0000")).toBeVisible();
   await contactDetails.getByRole("button", { name: "Закрыть" }).click();
@@ -1166,7 +1202,8 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await createEditor.getByLabel("Автор").fill("Natali");
   await createEditor.getByLabel("Краткое описание").fill("Короткая памятка перед первым визитом.");
   await createEditor.getByRole("textbox", { name: "Текст статьи" }).fill("Памятка помогает клиенту прийти вовремя и выбрать комфортную одежду.");
-  await createEditor.getByRole("button", { exact: true, name: "Сохранить" }).click();
+  await expect(createEditor.getByRole("status")).toHaveText("Все изменения сохранены");
+  await createEditor.getByRole("button", { exact: true, name: "К списку" }).click();
 
   await expect(createEditor).toHaveCount(0);
   await expect(page.getByRole("table").getByRole("link", { name: "Как подготовиться к массажу" })).toHaveAttribute(
@@ -1186,7 +1223,8 @@ test("blog workspace can create, filter and edit an article", async ({ page }) =
   await editEditor.getByLabel("SEO-заголовок").fill("Как подготовиться к массажу в Бургасе");
   await editEditor.getByLabel("SEO-описание").fill("Короткая памятка перед первым визитом в массажную студию.");
   await editEditor.getByLabel("Из медиатеки", { exact: true }).selectOption({ index: 1 });
-  await editEditor.getByRole("button", { exact: true, name: "Сохранить" }).click();
+  await expect(editEditor.getByRole("status")).toHaveText("Все изменения сохранены");
+  await editEditor.getByRole("button", { exact: true, name: "К списку" }).click();
 
   await expect(editEditor).toHaveCount(0);
   await expect(details.getByText("Опубликована", { exact: true })).toBeVisible();
@@ -1342,7 +1380,7 @@ test("client profile opens prefilled calendar appointment creation", async ({ pa
 
   const dialog = page.getByRole("dialog", { name: "Новая запись" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel("Клиент")).toHaveValue("Olena K.");
+  await expect(dialog.getByLabel("Клиент", { exact: true })).toHaveValue("Olena K.");
 });
 
 test("client filters update the table and profile certificate block", async ({ page }) => {

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { cloneBusinessHoursSchedule } from "@/lib/business-hours";
+
 import {
   getPublicShellRuntime,
   getRuntimeGiftCertificatesEnabled,
@@ -8,8 +10,28 @@ import {
 } from "./public-content-runtime";
 
 const runtimeMock = vi.hoisted(() => ({
+  businessDetailsResult: {
+    data: {
+      address: "ul. Mesta 49, Burgas",
+      businessName: "Magic Massage Natali",
+      phone: "+359 89 677 8308",
+      seoArea: "Burgas, Bulgaria",
+      updatedAt: "2026-07-18T10:00:00.000Z",
+      workingSchedule: [
+        { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 1 },
+        { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 2 },
+        { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 3 },
+        { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 4 },
+        { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 5 },
+        { closesAt: "18:00", isOpen: true, opensAt: "10:00", weekday: 6 },
+        { closesAt: "18:00", isOpen: false, opensAt: "10:00", weekday: 7 },
+      ],
+    },
+    source: "supabase",
+    status: "ok",
+  } as unknown,
   featuresResult: {
-    data: { giftCertificatesEnabled: true, publicBookingEnabled: true },
+    data: { blogEnabled: true, giftCertificatesEnabled: true, publicBookingEnabled: true },
     source: "supabase",
     status: "ok",
   } as unknown,
@@ -27,6 +49,7 @@ vi.mock("@/lib/public-content", async (importOriginal) => {
     ...actual,
     createConfiguredPublicContentDataLayer: vi.fn(() => ({
       getBlogPost: vi.fn(),
+      getBusinessDetails: vi.fn(async () => runtimeMock.businessDetailsResult),
       getSiteFeatures: vi.fn(async () => runtimeMock.featuresResult),
       listBlogPosts: vi.fn(),
       listServices: vi.fn(async () => runtimeMock.servicesResult),
@@ -36,8 +59,20 @@ vi.mock("@/lib/public-content", async (importOriginal) => {
 
 describe("public content runtime failure policy", () => {
   beforeEach(() => {
+    runtimeMock.businessDetailsResult = {
+      data: {
+        address: "ul. Mesta 49, Burgas",
+        businessName: "Magic Massage Natali",
+        phone: "+359 89 677 8308",
+        seoArea: "Burgas, Bulgaria",
+        updatedAt: "2026-07-18T10:00:00.000Z",
+        workingSchedule: cloneBusinessHoursSchedule(),
+      },
+      source: "supabase",
+      status: "ok",
+    };
     runtimeMock.featuresResult = {
-      data: { giftCertificatesEnabled: true, publicBookingEnabled: true },
+      data: { blogEnabled: true, giftCertificatesEnabled: true, publicBookingEnabled: true },
       source: "supabase",
       status: "ok",
     };
@@ -95,6 +130,15 @@ describe("public content runtime failure policy", () => {
     });
   });
 
+  it("exposes the current public business details from Supabase", async () => {
+    await expect(getPublicShellRuntime("bg")).resolves.toMatchObject({
+      businessDetails: {
+        address: "ul. Mesta 49, Burgas",
+        phone: "+359 89 677 8308",
+      },
+    });
+  });
+
   it("fails closed for gift certificates when the feature query fails", async () => {
     runtimeMock.featuresResult = {
       data: null,
@@ -106,6 +150,7 @@ describe("public content runtime failure policy", () => {
 
     await expect(getRuntimeGiftCertificatesEnabled()).resolves.toBe(false);
     await expect(getPublicShellRuntime("bg")).resolves.toMatchObject({
+      blogEnabled: false,
       giftCertificatesEnabled: false,
       publicBookingEnabled: false,
     });

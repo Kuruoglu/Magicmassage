@@ -10,11 +10,45 @@ const require = createRequire(import.meta.url);
 const playwrightCli = require.resolve("@playwright/test/cli");
 const required = process.argv.includes("--required");
 const playwrightArgs = process.argv.slice(2).filter((argument) => argument !== "--required");
+const e2eRunId = randomUUID();
 
 loadEnvConfig(process.cwd());
 
 function configuredValue(name) {
   return process.env[name]?.trim() || undefined;
+}
+
+function transientSupabaseMessage(value) {
+  const message = value instanceof Error
+    ? value.message
+    : typeof value?.message === "string"
+      ? value.message
+      : "";
+
+  return /fetch failed|network|socket|unrecognized JWT kid/i.test(message);
+}
+
+async function withTransientSupabaseRetries(operation, attempts = 8) {
+  let lastResult;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      lastResult = await operation();
+      if (!lastResult?.error || !transientSupabaseMessage(lastResult.error)) {
+        return lastResult;
+      }
+    } catch (error) {
+      if (!transientSupabaseMessage(error) || attempt === attempts) {
+        throw error;
+      }
+    }
+
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(attempt * 1_000, 5_000)));
+    }
+  }
+
+  return lastResult;
 }
 
 function decodeBase32(value) {
@@ -53,7 +87,7 @@ async function runCleanupSteps(steps) {
 
   for (const [label, operation] of steps) {
     try {
-      const result = await operation();
+      const result = await withTransientSupabaseRetries(operation);
       if (result?.error) {
         failures.push(`${label}: ${result.error.message}`);
       }
@@ -104,7 +138,12 @@ async function createRunSecurityAlert(serviceClient, userId) {
 
 async function resolveConfiguredUserId(url, publishableKey, credentials) {
   const authClient = createClient(url, publishableKey, {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+      storageKey: `mmn-e2e-configured-lookup-${randomUUID()}`,
+    },
   });
   const { data, error } = await authClient.auth.signInWithPassword(credentials);
   const userId = data.user?.id;
@@ -138,7 +177,11 @@ async function provisionEphemeralAdmin() {
       );
     }
     const serviceClient = createClient(url, secretKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        storageKey: `mmn-e2e-configured-service-${randomUUID()}`,
+      },
     });
     const credentials = { email: configuredEmail, password: configuredPassword };
     const userId = await resolveConfiguredUserId(url, publishableKey, credentials);
@@ -150,17 +193,31 @@ async function provisionEphemeralAdmin() {
         ["configured security alert cleanup", () => serviceClient.from("admin_security_alerts").delete().eq("id", alertId)],
       ]),
       credentials,
+      ephemeral: false,
       serviceClient,
       totpSecret: configuredValue("E2E_ADMIN_TOTP_SECRET"),
+      userId,
     };
   }
 
   if (!url || !secretKey || !publishableKey) {
-    return { alertId: null, cleanup: async () => undefined, credentials: null, serviceClient: null, totpSecret: null };
+    return {
+      alertId: null,
+      cleanup: async () => undefined,
+      credentials: null,
+      ephemeral: false,
+      serviceClient: null,
+      totpSecret: null,
+      userId: null,
+    };
   }
 
   const serviceClient = createClient(url, secretKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      storageKey: `mmn-e2e-ephemeral-service-${randomUUID()}`,
+    },
   });
   const email = `codex-e2e-${Date.now()}-${randomUUID().slice(0, 8)}@example.com`;
   const password = `E2E-${randomBytes(24).toString("base64url")}!9a`;
@@ -173,7 +230,9 @@ async function provisionEphemeralAdmin() {
   const userId = data.user?.id;
 
   if (error || !userId) {
-    throw new Error("Could not provision the ephemeral Supabase E2E user.");
+    throw new Error(
+      `Could not provision the ephemeral Supabase E2E user: ${error?.message ?? "missing user id"}`,
+    );
   }
 
   const { error: profileError } = await serviceClient.from("admin_profiles").insert({
@@ -191,7 +250,12 @@ async function provisionEphemeralAdmin() {
   }
 
   const authClient = createClient(url, publishableKey, {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+      storageKey: `mmn-e2e-enrollment-${randomUUID()}`,
+    },
   });
   const { error: signInError } = await authClient.auth.signInWithPassword({ email, password });
   if (signInError) {
@@ -242,8 +306,10 @@ async function provisionEphemeralAdmin() {
   return {
     alertId,
     credentials: { email, password },
+    ephemeral: true,
     serviceClient,
     totpSecret,
+    userId,
     cleanup: () => runCleanupSteps([
       ["ephemeral security alert cleanup", () => serviceClient.from("admin_security_alerts").delete().eq("id", alertId)],
       ["ephemeral profile cleanup", () => serviceClient.from("admin_profiles").delete().eq("user_id", userId)],
@@ -263,7 +329,9 @@ async function cleanupPersistentFixtures(serviceClient) {
     .from("admin_blog_posts")
     .select("id")
     .like("slug", "playwright-published-massage-guide-%");
-  if (generatedPostsError) throw new Error("Could not find generated blog E2E fixtures for cleanup.");
+  if (generatedPostsError) {
+    throw new Error(`Could not find generated blog E2E fixtures for cleanup: ${generatedPostsError.message}`);
+  }
 
   for (const post of generatedPosts ?? []) {
     cleanupResults.push(
@@ -288,8 +356,9 @@ async function cleanupPersistentFixtures(serviceClient) {
       .eq("id", "blog-playwright-published-massage-guide"),
   );
 
-  if (cleanupResults.some((result) => result.error)) {
-    throw new Error("Could not clean persistent E2E fixtures.");
+  const cleanupError = cleanupResults.find((result) => result.error)?.error;
+  if (cleanupError) {
+    throw new Error(`Could not clean persistent E2E fixtures: ${cleanupError.message}`);
   }
 }
 
@@ -349,8 +418,12 @@ let provisioned;
 let persistentSnapshot;
 
 try {
+  // Provisioning creates Auth/MFA fixtures and is intentionally not retried as
+  // one unit: a lost response could otherwise create an untracked second user.
   provisioned = await provisionEphemeralAdmin();
-  persistentSnapshot = await snapshotPersistentState(provisioned.serviceClient);
+  persistentSnapshot = await withTransientSupabaseRetries(
+    () => snapshotPersistentState(provisioned.serviceClient),
+  );
   const result = spawnSync(
     process.execPath,
     [playwrightCli, "test", "--config", "playwright.admin-auth.config.ts", ...playwrightArgs],
@@ -367,6 +440,9 @@ try {
           ? { E2E_ADMIN_TOTP_SECRET: provisioned.totpSecret }
           : {}),
         ...(provisioned.alertId ? { E2E_SECURITY_ALERT_ID: provisioned.alertId } : {}),
+        E2E_ADMIN_EPHEMERAL: provisioned.ephemeral ? "true" : "false",
+        E2E_ADMIN_RUN_ID: e2eRunId,
+        E2E_ADMIN_USER_ID: provisioned.userId ?? "",
         ...(required ? { E2E_ADMIN_AUTH_REQUIRED: "true" } : {}),
       },
       stdio: "inherit",
@@ -384,7 +460,7 @@ try {
 
   for (const [label, finalize] of finalizers) {
     try {
-      await finalize();
+      await withTransientSupabaseRetries(finalize);
     } catch (error) {
       console.error(`${label} failed: ${error instanceof Error ? error.message : "unknown error"}`);
       exitCode = 1;

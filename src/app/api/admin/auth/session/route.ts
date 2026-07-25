@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
-  adminAccessTokenCookieName,
   allAdminRoles,
   authorizeSupabaseAdminAccess,
   createSupabaseAdminClient,
   getBearerToken,
 } from "@/lib/supabase/admin";
+import { setAdminAccessTokenCookies } from "@/lib/supabase/admin-session-cookie";
 
 export async function POST(request: Request) {
   const token = getBearerToken(request.headers.get("authorization"));
@@ -33,20 +33,7 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true, role: authorization.role });
-
-  response.cookies.set(adminAccessTokenCookieName, token ?? "", {
-    httpOnly: true,
-    maxAge: 60 * 60,
-    path: "/admin",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
-  response.headers.append(
-    "Set-Cookie",
-    `${adminAccessTokenCookieName}=${encodeURIComponent(token ?? "")}; Path=/api/media/admin; Max-Age=3600; HttpOnly; SameSite=Lax${
-      process.env.NODE_ENV === "production" ? "; Secure" : ""
-    }`,
-  );
+  setAdminAccessTokenCookies(response, token!);
 
   return response;
 }

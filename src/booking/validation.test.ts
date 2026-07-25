@@ -72,6 +72,7 @@ describe("public booking validation", () => {
     };
 
     expect(parseConfirmPayload(payload, "booking-submit-001")).toEqual({
+      careEmailOptIn: false,
       contactPreference: "telegram",
       email: "client@example.com",
       fullName: "Client Example",
@@ -91,6 +92,11 @@ describe("public booking validation", () => {
     expect(parseConfirmPayload({ ...payload, contactPreference: "email", email: "" }, "booking-submit-001")).toBeNull();
     expect(parseConfirmPayload({ ...payload, selectionVersion: 0 }, "booking-submit-001")).toBeNull();
     expect(parseConfirmPayload({ ...payload, selectionId: "not-a-uuid" }, "booking-submit-001")).toBeNull();
+    expect(parseConfirmPayload({ ...payload, careEmailOptIn: "yes" }, "booking-submit-001")).toBeNull();
+    expect(parseConfirmPayload({ ...payload, careEmailOptIn: true }, "booking-submit-001")).toMatchObject({
+      careEmailOptIn: true,
+    });
+    expect(parseConfirmPayload({ ...payload, careEmailOptIn: true, email: "" }, "booking-submit-001")).toBeNull();
   });
 
   it("normalizes phone keys consistently with admin client records", () => {

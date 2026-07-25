@@ -2,52 +2,54 @@
 
 import { describe, expect, it } from "vitest";
 
-import { decodeGiftOrderMetadata, encodeGiftOrderMetadata } from "./metadata";
-import type { GiftCertificatePaymentMetadataOrder } from "./types";
+import {
+  decodeGiftOrderReferenceMetadata,
+  encodeGiftOrderReferenceMetadata,
+} from "./metadata";
 
-const longOrder: GiftCertificatePaymentMetadataOrder = {
-  locale: "en",
-  purchaseMode: "gift",
-  purchaserName: "Anna Buyer",
-  purchaserEmail: "anna@example.com",
-  recipientName: "Maria Recipient",
-  recipientEmail: "maria@example.com",
-  recipientMessage: "A".repeat(600),
-  deliveryMode: "recipient_email",
-  serviceItems: [{ serviceSlug: "classic-massage", sessions: 5 }],
-  amountVoucherEur: 500,
-  expiresOn: "2027-01-05",
-  totalEurCents: 72500,
+const reference = {
+  certificateCode: "MMN-GC-20260705-ABC123XY",
+  locale: "en" as const,
+  orderId: "01234567-89ab-4def-8123-456789abcdef",
+  schemaVersion: "v2" as const,
+  totalEurCents: 4500,
 };
 
 describe("gift order Stripe metadata", () => {
-  it("chunks and restores orders within Stripe metadata value limits", () => {
-    const metadata = encodeGiftOrderMetadata(longOrder);
+  it("contains only reconciliation fields and no customer PII or order contents", () => {
+    const metadata = encodeGiftOrderReferenceMetadata(reference);
 
-    expect(Object.keys(metadata).length).toBeGreaterThan(1);
-    expect(Object.values(metadata).every((value) => value.length <= 450)).toBe(true);
-    expect(decodeGiftOrderMetadata(metadata)).toEqual(longOrder);
+    expect(metadata).toEqual({
+      gift_order_id: reference.orderId,
+      gift_certificate_code: reference.certificateCode,
+      gift_total_eur_cents: "4500",
+      gift_locale: "en",
+      gift_order_schema_version: "v2",
+    });
+    expect(JSON.stringify(metadata)).not.toMatch(
+      /purchaser|recipient|email|message|serviceItems|amountVoucher/i,
+    );
   });
 
-  it("decodes chunk keys in numeric order", () => {
-    const metadata: Record<string, string> = {
-      gift_order_010: "}",
-      gift_order_002: '"locale":"en",',
-      gift_order_001: "{",
-      gift_order_003: '"purchaseMode":"self",',
-      gift_order_004: '"purchaserName":"Anna",',
-      gift_order_005: '"purchaserEmail":"anna@example.com",',
-      gift_order_006: '"recipientName":"Anna",',
-      gift_order_007: '"deliveryMode":"buyer_only",',
-      gift_order_008: '"serviceItems":[{"serviceSlug":"classic-massage","sessions":1}],',
-      gift_order_009: '"expiresOn":"2027-01-05","totalEurCents":4500',
-    };
-
-    expect(decodeGiftOrderMetadata(metadata)?.totalEurCents).toBe(4500);
+  it("round-trips a valid persisted-order reference", () => {
+    expect(decodeGiftOrderReferenceMetadata(encodeGiftOrderReferenceMetadata(reference))).toEqual(
+      reference,
+    );
   });
 
-  it("rejects corrupted or incomplete metadata instead of raw casting", () => {
-    expect(decodeGiftOrderMetadata({ gift_order_001: "{broken" })).toBeUndefined();
-    expect(decodeGiftOrderMetadata({ gift_order_001: '{"locale":"en"}' })).toBeUndefined();
+  it("rejects malformed, incomplete, or obsolete metadata", () => {
+    expect(decodeGiftOrderReferenceMetadata({ gift_order_id: reference.orderId })).toBeUndefined();
+    expect(
+      decodeGiftOrderReferenceMetadata({
+        ...encodeGiftOrderReferenceMetadata(reference),
+        gift_order_schema_version: "v1",
+      }),
+    ).toBeUndefined();
+    expect(
+      decodeGiftOrderReferenceMetadata({
+        ...encodeGiftOrderReferenceMetadata(reference),
+        gift_total_eur_cents: "45.5",
+      }),
+    ).toBeUndefined();
   });
 });

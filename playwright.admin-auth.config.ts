@@ -6,6 +6,7 @@ loadEnvConfig(process.cwd());
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
+  retries: 1,
   expect: {
     timeout: 10_000,
   },

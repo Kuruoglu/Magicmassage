@@ -132,7 +132,7 @@ const content: Record<Locale, HomeContent> = {
       addressLabel: "Адрес",
       address: "ул. „Места“ 49, Бургас",
       phoneLabel: "Телефон",
-      phone: "+359 89 677 8309",
+      phone: "+359 89 677 8308",
       hoursLabel: "Работно време",
       hours: "С предварително записване",
       hoursSchedule: [
@@ -216,7 +216,7 @@ const content: Record<Locale, HomeContent> = {
       addressLabel: "Адрес",
       address: "ул. «Места» 49, Бургас",
       phoneLabel: "Телефон",
-      phone: "+359 89 677 8309",
+      phone: "+359 89 677 8308",
       hoursLabel: "Время работы",
       hours: "По предварительной записи",
       hoursSchedule: [
@@ -300,7 +300,7 @@ const content: Record<Locale, HomeContent> = {
       addressLabel: "Адреса",
       address: "вул. «Места» 49, Бургас",
       phoneLabel: "Телефон",
-      phone: "+359 89 677 8309",
+      phone: "+359 89 677 8308",
       hoursLabel: "Години роботи",
       hours: "За попереднім записом",
       hoursSchedule: [
@@ -384,7 +384,7 @@ const content: Record<Locale, HomeContent> = {
       addressLabel: "Address",
       address: "Mesta Street 49, Burgas",
       phoneLabel: "Phone",
-      phone: "+359 89 677 8309",
+      phone: "+359 89 677 8308",
       hoursLabel: "Working hours",
       hours: "By appointment",
       hoursSchedule: [

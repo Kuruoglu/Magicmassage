@@ -13,6 +13,7 @@ describe("public route helpers", () => {
       "home",
       "services",
       "giftCertificates",
+      "blog",
       "about",
       "contacts",
       "privacy",
@@ -22,6 +23,7 @@ describe("public route helpers", () => {
     expect(getPublicPagePath("bg", "home")).toBe("/bg");
     expect(getPublicPagePath("ru", "services")).toBe("/ru/services");
     expect(getPublicPagePath("ru", "giftCertificates")).toBe("/ru/gift-certificates");
+    expect(getPublicPagePath("ru", "blog")).toBe("/ru/blog");
     expect(getPublicPagePath("ua", "about")).toBe("/ua/about");
     expect(getPublicPagePath("en", "about")).toBe("/en/about");
     expect(getPublicPagePath("bg", "contacts")).toBe("/bg/contacts");
@@ -33,6 +35,7 @@ describe("public route helpers", () => {
   it("preserves the current page when switching locale", () => {
     expect(getLocaleSwitchPath("bg", "services")).toBe("/bg/services");
     expect(getLocaleSwitchPath("ru", "giftCertificates")).toBe("/ru/gift-certificates");
+    expect(getLocaleSwitchPath("ua", "blog")).toBe("/ua/blog");
     expect(getLocaleSwitchPath("ua", "contacts")).toBe("/ua/contacts");
     expect(getLocaleSwitchPath("en", "contacts")).toBe("/en/contacts");
     expect(getLocaleSwitchPath("bg", "privacy")).toBe("/bg/privacy");

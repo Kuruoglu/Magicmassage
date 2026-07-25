@@ -9,6 +9,7 @@ import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
   type FormEvent,
+  type ReactNode,
   useEffect,
   useId,
   useMemo,
@@ -67,12 +68,16 @@ export type BlogArticleEditorProps = {
   categoryOptions?: readonly string[];
   className?: string;
   isSaving?: boolean;
+  localeLocked?: boolean;
+  localeNavigation?: ReactNode;
   mediaOptions?: readonly BlogMediaOption[];
   onAutosave?: (value: BlogArticleDraft) => Promise<void> | void;
   onCancel: (context: BlogArticleCancelContext) => void;
   onChange: (value: BlogArticleDraft) => void;
   onSave: (value: BlogArticleDraft) => Promise<void> | void;
   savedValue?: BlogArticleDraft;
+  cancelLabel?: string;
+  saveLabel?: string;
   value: BlogArticleDraft;
 };
 
@@ -88,13 +93,17 @@ export function BlogArticleEditor({
   authorOptions = [],
   categoryOptions = [],
   className = "",
+  cancelLabel = "Отмена",
   isSaving = false,
+  localeLocked = false,
+  localeNavigation,
   mediaOptions = [],
   onAutosave,
   onCancel,
   onChange,
   onSave,
   savedValue,
+  saveLabel = "Сохранить",
   value,
 }: BlogArticleEditorProps) {
   const instanceId = useId().replace(/:/g, "");
@@ -105,6 +114,8 @@ export function BlogArticleEditor({
   const [storedValidationErrors, setValidationErrors] = useState<BlogArticleValidationErrors>({});
   const onChangeRef = useRef(onChange);
   const onAutosaveRef = useRef(onAutosave);
+  const failedAutosaveDraftRef = useRef<string | undefined>(undefined);
+  const saveInFlightRef = useRef(false);
   const valueRef = useRef(value);
   const validationErrors = useMemo(() => {
     if (!storedValidationErrors.content || !getArticleText(value.content)) {
@@ -170,12 +181,15 @@ export function BlogArticleEditor({
     () => serializeArticleDraft(value) !== serializeArticleDraft(baseline),
     [baseline, value],
   );
-  const pending = isSaving || isSubmitting;
+  const pending = isSaving || isSubmitting || autosaveState === "saving";
 
   useEffect(() => {
     if (!hasUnsavedChanges || !onAutosaveRef.current || pending) return;
+    if (failedAutosaveDraftRef.current === serializeArticleDraft(value)) return;
 
     const timer = window.setTimeout(async () => {
+      if (saveInFlightRef.current) return;
+
       const nextValue = sanitizeArticleDraft(valueRef.current);
       if (
         isBlogPublicationStatus(nextValue.status) &&
@@ -183,12 +197,17 @@ export function BlogArticleEditor({
       ) return;
 
       setAutosaveState("saving");
+      saveInFlightRef.current = true;
       try {
         await onAutosaveRef.current?.(nextValue);
+        failedAutosaveDraftRef.current = undefined;
         setLastSavedValue(nextValue);
         setAutosaveState("saved");
       } catch {
+        failedAutosaveDraftRef.current = serializeArticleDraft(nextValue);
         setAutosaveState("error");
+      } finally {
+        saveInFlightRef.current = false;
       }
     }, 1500);
 
@@ -235,6 +254,7 @@ export function BlogArticleEditor({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saveInFlightRef.current) return;
 
     const nextValue = sanitizeArticleDraft(value);
     const nextErrors = validateArticleDraft(nextValue, mediaOptions);
@@ -248,8 +268,10 @@ export function BlogArticleEditor({
     }
 
     setIsSubmitting(true);
+    saveInFlightRef.current = true;
     try {
       await onSave(nextValue);
+      failedAutosaveDraftRef.current = undefined;
       setLastSavedValue(nextValue);
       setAutosaveState("saved");
 
@@ -259,6 +281,7 @@ export function BlogArticleEditor({
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Не удалось сохранить статью.");
     } finally {
+      saveInFlightRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -293,13 +316,15 @@ export function BlogArticleEditor({
             onClick={() => onCancel({ hasUnsavedChanges, value })}
             type="button"
           >
-            Отмена
+            {cancelLabel}
           </button>
           <button className={styles.primaryButton} disabled={pending || !hasUnsavedChanges} type="submit">
-            {pending ? "Сохранение..." : "Сохранить"}
+            {pending ? "Сохранение..." : saveLabel}
           </button>
         </div>
       </header>
+
+      {localeNavigation}
 
       {Object.keys(validationErrors).length ? (
         <div className={styles.errorSummary} role="alert" tabIndex={-1}>
@@ -318,7 +343,12 @@ export function BlogArticleEditor({
         </p>
       ) : null}
 
-      <div className={`${styles.workspace} admin-blog-editor-workspace`}>
+      <div
+        aria-labelledby={localeLocked ? `blog-locale-tab-${value.locale}` : undefined}
+        className={`${styles.workspace} admin-blog-editor-workspace`}
+        id={localeLocked ? "blog-localized-editor-panel" : undefined}
+        role={localeLocked ? "tabpanel" : undefined}
+      >
         <main className={`${styles.articleColumn} admin-blog-editor-main`}>
           <div className={styles.titleField}>
             <label htmlFor={fieldId("title")}>Заголовок</label>
@@ -368,6 +398,7 @@ export function BlogArticleEditor({
           <BlogPublishPanel
             errors={validationErrors}
             idPrefix={instanceId}
+            localeLocked={localeLocked}
             onChange={updateFields}
             value={value}
           />

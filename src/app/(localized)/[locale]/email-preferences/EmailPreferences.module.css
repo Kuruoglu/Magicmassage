@@ -1,0 +1,96 @@
+.workspace {
+  background: #faf9fb;
+  min-height: 64vh;
+  padding: 64px 24px 88px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #ded9e2;
+  border-radius: 10px;
+  color: #18141b;
+  margin: 0 auto;
+  max-width: 680px;
+  padding: clamp(24px, 6vw, 48px);
+}
+
+.kicker {
+  color: #6e4a8b;
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.panel h1 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+  margin: 0;
+}
+
+.panel h1:focus-visible {
+  outline: none;
+}
+
+.panel > p {
+  color: #625b66;
+  font-size: 1rem;
+  line-height: 1.65;
+  margin: 18px 0 0;
+}
+
+.panel .error {
+  background: #fff5f4;
+  border-left: 4px solid #bb3f35;
+  color: #7e2c27;
+  padding: 13px 15px;
+}
+
+.actions {
+  border-top: 1px solid #ded9e2;
+  margin-top: 30px;
+  padding-top: 22px;
+}
+
+.actions button,
+.actions a {
+  align-items: center;
+  background: #6e4a8b;
+  border: 1px solid #6e4a8b;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 48px;
+  padding: 11px 20px;
+  text-align: center;
+}
+
+.actions button:disabled {
+  background: #d6d0da;
+  border-color: #d6d0da;
+  color: #655e69;
+  cursor: not-allowed;
+}
+
+.actions button:focus-visible,
+.actions a:focus-visible {
+  outline: 3px solid rgba(110, 74, 139, 0.3);
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .workspace {
+    padding: 32px 16px calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .actions button,
+  .actions a {
+    width: 100%;
+  }
+}

@@ -2,7 +2,7 @@
 
 import { PaymentElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   calculateGiftCertificateTotal,
@@ -176,6 +176,8 @@ export function GiftCertificateForm({
   const [isPreparingPayment, setIsPreparingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | undefined>();
   const [touchedFields, setTouchedFields] = useState<Partial<Record<TouchedField, boolean>>>({});
+  const paymentSessionRevisionRef = useRef(0);
+  const paymentRequestControllerRef = useRef<AbortController | undefined>(undefined);
 
   const total = calculateGiftCertificateTotal({
     serviceItems: massageLines.map((line) => ({
@@ -236,7 +238,7 @@ export function GiftCertificateForm({
     (purchaseMode === "self" ||
       deliveryMode === "buyer_only" ||
       emailPattern.test(recipientEmail.trim()));
-  const [paymentIdempotencyKey] = useState(() => createBrowserIdempotencyKey());
+  const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState(() => createBrowserIdempotencyKey());
   const stripePromise = useMemo(
     () => (stripePublishableKey ? getStripePromise(stripePublishableKey) : null),
     [stripePublishableKey],
@@ -246,8 +248,26 @@ export function GiftCertificateForm({
       ? ""
       : `${window.location.origin}/${locale}/gift-certificates?payment=success`;
 
-  function updateMassageLine(id: string, patch: Partial<MassageLine>) {
+  useEffect(
+    () => () => {
+      paymentSessionRevisionRef.current += 1;
+      paymentRequestControllerRef.current?.abort();
+    },
+    [],
+  );
+
+  function resetPaymentSession() {
+    paymentSessionRevisionRef.current += 1;
+    paymentRequestControllerRef.current?.abort();
+    paymentRequestControllerRef.current = undefined;
     setSession(undefined);
+    setIsPreparingPayment(false);
+    setPaymentError(undefined);
+    setPaymentIdempotencyKey(createBrowserIdempotencyKey());
+  }
+
+  function updateMassageLine(id: string, patch: Partial<MassageLine>) {
+    resetPaymentSession();
     setMassageLines((current) => {
       if (
         patch.serviceSlug &&
@@ -261,12 +281,12 @@ export function GiftCertificateForm({
   }
 
   function removeMassageLine(id: string) {
-    setSession(undefined);
+    resetPaymentSession();
     setMassageLines((current) => current.filter((line) => line.id !== id));
   }
 
   function addMassageLine() {
-    setSession(undefined);
+    resetPaymentSession();
     setMassageLines((current) => {
       const usedServiceSlugs = new Set(current.map((line) => line.serviceSlug));
       const nextService = content.services.find((service) => !usedServiceSlugs.has(service.slug));
@@ -287,7 +307,7 @@ export function GiftCertificateForm({
   }
 
   function setVoucherAmount(amount: number | undefined) {
-    setSession(undefined);
+    resetPaymentSession();
     setAmountVoucherEur(amount);
   }
 
@@ -308,6 +328,10 @@ export function GiftCertificateForm({
   }
 
   async function preparePayment() {
+    if (paymentRequestControllerRef.current) {
+      return;
+    }
+
     if (!isValid) {
       markRequiredFieldsTouched();
       return;
@@ -326,6 +350,9 @@ export function GiftCertificateForm({
       return;
     }
 
+    const requestRevision = paymentSessionRevisionRef.current;
+    const requestController = new AbortController();
+    paymentRequestControllerRef.current = requestController;
     setIsPreparingPayment(true);
     setPaymentError(undefined);
 
@@ -353,17 +380,36 @@ export function GiftCertificateForm({
           clientTotalEurCents: total.totalEurCents,
           website: "",
         }),
+        signal: requestController.signal,
       });
 
       if (!response.ok) {
         throw new Error("Payment session failed");
       }
 
-      setSession((await response.json()) as PaymentSessionResponse);
+      const nextSession = (await response.json()) as PaymentSessionResponse;
+      if (
+        requestRevision !== paymentSessionRevisionRef.current ||
+        requestController.signal.aborted
+      ) {
+        return;
+      }
+      setSession(nextSession);
     } catch {
-      setPaymentError(content.paymentError);
+      if (
+        requestRevision === paymentSessionRevisionRef.current &&
+        !requestController.signal.aborted
+      ) {
+        setPaymentError(content.paymentError);
+      }
     } finally {
-      setIsPreparingPayment(false);
+      if (
+        requestRevision === paymentSessionRevisionRef.current &&
+        paymentRequestControllerRef.current === requestController
+      ) {
+        paymentRequestControllerRef.current = undefined;
+        setIsPreparingPayment(false);
+      }
     }
   }
 
@@ -398,7 +444,7 @@ export function GiftCertificateForm({
                 onChange={() => {
                   setPurchaseMode("self");
                   setDeliveryMode("buyer_only");
-                  setSession(undefined);
+                  resetPaymentSession();
                 }}
               />
               <span className="gift-choice-mark" aria-hidden="true" />
@@ -412,7 +458,7 @@ export function GiftCertificateForm({
                 checked={purchaseMode === "gift"}
                 onChange={() => {
                   setPurchaseMode("gift");
-                  setSession(undefined);
+                  resetPaymentSession();
                 }}
               />
               <span className="gift-choice-mark" aria-hidden="true" />
@@ -431,7 +477,7 @@ export function GiftCertificateForm({
                 aria-invalid={Boolean(purchaserNameError)}
                 onChange={(event) => {
                   setPurchaserName(event.target.value);
-                  setSession(undefined);
+                  resetPaymentSession();
                 }}
                 onBlur={() => markFieldTouched("purchaserName")}
                 autoComplete="name"
@@ -453,7 +499,7 @@ export function GiftCertificateForm({
                 aria-invalid={Boolean(purchaserEmailError)}
                 onChange={(event) => {
                   setPurchaserEmail(event.target.value);
-                  setSession(undefined);
+                  resetPaymentSession();
                 }}
                 onBlur={() => markFieldTouched("purchaserEmail")}
                 autoComplete="email"
@@ -479,7 +525,7 @@ export function GiftCertificateForm({
                     aria-invalid={Boolean(recipientNameError)}
                     onChange={(event) => {
                       setRecipientName(event.target.value);
-                      setSession(undefined);
+                      resetPaymentSession();
                     }}
                     onBlur={() => markFieldTouched("recipientName")}
                     autoComplete="name"
@@ -498,7 +544,7 @@ export function GiftCertificateForm({
                     maxLength={messageMaxLength}
                     onChange={(event) => {
                       setRecipientMessage(event.target.value);
-                      setSession(undefined);
+                      resetPaymentSession();
                     }}
                   />
                 </label>
@@ -514,7 +560,7 @@ export function GiftCertificateForm({
                     checked={deliveryMode === "buyer_only"}
                     onChange={() => {
                       setDeliveryMode("buyer_only");
-                      setSession(undefined);
+                      resetPaymentSession();
                     }}
                   />
                   <span className="gift-choice-mark" aria-hidden="true" />
@@ -528,7 +574,7 @@ export function GiftCertificateForm({
                     checked={deliveryMode === "recipient_email"}
                     onChange={() => {
                       setDeliveryMode("recipient_email");
-                      setSession(undefined);
+                      resetPaymentSession();
                     }}
                   />
                   <span className="gift-choice-mark" aria-hidden="true" />
@@ -548,7 +594,7 @@ export function GiftCertificateForm({
                     aria-invalid={Boolean(recipientEmailError)}
                     onChange={(event) => {
                       setRecipientEmail(event.target.value);
-                      setSession(undefined);
+                      resetPaymentSession();
                     }}
                     onBlur={() => markFieldTouched("recipientEmail")}
                     autoComplete="email"

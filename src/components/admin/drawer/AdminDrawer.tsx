@@ -5,6 +5,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  type RefObject,
   useContext,
   useEffect,
   useRef,
@@ -17,6 +18,7 @@ type AdminDrawerProps = {
   className?: string;
   closeConfirmationMessage?: string;
   hasUnsavedChanges?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   onClose: () => void;
 };
 
@@ -42,6 +44,7 @@ export function AdminDrawer({
   className = "",
   closeConfirmationMessage = "Есть несохраненные изменения. Закрыть без сохранения?",
   hasUnsavedChanges = false,
+  initialFocusRef,
   onClose,
 }: AdminDrawerProps) {
   const panelRef = useRef<HTMLElement>(null);
@@ -84,16 +87,18 @@ export function AdminDrawer({
       return;
     }
 
-    if (!panelRef.current.contains(document.activeElement)) {
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    if (!activeElement || !focusableElements.includes(activeElement)) {
       event.preventDefault();
-      firstElement.focus();
+      (event.shiftKey ? lastElement : firstElement).focus();
       return;
     }
 
-    if (event.shiftKey && document.activeElement === firstElement) {
+    if (event.shiftKey && activeElement === firstElement) {
       event.preventDefault();
       lastElement.focus();
-    } else if (!event.shiftKey && document.activeElement === lastElement) {
+    } else if (!event.shiftKey && activeElement === lastElement) {
       event.preventDefault();
       firstElement.focus();
     }
@@ -104,7 +109,8 @@ export function AdminDrawer({
     openDrawerCount += 1;
     document.body.classList.add("admin-drawer-open");
 
-    const focusTarget = panelRef.current ? getFocusableElements(panelRef.current)[0] ?? panelRef.current : undefined;
+    const focusTarget = initialFocusRef?.current
+      ?? (panelRef.current ? getFocusableElements(panelRef.current)[0] ?? panelRef.current : undefined);
     focusTarget?.focus();
 
     return () => {
@@ -116,7 +122,7 @@ export function AdminDrawer({
 
       restoreFocusRef.current?.focus();
     };
-  }, []);
+  }, [initialFocusRef]);
 
   return (
     <div className="admin-drawer-backdrop" onClick={handleBackdropClick}>

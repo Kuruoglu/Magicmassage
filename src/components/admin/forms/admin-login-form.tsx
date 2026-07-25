@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { type FormEvent, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -163,9 +164,11 @@ export function AdminLoginForm() {
             autoComplete="one-time-code"
             inputMode="numeric"
             maxLength={6}
+            name="totp"
             onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
             pattern="[0-9]{6}"
             required
+            spellCheck={false}
             value={code}
           />
         </label>
@@ -184,8 +187,10 @@ export function AdminLoginForm() {
         Email
         <input
           autoComplete="email"
+          name="email"
           onChange={(event) => setEmail(event.target.value)}
           required
+          spellCheck={false}
           type="email"
           value={email}
         />
@@ -194,6 +199,7 @@ export function AdminLoginForm() {
         Password
         <input
           autoComplete="current-password"
+          name="password"
           onChange={(event) => setPassword(event.target.value)}
           required
           type="password"
@@ -204,6 +210,9 @@ export function AdminLoginForm() {
       <button className="button primary" disabled={isSubmitting} type="submit">
         {isSubmitting ? "Signing in" : "Sign in"}
       </button>
+      <Link className="admin-auth-link" href="/admin/forgot-password">
+        Забыли пароль?
+      </Link>
     </form>
   );
 }

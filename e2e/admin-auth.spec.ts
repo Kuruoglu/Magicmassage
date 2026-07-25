@@ -42,6 +42,8 @@ function resolveAdminAuthEnvironment() {
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   );
   const credentialsPair = resolveConfiguredPair("E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD");
+  const ephemeral = configuredBoolean("E2E_ADMIN_EPHEMERAL");
+  const ephemeralUserId = configuredValue(process.env.E2E_ADMIN_USER_ID);
   const required = configuredBoolean("E2E_ADMIN_AUTH_REQUIRED");
   const secretKey = configuredValue(process.env.SUPABASE_SECRET_KEY);
   const securityAlertId = configuredValue(process.env.E2E_SECURITY_ALERT_ID);
@@ -57,6 +59,8 @@ function resolveAdminAuthEnvironment() {
     credentials: credentialsPair
       ? { email: credentialsPair.first, password: credentialsPair.second }
       : null,
+    ephemeral,
+    ephemeralUserId,
     publicSupabase: publicSupabasePair
       ? { publishableKey: publicSupabasePair.second, url: publicSupabasePair.first }
       : null,
@@ -183,6 +187,103 @@ test.describe("real admin authentication", () => {
     await expect(page.getByRole("heading", { name: "Admin login" })).toBeVisible();
   });
 
+  test("resets an ephemeral admin password only after the existing TOTP factor", async ({
+    baseURL,
+    context,
+    page,
+  }) => {
+    test.skip(
+      !adminAuthEnvironment.ephemeral
+      || !adminAuthEnvironment.credentials
+      || !adminAuthEnvironment.secretKey
+      || !adminAuthEnvironment.totpSecret
+      || !adminAuthEnvironment.ephemeralUserId,
+      "Password-changing recovery smoke runs only against a disposable E2E admin.",
+    );
+
+    expect(baseURL).toBeTruthy();
+    const publicSupabase = adminAuthEnvironment.publicSupabase!;
+    const credentials = adminAuthEnvironment.credentials!;
+    const serviceClient = createClient(publicSupabase.url, adminAuthEnvironment.secretKey!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        storageKey: `mmn-e2e-recovery-service-${adminAuthEnvironment.ephemeralUserId}`,
+      },
+    });
+    const { data: recoveryLink, error: recoveryLinkError } =
+      await serviceClient.auth.admin.generateLink({
+        email: credentials.email,
+        options: {
+          redirectTo: new URL("/admin/reset-password", baseURL).toString(),
+        },
+        type: "recovery",
+      });
+
+    expect(recoveryLinkError, "Could not generate the disposable recovery link.").toBeNull();
+    expect(recoveryLink.properties?.action_link).toBeTruthy();
+    expect(recoveryLink.user?.id).toBeTruthy();
+    expect(recoveryLink.user?.id).toBe(adminAuthEnvironment.ephemeralUserId);
+    const recoveryUserId = recoveryLink.user!.id;
+
+    try {
+      await page.goto(recoveryLink.properties!.action_link);
+      await expect(page).toHaveURL(/\/admin\/reset-password(?:[?#]|$)/);
+      await expect(page.getByRole("heading", { name: "Подтвердите личность" })).toBeVisible();
+      expect((await context.cookies()).some((cookie) => cookie.name === adminCookieName)).toBe(false);
+
+      await page.getByLabel("Код из приложения").fill(
+        createTotpCode(adminAuthEnvironment.totpSecret!),
+      );
+      await page.getByRole("button", { name: "Продолжить" }).click();
+      await expect(page.getByRole("heading", { name: "Новый пароль" })).toBeVisible();
+
+      const newPassword = `Recovery-E2E-${Date.now()}-Aa9!`;
+      await page.getByLabel("Новый пароль").fill(newPassword);
+      await page.getByLabel("Повторите пароль").fill(newPassword);
+      await page.getByRole("button", { name: "Сохранить новый пароль" }).click();
+
+      await expect(page.getByRole("heading", { name: "Пароль изменён" })).toBeVisible();
+      expect((await context.cookies()).some((cookie) => cookie.name === adminCookieName)).toBe(false);
+
+      const oldPasswordClient = createClient(publicSupabase.url, publicSupabase.publishableKey, {
+        auth: {
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          persistSession: false,
+          storageKey: `mmn-e2e-recovery-old-${adminAuthEnvironment.ephemeralUserId}`,
+        },
+      });
+      const oldPasswordResult = await oldPasswordClient.auth.signInWithPassword(credentials);
+      expect(oldPasswordResult.error).not.toBeNull();
+      expect(oldPasswordResult.data.session).toBeNull();
+
+      const newPasswordClient = createClient(publicSupabase.url, publicSupabase.publishableKey, {
+        auth: {
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          persistSession: false,
+          storageKey: `mmn-e2e-recovery-new-${adminAuthEnvironment.ephemeralUserId}`,
+        },
+      });
+      const newPasswordResult = await newPasswordClient.auth.signInWithPassword({
+        email: credentials.email,
+        password: newPassword,
+      });
+      expect(newPasswordResult.error).toBeNull();
+      expect(newPasswordResult.data.session?.access_token).toBeTruthy();
+      await newPasswordClient.auth.signOut({ scope: "local" });
+    } finally {
+      const { error: restorePasswordError } =
+        await serviceClient.auth.admin.updateUserById(recoveryUserId, {
+          password: credentials.password,
+        });
+      if (restorePasswordError) {
+        throw new Error(`Could not restore the disposable E2E password: ${restorePasswordError.message}`);
+      }
+    }
+  });
+
   test("accepts a real Supabase admin session", async ({ baseURL, context, page }) => {
     test.skip(
       !adminAuthEnvironment.credentials || !adminAuthEnvironment.secretKey,
@@ -266,6 +367,7 @@ test.describe("real admin authentication", () => {
       const cookieMatch = setCookie?.match(new RegExp(`^${adminCookieName}=([^;]+)`));
 
       expect(cookieMatch?.[1], "Admin session route did not set its HTTP-only cookie.").toBeTruthy();
+      expect(setCookie).toContain("Max-Age=28800");
 
       await context.addCookies([
         {
@@ -321,6 +423,20 @@ test.describe("real admin authentication", () => {
     await page.screenshot({ fullPage: true, path: "test-results/admin-security-alerts-mobile.png" });
     await alertRow.getByRole("button", { name: "Просмотрено" }).click();
     await expect(alertRow).toHaveCount(0);
+  });
+
+  test("restores a persisted MFA session when the server cookie is missing", async ({ context, page }) => {
+    test.skip(
+      !adminAuthEnvironment.credentials || !adminAuthEnvironment.totpSecret,
+      "Set E2E admin credentials and its TOTP secret for the persisted-session restore flow.",
+    );
+
+    await signInAdminThroughBrowser(page);
+    await context.clearCookies({ name: adminCookieName });
+    await page.goto("/admin");
+
+    await expect(page).toHaveURL(/\/admin$/, { timeout: 15_000 });
+    await expect(page.getByRole("navigation", { name: "Admin sections" })).toBeVisible();
   });
 
   test("shows the selected specialist schedule on desktop and mobile", async ({ page }) => {

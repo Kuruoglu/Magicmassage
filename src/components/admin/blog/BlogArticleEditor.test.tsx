@@ -151,6 +151,72 @@ describe("BlogArticleEditor", () => {
     );
   });
 
+  it("serializes autosaves and persists the latest draft after an in-flight save", async () => {
+    vi.useFakeTimers();
+    let resolveFirstAutosave: (() => void) | undefined;
+    const onAutosave = vi
+      .fn<(value: BlogArticleDraft) => Promise<void>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveFirstAutosave = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+
+    try {
+      render(<EditorHarness onAutosave={onAutosave} />);
+      const title = screen.getByLabelText("Заголовок");
+
+      fireEvent.change(title, { target: { value: "Первая версия" } });
+      await act(async () => vi.advanceTimersByTimeAsync(1500));
+      expect(onAutosave).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("button", { name: "Сохранение..." })).toBeDisabled();
+
+      fireEvent.change(title, { target: { value: "Последняя версия" } });
+      await act(async () => vi.advanceTimersByTimeAsync(3000));
+      expect(onAutosave).toHaveBeenCalledTimes(1);
+
+      await act(async () => resolveFirstAutosave?.());
+      await act(async () => vi.advanceTimersByTimeAsync(1500));
+
+      expect(onAutosave).toHaveBeenCalledTimes(2);
+      expect(onAutosave).toHaveBeenLastCalledWith(expect.objectContaining({ title: "Последняя версия" }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits for a new edit before retrying a failed autosave", async () => {
+    vi.useFakeTimers();
+    const onAutosave = vi
+      .fn<(value: BlogArticleDraft) => Promise<void>>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue(undefined);
+
+    try {
+      render(<EditorHarness onAutosave={onAutosave} />);
+      const title = screen.getByLabelText("Заголовок");
+
+      fireEvent.change(title, { target: { value: "Версия без сети" } });
+      await act(async () => vi.advanceTimersByTimeAsync(1500));
+      expect(onAutosave).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("status")).toHaveTextContent("Ошибка автосохранения");
+
+      await act(async () => vi.advanceTimersByTimeAsync(6000));
+      expect(onAutosave).toHaveBeenCalledTimes(1);
+
+      fireEvent.change(title, { target: { value: "Версия после изменения" } });
+      await act(async () => vi.advanceTimersByTimeAsync(1500));
+      expect(onAutosave).toHaveBeenCalledTimes(2);
+      expect(onAutosave).toHaveBeenLastCalledWith(
+        expect.objectContaining({ title: "Версия после изменения" }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("validates required metadata and moves focus to the first invalid field", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();

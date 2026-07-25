@@ -96,6 +96,7 @@ const blogRow = {
   slug: "care-guide",
   tag_labels: ["care", "massage"],
   title: "Care guide",
+  translation_key: "care-guide",
   updated_at: "2026-07-11T09:00:00Z",
 };
 
@@ -333,7 +334,7 @@ describe("public content data layer", () => {
       admin_media_assets: { data: [mediaAsset], error: null },
       admin_published_blog_posts: {
         data: [
-          { ...blogRow, locale: "bg", title: "Fallback guide" },
+          { ...blogRow, locale: "bg", slug: "care-guide-bg", title: "Fallback guide" },
           blogRow,
         ],
         error: null,
@@ -406,7 +407,7 @@ describe("public content data layer", () => {
   it("loads public site feature flags and handles a missing singleton", async () => {
     const configured = createMockClient({
       admin_public_site_flags: {
-        data: [{ gift_certificates_enabled: false, id: "site", public_booking_enabled: true }],
+        data: [{ blog_enabled: false, gift_certificates_enabled: false, id: "site", public_booking_enabled: true }],
         error: null,
       },
     }).client;
@@ -415,7 +416,7 @@ describe("public content data layer", () => {
     }).client;
 
     await expect(createPublicContentDataLayer(configured).getSiteFeatures()).resolves.toEqual({
-      data: { giftCertificatesEnabled: false, publicBookingEnabled: true },
+      data: { blogEnabled: false, giftCertificatesEnabled: false, publicBookingEnabled: true },
       source: "supabase",
       status: "ok",
     });
@@ -425,6 +426,73 @@ describe("public content data layer", () => {
       reason: "public_content_row_missing",
       source: "supabase",
       status: "not_configured",
+    });
+  });
+
+  it("loads the public business details through the narrow public view", async () => {
+    const workingSchedule = [
+      { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 1 },
+      { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 2 },
+      { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 3 },
+      { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 4 },
+      { closesAt: "19:00", isOpen: true, opensAt: "10:00", weekday: 5 },
+      { closesAt: "17:00", isOpen: true, opensAt: "10:00", weekday: 6 },
+      { closesAt: "18:00", isOpen: false, opensAt: "10:00", weekday: 7 },
+    ];
+    const { calls, client } = createMockClient({
+      admin_public_business_details: {
+        data: [{
+          address: "ул. Места 50, Бургас",
+          business_name: "Magic Massage Natali",
+          id: "site",
+          phone: "+359 89 677 8308",
+          seo_area: "Burgas, Bulgaria",
+          updated_at: "2026-07-18T10:00:00.000Z",
+          working_schedule: workingSchedule,
+        }],
+        error: null,
+      },
+    });
+
+    await expect(createPublicContentDataLayer(client).getBusinessDetails()).resolves.toEqual({
+      data: {
+        address: "ул. Места 50, Бургас",
+        businessName: "Magic Massage Natali",
+        phone: "+359 89 677 8308",
+        seoArea: "Burgas, Bulgaria",
+        updatedAt: "2026-07-18T10:00:00.000Z",
+        workingSchedule,
+      },
+      source: "supabase",
+      status: "ok",
+    });
+    expect(calls).toContainEqual(expect.objectContaining({ table: "admin_public_business_details" }));
+  });
+
+  it("rejects malformed public business schedules", async () => {
+    const logger = { error: vi.fn() };
+    const { client } = createMockClient({
+      admin_public_business_details: {
+        data: [{
+          address: "Burgas",
+          business_name: "Magic Massage Natali",
+          id: "site",
+          phone: "+359 89 677 8308",
+          seo_area: "Burgas, Bulgaria",
+          updated_at: "2026-07-18T10:00:00.000Z",
+          working_schedule: [],
+        }],
+        error: null,
+      },
+    });
+
+    await expect(createPublicContentDataLayer(client, logger).getBusinessDetails()).resolves.toMatchObject({
+      reason: "public_content_query_failed",
+      status: "query_failed",
+    });
+    expect(logger.error).toHaveBeenCalledWith("Public Supabase content read failed", {
+      cause: "invalid_data",
+      operation: "getBusinessDetails",
     });
   });
 

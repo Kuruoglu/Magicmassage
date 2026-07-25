@@ -42,7 +42,7 @@ describe("public pages content", () => {
         ),
       ).toBe(true);
       expect(content.contacts.title.length).toBeGreaterThan(10);
-      expect(content.contacts.phone).toBe("+359 89 677 8309");
+      expect(content.contacts.phone).toBe("+359 89 677 8308");
       expect(content.contacts.address.length).toBeGreaterThan(10);
     }
   });

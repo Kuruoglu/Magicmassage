@@ -113,6 +113,15 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown Supabase admin data load error";
 }
 
+function withRuntimeEmailSender(
+  settings: SettingsRecord | undefined,
+  env: AdminSupabaseEnvSource,
+) {
+  if (!settings) return undefined;
+  const verifiedEmailSender = env.RESEND_FROM_EMAIL?.trim();
+  return verifiedEmailSender ? { ...settings, verifiedEmailSender } : settings;
+}
+
 export async function loadAdminShellData({
   activeSection,
   createClient = createAdminSupabaseClient,
@@ -164,6 +173,9 @@ export async function loadAdminShellData({
           ? await repository.loadDomainRecords()
           : emptyRecords,
         services: activeSection === "services" ? await repository.listServices() : undefined,
+        settings: activeSection === "blog"
+          ? withRuntimeEmailSender(await repository.loadSettings(), env)
+          : undefined,
         source: "supabase",
       };
     }
@@ -178,6 +190,9 @@ export async function loadAdminShellData({
         prices: activeSection === "price" ? await repository.listPrices() : undefined,
         records: emptyRecords,
         services: activeSection === "services" ? await repository.listServices() : undefined,
+        settings: activeSection === "blog"
+          ? withRuntimeEmailSender(await repository.loadSettings(), env)
+          : undefined,
         source: "supabase",
       };
     }
@@ -216,7 +231,7 @@ export async function loadAdminShellData({
       prices,
       records,
       services,
-      settings,
+      settings: withRuntimeEmailSender(settings, env),
       source: "supabase",
     };
   } catch (error) {

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { BlogArticleView, createBlogPostMetadata, getBlogCopy } from "@/components/public-blog";
-import { getRuntimeBlogPost } from "@/content/public-content-runtime";
+import { getPublicShellRuntime, getRuntimeBlogPost } from "@/content/public-content-runtime";
 import { isSupportedLocale } from "@/i18n/config";
 
 type BlogPostPageProps = {
@@ -21,9 +21,12 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     return {};
   }
 
-  const post = await getBlogPost(locale, slug);
+  const [post, shellRuntime] = await Promise.all([
+    getBlogPost(locale, slug),
+    getPublicShellRuntime(locale),
+  ]);
 
-  if (!post) {
+  if (!shellRuntime.blogEnabled || !post) {
     return {
       title: getBlogCopy(locale).notFoundTitle,
       robots: { follow: false, index: false },
@@ -40,9 +43,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     notFound();
   }
 
-  const post = await getBlogPost(locale, slug);
+  const [post, shellRuntime] = await Promise.all([
+    getBlogPost(locale, slug),
+    getPublicShellRuntime(locale),
+  ]);
 
-  if (!post) {
+  if (!shellRuntime.blogEnabled || !post) {
     notFound();
   }
 

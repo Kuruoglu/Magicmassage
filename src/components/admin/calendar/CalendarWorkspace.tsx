@@ -8,6 +8,7 @@ import type { AdminRoleId } from "@/admin/config";
 import {
   appointmentBelongsToClient,
   findAppointmentClient,
+  getAppointmentNotificationEmail,
   findClientByIdentity,
   type Appointment,
   type CalendarBlock,
@@ -55,7 +56,7 @@ import {
   hasAppointmentOverlap,
   isSchedulingBlockingStatus,
 } from "./conflicts";
-import type { AppointmentOverlapLayout } from "./TimeGrid";
+import type { AppointmentOverlapLayout, CalendarTimeSelection } from "./TimeGrid";
 import {
   classifyAppointmentAgainstSchedule,
   createCalendarWorkingSchedule,
@@ -86,16 +87,17 @@ export type CalendarAppointmentFocus = {
 };
 
 export type CalendarAppointmentSaveResult =
-  | { ok: true; version?: number }
+  | { client?: ClientRecord; ok: true; version?: number }
   | {
+      client?: ClientRecord;
       message: string;
       ok: false;
     };
 
-type PendingCalendarConflict = {
+type PendingCalendarChange = {
   action: "appointment.drag" | "appointment.resize";
   appointment: Appointment;
-  conflictingAppointment: Appointment;
+  conflictingAppointment?: Appointment;
   originalAppointment: Appointment;
 };
 
@@ -105,6 +107,7 @@ type AppointmentDragPreview = {
 };
 
 export type CalendarWorkspaceProps = {
+  activeTimeSelection?: CalendarTimeSelection;
   actorUserId?: string;
   appointments: Appointment[];
   bookingBufferMinutes: number;
@@ -116,18 +119,22 @@ export type CalendarWorkspaceProps = {
   onCreateCalendarBlock?: (date: string) => void;
   onCreateWalkIn?: () => void;
   onDeleteCalendarBlock?: (block: CalendarBlock) => void;
+  onDeleteAppointment?: (appointment: Appointment) => void;
   onCalendarDateChange: (date: string) => void;
   onEditAppointment: (appointment: Appointment) => void;
   onEditCalendarBlock?: (block: CalendarBlock) => void;
+  onAppointmentPublicEmailCorrected?: (appointmentId: string, email: string) => void;
   onSaveAppointment: (
     appointment: Appointment,
     action?: AdminAuditAction,
     originalAppointment?: Appointment,
+    options?: { notifyClient: boolean },
   ) => Promise<CalendarAppointmentSaveResult>;
   onSaveSpecialistSchedule?: (
     specialistId: string,
     weeklySchedule: SpecialistScheduleDay[],
   ) => Promise<SpecialistScheduleSaveResult>;
+  onSelectTimeRange?: (selection: CalendarTimeSelection) => void;
   query: string;
   role: AdminRoleId;
   selectedAppointmentFocus?: CalendarAppointmentFocus;
@@ -276,6 +283,7 @@ function CalendarBlockScheduleItem({
 }
 
 export function CalendarWorkspace({
+  activeTimeSelection,
   appointments,
   bookingBufferMinutes,
   calendarBlocks = [],
@@ -286,11 +294,14 @@ export function CalendarWorkspace({
   onCreateCalendarBlock,
   onCreateWalkIn,
   onDeleteCalendarBlock,
+  onDeleteAppointment,
   onCalendarDateChange,
   onEditAppointment,
   onEditCalendarBlock,
+  onAppointmentPublicEmailCorrected,
   onSaveAppointment,
   onSaveSpecialistSchedule,
+  onSelectTimeRange,
   query,
   role,
   selectedAppointmentFocus,
@@ -351,11 +362,14 @@ export function CalendarWorkspace({
       query,
     ),
   );
+  const calendarGridAppointments = filteredAppointments.filter(
+    (appointment) => appointment.status !== "Отменена",
+  );
   const initialSelectedDate =
     selectedAppointmentFocus?.date ??
     (selectedCalendarDate && isIsoDate(selectedCalendarDate)
       ? selectedCalendarDate
-      : (sortAppointments(filteredAppointments)[0]?.date ?? getCalendarIsoDate(workingSchedule)));
+      : getCalendarIsoDate(workingSchedule));
   const initialSelectedAppointment = selectedAppointmentFocus
     ? filteredAppointments.find(
         (appointment) => appointmentKey(appointment) === selectedAppointmentFocus.appointmentKey,
@@ -378,10 +392,11 @@ export function CalendarWorkspace({
   const [pendingAppointmentKeys, setPendingAppointmentKeys] = useState<Set<string>>(() => new Set());
   const [calendarError, setCalendarError] = useState("");
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-  const [pendingConflict, setPendingConflict] = useState<PendingCalendarConflict | null>(null);
+  const [pendingChange, setPendingChange] = useState<PendingCalendarChange | null>(null);
+  const [pendingChangeNotifyClient, setPendingChangeNotifyClient] = useState(true);
   const [overlapOverrideReason, setOverlapOverrideReason] = useState("");
   const selectedDayAppointments = sortAppointments(
-    filteredAppointments.filter((appointment) => appointment.date === selectedDate),
+    calendarGridAppointments.filter((appointment) => appointment.date === selectedDate),
   );
   const selectedDayBlocks = specialistScopedBlocks
     .filter((block) => block.blockDate === selectedDate)
@@ -390,15 +405,17 @@ export function CalendarWorkspace({
   const visibleAppointments = mode === "day" ? selectedDayAppointments : listAppointments;
   const appointmentDetailPool = mode === "day" ? selectedDayAppointments : listAppointments;
   const hasVisibleAppointments = visibleAppointments.length > 0;
-  const selectedAppointment = hasVisibleAppointments
-    ? (appointmentDetailPool.find((appointment) => appointmentKey(appointment) === selectedKey) ??
-      appointmentDetailPool[0] ??
-      fallbackAppointment)
-    : fallbackAppointment;
-  const selectedAppointmentKey = hasVisibleAppointments ? appointmentKey(selectedAppointment) : "";
+  const selectedAppointmentInPool = hasVisibleAppointments
+    ? appointmentDetailPool.find((appointment) => appointmentKey(appointment) === selectedKey)
+    : undefined;
+  const selectedAppointment = selectedAppointmentInPool ?? appointmentDetailPool[0] ?? fallbackAppointment;
+  const selectedAppointmentKey = selectedAppointmentInPool ? appointmentKey(selectedAppointmentInPool) : "";
   const calendarHeading = calendarHeadingLabel(mode, selectedDate);
   const selectedAppointmentClient = findAppointmentClient(clients, selectedAppointment);
-  const shouldShowAppointmentDrawer = isAppointmentDrawerOpen && mode !== "month" && hasVisibleAppointments;
+  const pendingChangeNotificationEmail = pendingChange
+    ? getAppointmentNotificationEmail(clients, pendingChange.appointment)
+    : "";
+  const shouldShowAppointmentDrawer = isAppointmentDrawerOpen && mode !== "month" && Boolean(selectedAppointmentInPool);
   const monthDays = generateMonthGrid(selectedDate).map((date) => ({ date, day: Number(date.slice(-2)) }));
   const selectedMonth = selectedDate.slice(0, 7);
   const weekStart = startOfWeek(selectedDate);
@@ -407,6 +424,7 @@ export function CalendarWorkspace({
     day: Number(addDays(weekStart, index).slice(-2)),
   }));
   const selectedScheduleDay = getSpecialistScheduleDay(selectedSpecialist, selectedDate);
+
   function specialistCapacityScopeForDate(date: string) {
     const fullDayBlocks = calendarBlocks.filter(
       (block) => block.blockDate === date && isFullDayCalendarBlock(block),
@@ -569,7 +587,7 @@ export function CalendarWorkspace({
 
   function movePeriod(direction: "next" | "previous") {
     const nextDate = navigatePeriod(selectedDate, mode === "list" ? "month" : mode, direction);
-    const nextAppointments = filteredAppointments.filter((appointment) => appointment.date === nextDate);
+    const nextAppointments = calendarGridAppointments.filter((appointment) => appointment.date === nextDate);
     selectDate(nextDate, nextAppointments, mode);
   }
 
@@ -577,7 +595,7 @@ export function CalendarWorkspace({
     const today = getCalendarIsoDate(workingSchedule);
     selectDate(
       today,
-      filteredAppointments.filter((appointment) => appointment.date === today),
+      calendarGridAppointments.filter((appointment) => appointment.date === today),
       mode,
     );
   }
@@ -679,6 +697,7 @@ export function CalendarWorkspace({
     originalAppointment: Appointment,
     appointment: Appointment,
     action: "appointment.drag" | "appointment.resize",
+    options: { notifyClient: boolean },
   ) {
     const key = appointmentKey(originalAppointment);
 
@@ -689,7 +708,7 @@ export function CalendarWorkspace({
     setCalendarError("");
 
     try {
-      const result = await onSaveAppointment(appointment, action, originalAppointment);
+      const result = await onSaveAppointment(appointment, action, originalAppointment, options);
 
       if (!result.ok) {
         setSelectedDate(originalAppointment.date);
@@ -720,25 +739,10 @@ export function CalendarWorkspace({
     action: "appointment.drag" | "appointment.resize",
   ) {
     const conflictingAppointment = conflictingAppointmentFor(appointment, originalAppointment);
-
-    if (conflictingAppointment) {
-      setCalendarError("");
-      setOverlapOverrideReason("");
-      setPendingConflict({ action, appointment, conflictingAppointment, originalAppointment });
-      return;
-    }
-
-    void saveAppointmentChange(
-      originalAppointment,
-      {
-        ...appointment,
-        overlapOverride: false,
-        overlapOverrideReason: "",
-        overlapOverriddenAt: undefined,
-        overlapOverriddenBy: undefined,
-      },
-      action,
-    );
+    setCalendarError("");
+    setOverlapOverrideReason("");
+    setPendingChangeNotifyClient(true);
+    setPendingChange({ action, appointment, conflictingAppointment, originalAppointment });
   }
 
   function resizeAppointment(appointment: Appointment, deltaMinutes: number) {
@@ -795,7 +799,7 @@ export function CalendarWorkspace({
 
   function draggedAppointmentFor(event: DragEvent<HTMLElement>) {
     const key = event.dataTransfer.getData("text/admin-appointment-key") || draggedAppointmentKey;
-    return filteredAppointments.find((candidate) => appointmentKey(candidate) === key);
+    return calendarGridAppointments.find((candidate) => appointmentKey(candidate) === key);
   }
 
   function draggedAppointmentTime(event: DragEvent<HTMLElement>, appointment: Appointment) {
@@ -911,8 +915,18 @@ export function CalendarWorkspace({
     setSelectedSpecialistId(specialistId);
     setIsAppointmentDrawerOpen(false);
     setSelectedKey("");
-    setPendingConflict(null);
+    setPendingChange(null);
     setCalendarError("");
+  }
+
+  function selectTimeRange(selection: CalendarTimeSelection) {
+    onCalendarDateChange(selection.date);
+    setSelectedDate(selection.date);
+    setIsAppointmentDrawerOpen(false);
+    onSelectTimeRange?.({
+      ...selection,
+      specialistId: effectiveSpecialistId === "all" ? undefined : effectiveSpecialistId,
+    });
   }
 
   return (
@@ -928,7 +942,7 @@ export function CalendarWorkspace({
           onDateChange={(date) =>
             selectDate(
               date,
-              filteredAppointments.filter((appointment) => appointment.date === date),
+              calendarGridAppointments.filter((appointment) => appointment.date === date),
               mode,
             )
           }
@@ -939,10 +953,11 @@ export function CalendarWorkspace({
         />
         {role === "owner" || role === "administrator" ? (
           <div className="admin-route-context" aria-label="Фильтр календаря по специалисту">
-            <label>
+            <label className="admin-calendar-specialist-filter">
               Специалист
               <select
                 aria-label="Показать календарь специалиста"
+                className="admin-calendar-control admin-calendar-specialist-select"
                 onChange={(event) => changeSpecialistScope(event.target.value)}
                 value={effectiveSpecialistId}
               >
@@ -1006,18 +1021,28 @@ export function CalendarWorkspace({
             {calendarError}
           </p>
         ) : null}
-        {pendingConflict ? (
-          <section className="admin-calendar-conflict" aria-labelledby="admin-calendar-conflict-title">
+        {pendingChange ? (
+          <section className="admin-calendar-conflict" aria-labelledby="admin-calendar-change-title">
             <div className="admin-calendar-conflict-copy" role="alert">
-              <strong className="admin-calendar-conflict-title" id="admin-calendar-conflict-title">
-                Изменение пересекается с другой записью
+              <strong className="admin-calendar-conflict-title" id="admin-calendar-change-title">
+                {pendingChange.conflictingAppointment
+                  ? "Изменение пересекается с другой записью"
+                  : "Подтвердите изменение записи"}
               </strong>
               <p>
-                {pendingConflict.conflictingAppointment.client}, {formatCalendarDay(pendingConflict.conflictingAppointment.date)} в{" "}
-                {pendingConflict.conflictingAppointment.time}, {pendingConflict.conflictingAppointment.service}.
+                {formatCalendarDay(pendingChange.originalAppointment.date)}, {pendingChange.originalAppointment.time}
+                {" → "}
+                {formatCalendarDay(pendingChange.appointment.date)}, {pendingChange.appointment.time}.
               </p>
+              {pendingChange.conflictingAppointment ? (
+                <p>
+                  Пересечение: {pendingChange.conflictingAppointment.client},{" "}
+                  {formatCalendarDay(pendingChange.conflictingAppointment.date)} в {pendingChange.conflictingAppointment.time},{" "}
+                  {pendingChange.conflictingAppointment.service}.
+                </p>
+              ) : null}
             </div>
-            {canOverrideOverlap ? (
+            {pendingChange.conflictingAppointment && canOverrideOverlap ? (
               <label className="admin-calendar-conflict-reason">
                 Причина ручного пересечения
                 <textarea
@@ -1028,33 +1053,54 @@ export function CalendarWorkspace({
                   value={overlapOverrideReason}
                 />
               </label>
-            ) : (
+            ) : pendingChange.conflictingAppointment ? (
               <p>Для сохранения с пересечением требуется роль владельца или администратора.</p>
-            )}
+            ) : null}
+            <div className="admin-notify-client-choice">
+              <label className="admin-checkbox-field">
+                <input
+                  aria-describedby="admin-calendar-change-notification-helper"
+                  checked={Boolean(pendingChangeNotificationEmail) && pendingChangeNotifyClient}
+                  disabled={!pendingChangeNotificationEmail}
+                  onChange={(event) => setPendingChangeNotifyClient(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Уведомить клиента об изменении</span>
+              </label>
+              <p className="admin-form-helper" id="admin-calendar-change-notification-helper">
+                {pendingChangeNotificationEmail
+                  ? `Письмо будет отправлено на ${pendingChangeNotificationEmail}.`
+                  : "У клиента нет email. Изменение сохранится без письма."}
+              </p>
+            </div>
             <div className="admin-detail-actions admin-calendar-conflict-actions">
-              <button className="admin-outline-action" onClick={() => setPendingConflict(null)} type="button">
+              <button className="admin-outline-action" onClick={() => setPendingChange(null)} type="button">
                 Отменить изменение
               </button>
-              {canOverrideOverlap ? (
+              {!pendingChange.conflictingAppointment || canOverrideOverlap ? (
                 <button
-                  className="admin-danger-button"
-                  disabled={!overlapOverrideReason.trim()}
+                  className={pendingChange.conflictingAppointment ? "admin-danger-button" : "admin-primary-button"}
+                  disabled={Boolean(pendingChange.conflictingAppointment) && !overlapOverrideReason.trim()}
                   onClick={() => {
-                    const conflict = pendingConflict;
-                    setPendingConflict(null);
+                    const change = pendingChange;
+                    const clientEmail = getAppointmentNotificationEmail(clients, change.appointment);
+                    setPendingChange(null);
                     void saveAppointmentChange(
-                      conflict.originalAppointment,
+                      change.originalAppointment,
                       {
-                        ...conflict.appointment,
-                        overlapOverride: true,
-                        overlapOverrideReason: overlapOverrideReason.trim(),
+                        ...change.appointment,
+                        overlapOverride: Boolean(change.conflictingAppointment),
+                        overlapOverrideReason: change.conflictingAppointment ? overlapOverrideReason.trim() : "",
+                        overlapOverriddenAt: change.conflictingAppointment ? change.appointment.overlapOverriddenAt : undefined,
+                        overlapOverriddenBy: change.conflictingAppointment ? change.appointment.overlapOverriddenBy : undefined,
                       },
-                      conflict.action,
+                      change.action,
+                      { notifyClient: Boolean(clientEmail) && pendingChangeNotifyClient },
                     );
                   }}
                   type="button"
                 >
-                  Сохранить с пересечением
+                  {pendingChange.conflictingAppointment ? "Сохранить с пересечением" : "Сохранить изменение"}
                 </button>
               ) : null}
             </div>
@@ -1070,7 +1116,7 @@ export function CalendarWorkspace({
                 </span>
               ))}
               {monthDays.map((day) => {
-                const dayAppointments = filteredAppointments.filter((appointment) => appointment.date === day.date);
+                const dayAppointments = calendarGridAppointments.filter((appointment) => appointment.date === day.date);
                 const dayBlocks = specialistScopedBlocks.filter((block) => block.blockDate === day.date);
                 const dayBlockCount = dayBlocks.length;
                 const countLabel = appointmentCountLabel(dayAppointments.length);
@@ -1134,13 +1180,15 @@ export function CalendarWorkspace({
         ) : mode === "week" ? (
           <div ref={calendarViewRef} style={{ display: "contents" }}>
             <WeekCalendar
-              appointments={filteredAppointments}
+              activeTimeSelection={activeTimeSelection}
+              appointments={calendarGridAppointments}
               dragPreview={appointmentDragPreview?.appointment}
               heading={calendarHeading}
               isInteractionLocked={Boolean(resizingAppointmentKey)}
               onDragOverAppointment={previewAppointmentDrag}
               onDropAppointment={dropAppointment}
               onSelectDate={(date, dateAppointments) => selectDate(date, dateAppointments, "day")}
+              onSelectTimeRange={canManageBlocks ? selectTimeRange : undefined}
               renderAppointment={renderAppointment}
               weekDays={weekDays}
               workingHoursByDate={weekWorkingHoursByDate}
@@ -1191,15 +1239,14 @@ export function CalendarWorkspace({
               </div>
             ) : null}
             <DayCalendar
+              activeTimeSelection={activeTimeSelection}
               appointments={selectedDayAppointments}
-              bookingBufferMinutes={bookingBufferMinutes}
               dragPreview={appointmentDragPreview?.appointment}
-              freeSlotCount={selectedDayFreeCount}
               isInteractionLocked={Boolean(resizingAppointmentKey)}
               onDragOverAppointment={previewAppointmentDrag}
               onDropAppointment={dropAppointment}
+              onSelectTimeRange={canManageBlocks ? selectTimeRange : undefined}
               renderAppointment={renderAppointment}
-              scheduleLabel={selectedScheduleLabel}
               selectedDate={selectedDate}
               workingHours={selectedWorkingHours}
             />
@@ -1266,9 +1313,12 @@ export function CalendarWorkspace({
           appointmentClient={selectedAppointmentClient}
           onCancelAppointment={onCancelAppointment}
           onClose={() => setIsAppointmentDrawerOpen(false)}
+          onDeleteAppointment={onDeleteAppointment}
           onEditAppointment={onEditAppointment}
+          onPublicEmailCorrected={onAppointmentPublicEmailCorrected}
           onSaveAppointment={onSaveAppointment}
           role={role}
+          key={selectedAppointmentKey}
         />
       ) : null}
       {isScheduleDialogOpen && selectedSpecialist && onSaveSpecialistSchedule ? (

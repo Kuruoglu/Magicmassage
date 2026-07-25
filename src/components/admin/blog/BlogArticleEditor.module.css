@@ -149,6 +149,66 @@
   min-width: 0;
 }
 
+.localeTabs {
+  background: var(--blog-surface);
+  border-bottom: 1px solid var(--blog-border);
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px clamp(16px, 3vw, 34px);
+  position: sticky;
+  scrollbar-width: thin;
+  top: 78px;
+  z-index: 19;
+}
+
+.localeTab {
+  align-items: center;
+  background: var(--blog-surface-muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--blog-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  min-height: 40px;
+  padding: 6px 11px;
+}
+
+.localeTab span {
+  color: var(--blog-text);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.localeTab small,
+.localeTab em {
+  font-size: 0.7rem;
+  font-style: normal;
+}
+
+.localeTab em {
+  color: #8a5a00;
+  font-weight: 750;
+}
+
+.localeTab[data-status="missing"] small {
+  color: var(--blog-muted);
+}
+
+.localeTab[aria-selected="true"] {
+  background: var(--blog-surface);
+  border-color: var(--blog-primary);
+  box-shadow: inset 0 -2px 0 var(--blog-primary);
+  color: var(--blog-primary-strong);
+}
+
+.localeTab:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--blog-primary) 30%, transparent);
+  outline-offset: 2px;
+}
+
 .articleColumn {
   min-width: 0;
   padding: 30px clamp(18px, 4vw, 56px) 56px;
@@ -182,6 +242,25 @@
   color: var(--blog-muted);
   font-size: 0.78rem;
   font-weight: 750;
+}
+
+.readonlyLocale {
+  background: var(--blog-surface-muted);
+  border: 1px solid var(--blog-border);
+  border-radius: 6px;
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+}
+
+.readonlyLocale span,
+.readonlyLocale small {
+  color: var(--blog-muted);
+  font-size: 0.72rem;
+}
+
+.readonlyLocale strong {
+  font-size: 0.86rem;
 }
 
 .titleField input {

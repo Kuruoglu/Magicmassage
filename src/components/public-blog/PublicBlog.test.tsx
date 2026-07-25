@@ -100,7 +100,7 @@ describe("public blog", () => {
       },
     });
     expect(articleMetadata).toMatchObject({
-      title: "Подготовка к массажу",
+      title: post.title,
       description: post.seo.description,
       alternates: {
         canonical: "/ru/blog/recovery-guide",
@@ -110,6 +110,7 @@ describe("public blog", () => {
         },
       },
       openGraph: {
+        title: post.seo.ogTitle,
         publishedTime: post.publishedAt,
         modifiedTime: post.updatedAt,
         type: "article",

@@ -1,14 +1,14 @@
 import type Stripe from "stripe";
+import { randomUUID } from "node:crypto";
 
 import {
   calculateGiftCertificateTotal,
   getGiftCertificateExpiryDate,
   giftCertificateSalesConfig,
 } from "@/content/gift-certificates";
-import { getGiftCertificateEmailConfig } from "./email-config";
-import { encodeGiftOrderMetadata } from "./metadata";
+import { encodeGiftOrderReferenceMetadata } from "./metadata";
+import type { GiftCertificateOrderStore } from "./order-store";
 import type {
-  GiftCertificateEmailEnvironment,
   GiftCertificatePaymentMetadataOrder,
 } from "./types";
 import {
@@ -30,10 +30,12 @@ type GiftPaymentEnvironment = {
   NEXT_PUBLIC_SITE_URL?: string;
   GIFT_CERTIFICATES_ENABLE_LIVE_PAYMENTS?: string;
   GIFT_CERTIFICATES_FINAL_PRICES_CONFIRMED?: string;
-} & GiftCertificateEmailEnvironment;
+};
 
 export type GiftCertificatePaymentSessionInput = {
+  createOrderId?: () => string;
   idempotencyKey?: string;
+  orderStore?: GiftCertificateOrderStore;
   payload: unknown;
   now?: Date;
   env?: GiftPaymentEnvironment;
@@ -84,8 +86,10 @@ function buildStatementDescriptor(): string {
 }
 
 export async function createGiftCertificatePaymentSession({
+  createOrderId = randomUUID,
   payload,
   idempotencyKey,
+  orderStore,
   now = new Date(),
   env = process.env as GiftPaymentEnvironment,
   stripe,
@@ -116,44 +120,51 @@ export async function createGiftCertificatePaymentSession({
     };
   }
 
-  getGiftCertificateEmailConfig(env);
+  if (!orderStore) {
+    throw new Error("Gift certificate order persistence is not configured.");
+  }
 
-  const metadataOrder: GiftCertificatePaymentMetadataOrder = {
-    ...order,
-    recipientMessage: undefined,
-  };
+  const stableIdempotencyKey = idempotencyKey ?? randomUUID();
+  const persistedOrder = await orderStore.createPendingOrder({
+    certificateCode,
+    idempotencyKey: stableIdempotencyKey,
+    order,
+    orderId: createOrderId(),
+  });
+
   const paymentIntent = await stripe.paymentIntents.create(
     {
       amount: total.totalEurCents,
       currency: "eur",
-      receipt_email: validation.data.purchaserEmail,
-      description: `Gift certificate ${certificateCode}`,
+      receipt_email: persistedOrder.purchaserEmail,
+      description: `Gift certificate ${persistedOrder.certificateCode}`,
       statement_descriptor: buildStatementDescriptor(),
       automatic_payment_methods: {
         enabled: true,
         allow_redirects: "never",
       },
-      metadata: {
-        gift_order_version: "v1",
-        gift_certificate_code: certificateCode,
-        gift_total_eur_cents: String(total.totalEurCents),
-        gift_locale: validation.data.locale,
-        gift_delivery_mode: validation.data.deliveryMode,
-        ...encodeGiftOrderMetadata(metadataOrder),
-      },
+      metadata: encodeGiftOrderReferenceMetadata({
+        certificateCode: persistedOrder.certificateCode,
+        locale: persistedOrder.locale,
+        orderId: persistedOrder.id,
+        schemaVersion: "v2",
+        totalEurCents: persistedOrder.totalEurCents,
+      }),
     },
-    idempotencyKey ? { idempotencyKey } : undefined,
+    { idempotencyKey: stableIdempotencyKey },
   );
 
   if (!paymentIntent.client_secret) {
     throw new Error("Stripe did not return a client secret.");
   }
 
+  await orderStore.attachPaymentIntent(persistedOrder.id, paymentIntent.id);
+
   return {
     mode: "stripe",
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
-    amountEurCents: total.totalEurCents,
-    certificateCode,
+    amountEurCents: persistedOrder.totalEurCents,
+    certificateCode: persistedOrder.certificateCode,
   };
 }

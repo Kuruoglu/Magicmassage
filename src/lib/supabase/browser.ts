@@ -34,6 +34,21 @@ export function getSupabaseBrowserClient() {
   return cachedClient;
 }
 
+export function createSupabasePasswordRecoveryClient() {
+  const env = getPublicSupabaseEnv();
+  if (!env) {
+    return null;
+  }
+
+  return createClient(env.url, env.key, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: true,
+      persistSession: false,
+    },
+  });
+}
+
 export async function getAdminAccessToken() {
   const client = getSupabaseBrowserClient();
 

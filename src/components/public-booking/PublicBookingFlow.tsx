@@ -296,6 +296,7 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [contactErrors, setContactErrors] = useState<ContactErrors>({});
   const [contact, setContact] = useState<BookingContact>({
+    careEmailOptIn: false,
     contactPreference: "phone",
     email: "",
     name: "",
@@ -1089,7 +1090,10 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
                   value={contact.email}
                   aria-invalid={Boolean(contactErrors.email)}
                   aria-describedby={contactErrors.email ? `${formId}-email-error` : undefined}
-                  onChange={(event) => updateContact("email", event.target.value)}
+                  onChange={(event) => {
+                    updateContact("email", event.target.value);
+                    if (!event.target.value.trim()) updateContact("careEmailOptIn", false);
+                  }}
                 />
                 {contactErrors.email ? <small id={`${formId}-email-error`}>{contactErrors.email}</small> : null}
               </label>
@@ -1113,6 +1117,21 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
               </fieldset>
 
               {notice ? <p className={styles.policyNotice}>{notice}</p> : null}
+              <div className={styles.optionalConsent}>
+                <label className={styles.privacyChoice}>
+                  <input
+                    aria-describedby={`${formId}-care-email-helper`}
+                    checked={contact.careEmailOptIn}
+                    disabled={!contact.email.trim()}
+                    onChange={(event) => updateContact("careEmailOptIn", event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>{copy.careEmailOptIn}</span>
+                </label>
+                <small id={`${formId}-care-email-helper`}>
+                  {contact.email.trim() ? copy.careEmailOptInHelper : copy.careEmailOptInRequiresEmail}
+                </small>
+              </div>
               <label className={styles.privacyChoice}>
                 <input
                   data-booking-field="privacy"

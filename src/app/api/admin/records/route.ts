@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 
-import { isAdminPersistInput, persistAdminRecord } from "@/admin/persistence";
-import type { AdminAuditAction, AdminPersistInput } from "@/admin/persistence";
+import {
+  deleteAdminRecord,
+  isAdminDeleteInput,
+  isAdminPersistInput,
+  persistAdminRecord,
+} from "@/admin/persistence";
+import type { AdminAuditAction, AdminDeleteInput, AdminPersistInput } from "@/admin/persistence";
 import type { AdminRoleId } from "@/admin/config";
 import { isAdminDemoFallbackAllowed } from "@/admin/data-source";
 import { runWithAdminRepositoryAuditContext } from "@/admin/repository";
@@ -17,6 +22,7 @@ import { resolveAdminSupabaseEnv } from "@/admin/supabase-client";
 
 const recordWriteRoles: Record<AdminPersistInput["type"], AdminRoleId[]> = {
   appointment: ["owner", "administrator"],
+  blogVisibility: ["owner", "administrator", "editor"],
   blogPost: ["owner", "administrator", "editor"],
   certificate: ["owner", "administrator"],
   client: ["owner", "administrator"],
@@ -106,6 +112,7 @@ type CalendarBlockRow = {
 };
 
 const auditActionByRecordType: Record<Exclude<AdminPersistInput["type"], "appointment">, string> = {
+  blogVisibility: "site.blog_visibility",
   blogPost: "blog.publication",
   certificate: "record.certificate.upsert",
   client: "record.client.upsert",
@@ -362,7 +369,12 @@ async function classifyAppointmentOnServer(
 }
 
 function revalidatePublicContent(payload: AdminPersistInput) {
-  if (payload.type === "settings") {
+  if (
+    payload.type === "settings" ||
+    payload.type === "blogVisibility" ||
+    payload.type === "contactSettings" ||
+    payload.type === "contactChannel"
+  ) {
     for (const locale of publicLocales) {
       for (const suffix of publicShellPageSuffixes) {
         revalidatePath(`/${locale}${suffix}`);
@@ -398,7 +410,103 @@ function auditMetadata(payload: AdminPersistInput, role: AdminRoleId) {
     ...(payload.audit?.overlapOverride !== undefined
       ? { overlapOverride: payload.audit.overlapOverride }
       : {}),
+    ...(payload.audit?.notifyClient !== undefined
+      ? { notifyClient: payload.audit.notifyClient }
+      : {}),
   };
+}
+
+const recordDeleteRoles: Record<AdminDeleteInput["type"], AdminRoleId[]> = {
+  appointment: ["owner", "administrator"],
+  client: ["owner", "administrator"],
+};
+
+export async function DELETE(request: Request) {
+  let payload: unknown;
+
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Некорректный запрос на удаление." }, { status: 400 });
+  }
+
+  if (!isAdminDeleteInput(payload)) {
+    return NextResponse.json({ error: "Некорректный запрос на удаление." }, { status: 400 });
+  }
+
+  const supabaseAdminClient = createSupabaseAdminClient();
+  let actor: { role: AdminRoleId; userId: string } | undefined;
+
+  if (supabaseAdminClient) {
+    const authorization = await authorizeSupabaseAdminAccess(
+      supabaseAdminClient,
+      getBearerToken(request.headers.get("authorization")),
+      { allowedRoles: recordDeleteRoles[payload.type] },
+    );
+
+    if (!authorization.ok) {
+      return NextResponse.json({ error: authorization.message }, { status: authorization.statusCode });
+    }
+
+    if (!recordDeleteRoles[payload.type].includes(authorization.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    actor = { role: authorization.role, userId: authorization.userId };
+  } else if (!isAdminDemoFallbackAllowed()) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  } else if (resolveAdminSupabaseEnv() && !resolveSupabaseAdminEnv()) {
+    return NextResponse.json(
+      {
+        message: "SUPABASE_SECRET_KEY is required before deleting admin records from Supabase.",
+        mode: "supabase",
+        ok: false,
+      },
+      { status: 500 },
+    );
+  }
+
+  const operation = () => deleteAdminRecord(payload);
+  const result = actor
+    ? await runWithAdminRepositoryAuditContext(
+        {
+          action: `${payload.type}.delete`,
+          actorUserId: actor.userId,
+          metadata: { recordType: payload.type, role: actor.role },
+        },
+        operation,
+      )
+    : await operation();
+
+  if (!result.ok && result.reason === "client_has_appointments") {
+    return NextResponse.json(
+      { error: "Сначала удалите записи этого клиента из календаря." },
+      { status: 409 },
+    );
+  }
+
+  if (!result.ok && result.reason === "appointment_concurrent_update") {
+    return NextResponse.json(
+      { error: "Запись изменилась после открытия. Обновите календарь и повторите удаление." },
+      { status: 409 },
+    );
+  }
+
+  if (!result.ok && result.reason === "appointment_email_delivery_in_progress") {
+    return NextResponse.json(
+      { error: "Письмо по этой записи уже отправляется. Дождитесь завершения и повторите удаление." },
+      { status: 409 },
+    );
+  }
+
+  if (!result.ok && result.reason === "record_not_found") {
+    return NextResponse.json({ error: "Запись уже удалена или не найдена." }, { status: 404 });
+  }
+
+  return NextResponse.json(
+    result.ok ? result : { ...result, message: "Не удалось удалить запись. Повторите попытку." },
+    { status: result.ok || result.mode === "demo" ? 200 : 500 },
+  );
 }
 
 export async function POST(request: Request) {
@@ -571,7 +679,15 @@ export async function POST(request: Request) {
   }
 
   if (!result.ok && result.reason) {
-    const conflictMessage = result.reason === "appointment_calendar_block_conflict"
+    const conflictMessage = result.reason === "blog_translation_locale_conflict"
+      ? "Для этой статьи уже существует перевод на выбранном языке."
+      : result.reason === "blog_locale_slug_conflict"
+        ? "На этом языке уже существует статья с таким slug."
+      : result.reason === "blog_translation_key_immutable" || result.reason === "blog_locale_immutable"
+          ? "Язык и группа существующего перевода не могут быть изменены. Создайте новую языковую версию."
+          : result.reason === "care_email_consent_conflict"
+            ? "Согласие клиента изменилось в другой сессии. Профиль обновлён актуальными данными."
+          : result.reason === "appointment_calendar_block_conflict"
       ? "Appointment conflicts with blocked personal time."
       : result.reason === "appointment_concurrent_update"
         ? "Appointment changed while it was being saved. Reload and try again."
@@ -581,7 +697,13 @@ export async function POST(request: Request) {
             ? "Appointment overlaps another active appointment."
             : "Public booking service and booking snapshots cannot be changed.";
 
-    return NextResponse.json({ error: conflictMessage }, { status: 409 });
+    return NextResponse.json(
+      {
+        error: conflictMessage,
+        ...(result.record ? { record: result.record } : {}),
+      },
+      { status: 409 },
+    );
   }
 
   const responseResult = result.ok && persistPayload.type === "appointment"

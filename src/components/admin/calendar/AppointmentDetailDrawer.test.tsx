@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Appointment, ClientRecord } from "@/admin/domain";
 
@@ -59,6 +59,8 @@ function renderDrawer(overrides: Partial<Parameters<typeof AppointmentDetailDraw
 }
 
 describe("AppointmentDetailDrawer", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("saves a visit-specific comment without replacing the appointment note", async () => {
     const user = userEvent.setup();
     const { onSaveAppointment } = renderDrawer();
@@ -128,7 +130,142 @@ describe("AppointmentDetailDrawer", () => {
     expect(within(dialog).queryByRole("link", { name: "Открыть клиента" })).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Все сертификаты клиента")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Редактировать" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Отменить" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Отменить запись" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Удалить запись" })).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Комментарий после визита")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Email-уведомления")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("form", { name: /Исправление email/ })).not.toBeInTheDocument();
   });
+
+  it("separates cancellation from permanent deletion for an owner", async () => {
+    const user = userEvent.setup();
+    const onCancelAppointment = vi.fn();
+    const onDeleteAppointment = vi.fn();
+    renderDrawer({ onCancelAppointment, onDeleteAppointment });
+    const dialog = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+
+    await user.click(within(dialog).getByRole("button", { name: "Отменить запись" }));
+    expect(onCancelAppointment).toHaveBeenCalledWith(completedAppointment);
+
+    expect(within(dialog).getByRole("heading", { name: "Опасная зона" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Удалить запись" }));
+    expect(onDeleteAppointment).toHaveBeenCalledWith(completedAppointment);
+  });
+
+  it("shows the public booking snapshot before the CRM profile contact", () => {
+    renderDrawer({
+      appointment: {
+        ...completedAppointment,
+        id: undefined,
+        origin: "public",
+        publicEmail: "snapshot@example.com",
+        publicPhone: "+359899000111",
+      },
+      appointmentClient: {
+        ...restrictedClient,
+        email: "profile@example.com",
+        phone: "+359899000222",
+      },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+
+    expect(within(dialog).getByText("Email online-записи")).toBeVisible();
+    expect(within(dialog).getByText("snapshot@example.com")).toBeVisible();
+    expect(within(dialog).getByText("+359899000111")).toBeVisible();
+    expect(within(dialog).queryByText("profile@example.com")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("+359899000222")).not.toBeInTheDocument();
+  });
+
+  it("does not relabel the CRM profile email as an online-booking snapshot when the snapshot is empty", () => {
+    renderDrawer({
+      appointment: {
+        ...completedAppointment,
+        id: undefined,
+        origin: "public",
+        publicEmail: "",
+      },
+      appointmentClient: {
+        ...restrictedClient,
+        email: "profile@example.com",
+      },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+
+    expect(within(dialog).queryByText("Email online-записи")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("profile@example.com")).not.toBeInTheDocument();
+  });
+
+  it("shows the CRM profile contact first for an admin-origin appointment", () => {
+    renderDrawer({
+      appointment: {
+        ...completedAppointment,
+        id: undefined,
+        origin: "admin",
+        publicEmail: "stale-snapshot@example.com",
+        publicPhone: "+359899000111",
+      },
+      appointmentClient: {
+        ...restrictedClient,
+        email: "profile@example.com",
+        phone: "+359899000222",
+      },
+      role: "administrator",
+    });
+    const dialog = screen.getByRole("dialog", { name: "Детали выбранной записи" });
+
+    expect(within(dialog).getByText("Email клиента")).toBeVisible();
+    expect(within(dialog).getByText("profile@example.com")).toBeVisible();
+    expect(within(dialog).getByText("+359899000222")).toBeVisible();
+    expect(within(dialog).queryByText("stale-snapshot@example.com")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("+359899000111")).not.toBeInTheDocument();
+  });
+
+  it.each(["owner", "administrator"] as const)(
+    "lets an %s correct a suppressed public appointment email and updates the data owner",
+    async (role) => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          notifications: [{
+            canClearSuppression: true,
+            canRetry: false,
+            eventType: "booking_confirmed",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            recipientMasked: "w***@example.com",
+            status: "suppressed",
+            updatedAt: "2026-07-19T10:00:00.000Z",
+          }],
+        }), { headers: { "Content-Type": "application/json" }, status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ notifications: [] }), {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        }));
+      vi.stubGlobal("fetch", fetchMock);
+      const onPublicEmailCorrected = vi.fn();
+      const user = userEvent.setup();
+
+      renderDrawer({
+        appointment: {
+          ...completedAppointment,
+          origin: "public",
+          publicEmail: "wrong@example.com",
+        },
+        onPublicEmailCorrected,
+        role,
+      });
+
+      const field = await screen.findByLabelText("Новый email для online-записи");
+      await user.type(field, "corrected@example.com");
+      await user.click(screen.getByRole("button", { name: "Сохранить адрес и отправить снова" }));
+
+      await waitFor(() => expect(onPublicEmailCorrected).toHaveBeenCalledWith(
+        "appointment-anna",
+        "corrected@example.com",
+      ));
+      expect(screen.getByText("corrected@example.com")).toBeVisible();
+    },
+  );
 });

@@ -76,6 +76,7 @@ export type BookingConfirmation = {
 export type BookingContactPreference = "phone" | "viber" | "telegram" | "email";
 
 export type BookingContact = {
+  careEmailOptIn: boolean;
   contactPreference: BookingContactPreference;
   email: string;
   name: string;

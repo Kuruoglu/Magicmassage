@@ -5,12 +5,13 @@ import { externalBookingLinkProps } from "@/config/booking";
 import type { HomeContent } from "@/content/home";
 import type { ServiceContent } from "@/content/public-pages";
 import type { Locale } from "@/i18n/config";
-import type { PublicMediaPlacement } from "@/lib/public-content/types";
+import type { PublicBusinessDetails, PublicMediaPlacement } from "@/lib/public-content/types";
 import { resolvePublicMediaPlacement } from "@/lib/media-placement";
 import { getPublicBookingPath } from "@/navigation/public-routes";
 import { createLocalBusinessJsonLd } from "@/seo/local-business-json-ld";
 
 type HomePageViewProps = {
+  businessDetails?: PublicBusinessDetails;
   locale: Locale;
   content: HomeContent;
   services?: ServiceContent[];
@@ -50,6 +51,7 @@ function TrustIcon({ type }: { type: HomeContent["trust"][number]["icon"] }) {
 }
 
 export function HomePageView({
+  businessDetails,
   locale,
   content,
   mediaPlacements,
@@ -57,7 +59,7 @@ export function HomePageView({
   services = content.services.items,
 }: HomePageViewProps) {
   const base = `/${locale}`;
-  const localBusinessJsonLd = createLocalBusinessJsonLd(locale, content);
+  const localBusinessJsonLd = createLocalBusinessJsonLd(locale, content, businessDetails);
   const heroMedia = resolvePublicMediaPlacement(mediaPlacements, "home.hero", locale);
   const practitionerMedia = resolvePublicMediaPlacement(mediaPlacements, "home.practitioner", locale);
   const aboutPrimaryMedia = resolvePublicMediaPlacement(mediaPlacements, "home.about.primary", locale);

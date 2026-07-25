@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     throw new Error("NEXT_NOT_FOUND");
   }),
   shellRuntime: {
+    blogEnabled: true,
     giftCertificatesEnabled: true,
     mediaPlacements: [],
     publicBookingEnabled: true,

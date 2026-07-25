@@ -1,85 +1,35 @@
 import type Stripe from "stripe";
 
 import { calculateGiftCertificateTotal } from "@/content/gift-certificates";
-import { decodeGiftOrderMetadata, toFulfillmentOrder } from "./metadata";
-import type { GiftCertificateEmailResult } from "./email";
-import {
-  sendGiftCertificateBuyerEmail,
-  sendGiftCertificateRecipientEmail,
-} from "./email";
-import {
-  generateGiftCertificatePdf,
-  type GiftCertificatePdf,
-} from "./pdf";
-import type { GiftCertificatePaymentMetadataOrder } from "./types";
+import { decodeGiftOrderReferenceMetadata } from "./metadata";
+import type { GiftCertificateOrderStore } from "./order-store";
 
 type WebhookStripe = {
   webhooks: {
     constructEvent: (rawBody: string, signature: string, secret: string) => Stripe.Event;
   };
   paymentIntents: {
-    retrieve: (id: string) => Promise<{
-      id: string;
-      amount?: number;
-      currency?: string;
-      livemode?: boolean;
-      metadata: Record<string, string | undefined>;
-    }>;
-    update: (
-      id: string,
-      params: { metadata: Record<string, string | null> },
-    ) => Promise<unknown>;
+    retrieve: (id: string) => Promise<GiftCertificatePaymentIntentForFulfillment>;
   };
 };
 
-type HandleGiftCertificateWebhookInput = {
-  claimFulfillment?: (
-    paymentIntentId: string,
-    order: ReturnType<typeof toFulfillmentOrder>,
-    certificateCode: string,
-    amountEurCents: number,
-  ) => Promise<boolean>;
-  expectedLivemode?: boolean;
-  rawBody: string;
-  signature: string | null;
-  webhookSecret: string;
-  stripe: WebhookStripe;
-  fulfill?: (input: {
-    certificateCode: string;
-    order: ReturnType<typeof toFulfillmentOrder>;
-    paymentIntentId: string;
-  }) => Promise<GiftCertificateEmailResult>;
-  generatePdf?: (input: {
-    certificateCode: string;
-    order: ReturnType<typeof toFulfillmentOrder>;
-  }) => Promise<GiftCertificatePdf>;
-  sendBuyerEmail?: (input: {
-    certificateCode: string;
-    order: ReturnType<typeof toFulfillmentOrder>;
-    pdf: GiftCertificatePdf;
-  }) => Promise<string>;
-  sendRecipientEmail?: (input: {
-    certificateCode: string;
-    order: ReturnType<typeof toFulfillmentOrder>;
-    pdf: GiftCertificatePdf;
-  }) => Promise<string | null>;
-  now?: Date;
+export type GiftCertificatePaymentIntentForFulfillment = {
+  amount?: number;
+  currency?: string;
+  id: string;
+  livemode?: boolean;
+  metadata: Record<string, string | undefined>;
+  status: string;
 };
 
-const claimedPaymentIntents = new Set<string>();
-
-export function clearGiftCertificateWebhookLocksForTests() {
-  claimedPaymentIntents.clear();
-}
-
-async function claimInMemoryFulfillment(paymentIntentId: string) {
-  if (claimedPaymentIntents.has(paymentIntentId)) {
-    return false;
-  }
-
-  claimedPaymentIntents.add(paymentIntentId);
-  return true;
-}
+type HandleGiftCertificateWebhookInput = {
+  expectedLivemode?: boolean;
+  orderStore?: GiftCertificateOrderStore;
+  rawBody: string;
+  signature: string | null;
+  stripe: WebhookStripe;
+  webhookSecret: string;
+};
 
 function getPaymentIntentId(event: Stripe.Event): string | undefined {
   const object = event.data.object as { id?: string; object?: string };
@@ -87,33 +37,73 @@ function getPaymentIntentId(event: Stripe.Event): string | undefined {
   return object.object === "payment_intent" ? object.id : undefined;
 }
 
-function verifyPaymentIntentMatchesOrder(
-  paymentIntent: { amount?: number; currency?: string },
-  order: GiftCertificatePaymentMetadataOrder,
-) {
-  const total = calculateGiftCertificateTotal(order);
+export async function finalizePersistedGiftCertificatePayment({
+  actorUserId,
+  expectedLivemode,
+  orderStore,
+  paymentIntent,
+}: {
+  actorUserId?: string;
+  expectedLivemode?: boolean;
+  orderStore: GiftCertificateOrderStore;
+  paymentIntent: GiftCertificatePaymentIntentForFulfillment;
+}) {
+  if (paymentIntent.status !== "succeeded") {
+    throw new Error("Gift certificate payment is not successful.");
+  }
 
-  if (paymentIntent.amount !== undefined && paymentIntent.amount !== total.totalEurCents) {
+  if (expectedLivemode !== undefined && paymentIntent.livemode !== expectedLivemode) {
+    throw new Error("Stripe livemode does not match environment.");
+  }
+
+  const reference = decodeGiftOrderReferenceMetadata(paymentIntent.metadata);
+
+  if (!reference) {
+    throw new Error("Missing gift certificate order reference.");
+  }
+
+  if (paymentIntent.amount !== reference.totalEurCents) {
     throw new Error("Payment amount does not match gift certificate order.");
   }
 
-  if (paymentIntent.currency !== undefined && paymentIntent.currency.toLowerCase() !== "eur") {
+  if (paymentIntent.currency?.toLowerCase() !== "eur") {
     throw new Error("Payment currency does not match gift certificate order.");
   }
+
+  const order = await orderStore.loadOrder(reference.orderId);
+  const calculatedTotal = calculateGiftCertificateTotal(order).totalEurCents;
+
+  if (
+    order.id !== reference.orderId ||
+    order.certificateCode !== reference.certificateCode ||
+    order.locale !== reference.locale ||
+    order.totalEurCents !== reference.totalEurCents ||
+    calculatedTotal !== reference.totalEurCents ||
+    (order.paymentIntentId !== undefined && order.paymentIntentId !== paymentIntent.id)
+  ) {
+    throw new Error("Persisted gift certificate order does not match payment metadata.");
+  }
+
+  const input = {
+    certificateCode: reference.certificateCode,
+    locale: reference.locale,
+    orderId: reference.orderId,
+    paymentIntentId: paymentIntent.id,
+    totalEurCents: reference.totalEurCents,
+  };
+
+  return actorUserId
+    ? orderStore.reconcilePaidAndEnqueue({ ...input, actorUserId })
+    : orderStore.markPaidAndEnqueue(input);
 }
 
 export async function handleGiftCertificateWebhook({
-  claimFulfillment = claimInMemoryFulfillment,
   expectedLivemode,
+  orderStore,
   rawBody,
   signature,
-  webhookSecret,
   stripe,
-  fulfill,
-  generatePdf = generateGiftCertificatePdf,
-  sendBuyerEmail = sendGiftCertificateBuyerEmail,
-  sendRecipientEmail = sendGiftCertificateRecipientEmail,
-  now = new Date(),
+  webhookSecret,
 }: HandleGiftCertificateWebhookInput) {
   if (!signature) {
     throw new Error("Missing Stripe signature.");
@@ -131,108 +121,16 @@ export async function handleGiftCertificateWebhook({
     throw new Error("Missing PaymentIntent id.");
   }
 
+  if (!orderStore) {
+    throw new Error("Gift certificate order persistence is not configured.");
+  }
+
   const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const newlyPaid = await finalizePersistedGiftCertificatePayment({
+    expectedLivemode,
+    orderStore,
+    paymentIntent,
+  });
 
-  if (expectedLivemode !== undefined && paymentIntent.livemode !== expectedLivemode) {
-    throw new Error("Stripe livemode does not match environment.");
-  }
-
-  if (paymentIntent.metadata.gift_fulfilled_at) {
-    return { received: true, fulfilled: false };
-  }
-
-  const certificateCode = paymentIntent.metadata.gift_certificate_code;
-  const metadataOrder = decodeGiftOrderMetadata(paymentIntent.metadata);
-
-  if (!certificateCode || !metadataOrder) {
-    throw new Error("Missing gift certificate metadata.");
-  }
-
-  verifyPaymentIntentMatchesOrder(paymentIntent, metadataOrder);
-
-  const order = toFulfillmentOrder(metadataOrder);
-
-  if (!(await claimFulfillment(paymentIntentId, order, certificateCode, metadataOrder.totalEurCents))) {
-    return { received: true, fulfilled: false };
-  }
-
-  try {
-    if (fulfill) {
-      const emailResult = await fulfill({
-        certificateCode,
-        order,
-        paymentIntentId,
-      });
-
-      await stripe.paymentIntents.update(paymentIntentId, {
-        metadata: {
-          gift_fulfilled_at: now.toISOString(),
-          gift_fulfillment_status: "succeeded",
-          gift_buyer_email_id: emailResult.buyerEmailId,
-          gift_recipient_email_id: emailResult.recipientEmailId,
-        },
-      });
-
-      return { received: true, fulfilled: true };
-    }
-
-    const pdf = await generatePdf({ certificateCode, order });
-    const existingBuyerEmailId = paymentIntent.metadata.gift_buyer_email_id;
-    const buyerEmailId =
-      existingBuyerEmailId ??
-      (await sendBuyerEmail({
-        certificateCode,
-        order,
-        pdf,
-      }));
-
-    if (!existingBuyerEmailId) {
-      await stripe.paymentIntents.update(paymentIntentId, {
-        metadata: {
-          gift_buyer_email_id: buyerEmailId,
-        },
-      });
-    }
-
-    const needsRecipientEmail = order.deliveryMode === "recipient_email" && order.recipientEmail;
-    const existingRecipientEmailId = paymentIntent.metadata.gift_recipient_email_id;
-    const recipientEmailId =
-      existingRecipientEmailId ??
-      (needsRecipientEmail
-        ? await sendRecipientEmail({
-            certificateCode,
-            order,
-            pdf,
-          })
-        : null);
-
-    if (needsRecipientEmail && !existingRecipientEmailId) {
-      await stripe.paymentIntents.update(paymentIntentId, {
-        metadata: {
-          gift_recipient_email_id: recipientEmailId,
-        },
-      });
-    }
-
-    await stripe.paymentIntents.update(paymentIntentId, {
-      metadata: {
-        gift_fulfilled_at: now.toISOString(),
-        gift_fulfillment_status: "succeeded",
-        gift_buyer_email_id: buyerEmailId,
-        gift_recipient_email_id: recipientEmailId,
-      },
-    });
-
-    return { received: true, fulfilled: true };
-  } catch (error) {
-    await stripe.paymentIntents.update(paymentIntentId, {
-      metadata: {
-        gift_fulfillment_failed_at: now.toISOString(),
-        gift_fulfillment_status: "failed",
-        gift_fulfillment_error: error instanceof Error ? error.message.slice(0, 200) : "Unknown fulfillment error",
-      },
-    });
-
-    throw error;
-  }
+  return { received: true, fulfilled: newlyPaid };
 }

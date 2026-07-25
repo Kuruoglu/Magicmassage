@@ -17,6 +17,7 @@ describe("BlogPostLayout", () => {
   beforeEach(() => {
     localStorage.clear();
     getPublicShellRuntimeMock.mockResolvedValue({
+      blogEnabled: true,
       giftCertificatesEnabled: true,
       mediaPlacements: [],
       services: [],
@@ -43,5 +44,19 @@ describe("BlogPostLayout", () => {
     expect(screen.getByText("Article detail")).toBeInTheDocument();
     expect(screen.getByLabelText("Cookie consent")).toBeInTheDocument();
     expect(screen.getByTestId("site-footer-inner")).toBeInTheDocument();
+  });
+
+  it("fails closed when blog visibility is disabled", async () => {
+    getPublicShellRuntimeMock.mockResolvedValue({
+      blogEnabled: false,
+      giftCertificatesEnabled: true,
+      mediaPlacements: [],
+      services: [],
+    });
+
+    await expect(BlogPostLayout({
+      children: <main>Hidden article</main>,
+      params: Promise.resolve({ locale: "ru", slug: "massage-preparation" }),
+    })).rejects.toThrow();
   });
 });

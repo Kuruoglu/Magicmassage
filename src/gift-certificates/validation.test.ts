@@ -100,8 +100,12 @@ describe("gift certificate payload validation", () => {
     const result = validateGiftCertificateOrderPayload({
       ...validSelfPayload,
       purchaserName: "A".repeat(81),
+      purchaserEmail: `${"a".repeat(243)}@example.com`,
+      recipientEmail: `${"b".repeat(243)}@example.com`,
       recipientName: "B".repeat(81),
       recipientMessage: "C".repeat(181),
+      deliveryMode: "recipient_email",
+      purchaseMode: "gift",
       serviceItems: Array.from({ length: 7 }, () => ({
         serviceSlug: "classic-massage",
         sessions: 1,
@@ -112,6 +116,8 @@ describe("gift certificate payload validation", () => {
     expect(!result.success && result.errors).toEqual(
       expect.arrayContaining([
         "Purchaser name must be 80 characters or fewer.",
+        "Purchaser email must be 254 characters or fewer.",
+        "Recipient email must be 254 characters or fewer.",
         "Recipient name must be 80 characters or fewer.",
         "Recipient message must be 180 characters or fewer.",
         "Choose no more than 6 massage lines.",

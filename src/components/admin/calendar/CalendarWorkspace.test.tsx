@@ -139,6 +139,7 @@ function renderCalendar({
   onCreateWalkIn = vi.fn(),
   onSaveAppointment = vi.fn(async () => ({ ok: true }) as CalendarAppointmentSaveResult),
   onSaveSpecialistSchedule,
+  onSelectTimeRange = vi.fn(),
   query = "",
   role = "owner",
   scheduleSettings = siteSettings,
@@ -152,23 +153,16 @@ function renderCalendar({
   onDeleteCalendarBlock?: (block: CalendarBlock) => void;
   onEditCalendarBlock?: (block: CalendarBlock) => void;
   onCreateWalkIn?: () => void;
-  onSaveAppointment?: (
-    appointment: Appointment,
-    action?: Parameters<typeof CalendarWorkspace>[0]["onSaveAppointment"] extends (
-      appointment: Appointment,
-      action?: infer T,
-    ) => unknown
-      ? T
-      : never,
-  ) => Promise<CalendarAppointmentSaveResult>;
+  onSaveAppointment?: Parameters<typeof CalendarWorkspace>[0]["onSaveAppointment"];
   onSaveSpecialistSchedule?: Parameters<typeof CalendarWorkspace>[0]["onSaveSpecialistSchedule"];
+  onSelectTimeRange?: Parameters<typeof CalendarWorkspace>[0]["onSelectTimeRange"];
   role?: AdminRoleId;
   query?: string;
   scheduleSettings?: typeof siteSettings;
   specialistRecords?: SpecialistRecord[];
   currentSpecialistId?: string;
 } = {}) {
-  render(
+  const view = render(
     <CalendarWorkspace
       appointments={calendarAppointments}
       bookingBufferMinutes={30}
@@ -186,6 +180,7 @@ function renderCalendar({
       onEditCalendarBlock={onEditCalendarBlock}
       onSaveAppointment={onSaveAppointment}
       onSaveSpecialistSchedule={onSaveSpecialistSchedule}
+      onSelectTimeRange={onSelectTimeRange}
       query={query}
       role={role}
       selectedCalendarDate="2026-07-06"
@@ -194,7 +189,7 @@ function renderCalendar({
     />,
   );
 
-  return { onSaveAppointment };
+  return { ...view, onSaveAppointment, onSelectTimeRange };
 }
 
 function createDataTransfer() {
@@ -210,7 +205,26 @@ function createDataTransfer() {
   } as unknown as DataTransfer;
 }
 
+async function confirmCalendarChange({ notifyClient = true } = {}) {
+  const user = userEvent.setup();
+  const change = screen.getByRole("region", { name: /(?:Подтвердите изменение|Изменение пересекается)/ });
+  const notify = within(change).getByRole("checkbox", {
+    name: "Уведомить клиента об изменении",
+  }) as HTMLInputElement;
+
+  if (!notifyClient && notify.checked) await user.click(notify);
+  await user.click(within(change).getByRole("button", { name: /^Сохранить/ }));
+}
+
 describe("CalendarWorkspace", () => {
+  it("renders the day calendar without instruction and summary blocks", () => {
+    renderCalendar();
+
+    expect(screen.queryByText(/На телефоне коснитесь свободного времени/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Сводка дня/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Расписание 6 июля")).toBeInTheDocument();
+  });
+
   it("lets an owner filter the calendar by specialist", async () => {
     const user = userEvent.setup();
     const yanaAppointment: Appointment = {
@@ -224,6 +238,10 @@ describe("CalendarWorkspace", () => {
       specialistRecords: specialists,
     });
 
+    expect(screen.getByLabelText("Показать календарь специалиста")).toHaveClass(
+      "admin-calendar-control",
+      "admin-calendar-specialist-select",
+    );
     expect(screen.getByText("Анна Петрова")).toBeVisible();
     expect(screen.getByText("Мария Иванова")).toBeVisible();
     await user.selectOptions(screen.getByLabelText("Показать календарь специалиста"), "specialist-yana");
@@ -276,9 +294,61 @@ describe("CalendarWorkspace", () => {
   it("jumps to an exact date from the toolbar date picker", async () => {
     renderCalendar({ calendarAppointments: [] });
 
+    expect(screen.getByLabelText("Выбрать дату")).toHaveClass("admin-calendar-control", "admin-calendar-date-input");
     fireEvent.change(screen.getByLabelText("Выбрать дату"), { target: { value: "2026-07-12" } });
 
     expect(screen.getByRole("heading", { name: "12 июля" })).toBeVisible();
+  });
+
+  it("opens on today's Europe/Sofia date when no date was requested", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-18T22:30:00.000Z"));
+
+    try {
+      const { unmount } = render(
+        <CalendarWorkspace
+          appointments={appointments}
+          bookingBufferMinutes={30}
+          canManageBlocks
+          clients={clients}
+          dailySlotCapacity={4}
+          onCancelAppointment={vi.fn()}
+          onCalendarDateChange={vi.fn()}
+          onEditAppointment={vi.fn()}
+          onSaveAppointment={vi.fn(async () => ({ ok: true as const }))}
+          query=""
+          role="owner"
+          siteSettings={siteSettings}
+        />,
+      );
+
+      expect(screen.getByLabelText("Выбрать дату")).toHaveValue("2026-07-19");
+      expect(screen.getByRole("heading", { name: "19 июля" })).toBeVisible();
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hides cancelled appointments from calendar grids but keeps them in the list history", async () => {
+    const user = userEvent.setup();
+    const cancelledAppointment: Appointment = {
+      ...appointments[0],
+      status: "Отменена",
+    };
+    renderCalendar({ calendarAppointments: [cancelledAppointment] });
+
+    expect(screen.queryByRole("button", { name: /Анна Петрова/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Неделя" }));
+    expect(screen.queryByRole("button", { name: /Анна Петрова/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    expect(screen.getByRole("button", { name: /^6 июля, 0 записей/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Список" }));
+    const listItem = screen.getByRole("button", { name: /Анна Петрова/ });
+    expect(within(listItem).getByText("Отменена")).toBeInTheDocument();
   });
 
   it("renders a scrollable full-day grid with visible 30-minute rails", () => {
@@ -308,6 +378,36 @@ describe("CalendarWorkspace", () => {
     expect(within(grid as HTMLElement).getByText("24:00")).toBeInTheDocument();
   });
 
+  it("forwards a selected grid interval with the active specialist", () => {
+    const onSelectTimeRange = vi.fn();
+    const { container } = renderCalendar({ onSelectTimeRange, specialistRecords: specialists });
+    const specialistSelect = container.querySelector("select.admin-calendar-specialist-select") as HTMLSelectElement;
+    fireEvent.change(specialistSelect, { target: { value: "specialist-natali" } });
+
+    const timeColumn = container.querySelector(".admin-calendar-time-column") as HTMLElement;
+    vi.spyOn(timeColumn, "getBoundingClientRect").mockReturnValue({
+      bottom: 1728,
+      height: 1728,
+      left: 0,
+      right: 300,
+      toJSON: () => ({}),
+      top: 0,
+      width: 300,
+      x: 0,
+      y: 0,
+    });
+    fireEvent.pointerDown(timeColumn, { button: 0, clientY: 1008, pointerId: 1, pointerType: "mouse" });
+    fireEvent.pointerUp(timeColumn, { button: 0, clientY: 1080, pointerId: 1, pointerType: "mouse" });
+
+    expect(onSelectTimeRange).toHaveBeenCalledWith({
+      date: "2026-07-06",
+      durationMinutes: 60,
+      endsAt: "15:00",
+      specialistId: "specialist-natali",
+      startsAt: "14:00",
+    });
+  });
+
   it("clamps a late drop by the appointment duration", async () => {
     const { onSaveAppointment } = renderCalendar({ calendarAppointments: [appointments[0]] });
     const appointmentBlock = screen.getByText(appointments[0].client).closest(".admin-timed-appointment") as HTMLElement;
@@ -334,11 +434,14 @@ describe("CalendarWorkspace", () => {
     });
     fireEvent(timeColumn, dropEvent);
 
+    await confirmCalendarChange();
+
     await waitFor(() =>
       expect(onSaveAppointment).toHaveBeenCalledWith(
         expect.objectContaining({ id: "appointment-anna", time: "23:00" }),
         "appointment.drag",
         expect.objectContaining({ id: "appointment-anna", time: "10:00" }),
+        { notifyClient: true },
       ),
     );
   });
@@ -417,11 +520,14 @@ describe("CalendarWorkspace", () => {
     });
     fireEvent(timeColumn, dropEvent);
 
+    await confirmCalendarChange({ notifyClient: false });
+
     await waitFor(() =>
       expect(onSaveAppointment).toHaveBeenCalledWith(
         expect.objectContaining({ id: sourceAppointment.id, time: "09:30" }),
         "appointment.drag",
         expect.objectContaining({ id: sourceAppointment.id, time: "09:00" }),
+        { notifyClient: false },
       ),
     );
     expect(sourceBlock).not.toHaveClass("is-dragging");
@@ -568,15 +674,18 @@ describe("CalendarWorkspace", () => {
     });
   });
 
-  it("keeps capacity totals based on all appointments while search filters the display", () => {
+  it("keeps capacity totals based on all appointments while search filters the display", async () => {
+    const user = userEvent.setup();
     renderCalendar({ query: "Анна" });
 
-    expect(screen.getByText("2 свободных слота")).toBeInTheDocument();
     expect(screen.getByText("Анна Петрова")).toBeInTheDocument();
     expect(screen.queryByText("Мария Иванова")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    expect(screen.getByRole("button", { name: /^6 июля, 1 запись, 2 свободных слота$/ })).toBeInTheDocument();
   });
 
-  it("counts only specialists who work on the selected day in day and month capacity", async () => {
+  it("counts only specialists who work on the selected day in month capacity", async () => {
     const user = userEvent.setup();
     renderCalendar({
       calendarAppointments: [],
@@ -591,21 +700,22 @@ describe("CalendarWorkspace", () => {
       ],
     });
 
-    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
-    expect(screen.queryByText("8 свободных слотов")).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "Месяц" }));
-    expect(screen.getByRole("button", { name: /6 июля, 0 записей, 4 свободных слота/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^6 июля, 0 записей, 4 свободных слота$/ })).toBeInTheDocument();
   });
 
-  it("keeps another working specialist available when one calendar is blocked all day", () => {
+  it("keeps another working specialist available when one calendar is blocked all day", async () => {
+    const user = userEvent.setup();
     renderCalendar({
       calendarAppointments: [],
       calendarBlocks: [fullDayCalendarBlock],
       specialistRecords: specialists,
     });
 
-    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    expect(screen.getByRole("button", {
+      name: /^6 июля, 0 записей, Ограничено: 1 блокировка, 4 по дневному лимиту, блокировок: 1$/,
+    })).toBeInTheDocument();
   });
 
   it("does not let public-disabled appointments consume or close another specialist capacity", async () => {
@@ -625,18 +735,18 @@ describe("CalendarWorkspace", () => {
       ],
     });
 
-    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
-    expect(screen.queryByText("8 свободных слотов")).not.toBeInTheDocument();
     expect(screen.queryByText(/Онлайн-запись на этот день закрыта/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Месяц" }));
     expect(screen.getByRole("button", { name: /6 июля, 5 записей, 4 свободных слота/ })).toBeInTheDocument();
   });
 
-  it("uses the compatibility schedule only when no specialist records exist", () => {
+  it("uses the compatibility schedule only when no specialist records exist", async () => {
+    const user = userEvent.setup();
     renderCalendar({ calendarAppointments: [], specialistRecords: [] });
 
-    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Месяц" }));
+    expect(screen.getByRole("button", { name: /^6 июля, 0 записей, 4 свободных слота$/ })).toBeInTheDocument();
   });
 
   it("applies daily limits per specialist before aggregating all-specialist availability", async () => {
@@ -651,7 +761,6 @@ describe("CalendarWorkspace", () => {
       specialistRecords: specialists,
     });
 
-    expect(screen.getByText("4 свободных слота")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("1 запись добавлена вручную");
     expect(screen.getByRole("status")).toHaveTextContent("Онлайн доступно: 4 свободных слота");
 
@@ -752,6 +861,7 @@ describe("CalendarWorkspace", () => {
         }),
         "appointment.resize",
         expect.objectContaining({ durationMinutes: 60, id: "appointment-anna" }),
+        { notifyClient: true },
       ),
     );
   });
@@ -812,10 +922,13 @@ describe("CalendarWorkspace", () => {
     fireEvent(annaBlock, suppressedDragStart);
     expect(suppressedDragStart.defaultPrevented).toBe(true);
 
+    await confirmCalendarChange();
+
     expect(onSaveAppointment).toHaveBeenCalledWith(
       expect.objectContaining({ durationMinutes: 75, id: "appointment-anna" }),
       "appointment.resize",
       expect.objectContaining({ durationMinutes: 60, id: "appointment-anna" }),
+      { notifyClient: true },
     );
     expect(onSaveAppointment).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("status")).toHaveTextContent("Сохраняем изменение записи");
@@ -844,32 +957,63 @@ describe("CalendarWorkspace", () => {
     expect(onSaveAppointment).not.toHaveBeenCalled();
   });
 
-  it("keeps each appointment pending until its own save completes", async () => {
-    const resolvers: Array<(result: CalendarAppointmentSaveResult) => void> = [];
+  it("uses the immutable public email snapshot for change notifications", async () => {
+    const publicAppointment = {
+      ...appointments[0],
+      origin: "public" as const,
+      publicEmail: "snapshot@example.com",
+    };
+    const { onSaveAppointment } = renderCalendar({
+      calendarAppointments: [publicAppointment],
+    });
+    const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
+
+    fireEvent.keyDown(within(annaBlock).getByRole("slider"), { key: "ArrowDown" });
+
+    const confirmation = screen.getByRole("region", {
+      name: /Подтвердите изменение/,
+    });
+    expect(
+      within(confirmation).getByText(
+        "Письмо будет отправлено на snapshot@example.com.",
+      ),
+    ).toBeVisible();
+    expect(within(confirmation).queryByText(/anna@example\.com/i)).toBeNull();
+
+    await confirmCalendarChange();
+
+    expect(onSaveAppointment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: publicAppointment.id,
+        publicEmail: "snapshot@example.com",
+      }),
+      "appointment.resize",
+      expect.objectContaining({ id: publicAppointment.id }),
+      { notifyClient: true },
+    );
+  });
+
+  it("keeps an appointment pending until its confirmed save completes", async () => {
+    let resolveSave: ((result: CalendarAppointmentSaveResult) => void) | undefined;
     const onSaveAppointment = vi.fn(
       () =>
         new Promise<CalendarAppointmentSaveResult>((resolve) => {
-          resolvers.push(resolve);
+          resolveSave = resolve;
         }),
     );
     renderCalendar({ onSaveAppointment });
     const annaBlock = screen.getByText("Анна Петрова").closest(".admin-timed-appointment") as HTMLElement;
-    const mariaBlock = screen.getByText("Мария Иванова").closest(".admin-timed-appointment") as HTMLElement;
 
     fireEvent.keyDown(within(annaBlock).getByRole("slider"), { key: "ArrowDown" });
-    fireEvent.keyDown(within(mariaBlock).getByRole("slider"), { key: "ArrowDown" });
+    expect(onSaveAppointment).not.toHaveBeenCalled();
+    await confirmCalendarChange();
 
-    expect(onSaveAppointment).toHaveBeenCalledTimes(2);
+    expect(onSaveAppointment).toHaveBeenCalledTimes(1);
     expect(annaBlock).toHaveAttribute("aria-busy", "true");
-    expect(mariaBlock).toHaveAttribute("aria-busy", "true");
-
-    resolvers[0]?.({ ok: true });
-    await waitFor(() => expect(annaBlock).not.toHaveAttribute("aria-busy"));
-    expect(mariaBlock).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("status")).toHaveTextContent("Сохраняем изменение записи");
 
-    resolvers[1]?.({ ok: true });
-    await waitFor(() => expect(mariaBlock).not.toHaveAttribute("aria-busy"));
+    resolveSave?.({ ok: true });
+    await waitFor(() => expect(annaBlock).not.toHaveAttribute("aria-busy"));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

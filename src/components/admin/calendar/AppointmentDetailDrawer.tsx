@@ -12,6 +12,7 @@ import {
   AdminDrawerHeader,
   AdminDrawerSection,
 } from "@/components/admin/drawer";
+import { EmailNotificationStatusList } from "@/components/admin/email-notifications";
 import { isPostVisitCommentAvailable } from "@/components/admin/clients/visit-comments";
 import { statusClass } from "@/components/admin/lib/formatters";
 import {
@@ -29,7 +30,9 @@ type AppointmentDetailDrawerProps = {
   appointmentClient?: ClientRecord;
   onCancelAppointment: (appointment: Appointment) => void;
   onClose: () => void;
+  onDeleteAppointment?: (appointment: Appointment) => void;
   onEditAppointment: (appointment: Appointment) => void;
+  onPublicEmailCorrected?: (appointmentId: string, email: string) => void;
   onSaveAppointment: (
     appointment: Appointment,
     action?: AdminAuditAction,
@@ -43,7 +46,9 @@ export function AppointmentDetailDrawer({
   appointmentClient,
   onCancelAppointment,
   onClose,
+  onDeleteAppointment,
   onEditAppointment,
+  onPublicEmailCorrected,
   onSaveAppointment,
   role,
 }: AppointmentDetailDrawerProps) {
@@ -51,13 +56,22 @@ export function AppointmentDetailDrawer({
   const [postVisitComment, setPostVisitComment] = useState(initialPostVisitComment);
   const [savedPostVisitComment, setSavedPostVisitComment] = useState(initialPostVisitComment);
   const [postVisitSaveState, setPostVisitSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [publicEmailSnapshot, setPublicEmailSnapshot] = useState(appointment.publicEmail?.trim() ?? "");
   const canCommentAfterVisit = role !== "specialist" && isPostVisitCommentAvailable(appointment);
   const needsCompletionWarning =
     canCommentAfterVisit && appointment.status !== "Завершена" && appointment.status !== "Не пришёл";
   const hasUnsavedChanges = postVisitComment !== savedPostVisitComment;
   const canViewContact = role === "owner" || role === "administrator";
-  const displayedPhone = canViewContact ? appointmentClient?.phone ?? appointment.publicPhone ?? "" : "";
-  const displayedEmail = canViewContact ? appointmentClient?.email ?? appointment.publicEmail ?? "" : "";
+  const displayedPhone = canViewContact
+    ? appointment.origin === "public"
+      ? appointment.publicPhone || appointmentClient?.phone || ""
+      : appointmentClient?.phone || appointment.publicPhone || ""
+    : "";
+  const displayedEmail = canViewContact
+    ? appointment.origin === "public"
+      ? publicEmailSnapshot
+      : appointmentClient?.email || publicEmailSnapshot || ""
+    : "";
   const publicContactLabel = canViewContact && appointment.publicContactPreference
     ? ({ email: "Email", phone: "Телефон", telegram: "Telegram", viber: "Viber" } as const)[appointment.publicContactPreference]
     : undefined;
@@ -111,8 +125,13 @@ export function AppointmentDetailDrawer({
                   Редактировать
                 </button>
                 {appointment.status === "Отменена" ? null : (
-                  <button className="admin-danger-button" onClick={() => onCancelAppointment(appointment)} type="button">
-                    Отменить
+                  <button
+                    className="admin-danger-button"
+                    disabled={hasUnsavedChanges}
+                    onClick={() => onCancelAppointment(appointment)}
+                    type="button"
+                  >
+                    Отменить запись
                   </button>
                 )}
               </>
@@ -157,7 +176,7 @@ export function AppointmentDetailDrawer({
             ) : null}
             {displayedEmail ? (
               <div>
-                <dt>Email клиента</dt>
+                <dt>{appointment.origin === "public" ? "Email online-записи" : "Email клиента"}</dt>
                 <dd>{displayedEmail}</dd>
               </div>
             ) : null}
@@ -185,6 +204,20 @@ export function AppointmentDetailDrawer({
             ) : null}
           </dl>
         </AdminDrawerSection>
+        {(role === "owner" || role === "administrator") && appointment.id ? (
+          <AdminDrawerSection title="Email-уведомления">
+            <EmailNotificationStatusList
+              aggregateId={appointment.id}
+              aggregateType="appointment"
+              allowRecipientCorrection={appointment.origin === "public"}
+              onRecipientCorrected={(email) => {
+                setPublicEmailSnapshot(email);
+                onPublicEmailCorrected?.(appointment.id!, email);
+              }}
+              recipientEmail={publicEmailSnapshot}
+            />
+          </AdminDrawerSection>
+        ) : null}
         <AdminDrawerSection title="После визита">
           {canCommentAfterVisit ? (
             <form
@@ -246,6 +279,25 @@ export function AppointmentDetailDrawer({
                 </Link>
               </div>
             </section>
+          </AdminDrawerSection>
+        ) : null}
+        {(role === "owner" || role === "administrator") && appointment.id && onDeleteAppointment ? (
+          <AdminDrawerSection
+            className="admin-danger-zone"
+            description="Удаляйте только ошибочные или дублирующиеся записи. Это действие нельзя отменить."
+            title="Опасная зона"
+          >
+            <button
+              className="admin-danger-button"
+              disabled={hasUnsavedChanges}
+              onClick={() => onDeleteAppointment(appointment)}
+              type="button"
+            >
+              Удалить запись
+            </button>
+            {hasUnsavedChanges ? (
+              <p className="admin-form-helper">Сначала сохраните или отмените изменения комментария.</p>
+            ) : null}
           </AdminDrawerSection>
         ) : null}
       </AdminDrawerBody>

@@ -68,6 +68,10 @@ function createDocumentDefinition(
   certificateCode: string,
   order: GiftCertificateFulfillmentOrder,
 ): TDocumentDefinitions {
+  // Resend compares the complete request body for a reused idempotency key.
+  // Pin PDF metadata to persisted order data so a worker retry produces the
+  // same attachment bytes instead of a new current-time CreationDate.
+  const metadataDate = new Date(`${order.expiresOn}T00:00:00.000Z`);
   const serviceLines = getServiceLine(order);
   const contentLines: Content[] = [
     { text: "Gift certificate", style: "eyebrow" },
@@ -108,6 +112,13 @@ function createDocumentDefinition(
   );
 
   return {
+    info: {
+      creationDate: metadataDate,
+      creator: "Magic Massage Natali",
+      modDate: metadataDate,
+      subject: `Gift certificate ${certificateCode}`,
+      title: `Gift certificate ${certificateCode}`,
+    },
     pageSize: "A4",
     pageMargins: [56, 56, 56, 56],
     defaultStyle: {

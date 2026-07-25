@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import { resolveAdminRole, type FinanceRow, type FinanceSummary } from "./config";
 import { normalizeClientPhone, parseEuroAmountToCents } from "./domain";
+import { normalizeMediaStatus } from "./media-status";
 import type {
   AdminAppointmentDatabaseRow,
   AdminBlogPostDatabaseRow,
@@ -60,6 +61,7 @@ type SupabaseQueryResult<T> = {
 };
 
 type SupabaseMutationResult = {
+  data?: unknown;
   error: SupabaseError | null;
 };
 
@@ -123,6 +125,8 @@ export type AdminFinanceExportLogInput = {
 };
 
 export type AdminRepository = {
+  deleteAppointment(id: string, expectedVersion: number, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  deleteClient(id: string, auditContext?: AdminRepositoryAuditContext): Promise<void>;
   listAppointments(specialistId?: string): Promise<Appointment[]>;
   listAdminUsers(): Promise<AdminUserRecord[]>;
   listBlogPosts(): Promise<BlogPostRecord[]>;
@@ -140,9 +144,10 @@ export type AdminRepository = {
   loadSettings(): Promise<SettingsRecord | undefined>;
   logFinanceExport(input: AdminFinanceExportLogInput): Promise<void>;
   saveAppointment(appointment: Appointment, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveBlogVisibility(enabled: boolean, auditContext?: AdminRepositoryAuditContext): Promise<void>;
   saveBlogPost(post: BlogPostRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
   saveCertificate(certificate: CertificateRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
-  saveClient(client: ClientRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
+  saveClient(client: ClientRecord, auditContext?: AdminRepositoryAuditContext): Promise<ClientRecord>;
   saveContactChannel(channel: ContactChannelRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
   saveContactSettings(settings: ContactSettingsRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
   saveMedia(media: MediaRecord, auditContext?: AdminRepositoryAuditContext): Promise<void>;
@@ -153,6 +158,9 @@ export type AdminRepository = {
 
 const clientColumns = [
   "id",
+  "care_email_consent_at",
+  "care_email_consent_source",
+  "care_email_withdrawn_at",
   "email",
   "full_name",
   "locale",
@@ -350,6 +358,7 @@ const contactSettingsColumns = [
   "phone",
   "seo_area",
   "working_hours",
+  "working_schedule",
 ].join(", ");
 
 const adminProfileColumns = [
@@ -392,12 +401,15 @@ const blogPostColumns = [
   "status",
   "tag_labels",
   "title",
+  "translation_key",
   "updated_on",
 ].join(", ");
 
 const siteSettingsColumns = [
   "id",
   "audit_log_retention_days",
+  "blog_enabled",
+  "booking_customer_emails_enabled",
   "booking_buffer_minutes",
   "booking_hold_minutes",
   "booking_horizon_days",
@@ -410,11 +422,15 @@ const siteSettingsColumns = [
   "default_locale",
   "default_seo_title",
   "email_sender",
+  "email_review_url",
+  "care_emails_enabled",
   "google_calendar_id",
   "google_calendar_mode",
   "gift_certificates_enabled",
   "public_booking_daily_limit",
   "public_booking_enabled",
+  "owner_notification_email",
+  "owner_notifications_enabled",
   "reminder_template",
   "roles_policy",
   "stripe_mode",
@@ -751,6 +767,9 @@ function mapStripeStatus(row: Pick<AdminStripeSaleDatabaseRow, "gross_cents" | "
 
 function mapClientRow(row: AdminClientDatabaseRow): ClientRecord {
   return {
+    careEmailConsentAt: row.care_email_consent_at ?? undefined,
+    careEmailConsentSource: row.care_email_consent_source ?? undefined,
+    careEmailWithdrawnAt: row.care_email_withdrawn_at ?? undefined,
     email: row.email,
     history: [],
     id: row.id,
@@ -770,6 +789,18 @@ function mapClientRow(row: AdminClientDatabaseRow): ClientRecord {
 
 function mapClientRecordToRow(client: ClientRecord): AdminClientDatabaseRow {
   return {
+    ...(client.careEmailConsentAt !== undefined ||
+    client.careEmailConsentSource !== undefined ||
+    client.careEmailWithdrawnAt !== undefined
+      ? {
+          care_email_consent_at: client.careEmailConsentAt ?? null,
+          care_email_consent_source: client.careEmailConsentSource ?? null,
+          care_email_expected_consent_at: client.careEmailExpectedConsentAt ?? null,
+          care_email_expected_consent_source: client.careEmailExpectedConsentSource ?? null,
+          care_email_expected_withdrawn_at: client.careEmailExpectedWithdrawnAt ?? null,
+          care_email_withdrawn_at: client.careEmailWithdrawnAt ?? null,
+        }
+      : {}),
     email: client.email,
     full_name: client.name,
     id: client.id,
@@ -1070,7 +1101,7 @@ function mapMediaRow(
       ? (row.publication_consent_status as MediaPublicationConsent)
       : "unknown",
     size: row.file_size_label,
-    status: mapMediaStatus(row.status),
+    status: normalizeMediaStatus(mapMediaStatus(row.status), row.alt_text),
     type: mapMediaType(row.media_type),
     uploadedAt: row.uploaded_on,
     url: row.url,
@@ -1091,7 +1122,7 @@ function mapMediaRecordToRow(media: MediaRecord): AdminMediaDatabaseRow {
     media_type: mapMediaTypeToDatabase(media.type),
     name: media.name,
     publication_consent_status: media.publicationConsent ?? "unknown",
-    status: mapMediaStatusToDatabase(media.status),
+    status: mapMediaStatusToDatabase(normalizeMediaStatus(media.status, media.altText)),
     uploaded_on: media.uploadedAt,
     url: media.url,
     usage_contexts: [...media.usage],
@@ -1132,6 +1163,7 @@ function mapContactSettingsRow(row: AdminContactSettingsDatabaseRow): ContactSet
     phone: row.phone,
     seoArea: row.seo_area,
     workingHours: row.working_hours,
+    workingSchedule: row.working_schedule.map((day) => ({ ...day })),
   };
 }
 
@@ -1146,6 +1178,7 @@ function mapContactSettingsRecordToRow(settings: ContactSettingsRecord): AdminCo
     phone: settings.phone,
     seo_area: settings.seoArea,
     working_hours: settings.workingHours,
+    working_schedule: settings.workingSchedule.map((day) => ({ ...day })),
   };
 }
 
@@ -1173,6 +1206,7 @@ function mapBlogPostRow(row: AdminBlogPostDatabaseRow): BlogPostRecord {
     status: mapBlogStatus(row.status),
     tags: [...row.tag_labels],
     title: row.title,
+    translationKey: row.translation_key,
     updatedAt: row.updated_on,
   };
 }
@@ -1261,6 +1295,7 @@ function mapBlogPostRecordToRow(post: BlogPostRecord, mediaAssetId: string | nul
     status: mapBlogStatusToDatabase(post.status),
     tag_labels: [...post.tags],
     title: post.title,
+    translation_key: post.translationKey,
     updated_on: post.updatedAt,
   };
 }
@@ -1268,6 +1303,8 @@ function mapBlogPostRecordToRow(post: BlogPostRecord, mediaAssetId: string | nul
 function mapSettingsRow(row: AdminSiteSettingsDatabaseRow): SettingsRecord {
   return {
     auditLogRetentionDays: row.audit_log_retention_days,
+    blogEnabled: row.blog_enabled ?? true,
+    bookingCustomerEmailsEnabled: row.booking_customer_emails_enabled ?? false,
     bookingBufferMinutes: row.booking_buffer_minutes,
     bookingHoldMinutes: row.booking_hold_minutes ?? 5,
     bookingHorizonDays: row.booking_horizon_days ?? 60,
@@ -1280,11 +1317,15 @@ function mapSettingsRow(row: AdminSiteSettingsDatabaseRow): SettingsRecord {
     defaultLocale: row.default_locale,
     defaultSeoTitle: row.default_seo_title,
     emailSender: row.email_sender,
+    emailReviewUrl: row.email_review_url ?? "",
+    careEmailsEnabled: row.care_emails_enabled ?? false,
     googleCalendarId: row.google_calendar_id,
     googleCalendarMode: mapCalendarSyncMode(row.google_calendar_mode),
     giftCertificatesEnabled: row.gift_certificates_enabled,
     publicBookingDailyLimit: row.public_booking_daily_limit ?? 8,
     publicBookingEnabled: row.public_booking_enabled ?? false,
+    ownerNotificationEmail: row.owner_notification_email ?? "",
+    ownerNotificationsEnabled: row.owner_notifications_enabled ?? false,
     reminderTemplate: row.reminder_template,
     rolesPolicy: row.roles_policy,
     stripeMode: mapStripeMode(row.stripe_mode),
@@ -1298,6 +1339,7 @@ function mapSettingsRow(row: AdminSiteSettingsDatabaseRow): SettingsRecord {
 function mapSettingsRecordToRow(settings: SettingsRecord): AdminSiteSettingsDatabaseRow {
   return {
     audit_log_retention_days: settings.auditLogRetentionDays,
+    booking_customer_emails_enabled: settings.bookingCustomerEmailsEnabled ?? false,
     booking_buffer_minutes: settings.bookingBufferMinutes,
     booking_hold_minutes: settings.bookingHoldMinutes ?? 5,
     booking_horizon_days: settings.bookingHorizonDays ?? 60,
@@ -1310,12 +1352,16 @@ function mapSettingsRecordToRow(settings: SettingsRecord): AdminSiteSettingsData
     default_locale: settings.defaultLocale,
     default_seo_title: settings.defaultSeoTitle,
     email_sender: settings.emailSender,
+    email_review_url: settings.emailReviewUrl ?? "",
+    care_emails_enabled: settings.careEmailsEnabled ?? false,
     google_calendar_id: settings.googleCalendarId,
     google_calendar_mode: mapCalendarSyncModeToDatabase(settings.googleCalendarMode),
     gift_certificates_enabled: settings.giftCertificatesEnabled !== false,
     id: "site",
     public_booking_daily_limit: settings.publicBookingDailyLimit ?? settings.dailySlotCapacity,
     public_booking_enabled: settings.publicBookingEnabled ?? false,
+    owner_notification_email: settings.ownerNotificationEmail ?? "",
+    owner_notifications_enabled: settings.ownerNotificationsEnabled ?? false,
     reminder_template: settings.reminderTemplate,
     roles_policy: settings.rolesPolicy,
     stripe_mode: mapStripeModeToDatabase(settings.stripeMode),
@@ -1394,12 +1440,17 @@ async function selectAllRowsById<T extends { id: string }>(
   client: AdminSupabaseClient,
   table: string,
   columns: string,
+  configure: (
+    query: AdminSupabaseSelectQuery<T>,
+  ) => AdminSupabaseSelectQuery<T> = (query) => query,
 ) {
   const rows: T[] = [];
   let lastId: string | undefined;
 
   for (;;) {
-    let query = client.from(table).select(columns) as AdminSupabaseSelectQuery<T>;
+    let query = configure(
+      client.from(table).select(columns) as AdminSupabaseSelectQuery<T>,
+    );
 
     if (lastId !== undefined) {
       query = query.gt("id", lastId);
@@ -1436,14 +1487,43 @@ async function callRpc(
   functionName: string,
   parameters: Record<string, unknown>,
 ) {
-  const { error } = await client.rpc(functionName, parameters);
+  const { data, error } = await client.rpc(functionName, parameters);
 
   if (error) {
     throw new Error(`${functionName}: ${error.message}`);
   }
+  return data;
 }
 
 export function createAdminSupabaseRepository(client: AdminSupabaseClient): AdminRepository {
+  async function deleteRecordWithAudit(
+    recordType: "appointment" | "client",
+    id: string,
+    expectedVersion: number | null,
+    auditContext?: AdminRepositoryAuditContext,
+  ) {
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_delete_record_with_audit: verified actor is required");
+    }
+
+    await callRpc(client, "admin_delete_record_with_audit", {
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_audit_metadata: verifiedAuditContext.metadata,
+      p_expected_version: expectedVersion,
+      p_record_id: id,
+      p_record_type: recordType,
+    });
+  }
+
+  async function deleteAppointment(id: string, expectedVersion: number, auditContext?: AdminRepositoryAuditContext) {
+    await deleteRecordWithAudit("appointment", id, expectedVersion, auditContext);
+  }
+
+  async function deleteClient(id: string, auditContext?: AdminRepositoryAuditContext) {
+    await deleteRecordWithAudit("client", id, null, auditContext);
+  }
+
   async function listAdminUsers() {
     const rows = await selectRows<AdminProfileDatabaseRow>(client, "admin_profiles", adminProfileColumns, (query) =>
       query.order("display_name", { ascending: true }),
@@ -1460,12 +1540,16 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function listAppointments(specialistId?: string) {
-    const rows = await selectRows<AdminAppointmentDatabaseRow>(
+    const rows = await selectAllRowsById<AdminAppointmentDatabaseRow>(
       client,
       "admin_appointments",
       specialistId ? specialistAppointmentColumns : appointmentColumns,
-      (query) =>
-      (specialistId ? query.eq("specialist_id", specialistId) : query).order("starts_on", { ascending: true }),
+      (query) => (specialistId ? query.eq("specialist_id", specialistId) : query),
+    );
+    rows.sort(
+      (left, right) =>
+        `${left.starts_on} ${left.starts_at}`.localeCompare(`${right.starts_on} ${right.starts_at}`) ||
+        left.id.localeCompare(right.id),
     );
 
     return rows.map(specialistId ? mapSpecialistAppointmentRow : mapAppointmentRow);
@@ -1638,7 +1722,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
       settings: "site.gift_certificates",
     };
 
-    await callRpc(client, "admin_save_record_with_audit", {
+    return callRpc(client, "admin_save_record_with_audit", {
       p_action: verifiedAuditContext.action ?? defaultActionByRecordType[recordType],
       p_actor_user_id: verifiedAuditContext.actorUserId,
       p_audit_metadata: verifiedAuditContext.metadata,
@@ -1648,7 +1732,34 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function saveClient(clientRecord: ClientRecord, auditContext?: AdminRepositoryAuditContext) {
-    await saveRecordWithAudit("client", mapClientRecordToRow(clientRecord), auditContext);
+    const savedConsent = await saveRecordWithAudit(
+      "client",
+      mapClientRecordToRow(clientRecord),
+      auditContext,
+    );
+    const savedClient = { ...clientRecord };
+    delete savedClient.careEmailExpectedConsentAt;
+    delete savedClient.careEmailExpectedConsentSource;
+    delete savedClient.careEmailExpectedWithdrawnAt;
+
+    if (typeof savedConsent === "object" && savedConsent !== null && !Array.isArray(savedConsent)) {
+      const consent = savedConsent as Record<string, unknown>;
+      savedClient.careEmailConsentAt =
+        typeof consent.care_email_consent_at === "string"
+          ? consent.care_email_consent_at
+          : undefined;
+      savedClient.careEmailConsentSource =
+        consent.care_email_consent_source === "admin_recorded" ||
+        consent.care_email_consent_source === "public_booking"
+          ? consent.care_email_consent_source
+          : undefined;
+      savedClient.careEmailWithdrawnAt =
+        typeof consent.care_email_withdrawn_at === "string"
+          ? consent.care_email_withdrawn_at
+          : undefined;
+    }
+
+    return savedClient;
   }
 
   async function saveAppointment(appointment: Appointment, auditContext?: AdminRepositoryAuditContext) {
@@ -1658,10 +1769,11 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
       throw new Error("admin_save_appointment_with_audit: verified actor is required");
     }
 
-    await callRpc(client, "admin_save_appointment_with_audit", {
+    await callRpc(client, "admin_save_appointment_with_audit_v2", {
       p_action: verifiedAuditContext.action ?? "appointment.update",
       p_actor_user_id: verifiedAuditContext.actorUserId,
       p_audit_metadata: verifiedAuditContext.metadata,
+      p_notify_client: verifiedAuditContext.metadata.notifyClient !== false,
       p_record: record,
     });
   }
@@ -1723,7 +1835,17 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   async function saveContactSettings(settings: ContactSettingsRecord, auditContext?: AdminRepositoryAuditContext) {
-    await saveRecordWithAudit("contactSettings", mapContactSettingsRecordToRow(settings), auditContext);
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_save_contact_settings_with_audit: verified actor is required");
+    }
+
+    await callRpc(client, "admin_save_contact_settings_with_audit", {
+      p_action: verifiedAuditContext.action ?? "record.contactSettings.upsert",
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_audit_metadata: verifiedAuditContext.metadata,
+      p_record: mapContactSettingsRecordToRow(settings),
+    });
   }
 
   async function saveBlogPost(post: BlogPostRecord, auditContext?: AdminRepositoryAuditContext) {
@@ -1759,11 +1881,24 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
           sort_order: 0,
         }
       : null;
-    await callRpc(client, "admin_save_blog_post_aggregate", {
+    await callRpc(client, "admin_save_localized_blog_post_aggregate", {
       p_actor_user_id: verifiedAuditContext.actorUserId,
       p_audit_metadata: verifiedAuditContext.metadata,
       p_placement: placement,
       p_post: postRow,
+    });
+  }
+
+  async function saveBlogVisibility(enabled: boolean, auditContext?: AdminRepositoryAuditContext) {
+    const verifiedAuditContext = auditContext ?? adminRepositoryAuditContext.getStore();
+    if (!verifiedAuditContext) {
+      throw new Error("admin_set_blog_visibility_with_audit: verified actor is required");
+    }
+
+    await callRpc(client, "admin_set_blog_visibility_with_audit", {
+      p_actor_user_id: verifiedAuditContext.actorUserId,
+      p_audit_metadata: verifiedAuditContext.metadata,
+      p_enabled: enabled,
     });
   }
 
@@ -1780,6 +1915,8 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   }
 
   return {
+    deleteAppointment,
+    deleteClient,
     listAppointments,
     listAdminUsers,
     listBlogPosts,
@@ -1797,6 +1934,7 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
     loadSettings,
     logFinanceExport,
     saveAppointment,
+    saveBlogVisibility,
     saveBlogPost,
     saveCertificate,
     saveClient,

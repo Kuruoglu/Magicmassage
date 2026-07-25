@@ -35,7 +35,8 @@ certificate purchase flow.
   is owner-configurable as 15 or 30 minutes.
 - Gift certificates and online card payments are in the current implementation
   slice. Live payments remain blocked until final prices are confirmed.
-- Booking email automation and Telegram booking notifications remain later work.
+- Transactional booking and gift-certificate email is approved and implemented
+  behind disabled-by-default settings; Telegram notifications remain later work.
 - Public locales are `bg`, `ru`, `ua`, and `en`.
 - `ua` remains the public URL segment and `UA` user-facing label; metadata maps
   it to `uk-UA`.
@@ -97,7 +98,7 @@ Out of MVP scope:
 
 - Blog.
 - Customer self-service cancellation and rescheduling links.
-- Booking emails, reminders, and Telegram notifications.
+- Telegram booking notifications and bulk marketing email.
 - Customer accounts, loyalty features, and full Telegram booking.
 
 ## Phase 1 - Scope, Content, And Design
@@ -150,6 +151,9 @@ pipeline passes, and browser smoke checks cover the critical public flows.
   content.
 - [ ] Add Gift Certificates page with embedded Stripe Payment Element,
   server-side totals, PDF/email fulfillment, and live-payment safety flags.
+- [x] Add the Resend/Supabase transactional email outbox, localized booking and
+  certificate templates, signed care-email withdrawal, delivery status, and
+  audited resend controls behind disabled-by-default settings.
 - [x] Add and test internal booking CTAs with Studio24 fallback.
 - [x] Add service, duration, date, availability, contact, hold, and confirmation steps.
 - [x] Add public daily capacity, configurable buffers, and admin personal blocks.

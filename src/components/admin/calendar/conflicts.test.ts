@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { CalendarBlock } from "@/admin/domain";
+
 import {
+  appointmentOverlapsCalendarBlock,
   appointmentsOverlap,
+  calendarBlocksOverlap,
   classifyAppointment,
   hasAppointmentOverlap,
   isOutsideWorkingHours,
@@ -12,6 +16,17 @@ const appointment = (overrides: Partial<CalendarAppointmentTime> = {}): Calendar
   date: "2026-07-14",
   duration: 60,
   start: "10:00",
+  ...overrides,
+});
+
+const block = (overrides: Partial<CalendarBlock> = {}): CalendarBlock => ({
+  blockDate: "2026-07-14",
+  endsAt: "11:30",
+  id: "block-1",
+  internalNote: "Обед",
+  kind: "personal",
+  specialistId: "specialist-natali",
+  startsAt: "11:00",
   ...overrides,
 });
 
@@ -63,6 +78,33 @@ describe("calendar scheduling classification", () => {
 
     expect(hasAppointmentOverlap(appointment({ start: "12:30" }), existing)).toBe(true);
     expect(hasAppointmentOverlap(appointment({ start: "10:30" }), existing)).toBe(false);
+  });
+
+  it("includes the appointment buffer when checking a calendar block", () => {
+    const bufferedAppointment = {
+      ...appointment({ specialistId: "specialist-natali" }),
+      buffer: 30,
+    };
+
+    expect(appointmentOverlapsCalendarBlock(bufferedAppointment, block())).toBe(true);
+    expect(appointmentOverlapsCalendarBlock(bufferedAppointment, block({ startsAt: "11:30", endsAt: "12:00" }))).toBe(false);
+  });
+
+  it("scopes appointment-block conflicts to the same date and specialist", () => {
+    const bufferedAppointment = {
+      ...appointment({ specialistId: "specialist-natali" }),
+      buffer: 30,
+    };
+
+    expect(appointmentOverlapsCalendarBlock(bufferedAppointment, block({ blockDate: "2026-07-15" }))).toBe(false);
+    expect(appointmentOverlapsCalendarBlock(bufferedAppointment, block({ specialistId: "specialist-yana" }))).toBe(false);
+  });
+
+  it("uses half-open, specialist-aware intervals for block-to-block conflicts", () => {
+    expect(calendarBlocksOverlap(block(), block({ id: "block-2", startsAt: "11:15", endsAt: "12:00" }))).toBe(true);
+    expect(calendarBlocksOverlap(block(), block({ id: "block-2", startsAt: "11:30", endsAt: "12:00" }))).toBe(false);
+    expect(calendarBlocksOverlap(block(), block({ blockDate: "2026-07-15", id: "block-2" }))).toBe(false);
+    expect(calendarBlocksOverlap(block(), block({ id: "block-2", specialistId: "specialist-yana" }))).toBe(false);
   });
 
   it("classifies appointments outside working hours without treating boundaries as outside", () => {

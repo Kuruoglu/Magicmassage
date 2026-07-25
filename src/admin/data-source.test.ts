@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { cloneBusinessHoursSchedule } from "@/lib/business-hours";
 
 import type { FinanceRow } from "./config";
 import type {
@@ -23,6 +24,8 @@ const emptyRecords: AdminDomainRecords = {
 
 function createRepositoryStub(overrides: Partial<AdminRepository>): AdminRepository {
   return {
+    deleteAppointment: async () => {},
+    deleteClient: async () => {},
     listAppointments: async () => [],
     listAdminUsers: async () => [],
     listCalendarBlocks: async () => [],
@@ -41,8 +44,9 @@ function createRepositoryStub(overrides: Partial<AdminRepository>): AdminReposit
     logFinanceExport: async () => {},
     saveAppointment: async () => {},
     saveBlogPost: async () => {},
+    saveBlogVisibility: async () => {},
     saveCertificate: async () => {},
-    saveClient: async () => {},
+    saveClient: async (client) => client,
     saveContactChannel: async () => {},
     saveContactSettings: async () => {},
     saveMedia: async () => {},
@@ -92,6 +96,7 @@ describe("admin data source", () => {
         status: "Запланирована",
         tags: ["supabase", "blog"],
         title: "Supabase Blog",
+        translationKey: "blog-supabase",
         updatedAt: "2026-07-09",
       },
     ];
@@ -156,6 +161,7 @@ describe("admin data source", () => {
       phone: "+359 88 000 1122",
       seoArea: "Burgas",
       workingHours: "Пн-Сб 10:00-19:00",
+      workingSchedule: cloneBusinessHoursSchedule(),
     };
     const settings: SettingsRecord = {
       auditLogRetentionDays: 540,
@@ -247,6 +253,7 @@ describe("admin data source", () => {
       env: {
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_demo",
         NEXT_PUBLIC_SUPABASE_URL: "https://demo.supabase.co",
+        RESEND_FROM_EMAIL: "Magic Massage Natali <hello@mail.magicmassage.bg>",
       },
       now: new Date("2026-07-09T12:00:00.000Z"),
     });
@@ -261,6 +268,9 @@ describe("admin data source", () => {
     expect(data.prices?.[0]?.id).toBe("price-supabase-massage-75");
     expect(data.services?.[0]?.name).toBe("Supabase Massage");
     expect(data.settings?.businessName).toBe("Supabase Magic Massage");
+    expect(data.settings?.verifiedEmailSender).toBe(
+      "Magic Massage Natali <hello@mail.magicmassage.bg>",
+    );
     expect(data.financeRows).toBe(financeRows);
   });
 

@@ -69,4 +69,191 @@ describe("ClientForm", () => {
     expect(onClose).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
+
+  it("records explicit care-email consent for owners and administrators", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderForm({ initialClient: existingClient, role: "administrator" });
+    const dialog = screen.getByRole("dialog", { name: "Редактировать клиента" });
+    const consent = within(dialog).getByRole("checkbox", {
+      name: "Клиент явно согласился получать письмо после визита",
+    });
+
+    expect(consent).toBeEnabled();
+    expect(consent).not.toBeChecked();
+    await user.click(consent);
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        careEmailConsentAt: expect.any(String),
+        careEmailConsentSource: "admin_recorded",
+        careEmailExpectedConsentAt: null,
+        careEmailExpectedConsentSource: null,
+        careEmailExpectedWithdrawnAt: null,
+        careEmailWithdrawnAt: undefined,
+      }),
+      existingClient.id,
+    );
+  });
+
+  it("omits consent state when the administrator did not change it", async () => {
+    const user = userEvent.setup();
+    const consentedClient: ClientRecord = {
+      ...existingClient,
+      careEmailConsentAt: "2026-07-20T10:00:00.000Z",
+      careEmailConsentSource: "public_booking",
+    };
+    const { onSave } = renderForm({
+      clients: [consentedClient],
+      initialClient: consentedClient,
+    });
+    const dialog = screen.getByRole("dialog", { name: "Редактировать клиента" });
+
+    await user.type(within(dialog).getByLabelText("Имя"), " обновлено");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    const savedClient = onSave.mock.calls[0][0] as ClientRecord;
+    expect(savedClient).not.toHaveProperty("careEmailConsentAt");
+    expect(savedClient).not.toHaveProperty("careEmailConsentSource");
+    expect(savedClient).not.toHaveProperty("careEmailWithdrawnAt");
+    expect(savedClient).not.toHaveProperty("careEmailExpectedConsentAt");
+  });
+
+  it("requires explicit renewed consent after the client email changes", async () => {
+    const user = userEvent.setup();
+    const consentedClient: ClientRecord = {
+      ...existingClient,
+      careEmailConsentAt: "2026-07-20T10:00:00.000Z",
+      careEmailConsentSource: "public_booking",
+    };
+    const { onSave } = renderForm({
+      clients: [consentedClient],
+      initialClient: consentedClient,
+    });
+    const dialog = screen.getByRole("dialog", { name: "Редактировать клиента" });
+    const consent = within(dialog).getByRole("checkbox", {
+      name: "Клиент явно согласился получать письмо после визита",
+    });
+
+    expect(consent).toBeChecked();
+    await user.clear(within(dialog).getByLabelText("Email"));
+    await user.type(within(dialog).getByLabelText("Email"), "new@example.com");
+    expect(consent).not.toBeChecked();
+
+    await user.click(consent);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Сохранить изменения" }),
+    );
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        careEmailConsentAt: expect.any(String),
+        careEmailExpectedConsentAt: consentedClient.careEmailConsentAt,
+        careEmailExpectedConsentSource: "public_booking",
+        email: "new@example.com",
+      }),
+      consentedClient.id,
+    );
+  });
+
+  it("restores unchanged consent when an email edit is reverted before save", async () => {
+    const user = userEvent.setup();
+    const consentedClient: ClientRecord = {
+      ...existingClient,
+      careEmailConsentAt: "2026-07-20T10:00:00.000Z",
+      careEmailConsentSource: "public_booking",
+    };
+    const { onSave } = renderForm({
+      clients: [consentedClient],
+      initialClient: consentedClient,
+    });
+    const dialog = screen.getByRole("dialog", { name: "Редактировать клиента" });
+    const email = within(dialog).getByLabelText("Email");
+    const consent = within(dialog).getByRole("checkbox", {
+      name: "Клиент явно согласился получать письмо после визита",
+    });
+
+    await user.clear(email);
+    await user.type(email, "temporary@example.com");
+    expect(consent).not.toBeChecked();
+
+    await user.clear(email);
+    await user.type(email, existingClient.email);
+    expect(consent).toBeChecked();
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    const savedClient = onSave.mock.calls[0][0] as ClientRecord;
+    expect(savedClient.email).toBe(existingClient.email);
+    expect(savedClient).not.toHaveProperty("careEmailConsentAt");
+    expect(savedClient).not.toHaveProperty("careEmailConsentSource");
+    expect(savedClient).not.toHaveProperty("careEmailWithdrawnAt");
+    expect(savedClient).not.toHaveProperty("careEmailExpectedConsentAt");
+  });
+
+  it("does not carry explicit consent to a later email address", async () => {
+    const user = userEvent.setup();
+    const consentedClient: ClientRecord = {
+      ...existingClient,
+      careEmailConsentAt: "2026-07-20T10:00:00.000Z",
+      careEmailConsentSource: "public_booking",
+    };
+    const { onSave } = renderForm({
+      clients: [consentedClient],
+      initialClient: consentedClient,
+    });
+    const dialog = screen.getByRole("dialog", { name: "Редактировать клиента" });
+    const email = within(dialog).getByLabelText("Email");
+    const consent = within(dialog).getByRole("checkbox", {
+      name: "Клиент явно согласился получать письмо после визита",
+    });
+
+    await user.clear(email);
+    await user.type(email, "consented@example.com");
+    await user.click(consent);
+    expect(consent).toBeChecked();
+
+    await user.clear(email);
+    await user.type(email, "unconfirmed@example.com");
+    expect(consent).not.toBeChecked();
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    const savedClient = onSave.mock.calls[0][0] as ClientRecord;
+    expect(savedClient).toEqual(expect.objectContaining({
+      careEmailConsentAt: consentedClient.careEmailConsentAt,
+      careEmailConsentSource: consentedClient.careEmailConsentSource,
+      careEmailExpectedConsentAt: consentedClient.careEmailConsentAt,
+      careEmailExpectedConsentSource: consentedClient.careEmailConsentSource,
+      careEmailWithdrawnAt: expect.any(String),
+      email: "unconfirmed@example.com",
+    }));
+  });
+
+  it("drops new consent when an unconsented client's email changes again", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderForm({ initialClient: existingClient, role: "administrator" });
+    const dialog = screen.getByRole("dialog", { name: "Редактировать клиента" });
+    const email = within(dialog).getByLabelText("Email");
+    const consent = within(dialog).getByRole("checkbox", {
+      name: "Клиент явно согласился получать письмо после визита",
+    });
+
+    await user.click(consent);
+    await user.clear(email);
+    await user.type(email, "unconfirmed@example.com");
+    expect(consent).not.toBeChecked();
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    const savedClient = onSave.mock.calls[0][0] as ClientRecord;
+    expect(savedClient.email).toBe("unconfirmed@example.com");
+    expect(savedClient).not.toHaveProperty("careEmailConsentAt");
+    expect(savedClient).not.toHaveProperty("careEmailWithdrawnAt");
+  });
+
+  it("does not expose the consent control to non-operational roles", () => {
+    renderForm({ initialClient: existingClient, role: "editor" });
+
+    expect(screen.queryByRole("checkbox", {
+      name: "Клиент явно согласился получать письмо после визита",
+    })).not.toBeInTheDocument();
+  });
 });

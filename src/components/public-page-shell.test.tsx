@@ -6,6 +6,7 @@ import { studio24BookingUrl } from "@/config/booking";
 import { messengerLinks } from "@/config/messengers";
 import { getHomeContent } from "@/content/home";
 import { getPublicPagesContent } from "@/content/public-pages";
+import { cloneBusinessHoursSchedule } from "@/lib/business-hours";
 import { PublicPageShell } from "./public-page-shell";
 
 describe("PublicPageShell", () => {
@@ -24,6 +25,7 @@ describe("PublicPageShell", () => {
     expect(within(primaryNav).getByRole("link", { name: "Главная" })).toHaveAttribute("href", "/ru");
     expect(within(primaryNav).getByRole("link", { name: "Обо мне" })).toHaveAttribute("href", "/ru/about");
     expect(within(primaryNav).getByRole("link", { name: "Сертификаты" })).toHaveAttribute("href", "/ru/gift-certificates");
+    expect(within(primaryNav).getByRole("link", { name: "Блог" })).toHaveAttribute("href", "/ru/blog");
     expect(within(primaryNav).getByRole("link", { name: "Контакты" })).toHaveAttribute("href", "/ru/contacts");
 
     await user.click(within(primaryNav).getByText("Массажи"));
@@ -95,6 +97,10 @@ describe("PublicPageShell", () => {
       "href",
       "/ru/gift-certificates",
     );
+    expect(within(mobileNav).getByRole("link", { name: "Блог" })).toHaveAttribute(
+      "href",
+      "/ru/blog",
+    );
     expect(within(mobileMenu).getByRole("link", { name: "BG" })).toHaveAttribute(
       "href",
       "/bg/contacts",
@@ -157,6 +163,43 @@ describe("PublicPageShell", () => {
     );
   });
 
+  it("renders the current admin-managed address, phone, Viber link, and footer schedule", async () => {
+    const user = userEvent.setup();
+    const schedule = cloneBusinessHoursSchedule();
+    schedule[5].closesAt = "17:00";
+
+    render(
+      <PublicPageShell
+        businessDetails={{
+          address: "ул. Места 50, Бургас",
+          businessName: "Magic Massage Natali",
+          phone: "+359 89 677 8308",
+          seoArea: "Burgas, Bulgaria",
+          updatedAt: "2026-07-18T10:00:00.000Z",
+          workingSchedule: schedule,
+        }}
+        locale="ru"
+        currentPage="home"
+        content={getHomeContent("ru")}
+      >
+        <main>Home</main>
+      </PublicPageShell>,
+    );
+
+    expect(screen.getByText("ул. Места 50, Бургас")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "+359 89 677 8308" })).toHaveAttribute(
+      "href",
+      "tel:+359896778308",
+    );
+    expect(screen.getByText("Суббота").closest("li")).toHaveTextContent("10:00 - 17:00");
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+    expect(within(screen.getByRole("complementary")).getByRole("link", { name: "Viber" })).toHaveAttribute(
+      "href",
+      "viber://chat?number=%2B359896778308",
+    );
+  });
+
   it("removes gift certificates from desktop and mobile navigation when disabled", async () => {
     const user = userEvent.setup();
     render(
@@ -180,6 +223,33 @@ describe("PublicPageShell", () => {
     expect(
       within(screen.getByRole("navigation", { name: "Mobile navigation" })).queryByRole("link", {
         name: "Сертификаты",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("removes the blog from desktop and mobile navigation when disabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <PublicPageShell
+        blogEnabled={false}
+        locale="ru"
+        currentPage="home"
+        content={getHomeContent("ru")}
+      >
+        <main>Home</main>
+      </PublicPageShell>,
+    );
+
+    expect(
+      within(screen.getByRole("navigation", { name: "Primary navigation" })).queryByRole("link", {
+        name: "Блог",
+      }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+    expect(
+      within(screen.getByRole("navigation", { name: "Mobile navigation" })).queryByRole("link", {
+        name: "Блог",
       }),
     ).not.toBeInTheDocument();
   });

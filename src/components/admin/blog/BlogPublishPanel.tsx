@@ -26,31 +26,40 @@ const STATUS_LABELS: Record<BlogArticleDraft["status"], string> = {
 export type BlogPublishPanelProps = {
   errors?: BlogArticleValidationErrors;
   idPrefix: string;
+  localeLocked?: boolean;
   onChange: BlogArticlePatchHandler;
   value: BlogArticleDraft;
 };
 
-export function BlogPublishPanel({ errors = {}, idPrefix, onChange, value }: BlogPublishPanelProps) {
+export function BlogPublishPanel({ errors = {}, idPrefix, localeLocked = false, onChange, value }: BlogPublishPanelProps) {
   const fieldId = (field: keyof BlogArticleDraft) => `${idPrefix}-${field}`;
   const scheduledAtErrorId = `${fieldId("scheduledAt")}-error`;
 
   return (
     <fieldset className={styles.fieldGroup}>
       <legend>Публикация</legend>
-      <div className={styles.field}>
-        <label htmlFor={fieldId("locale")}>Язык</label>
-        <select
-          id={fieldId("locale")}
-          onChange={(event) => onChange({ locale: event.target.value as BlogArticleDraft["locale"] })}
-          value={value.locale}
-        >
-          {BLOG_LOCALES.map((locale) => (
-            <option key={locale} value={locale}>
-              {LOCALE_LABELS[locale]}
-            </option>
-          ))}
-        </select>
-      </div>
+      {localeLocked ? (
+        <div className={styles.readonlyLocale}>
+          <span>Язык</span>
+          <strong>{LOCALE_LABELS[value.locale]}</strong>
+          <small>Переключается во вкладках над редактором.</small>
+        </div>
+      ) : (
+        <div className={styles.field}>
+          <label htmlFor={fieldId("locale")}>Язык</label>
+          <select
+            id={fieldId("locale")}
+            onChange={(event) => onChange({ locale: event.target.value as BlogArticleDraft["locale"] })}
+            value={value.locale}
+          >
+            {BLOG_LOCALES.map((locale) => (
+              <option key={locale} value={locale}>
+                {LOCALE_LABELS[locale]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className={styles.field}>
         <label htmlFor={fieldId("status")}>Статус</label>
         <select

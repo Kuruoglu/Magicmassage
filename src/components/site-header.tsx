@@ -16,7 +16,8 @@ import {
   type PublicPageKey,
 } from "@/navigation/public-routes";
 import { getServicePagePath } from "@/navigation/service-routes";
-import type { PublicMediaPlacement } from "@/lib/public-content/types";
+import type { PublicBusinessDetails, PublicMediaPlacement } from "@/lib/public-content/types";
+import { toPhoneHref } from "@/lib/business-hours";
 import { resolvePublicMediaPlacement } from "@/lib/media-placement";
 import { MessengerIcon } from "./messenger-icon";
 
@@ -28,6 +29,8 @@ const localeLabels: Record<Locale, string> = {
 };
 
 type SiteHeaderProps = {
+  blogEnabled?: boolean;
+  businessDetails?: PublicBusinessDetails;
   locale: Locale;
   currentPage?: PublicPageKey;
   content: HomeContent;
@@ -39,6 +42,8 @@ type SiteHeaderProps = {
 };
 
 export function SiteHeader({
+  blogEnabled = true,
+  businessDetails,
   locale,
   currentPage,
   content,
@@ -59,13 +64,18 @@ export function SiteHeader({
     { page: "services", label: content.navigation.services },
     { page: "giftCertificates", label: content.navigation.giftCertificates },
     { page: "about", label: content.navigation.about },
+    { page: "blog", label: content.navigation.blog },
     { page: "contacts", label: content.navigation.contacts },
   ];
-  const links = navigationLinks.filter(
-    (link) => giftCertificatesEnabled || link.page !== "giftCertificates",
+  const links = navigationLinks.filter((link) =>
+    (giftCertificatesEnabled || link.page !== "giftCertificates") &&
+    (blogEnabled || link.page !== "blog"),
   );
   const services = runtimeServices ?? getPublicPagesContent(locale).services.items;
   const logoMedia = resolvePublicMediaPlacement(mediaPlacements, "global.logo", locale);
+  const viberHref = businessDetails
+    ? `viber://chat?number=${encodeURIComponent(toPhoneHref(businessDetails.phone))}`
+    : messengerLinks.viber.href;
   const localePathFor = (item: Locale) =>
     localePaths?.[item] ??
     (currentPage ? getLocaleSwitchPath(item, currentPage) : getPublicPagePath(item, "home"));
@@ -360,7 +370,7 @@ export function SiteHeader({
               </span>
               Telegram
             </a>
-            <a href={messengerLinks.viber.href} {...externalMessengerLinkProps} onClick={closeMenu}>
+            <a href={viberHref} {...externalMessengerLinkProps} onClick={closeMenu}>
               <span aria-hidden="true">
                 <MessengerIcon name="viber" />
               </span>

@@ -5,6 +5,7 @@ import {
   publicContentLocales,
   type PublicBlogPost,
   type PublicBlogPostSummary,
+  type PublicBusinessDetails,
   type PublicContentDataLayer,
   type PublicContentLocale,
   type PublicContentLogger,
@@ -18,6 +19,7 @@ import {
   type PublicServicePrice,
   type PublicSiteFeatures,
 } from "./types";
+import { isBusinessHoursSchedule } from "@/lib/business-hours";
 
 const serviceColumns =
   "slug, category, default_duration_minutes, cover_media_id, display_order, updated_at";
@@ -30,7 +32,7 @@ const mediaPlacementColumns =
 const mediaAssetColumns =
   "id, url, mime_type, byte_size, width_pixels, height_pixels, alt_text, alt_text_localized, updated_at";
 const blogColumns =
-  "id, slug, locale, title, category, author, tag_labels, sanitized_html, canonical_url, meta_description, robots_directives, og_title, og_description, cover_media_id, cover_alt_text, og_image_media_id, hreflang, published_at, updated_at";
+  "id, translation_key, slug, locale, title, category, author, tag_labels, sanitized_html, canonical_url, meta_description, robots_directives, og_title, og_description, cover_media_id, cover_alt_text, og_image_media_id, hreflang, published_at, updated_at";
 
 class PublicContentReadError extends Error {
   constructor(readonly kind: "invalid_data" | "query_error") {
@@ -134,6 +136,17 @@ function asBoolean(row: UnknownRow, key: string) {
   }
 
   return row[key] as boolean;
+}
+
+function asPhone(row: UnknownRow, key: string) {
+  const value = asString(row, key);
+  const digitCount = value.replace(/\D/g, "").length;
+
+  if (!/^\+?[0-9\s().-]{7,24}$/.test(value) || digitCount < 7 || digitCount > 15) {
+    throw new PublicContentReadError("invalid_data");
+  }
+
+  return value;
 }
 
 function asIsoDate(row: UnknownRow, key: string) {
@@ -378,6 +391,7 @@ function mapBlogRow(value: unknown) {
     slug: asSlug(row, "slug"),
     tags: asStringArray(row, "tag_labels"),
     title: asString(row, "title"),
+    translationKey: asString(row, "translation_key"),
     updatedAt: asIsoDate(row, "updated_at"),
   };
 }
@@ -675,8 +689,8 @@ export function createPublicContentDataLayer(
           .order("slug", { ascending: true }),
       );
       const mapped = rows.map(mapBlogRow);
-      const selected = [...new Set(mapped.map((post) => post.slug))]
-        .map((slug) => byLocale(mapped.filter((post) => post.slug === slug), locales))
+      const selected = [...new Set(mapped.map((post) => post.translationKey))]
+        .map((translationKey) => byLocale(mapped.filter((post) => post.translationKey === translationKey), locales))
         .filter((post): post is ReturnType<typeof mapBlogRow> => Boolean(post));
       const media = await readMediaAssets(client!, collectMediaIds(selected), locales);
       const posts = selected
@@ -727,7 +741,7 @@ export function createPublicContentDataLayer(
       const rows = await readRows(
         client!
           .from("admin_public_site_flags")
-          .select("id, gift_certificates_enabled, public_booking_enabled")
+          .select("id, blog_enabled, gift_certificates_enabled, public_booking_enabled")
           .eq("id", "site")
           .limit(1),
       );
@@ -743,11 +757,42 @@ export function createPublicContentDataLayer(
       }
 
       return ok({
+        blogEnabled: asBoolean(row, "blog_enabled"),
         giftCertificatesEnabled: asBoolean(row, "gift_certificates_enabled"),
         publicBookingEnabled: asBoolean(row, "public_booking_enabled"),
       });
     });
   }
 
-  return { getBlogPost, getSiteFeatures, listBlogPosts, listServices };
+  async function getBusinessDetails() {
+    return execute<PublicBusinessDetails>("getBusinessDetails", async () => {
+      const rows = await readRows(
+        client!
+          .from("admin_public_business_details")
+          .select("id, business_name, phone, address, seo_area, working_schedule, updated_at")
+          .eq("id", "site")
+          .limit(1),
+      );
+
+      if (rows.length === 0) {
+        return notConfigured("public_content_row_missing");
+      }
+
+      const row = asRow(rows[0]);
+      if (asString(row, "id") !== "site" || !isBusinessHoursSchedule(row.working_schedule)) {
+        throw new PublicContentReadError("invalid_data");
+      }
+
+      return ok({
+        address: asString(row, "address"),
+        businessName: asString(row, "business_name"),
+        phone: asPhone(row, "phone"),
+        seoArea: asString(row, "seo_area"),
+        updatedAt: asIsoDate(row, "updated_at"),
+        workingSchedule: row.working_schedule.map((day) => ({ ...day })),
+      });
+    });
+  }
+
+  return { getBlogPost, getBusinessDetails, getSiteFeatures, listBlogPosts, listServices };
 }

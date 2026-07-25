@@ -32,8 +32,17 @@ export type GiftCertificatePaymentMetadataOrder = GiftCertificateFulfillmentOrde
   totalEurCents: number;
 };
 
-export type GiftCertificateEmailEnvironment = {
-  RESEND_API_KEY?: string;
-  RESEND_FROM_EMAIL?: string;
-  GIFT_CERTIFICATES_OWNER_EMAIL?: string;
+export type GiftCertificatePersistedOrder = GiftCertificatePaymentMetadataOrder & {
+  certificateCode: string;
+  id: string;
+  paymentIntentId?: string;
+  status: "pending" | "paid" | "fulfilled" | "fulfillment_failed";
+};
+
+export type GiftCertificateStripeMetadata = {
+  certificateCode: string;
+  locale: Locale;
+  orderId: string;
+  schemaVersion: "v2";
+  totalEurCents: number;
 };

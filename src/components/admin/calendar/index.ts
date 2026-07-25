@@ -29,7 +29,9 @@ export {
 } from "./time";
 
 export {
+  appointmentOverlapsCalendarBlock,
   appointmentsOverlap,
+  calendarBlocksOverlap,
   classifyAppointment,
   hasAppointmentOverlap,
   isOutsideWorkingHours,
@@ -92,6 +94,10 @@ export { CalendarAppointmentDialog } from "./CalendarAppointmentDialog";
 export type { CalendarAppointmentDialogProps } from "./CalendarAppointmentDialog";
 export { CalendarBlockDialog } from "./CalendarBlockDialog";
 export type { CalendarBlockSaveResult } from "./CalendarBlockDialog";
+export { createCalendarBlockMutationPayload } from "./calendar-block-payload";
+export type { CalendarBlockIntent } from "./calendar-block-payload";
+export { CalendarTimeSelectionDialog } from "./CalendarTimeSelectionDialog";
+export type { CalendarTimeSelectionDialogProps } from "./CalendarTimeSelectionDialog";
 export { SpecialistScheduleDialog } from "./SpecialistScheduleDialog";
 export type { SpecialistScheduleSaveResult } from "./SpecialistScheduleDialog";
 export { CalendarToolbar } from "./CalendarToolbar";
@@ -103,6 +109,6 @@ export type {
 } from "./CalendarWorkspace";
 export { DayCalendar } from "./DayCalendar";
 export { TimeGrid } from "./TimeGrid";
-export type { TimeGridDay } from "./TimeGrid";
+export type { CalendarTimeSelection, TimeGridDay } from "./TimeGrid";
 export { WeekCalendar } from "./WeekCalendar";
 export type { CalendarWeekDay } from "./WeekCalendar";

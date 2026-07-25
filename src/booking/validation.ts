@@ -133,6 +133,7 @@ export function parseConfirmPayload(
       "email",
       "locale",
       "contactPreference",
+      "careEmailOptIn",
       "note",
       "privacyAccepted",
       "website",
@@ -147,6 +148,7 @@ export function parseConfirmPayload(
   const email = normalizedOptionalString(payload.email) ?? "";
   const note = normalizedOptionalString(payload.note) ?? "";
   const normalizedKey = idempotencyKey?.trim() ?? "";
+  const careEmailOptIn = payload.careEmailOptIn ?? false;
 
   if (
     typeof payload.holdToken !== "string" ||
@@ -168,7 +170,8 @@ export function parseConfirmPayload(
     payload.privacyAccepted !== true ||
     note.length > 1000 ||
     unsafeTextPattern.test(note) ||
-    !idempotencyKeyPattern.test(normalizedKey)
+    !idempotencyKeyPattern.test(normalizedKey) ||
+    typeof careEmailOptIn !== "boolean"
   ) {
     return null;
   }
@@ -177,8 +180,10 @@ export function parseConfirmPayload(
   if (phoneNormalized.length < 7 || phoneNormalized.length > 15) return null;
   if (email && (email.length > 254 || !emailPattern.test(email))) return null;
   if (payload.contactPreference === "email" && !email) return null;
+  if (careEmailOptIn && !email) return null;
 
   return {
+    careEmailOptIn,
     contactPreference: payload.contactPreference,
     email: email ? email.toLowerCase() : null,
     fullName,

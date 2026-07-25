@@ -6,6 +6,7 @@ import {
   buildClientIdFromPhone,
   createAdminDemoRecords,
   findClientByIdentity,
+  getAppointmentNotificationEmail,
 } from "./domain";
 
 const demoRecords = () =>
@@ -88,5 +89,25 @@ describe("admin domain records", () => {
 
     expect(seed.certificates.find((certificate) => certificate.code === "MMN-2407-1023")?.client_id).toBe(existingOlenaId);
     expect(seed.certificates.find((certificate) => certificate.code === "MMN-2407-2000")?.client_id).toBe(secondOlenaId);
+  });
+
+  it("uses the immutable public snapshot for public appointment notifications", () => {
+    const records = demoRecords();
+    const appointment = records.appointments[0];
+
+    expect(
+      getAppointmentNotificationEmail(records.clients, {
+        ...appointment,
+        origin: "public",
+        publicEmail: "booking-snapshot@example.com",
+      }),
+    ).toBe("booking-snapshot@example.com");
+    expect(
+      getAppointmentNotificationEmail(records.clients, {
+        ...appointment,
+        origin: "admin",
+        publicEmail: "stale-snapshot@example.com",
+      }),
+    ).toBe(findClientByIdentity(records.clients, appointment.clientId)?.email);
   });
 });

@@ -1,14 +1,16 @@
 "use client";
 
-import { type FormEvent, type KeyboardEvent, useId, useMemo, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 
 import type { AdminRoleId } from "@/admin/config";
 import {
   findClientByIdentity,
   findUniqueClientByName,
+  getAppointmentNotificationEmail,
   normalizeSearch,
   type Appointment,
   type AppointmentStatus,
+  type CalendarBlock,
   type ClientRecord,
   type SpecialistRecord,
 } from "@/admin/domain";
@@ -23,7 +25,12 @@ import {
 } from "@/components/admin/drawer";
 
 import type { CalendarAppointmentSaveResult } from "./CalendarWorkspace";
-import { appointmentsOverlap, hasAppointmentOverlap, isSchedulingBlockingStatus } from "./conflicts";
+import {
+  appointmentOverlapsCalendarBlock,
+  appointmentsOverlap,
+  hasAppointmentOverlap,
+  isSchedulingBlockingStatus,
+} from "./conflicts";
 import { isIsoDate } from "./date";
 import {
   classifyAppointmentAgainstSchedule,
@@ -52,24 +59,32 @@ const appointmentStatusOptions: AppointmentStatus[] = [
 export type CalendarAppointmentDialogProps = {
   appointments: Appointment[];
   bookingBufferMinutes: number;
+  calendarBlocks?: CalendarBlock[];
   clients: ClientRecord[];
   initialAppointment?: Appointment;
   onClose: () => void;
-  onSave: (appointment: Appointment) => Promise<CalendarAppointmentSaveResult>;
+  onSave: (
+    appointment: Appointment,
+    options: { notifyClient: boolean },
+  ) => Promise<CalendarAppointmentSaveResult>;
   prefillClient?: ClientRecord;
   prefillClientName?: string;
   prefillDate?: string;
+  prefillDurationMinutes?: number;
+  prefillSpecialistId?: string;
+  prefillTime?: string;
+  requireSpecialistSelection?: boolean;
   role: AdminRoleId;
   siteSettings: CalendarScheduleSettings;
   specialists?: SpecialistRecord[];
   currentSpecialistId?: string;
 };
 
-function CalendarAppointmentCloseButton({ onClose }: { onClose: () => void }) {
+function CalendarAppointmentCloseButton({ disabled = false, onClose }: { disabled?: boolean; onClose: () => void }) {
   const requestClose = useAdminDrawerClose();
 
   return (
-    <button className="admin-secondary-button" onClick={requestClose ?? onClose} type="button">
+    <button className="admin-secondary-button" disabled={disabled} onClick={requestClose ?? onClose} type="button">
       Отмена
     </button>
   );
@@ -78,6 +93,7 @@ function CalendarAppointmentCloseButton({ onClose }: { onClose: () => void }) {
 export function CalendarAppointmentDialog({
   appointments,
   bookingBufferMinutes,
+  calendarBlocks = [],
   clients,
   initialAppointment,
   onClose,
@@ -85,6 +101,10 @@ export function CalendarAppointmentDialog({
   prefillClient,
   prefillClientName,
   prefillDate,
+  prefillDurationMinutes,
+  prefillSpecialistId,
+  prefillTime,
+  requireSpecialistSelection = false,
   role,
   siteSettings,
   specialists = [],
@@ -99,6 +119,7 @@ export function CalendarAppointmentDialog({
     [specialists],
   );
   const defaultSpecialist =
+    activeSpecialists.find((specialist) => specialist.id === prefillSpecialistId) ??
     activeSpecialists.find((specialist) => specialist.id === currentSpecialistId) ??
     activeSpecialists[0];
   const [initialForm] = useState<Appointment>(() => ({
@@ -106,36 +127,48 @@ export function CalendarAppointmentDialog({
     clientId: initialAppointment?.clientId ?? prefillClient?.id,
     bufferMinutes: initialAppointment?.bufferMinutes ?? bookingBufferMinutes,
     date: initialAppointment?.date ?? prefillDate ?? getCalendarIsoDate(workingSchedule),
-    durationMinutes: initialAppointment?.durationMinutes ?? 60,
+    durationMinutes: initialAppointment?.durationMinutes ?? prefillDurationMinutes ?? 60,
     id: initialAppointment?.id,
+    locale: initialAppointment?.locale,
     note: initialAppointment?.note ?? "",
+    origin: initialAppointment?.origin,
     overlapOverride: initialAppointment?.overlapOverride ?? false,
     overlapOverrideReason: initialAppointment?.overlapOverrideReason ?? "",
     overlapOverriddenAt: initialAppointment?.overlapOverriddenAt,
     overlapOverriddenBy: initialAppointment?.overlapOverriddenBy,
     postVisitComment: initialAppointment?.postVisitComment ?? "",
     postVisitCommentedAt: initialAppointment?.postVisitCommentedAt,
+    publicContactPreference: initialAppointment?.publicContactPreference,
+    publicEmail: initialAppointment?.publicEmail,
+    publicNote: initialAppointment?.publicNote,
+    publicPhone: initialAppointment?.publicPhone,
+    publicReference: initialAppointment?.publicReference,
     service: initialAppointment?.service ?? appointmentServiceOptions[0],
-    specialistId: initialAppointment?.specialistId ?? defaultSpecialist?.id,
-    specialistName: initialAppointment?.specialistName ?? defaultSpecialist?.displayName,
+    serviceSlug: initialAppointment?.serviceSlug,
+    specialistId: initialAppointment?.specialistId ?? (requireSpecialistSelection ? undefined : defaultSpecialist?.id),
+    specialistName: initialAppointment?.specialistName ?? (requireSpecialistSelection ? undefined : defaultSpecialist?.displayName),
     status: initialAppointment?.status ?? "Новая заявка",
-    time: initialAppointment?.time ?? "14:00",
+    time: initialAppointment?.time ?? prefillTime ?? "14:00",
     version: initialAppointment?.version,
   }));
   const [form, setForm] = useState<Appointment>(() => initialForm);
+  const minimumDurationMinutes = Math.min(15, initialForm.durationMinutes ?? 15);
   const [error, setError] = useState("");
+  const [isPending, setIsPending] = useState(false);
+  const saveInFlightRef = useRef(false);
+  const [notifyClient, setNotifyClient] = useState(true);
   const [activeClientSuggestion, setActiveClientSuggestion] = useState(-1);
   const [areClientSuggestionsDismissed, setAreClientSuggestionsDismissed] = useState(false);
   const clientSuggestionsId = useId();
   const isEditing = Boolean(initialAppointment);
   const isPublicBooking = initialAppointment?.origin === "public";
-  const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(initialForm);
   const schedulingClassification = useMemo(() => {
     if (!isIsoDate(form.date) || !/^\d{2}:\d{2}$/.test(form.time)) {
       return {
         outsideDailyWorkingHours: false,
         outsideWorkingDay: false,
         outsideWorkingHours: false,
+        blockedByCalendarBlock: false,
         overlap: false,
       };
     }
@@ -161,6 +194,12 @@ export function CalendarAppointmentDialog({
           start: appointment.time,
         })),
     );
+    const blockedByCalendarBlock = isSchedulingBlockingStatus(form.status) && calendarBlocks.some((block) =>
+      appointmentOverlapsCalendarBlock(
+        { ...candidate, buffer: form.bufferMinutes ?? bookingBufferMinutes },
+        block,
+      ),
+    );
     const appointmentSpecialist = specialists.find(
       (specialist) => specialist.id === form.specialistId,
     );
@@ -170,9 +209,10 @@ export function CalendarAppointmentDialog({
 
     return {
       ...classifyAppointmentAgainstSchedule(candidate, appointmentSchedule),
+      blockedByCalendarBlock,
       overlap,
     };
-  }, [appointments, form, siteSettings.timezone, specialists, workingSchedule]);
+  }, [appointments, bookingBufferMinutes, calendarBlocks, form, siteSettings.timezone, specialists, workingSchedule]);
   const conflictingAppointment = useMemo(() => {
     if (!isIsoDate(form.date) || !/^\d{2}:\d{2}$/.test(form.time)) {
       return undefined;
@@ -200,6 +240,24 @@ export function CalendarAppointmentDialog({
         ),
     );
   }, [appointments, form]);
+  const conflictingCalendarBlock = useMemo(() => {
+    if (!isSchedulingBlockingStatus(form.status) || !isIsoDate(form.date) || !/^\d{2}:\d{2}$/.test(form.time)) {
+      return undefined;
+    }
+
+    return calendarBlocks.find((block) =>
+      appointmentOverlapsCalendarBlock(
+        {
+          date: form.date,
+          buffer: form.bufferMinutes ?? bookingBufferMinutes,
+          duration: form.durationMinutes ?? 60,
+          specialistId: form.specialistId,
+          start: form.time,
+        },
+        block,
+      ),
+    );
+  }, [bookingBufferMinutes, calendarBlocks, form]);
   const canOverrideOverlap = role === "owner" || role === "administrator";
   const normalizedClientQuery = normalizeSearch(form.client);
   const clientSuggestions =
@@ -216,6 +274,11 @@ export function CalendarAppointmentDialog({
           .slice(0, 4)
       : [];
   const showClientSuggestions = clientSuggestions.length > 0 && !areClientSuggestionsDismissed;
+  const notificationEmail = getAppointmentNotificationEmail(clients, form);
+  const canNotifyClient = (role === "owner" || role === "administrator") && Boolean(notificationEmail.trim());
+  const hasUnsavedChanges =
+    JSON.stringify(form) !== JSON.stringify(initialForm) ||
+    (canNotifyClient && !notifyClient);
 
   function updateForm<Field extends keyof Appointment>(field: Field, value: Appointment[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -277,6 +340,7 @@ export function CalendarAppointmentDialog({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saveInFlightRef.current) return;
 
     const client = form.client.trim();
 
@@ -286,6 +350,11 @@ export function CalendarAppointmentDialog({
     }
 
     const linkedClient = findClientByIdentity(clients, form.clientId) ?? findUniqueClientByName(clients, client);
+
+    if (isSchedulingBlockingStatus(form.status) && schedulingClassification.blockedByCalendarBlock) {
+      setError("Выбранное время уже заблокировано. Измените время или специалиста.");
+      return;
+    }
 
     const hasBlockingOverlap = isSchedulingBlockingStatus(form.status) && schedulingClassification.overlap;
 
@@ -299,37 +368,58 @@ export function CalendarAppointmentDialog({
       return;
     }
 
-    const result = await onSave({
-      ...form,
-      bufferMinutes: initialAppointment ? form.bufferMinutes : bookingBufferMinutes,
-      client,
-      clientId: linkedClient?.id,
-      durationMinutes: Math.max(form.durationMinutes ?? 60, 15),
-      note: form.note.trim(),
-      overlapOverride: hasBlockingOverlap,
-      overlapOverrideReason: hasBlockingOverlap ? form.overlapOverrideReason?.trim() : "",
-      overlapOverriddenAt: hasBlockingOverlap ? form.overlapOverriddenAt : undefined,
-      overlapOverriddenBy: hasBlockingOverlap ? form.overlapOverriddenBy : undefined,
-      postVisitComment: form.postVisitComment?.trim(),
-      postVisitCommentedAt: form.postVisitComment?.trim()
-        ? (form.postVisitCommentedAt ?? new Date().toISOString())
-        : undefined,
-    });
-    if (result.ok) onClose();
-    else setError(result.message);
+    setIsPending(true);
+    saveInFlightRef.current = true;
+    setError("");
+    try {
+      const result = await onSave({
+        ...form,
+        bufferMinutes: initialAppointment ? form.bufferMinutes : bookingBufferMinutes,
+        client,
+        clientId: linkedClient?.id,
+        durationMinutes: Math.max(form.durationMinutes ?? 60, minimumDurationMinutes),
+        note: form.note.trim(),
+        overlapOverride: hasBlockingOverlap,
+        overlapOverrideReason: hasBlockingOverlap ? form.overlapOverrideReason?.trim() : "",
+        overlapOverriddenAt: hasBlockingOverlap ? form.overlapOverriddenAt : undefined,
+        overlapOverriddenBy: hasBlockingOverlap ? form.overlapOverriddenBy : undefined,
+        postVisitComment: form.postVisitComment?.trim(),
+        postVisitCommentedAt: form.postVisitComment?.trim()
+          ? (form.postVisitCommentedAt ?? new Date().toISOString())
+          : undefined,
+      }, { notifyClient: canNotifyClient && notifyClient });
+      if (result.ok) onClose();
+      else setError(result.message);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Не удалось сохранить запись.");
+    } finally {
+      saveInFlightRef.current = false;
+      setIsPending(false);
+    }
+  }
+
+  function closeIfIdle() {
+    if (!saveInFlightRef.current) onClose();
   }
 
   return (
     <AdminDrawer
       ariaLabelledBy="calendar-action-title"
       className="admin-calendar-appointment-drawer"
-      hasUnsavedChanges={hasUnsavedChanges}
-      onClose={onClose}
+      hasUnsavedChanges={!isPending && hasUnsavedChanges}
+      onClose={closeIfIdle}
     >
-      <form className="admin-drawer-form" noValidate onSubmit={handleSubmit}>
+      <form
+        aria-busy={isPending}
+        aria-label={isEditing ? "Форма редактирования записи" : "Форма новой записи"}
+        className="admin-drawer-form"
+        noValidate
+        onSubmit={handleSubmit}
+      >
         <AdminDrawerHeader
+          closeDisabled={isPending}
           kicker="Календарь"
-          onClose={onClose}
+          onClose={closeIfIdle}
           title={isEditing ? "Редактировать запись" : "Новая запись"}
           titleId="calendar-action-title"
         />
@@ -419,6 +509,9 @@ export function CalendarAppointmentDialog({
                     required
                     value={form.specialistId ?? ""}
                   >
+                    {requireSpecialistSelection && activeSpecialists.length > 0 ? (
+                      <option value="">Выберите специалиста</option>
+                    ) : null}
                     {activeSpecialists.length === 0 ? (
                       <option value="">Нет доступных специалистов</option>
                     ) : null}
@@ -438,7 +531,9 @@ export function CalendarAppointmentDialog({
             </AdminDrawerSection>
 
             <AdminDrawerSection title="Дата и статус">
-              {schedulingClassification.outsideWorkingHours || schedulingClassification.overlap ? (
+              {schedulingClassification.outsideWorkingHours ||
+              schedulingClassification.overlap ||
+              schedulingClassification.blockedByCalendarBlock ? (
                 <div className="admin-form-alert" role="status">
                   {schedulingClassification.outsideWorkingHours ? (
                     schedulingClassification.outsideWorkingDay ? (
@@ -451,6 +546,15 @@ export function CalendarAppointmentDialog({
                     <p>
                       Запись пересекается с {conflictingAppointment?.client ?? "другой записью"}
                       {conflictingAppointment ? ` в ${conflictingAppointment.time}` : ""}.
+                    </p>
+                  ) : null}
+                  {schedulingClassification.blockedByCalendarBlock ? (
+                    <p>
+                      Время пересекается с блокировкой
+                      {conflictingCalendarBlock
+                        ? ` ${conflictingCalendarBlock.startsAt} - ${conflictingCalendarBlock.endsAt}`
+                        : " в календаре"}
+                      . Выберите другой интервал или специалиста.
                     </p>
                   ) : null}
                 </div>
@@ -489,9 +593,9 @@ export function CalendarAppointmentDialog({
               <label>
                 Длительность, минут
                 <input
-                  min="15"
+                  min={minimumDurationMinutes}
                   onChange={(event) => updateForm("durationMinutes", Number(event.target.value))}
-                  step="15"
+                  step={minimumDurationMinutes < 15 ? 1 : 15}
                   type="number"
                   value={form.durationMinutes ?? 60}
                 />
@@ -525,12 +629,34 @@ export function CalendarAppointmentDialog({
                 />
               </label>
             </AdminDrawerSection>
+
+            {role === "owner" || role === "administrator" ? (
+            <AdminDrawerSection title="Email-уведомление">
+              <label className="admin-checkbox-field admin-form-wide">
+                <input
+                  aria-describedby={`${clientSuggestionsId}-notification-helper`}
+                  checked={canNotifyClient && notifyClient}
+                  disabled={!canNotifyClient}
+                  onChange={(event) => setNotifyClient(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>{isEditing ? "Уведомить клиента об изменении записи" : "Отправить клиенту подтверждение записи"}</span>
+              </label>
+              <p className="admin-form-helper" id={`${clientSuggestionsId}-notification-helper`}>
+                {canNotifyClient
+                  ? `Письмо будет отправлено на ${notificationEmail}.`
+                  : "У выбранного клиента нет email. Уведомление недоступно, но запись можно сохранить."}
+              </p>
+            </AdminDrawerSection>
+            ) : null}
           </div>
         </AdminDrawerBody>
 
         <AdminDrawerFooter>
-          <button className="admin-primary-button" type="submit">{isEditing ? "Сохранить изменения" : "Сохранить запись"}</button>
-          <CalendarAppointmentCloseButton onClose={onClose} />
+          <button className="admin-primary-button" disabled={isPending} type="submit">
+            {isPending ? "Сохранение…" : isEditing ? "Сохранить изменения" : "Сохранить запись"}
+          </button>
+          <CalendarAppointmentCloseButton disabled={isPending} onClose={closeIfIdle} />
         </AdminDrawerFooter>
       </form>
     </AdminDrawer>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { fontVariables } from "@/app/fonts";
+import { AdminSessionBridge } from "@/components/admin/admin-session-bridge";
 import { businessFacts } from "@/config/business";
 import { siteUrl } from "@/seo/site-url";
 
@@ -18,7 +19,10 @@ export const metadata: Metadata = {
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru" className={fontVariables} data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body>
+        <AdminSessionBridge />
+        {children}
+      </body>
     </html>
   );
 }

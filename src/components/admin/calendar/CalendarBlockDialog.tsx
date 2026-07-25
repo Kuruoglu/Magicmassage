@@ -9,22 +9,33 @@ import {
 } from "react";
 
 import type { AdminRoleId } from "@/admin/config";
-import type { CalendarBlock, CalendarBlockKind, SpecialistRecord } from "@/admin/domain";
+import type { Appointment, CalendarBlock, CalendarBlockKind, SpecialistRecord } from "@/admin/domain";
+
+import {
+  appointmentOverlapsCalendarBlock,
+  calendarBlocksOverlap,
+  isSchedulingBlockingStatus,
+} from "./conflicts";
 
 export type CalendarBlockSaveResult =
   | { ok: true }
   | { message: string; ok: false };
 
 type CalendarBlockDialogProps = {
+  appointments?: Appointment[];
+  bookingBufferMinutes?: number;
+  calendarBlocks?: CalendarBlock[];
   currentSpecialistId?: string;
   initialBlock?: CalendarBlock;
   initialDate: string;
   initialEndsAt?: string;
+  initialSpecialistId?: string;
   initialStartsAt?: string;
   intent?: "block" | "walk-in";
   onClose: () => void;
   onSave: (block: CalendarBlock) => Promise<CalendarBlockSaveResult>;
   role?: AdminRoleId;
+  requireSpecialistSelection?: boolean;
   specialists?: SpecialistRecord[];
 };
 
@@ -33,6 +44,9 @@ const kindOptions: Array<{ label: string; value: CalendarBlockKind }> = [
   { label: "Недоступно", value: "unavailable" },
   { label: "Другое", value: "other" },
 ];
+
+const personalReasonOptions = ["Обед", "Личные дела", "Перерыв"] as const;
+type PersonalReason = "" | (typeof personalReasonOptions)[number] | "other";
 
 function getFocusableElements(container: HTMLElement) {
   return Array.from(
@@ -43,15 +57,20 @@ function getFocusableElements(container: HTMLElement) {
 }
 
 export function CalendarBlockDialog({
+  appointments = [],
+  bookingBufferMinutes = 0,
+  calendarBlocks = [],
   currentSpecialistId,
   initialBlock,
   initialDate,
   initialEndsAt,
+  initialSpecialistId,
   initialStartsAt,
   intent = "block",
   onClose,
   onSave,
   role = "owner",
+  requireSpecialistSelection = false,
   specialists = [],
 }: CalendarBlockDialogProps) {
   const dialogRef = useRef<HTMLElement>(null);
@@ -61,12 +80,22 @@ export function CalendarBlockDialog({
   const [endsAt, setEndsAt] = useState(initialBlock?.endsAt ?? initialEndsAt ?? "13:00");
   const [kind, setKind] = useState<CalendarBlockKind>(initialBlock?.kind ?? (intent === "walk-in" ? "other" : "personal"));
   const [internalNote, setInternalNote] = useState(initialBlock?.internalNote ?? (intent === "walk-in" ? "Клиент сейчас" : ""));
+  const initialPersonalReason = initialBlock?.kind === "personal"
+    ? personalReasonOptions.find((reason) => reason === initialBlock.internalNote)
+      ?? (initialBlock.internalNote ? "other" : "")
+    : "";
+  const [personalReason, setPersonalReason] = useState<PersonalReason>(initialPersonalReason);
+  const [customPersonalReason, setCustomPersonalReason] = useState(
+    initialPersonalReason === "other" ? initialBlock?.internalNote ?? "" : "",
+  );
   const activeSpecialists = specialists.filter((specialist) => specialist.status === "active");
   const defaultSpecialist =
     activeSpecialists.find((specialist) => specialist.id === currentSpecialistId) ??
     activeSpecialists[0];
   const [specialistId, setSpecialistId] = useState<string | undefined>(
-    initialBlock?.specialistId ?? defaultSpecialist?.id,
+    initialBlock?.specialistId
+      ?? initialSpecialistId
+      ?? (requireSpecialistSelection ? undefined : defaultSpecialist?.id),
   );
   const [isFullDay, setIsFullDay] = useState(
     initialBlock?.startsAt === "00:00" && initialBlock.endsAt === "23:59",
@@ -125,6 +154,11 @@ export function CalendarBlockDialog({
     event.preventDefault();
     const nextStartsAt = isFullDay ? "00:00" : startsAt;
     const nextEndsAt = isFullDay ? "23:59" : endsAt;
+    const nextInternalNote = intent === "walk-in" || kind !== "personal"
+      ? internalNote.trim()
+      : personalReason === "other"
+        ? customPersonalReason.trim()
+        : personalReason;
 
     if (!blockDate || nextStartsAt >= nextEndsAt || (activeSpecialists.length > 0 && !specialistId)) {
       setError("Проверьте специалиста, дату и укажите время окончания позже времени начала.");
@@ -132,20 +166,49 @@ export function CalendarBlockDialog({
     }
 
     const specialist = activeSpecialists.find((candidate) => candidate.id === specialistId);
-
-    setIsSaving(true);
-    setError("");
-    const result = await onSave({
+    const nextBlock: CalendarBlock = {
       blockDate,
       endsAt: nextEndsAt,
       id: initialBlock?.id ?? crypto.randomUUID(),
-      internalNote: internalNote.trim(),
+      internalNote: nextInternalNote,
       kind,
       specialistId,
       specialistName: specialist?.displayName ?? initialBlock?.specialistName,
       startsAt: nextStartsAt,
       version: initialBlock?.version,
-    });
+    };
+    const conflictingAppointment = appointments.find(
+      (appointment) =>
+        isSchedulingBlockingStatus(appointment.status) &&
+        appointmentOverlapsCalendarBlock(
+          {
+            buffer: appointment.bufferMinutes ?? bookingBufferMinutes,
+            date: appointment.date,
+            duration: appointment.durationMinutes ?? 60,
+            specialistId: appointment.specialistId,
+            start: appointment.time,
+          },
+          nextBlock,
+        ),
+    );
+
+    if (conflictingAppointment) {
+      setError(`Интервал пересекается с записью ${conflictingAppointment.client} в ${conflictingAppointment.time}.`);
+      return;
+    }
+
+    const conflictingBlock = calendarBlocks.find(
+      (block) => block.id !== nextBlock.id && calendarBlocksOverlap(block, nextBlock),
+    );
+
+    if (conflictingBlock) {
+      setError(`Интервал уже заблокирован с ${conflictingBlock.startsAt} до ${conflictingBlock.endsAt}.`);
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+    const result = await onSave(nextBlock);
     setIsSaving(false);
 
     if (!result.ok) {
@@ -183,11 +246,12 @@ export function CalendarBlockDialog({
           </button>
         </div>
 
-        <form className="admin-action-body" onSubmit={handleSubmit}>
+        <form className="admin-action-body" noValidate onSubmit={handleSubmit}>
           {role === "owner" || role === "administrator" ? (
             <label>
               Специалист
               <select
+                aria-invalid={error && !specialistId ? "true" : undefined}
                 disabled={activeSpecialists.length === 0}
                 onChange={(event) => {
                   setSpecialistId(event.target.value || undefined);
@@ -196,6 +260,9 @@ export function CalendarBlockDialog({
                 required
                 value={specialistId ?? ""}
               >
+                {requireSpecialistSelection && activeSpecialists.length > 0 ? (
+                  <option value="">Выберите специалиста</option>
+                ) : null}
                 {activeSpecialists.length === 0 ? (
                   <option value="">Нет доступных специалистов</option>
                 ) : null}
@@ -234,6 +301,50 @@ export function CalendarBlockDialog({
             </div>
           </fieldset>}
 
+          {intent !== "walk-in" && kind === "personal" ? (
+            <fieldset className="admin-settings-choice">
+              <legend>Причина</legend>
+              <div className="admin-filter-row" aria-label="Причина личного времени">
+                {personalReasonOptions.map((reason) => (
+                  <button
+                    aria-pressed={personalReason === reason}
+                    key={reason}
+                    onClick={() => {
+                      setPersonalReason(reason);
+                      setError("");
+                    }}
+                    type="button"
+                  >
+                    {reason}
+                  </button>
+                ))}
+                <button
+                  aria-pressed={personalReason === "other"}
+                  onClick={() => {
+                    setPersonalReason("other");
+                    setError("");
+                  }}
+                  type="button"
+                >
+                  Другая
+                </button>
+              </div>
+            </fieldset>
+          ) : null}
+
+          {intent !== "walk-in" && kind === "personal" && personalReason === "other" ? (
+            <label>
+              Другая причина
+              <textarea
+                maxLength={2000}
+                onChange={(event) => setCustomPersonalReason(event.target.value)}
+                placeholder="Например: личная встреча"
+                rows={3}
+                value={customPersonalReason}
+              />
+            </label>
+          ) : null}
+
           {intent === "walk-in" ? null : <label className="admin-checkbox-field">
             <input
               checked={isFullDay}
@@ -256,16 +367,18 @@ export function CalendarBlockDialog({
             </div>
           ) : null}
 
-          <label>
-            {intent === "walk-in" ? "Имя или короткая пометка" : "Внутренняя заметка"}
-            <textarea
-              maxLength={2000}
-              onChange={(event) => setInternalNote(event.target.value)}
-              placeholder={intent === "walk-in" ? "Например: посетитель" : "Например: личная встреча"}
-              rows={3}
-              value={internalNote}
-            />
-          </label>
+          {intent === "walk-in" || kind !== "personal" ? (
+            <label>
+              {intent === "walk-in" ? "Имя или короткая пометка" : "Внутренняя заметка"}
+              <textarea
+                maxLength={2000}
+                onChange={(event) => setInternalNote(event.target.value)}
+                placeholder={intent === "walk-in" ? "Например: посетитель" : "Например: причина недоступности"}
+                rows={3}
+                value={internalNote}
+              />
+            </label>
+          ) : null}
 
           <p className="admin-form-helper">
             {intent === "walk-in"

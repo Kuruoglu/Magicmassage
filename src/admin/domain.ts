@@ -1,4 +1,5 @@
 import type { AdminRoleId, FinanceRow } from "./config";
+import type { BusinessHoursDay } from "@/lib/business-hours";
 
 export type AppointmentStatus =
   | "Подтверждена"
@@ -59,6 +60,12 @@ export type ClientVisit = {
 };
 
 export type ClientRecord = {
+  careEmailConsentAt?: string;
+  careEmailConsentSource?: "admin_recorded" | "public_booking";
+  careEmailExpectedConsentAt?: string | null;
+  careEmailExpectedConsentSource?: "admin_recorded" | "public_booking" | null;
+  careEmailExpectedWithdrawnAt?: string | null;
+  careEmailWithdrawnAt?: string;
   contactRestricted?: boolean;
   id: string;
   email: string;
@@ -215,9 +222,14 @@ export type ContactSettingsRecord = {
   phone: string;
   seoArea: string;
   workingHours: string;
+  workingSchedule: BusinessHoursDay[];
 };
 
 export type BlogStatus = "Опубликована" | "Черновик" | "Запланирована" | "На проверке";
+
+export type BlogVisibilityRecord = {
+  enabled: boolean;
+};
 
 export type BlogPostRecord = {
   author: string;
@@ -242,6 +254,7 @@ export type BlogPostRecord = {
   status: BlogStatus;
   tags: string[];
   title: string;
+  translationKey: string;
   updatedAt: string;
 };
 
@@ -251,6 +264,8 @@ export type StripeMode = "Тестовый" | "Live после подтверж�
 
 export type SettingsRecord = {
   auditLogRetentionDays: number;
+  blogEnabled?: boolean;
+  bookingCustomerEmailsEnabled?: boolean;
   bookingBufferMinutes: number;
   bookingHoldMinutes?: number;
   bookingHorizonDays?: number;
@@ -263,16 +278,21 @@ export type SettingsRecord = {
   defaultLocale: string;
   defaultSeoTitle: string;
   emailSender: string;
+  emailReviewUrl?: string;
   giftCertificatesEnabled?: boolean;
   googleCalendarId: string;
   googleCalendarMode: CalendarSyncMode;
+  careEmailsEnabled?: boolean;
   publicBookingDailyLimit?: number;
   publicBookingEnabled?: boolean;
+  ownerNotificationEmail?: string;
+  ownerNotificationsEnabled?: boolean;
   reminderTemplate: string;
   rolesPolicy: string;
   stripeMode: StripeMode;
   timezone: string;
   updatedAt: string;
+  verifiedEmailSender?: string;
   workingDays: string;
   workingHours: string;
 };
@@ -314,6 +334,12 @@ export type AdminDomainRecords = {
 };
 
 export type AdminClientDatabaseRow = {
+  care_email_consent_at?: string | null;
+  care_email_consent_source?: "admin_recorded" | "public_booking" | null;
+  care_email_expected_consent_at?: string | null;
+  care_email_expected_consent_source?: "admin_recorded" | "public_booking" | null;
+  care_email_expected_withdrawn_at?: string | null;
+  care_email_withdrawn_at?: string | null;
   id: string;
   email: string;
   full_name: string;
@@ -487,6 +513,7 @@ export type AdminContactSettingsDatabaseRow = {
   phone: string;
   seo_area: string;
   working_hours: string;
+  working_schedule: BusinessHoursDay[];
 };
 
 export type AdminBlogPostDatabaseRow = {
@@ -517,11 +544,14 @@ export type AdminBlogPostDatabaseRow = {
   status: string;
   tag_labels: string[];
   title: string;
+  translation_key: string;
   updated_on: string;
 };
 
 export type AdminSiteSettingsDatabaseRow = {
   audit_log_retention_days: number;
+  blog_enabled?: boolean;
+  booking_customer_emails_enabled?: boolean;
   booking_buffer_minutes: number;
   booking_hold_minutes?: number;
   booking_horizon_days?: number;
@@ -534,12 +564,16 @@ export type AdminSiteSettingsDatabaseRow = {
   default_locale: string;
   default_seo_title: string;
   email_sender: string;
+  email_review_url?: string;
+  care_emails_enabled?: boolean;
   google_calendar_id: string;
   google_calendar_mode: string;
   gift_certificates_enabled: boolean;
   id: "site";
   public_booking_daily_limit?: number;
   public_booking_enabled?: boolean;
+  owner_notification_email?: string;
+  owner_notifications_enabled?: boolean;
   reminder_template: string;
   roles_policy: string;
   stripe_mode: string;
@@ -625,6 +659,16 @@ export function findUniqueClientByName(clients: ClientRecord[], name: string | u
 
 export function findAppointmentClient(clients: ClientRecord[], appointment: Appointment) {
   return findClientByIdentity(clients, appointment.clientId) ?? findUniqueClientByName(clients, appointment.client);
+}
+
+export function getAppointmentNotificationEmail(clients: ClientRecord[], appointment: Appointment) {
+  const publicEmail = appointment.publicEmail?.trim() ?? "";
+
+  if (appointment.origin === "public") {
+    return publicEmail;
+  }
+
+  return findAppointmentClient(clients, appointment)?.email.trim() || publicEmail;
 }
 
 export function findCertificateClient(clients: ClientRecord[], certificate: CertificateRecord) {

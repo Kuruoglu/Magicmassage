@@ -10,7 +10,11 @@ import {
   CALENDAR_WEEKDAY_LABELS,
 } from "./constants";
 import { appointmentCountLabel, formatCalendarDay, formatCalendarShortDay } from "./format";
-import { TimeGrid, type AppointmentOverlapLayout } from "./TimeGrid";
+import {
+  TimeGrid,
+  type AppointmentOverlapLayout,
+  type CalendarTimeSelection,
+} from "./TimeGrid";
 import { timeToPosition } from "./time";
 
 export type CalendarWeekDay = {
@@ -19,6 +23,7 @@ export type CalendarWeekDay = {
 };
 
 type WeekCalendarProps = {
+  activeTimeSelection?: CalendarTimeSelection;
   appointments: Appointment[];
   dragPreview?: Appointment;
   heading: string;
@@ -26,6 +31,7 @@ type WeekCalendarProps = {
   onDragOverAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onDropAppointment: (event: DragEvent<HTMLElement>, date: string) => void;
   onSelectDate: (date: string, appointments: Appointment[]) => void;
+  onSelectTimeRange?: (selection: CalendarTimeSelection) => void;
   renderAppointment: (
     appointment: Appointment,
     compact: boolean,
@@ -37,6 +43,7 @@ type WeekCalendarProps = {
 };
 
 export function WeekCalendar({
+  activeTimeSelection,
   appointments,
   dragPreview,
   heading,
@@ -44,6 +51,7 @@ export function WeekCalendar({
   onDragOverAppointment,
   onDropAppointment,
   onSelectDate,
+  onSelectTimeRange,
   renderAppointment,
   weekDays,
   workingHoursByDate = {},
@@ -97,12 +105,14 @@ export function WeekCalendar({
         })}
       </div>
       <TimeGrid
+        activeTimeSelection={activeTimeSelection}
         days={timeGridDays}
         dragPreview={dragPreview}
         isInteractionLocked={isInteractionLocked}
         mode="week"
         onDragOverAppointment={onDragOverAppointment}
         onDropAppointment={onDropAppointment}
+        onSelectTimeRange={onSelectTimeRange}
         renderAppointment={renderAppointment}
       />
     </div>

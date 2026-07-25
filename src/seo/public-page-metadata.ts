@@ -27,6 +27,10 @@ const metadataByLocale: Record<
       description:
         "Подаръчни сертификати за масаж в Magic Massage Natali: конкретни масажи, няколко сеанса или свободна сума в EUR.",
     },
+    blog: {
+      title: "Блог за масаж и възстановяване",
+      description: "Практични съвети за масаж, възстановяване и грижа за тялото от Magic Massage Natali в Бургас.",
+    },
     about: {
       title: "За Magic Massage Natali",
       description: "Научете повече за Натали, студиото и индивидуалния подход към всеки сеанс.",
@@ -62,6 +66,10 @@ const metadataByLocale: Record<
       title: "Подарочные сертификаты на массаж",
       description:
         "Подарочные сертификаты Magic Massage Natali: конкретные массажи, несколько сеансов или свободная сумма в EUR.",
+    },
+    blog: {
+      title: "Блог о массаже и восстановлении",
+      description: "Практические советы о массаже, восстановлении и заботе о теле от Magic Massage Natali в Бургасе.",
     },
     about: {
       title: "О Magic Massage Natali",
@@ -99,6 +107,10 @@ const metadataByLocale: Record<
       description:
         "Подарункові сертифікати Magic Massage Natali: конкретні масажі, кілька сеансів або вільна сума в EUR.",
     },
+    blog: {
+      title: "Блог про масаж і відновлення",
+      description: "Практичні поради про масаж, відновлення та турботу про тіло від Magic Massage Natali у Бургасі.",
+    },
     about: {
       title: "Про Magic Massage Natali",
       description: "Дізнайтеся більше про Наталі, салон та індивідуальний підхід до кожного сеансу.",
@@ -134,6 +146,10 @@ const metadataByLocale: Record<
       title: "Massage gift certificates",
       description:
         "Gift certificates for Magic Massage Natali: specific massages, multiple sessions or a free EUR amount.",
+    },
+    blog: {
+      title: "Massage and recovery blog",
+      description: "Practical advice about massage, recovery and body care from Magic Massage Natali in Burgas.",
     },
     about: {
       title: "About Magic Massage Natali",
@@ -197,5 +213,5 @@ export function createPublicPageMetadata(
 }
 
 export function getPublicSitemapPages(): PublicPageKey[] {
-  return [...publicPageKeys];
+  return publicPageKeys.filter((page) => page !== "blog");
 }

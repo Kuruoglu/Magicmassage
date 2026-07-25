@@ -12,20 +12,24 @@ export type LegalPageContent = {
   }>;
 };
 
-const thirdPartyNotes: Record<Locale, { maps: string; stripe: string }> = {
+const thirdPartyNotes: Record<Locale, { email: string; maps: string; stripe: string }> = {
   bg: {
+    email: "Ако посочите имейл, Resend го обработва за оперативни съобщения за записването или сертификата. Отделен имейл след посещение се изпраща само с изрично съгласие и може да бъде отказан по всяко време. Адресът и съдържанието на приключилите известия се заличават след 90 дни.",
     stripe: "Stripe обработва данните на картата в защитени платежни полета при покупка на подаръчен сертификат. Magic Massage Natali не съхранява номер на карта, CVC или банкови данни.",
     maps: "Google Maps се зарежда само след съгласие за незадължителни cookies. Можете да откажете и пак да използвате адреса и връзката за маршрут.",
   },
   ru: {
+    email: "Если указан email, Resend обрабатывает его для операционных писем о записи или сертификате. Отдельное письмо после визита отправляется только при явном согласии, которое можно отозвать в любое время. Адрес и содержимое завершённых уведомлений удаляются через 90 дней.",
     stripe: "Stripe обрабатывает данные карты в защищённых платёжных полях при покупке подарочного сертификата. Magic Massage Natali не хранит номер карты, CVC или банковские данные.",
     maps: "Google Maps загружается только после согласия на необязательные cookies. Можно отказаться и продолжить использовать адрес и ссылку на маршрут.",
   },
   ua: {
+    email: "Якщо вказано email, Resend обробляє його для операційних листів про запис або сертифікат. Окремий лист після візиту надсилається лише за явною згодою, яку можна відкликати будь-коли. Адресу та вміст завершених сповіщень видаляють через 90 днів.",
     stripe: "Stripe обробляє дані картки в захищених платіжних полях під час купівлі подарункового сертифіката. Magic Massage Natali не зберігає номер картки, CVC або банківські дані.",
     maps: "Google Maps завантажується лише після згоди на необов'язкові cookies. Можна відмовитися й далі користуватися адресою та посиланням на маршрут.",
   },
   en: {
+    email: "If you provide an email address, Resend processes it for operational appointment or certificate messages. A separate post-visit email is sent only with explicit consent, which can be withdrawn at any time. Final notification addresses and content are erased after 90 days.",
     stripe: "Stripe handles card data in secure payment fields for gift certificate purchases. Magic Massage Natali does not store card numbers, CVC or bank data.",
     maps: "Google Maps loads only after consent to optional cookies. You can decline and still use the address and directions link.",
   },
@@ -56,7 +60,7 @@ const content: Record<Locale, Record<LegalPageKey, LegalPageContent>> = {
         },
         {
           title: "Плащания и външни услуги",
-          paragraphs: [thirdPartyNotes.bg.stripe, thirdPartyNotes.bg.maps],
+          paragraphs: [thirdPartyNotes.bg.stripe, thirdPartyNotes.bg.email, thirdPartyNotes.bg.maps],
         },
         {
           title: "Контакт",
@@ -119,7 +123,7 @@ const content: Record<Locale, Record<LegalPageKey, LegalPageContent>> = {
         },
         {
           title: "Платежи и внешние сервисы",
-          paragraphs: [thirdPartyNotes.ru.stripe, thirdPartyNotes.ru.maps],
+          paragraphs: [thirdPartyNotes.ru.stripe, thirdPartyNotes.ru.email, thirdPartyNotes.ru.maps],
         },
         {
           title: "Контакт",
@@ -182,7 +186,7 @@ const content: Record<Locale, Record<LegalPageKey, LegalPageContent>> = {
         },
         {
           title: "Платежі та зовнішні сервіси",
-          paragraphs: [thirdPartyNotes.ua.stripe, thirdPartyNotes.ua.maps],
+          paragraphs: [thirdPartyNotes.ua.stripe, thirdPartyNotes.ua.email, thirdPartyNotes.ua.maps],
         },
         {
           title: "Контакт",
@@ -245,7 +249,7 @@ const content: Record<Locale, Record<LegalPageKey, LegalPageContent>> = {
         },
         {
           title: "Payments and third parties",
-          paragraphs: [thirdPartyNotes.en.stripe, thirdPartyNotes.en.maps],
+          paragraphs: [thirdPartyNotes.en.stripe, thirdPartyNotes.en.email, thirdPartyNotes.en.maps],
         },
         {
           title: "Contact",

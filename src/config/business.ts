@@ -8,8 +8,8 @@ export const businessFacts = {
     mapQuery: "49 ulitsa Mesta, Burgas, Bulgaria",
   },
   phone: {
-    display: "+359 89 677 8309",
-    tel: "+359896778309",
+    display: "+359 89 677 8308",
+    tel: "+359896778308",
   },
   email: "info@magicmassage.bg",
   bookingUrl: "https://studio24.bg/magic-massage-studio-natali-s8031",

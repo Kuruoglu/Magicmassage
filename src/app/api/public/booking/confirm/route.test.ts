@@ -33,6 +33,7 @@ vi.mock("@/booking/service", async (importOriginal) => {
 });
 
 const confirmationPayload = {
+  careEmailOptIn: false,
   contactPreference: "telegram",
   email: "client@example.com",
   fullName: "Client Example",
@@ -72,6 +73,7 @@ describe("public booking confirmation route", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ status: "confirmed" });
     expect(confirmPublicBooking).toHaveBeenCalledWith(expect.objectContaining({
+      careEmailOptIn: false,
       contactPreference: "telegram",
       idempotencyKey: "booking-submit-001",
       phoneNormalized: "359881234567",

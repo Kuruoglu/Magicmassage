@@ -1,3 +1,5 @@
+import type { BusinessHoursDay } from "@/lib/business-hours";
+
 export const publicContentLocales = ["bg", "ru", "ua", "en"] as const;
 
 export type PublicContentLocale = (typeof publicContentLocales)[number];
@@ -132,8 +134,18 @@ export type PublicBlogListData = {
 };
 
 export type PublicSiteFeatures = {
+  blogEnabled: boolean;
   giftCertificatesEnabled: boolean;
   publicBookingEnabled: boolean;
+};
+
+export type PublicBusinessDetails = {
+  address: string;
+  businessName: string;
+  phone: string;
+  seoArea: string;
+  updatedAt: string;
+  workingSchedule: BusinessHoursDay[];
 };
 
 export type PublicContentQueryResponse = {
@@ -172,6 +184,7 @@ export type PublicContentReadOptions = {
 };
 
 export type PublicContentDataLayer = {
+  getBusinessDetails(): Promise<PublicContentResult<PublicBusinessDetails>>;
   getBlogPost(
     slug: string,
     locale: PublicContentLocale,

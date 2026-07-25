@@ -1,11 +1,14 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getGiftCertificatesPageContent } from "@/content/gift-certificates-page";
 import { GiftCertificateForm } from "./gift-certificate-form";
 
 describe("GiftCertificateForm", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
   it("renders a structured checkout editor with a live certificate preview", () => {
     const content = getGiftCertificatesPageContent("en");
 
@@ -236,5 +239,95 @@ describe("GiftCertificateForm", () => {
     await user.type(screen.getByLabelText(content.form.purchaserEmailLabel), "anna@example.com");
 
     expect(submit).toBeEnabled();
+  });
+
+  it("rotates the idempotency key after an order changes but keeps retries stable", async () => {
+    const user = userEvent.setup();
+    const content = getGiftCertificatesPageContent("en");
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        amountEurCents: 4500,
+        clientSecret: null,
+        mode: "demo",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<GiftCertificateForm locale="en" content={content.form} stripePublishableKey="pk_test_example" />);
+    const name = screen.getByLabelText(content.form.purchaserNameLabel);
+    const email = screen.getByLabelText(content.form.purchaserEmailLabel);
+    const paymentSection = screen.getByRole("group", { name: content.form.paymentSectionTitle });
+
+    await user.type(name, "Anna Buyer");
+    await user.type(email, "anna@example.com");
+    await user.click(within(paymentSection).getByRole("button", { name: content.form.payAction }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const firstKey = new Headers(fetchMock.mock.calls[0][1]?.headers).get("idempotency-key");
+
+    await user.type(name, " Updated");
+    await user.click(within(paymentSection).getByRole("button", { name: content.form.payAction }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const secondKey = new Headers(fetchMock.mock.calls[1][1]?.headers).get("idempotency-key");
+
+    await user.click(within(paymentSection).getByRole("button", { name: content.form.payAction }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    const retryKey = new Headers(fetchMock.mock.calls[2][1]?.headers).get("idempotency-key");
+
+    expect(firstKey).toMatch(/^[A-Za-z0-9._:-]{16,128}$/);
+    expect(secondKey).toMatch(/^[A-Za-z0-9._:-]{16,128}$/);
+    expect(secondKey).not.toBe(firstKey);
+    expect(retryKey).toBe(secondKey);
+  });
+
+  it("ignores an obsolete payment session that resolves after the order changes", async () => {
+    const user = userEvent.setup();
+    const content = getGiftCertificatesPageContent("en");
+    const responses: Array<(response: Response) => void> = [];
+    const fetchMock = vi.fn<typeof fetch>(
+      () =>
+        new Promise<Response>((resolve) => {
+          responses.push(resolve);
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<GiftCertificateForm locale="en" content={content.form} stripePublishableKey="pk_test_example" />);
+    const name = screen.getByLabelText(content.form.purchaserNameLabel);
+    const email = screen.getByLabelText(content.form.purchaserEmailLabel);
+    const paymentSection = screen.getByRole("group", { name: content.form.paymentSectionTitle });
+
+    await user.type(name, "Anna Buyer");
+    await user.type(email, "anna@example.com");
+    await user.click(within(paymentSection).getByRole("button", { name: content.form.payAction }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    await user.type(name, " Updated");
+    await user.click(within(paymentSection).getByRole("button", { name: content.form.payAction }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    responses[0](
+      Response.json({
+        amountEurCents: 4500,
+        clientSecret: null,
+        mode: "demo",
+      }),
+    );
+    await waitFor(() =>
+      expect(within(paymentSection).queryByText(content.form.demoPaymentNotice)).not.toBeInTheDocument(),
+    );
+    expect(
+      within(paymentSection).getByRole("button", { name: content.form.preparingPayment }),
+    ).toBeDisabled();
+
+    responses[1](
+      Response.json({
+        amountEurCents: 4500,
+        clientSecret: null,
+        mode: "demo",
+      }),
+    );
+    expect(
+      await within(paymentSection).findByText(content.form.demoPaymentNotice),
+    ).toBeInTheDocument();
   });
 });

@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Appointment, ClientRecord, SpecialistRecord } from "@/admin/domain";
+import type { Appointment, CalendarBlock, ClientRecord, SpecialistRecord } from "@/admin/domain";
 
 import {
   CalendarAppointmentCancelDialog,
@@ -90,6 +91,17 @@ const conflictingAppointment: Appointment = {
   time: "14:30",
 };
 
+const personalCalendarBlock: CalendarBlock = {
+  blockDate: "2026-07-14",
+  endsAt: "15:30",
+  id: "block-lunch",
+  internalNote: "Обед",
+  kind: "personal",
+  specialistId: "specialist-natali",
+  specialistName: "Натали",
+  startsAt: "15:00",
+};
+
 const siteSettings = {
   timezone: "Europe/Sofia",
   workingDays: "Пн-Сб",
@@ -136,6 +148,32 @@ describe("CalendarAppointmentDialog", () => {
     );
   });
 
+  it("uses and preserves the public booking email snapshot while editing", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      initialAppointment: {
+        ...conflictingAppointment,
+        origin: "public",
+        publicEmail: "booking-snapshot@example.com",
+        publicReference: "MMN-20260714-0001",
+      },
+    });
+    const dialog = screen.getByRole("dialog", { name: "Редактировать запись" });
+
+    expect(within(dialog).getByText("Письмо будет отправлено на booking-snapshot@example.com.")).toBeVisible();
+    expect(within(dialog).queryByText(/maria@example\.com/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: "public",
+        publicEmail: "booking-snapshot@example.com",
+        publicReference: "MMN-20260714-0001",
+      }),
+      { notifyClient: true },
+    );
+  });
+
   it("preserves an existing appointment buffer snapshot when settings change", async () => {
     const user = userEvent.setup();
     const { onSave } = renderAppointmentDialog({
@@ -146,7 +184,7 @@ describe("CalendarAppointmentDialog", () => {
 
     await user.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ bufferMinutes: 15 }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ bufferMinutes: 15 }), { notifyClient: true });
   });
 
   it("searches existing clients and links the selected identity on save", async () => {
@@ -160,7 +198,124 @@ describe("CalendarAppointmentDialog", () => {
     await user.click(within(suggestions).getByRole("option", { name: /Мария Иванова/ }));
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ client: "Мария Иванова", clientId: "client-maria" }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ client: "Мария Иванова", clientId: "client-maria" }),
+      { notifyClient: true },
+    );
+  });
+
+  it("prefills the date, time, duration, and specialist from a selected calendar interval", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      prefillClient: clients[0],
+      prefillDate: "2026-07-20",
+      prefillDurationMinutes: 75,
+      prefillSpecialistId: "specialist-yana",
+      prefillTime: "14:15",
+    });
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+
+    expect(within(dialog).getByLabelText("Дата")).toHaveValue("2026-07-20");
+    expect(within(dialog).getByLabelText("Время")).toHaveValue("14:15");
+    expect(within(dialog).getByLabelText("Длительность, минут")).toHaveValue(75);
+    expect(within(dialog).getByLabelText("Специалист")).toHaveValue("specialist-yana");
+
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      date: "2026-07-20",
+      durationMinutes: 75,
+      specialistId: "specialist-yana",
+      time: "14:15",
+    }), { notifyClient: true });
+  });
+
+  it("preserves a normalized 23:59 selection duration when saving", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      prefillClient: clients[0],
+      prefillDurationMinutes: 14,
+      prefillTime: "23:45",
+    });
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+
+    expect(within(dialog).getByLabelText("Длительность, минут")).toHaveValue(14);
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ durationMinutes: 14, time: "23:45" }),
+      { notifyClient: true },
+    );
+  });
+
+  it("blocks an appointment that crosses personal time for the same specialist", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      calendarBlocks: [personalCalendarBlock],
+      prefillClient: clients[0],
+      prefillTime: "14:00",
+    });
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+
+    expect(within(dialog).getByRole("status")).toHaveTextContent(
+      "Время пересекается с блокировкой 15:00 - 15:30",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Выбранное время уже заблокировано");
+  });
+
+  it("requires a specialist when the interval came from the all-specialists view", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderAppointmentDialog({
+      prefillClient: clients[0],
+      requireSpecialistSelection: true,
+    });
+    const dialog = screen.getByRole("dialog", { name: "Новая запись" });
+
+    expect(within(dialog).getByLabelText("Специалист")).toHaveValue("");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("alert")).toBeInTheDocument();
+  });
+
+  it("defaults client email notification on and disables it when no email exists", () => {
+    const withoutEmail = { ...clients[0], email: "" };
+    const { unmount } = render(
+      <CalendarAppointmentDialog
+        appointments={[]}
+        bookingBufferMinutes={30}
+        clients={clients}
+        onClose={vi.fn()}
+        onSave={vi.fn(async () => ({ ok: true as const }))}
+        prefillClient={clients[0]}
+        prefillDate="2026-07-14"
+        role="owner"
+        siteSettings={siteSettings}
+        specialists={specialists}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "Отправить клиенту подтверждение записи" })).toBeChecked();
+    unmount();
+
+    render(
+      <CalendarAppointmentDialog
+        appointments={[]}
+        bookingBufferMinutes={30}
+        clients={[withoutEmail]}
+        onClose={vi.fn()}
+        onSave={vi.fn(async () => ({ ok: true as const }))}
+        prefillClient={withoutEmail}
+        prefillDate="2026-07-14"
+        role="owner"
+        siteSettings={siteSettings}
+        specialists={specialists}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "Отправить клиенту подтверждение записи" })).toBeDisabled();
+    expect(screen.getByText(/У выбранного клиента нет email/)).toBeVisible();
   });
 
   it("supports keyboard selection through an accessible client combobox", async () => {
@@ -180,7 +335,7 @@ describe("CalendarAppointmentDialog", () => {
     expect(clientInput).toHaveAttribute("aria-expanded", "false");
 
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ clientId: "client-maria" }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ clientId: "client-maria" }), { notifyClient: true });
   });
 
   it("guards backdrop and Escape closing when the appointment has unsaved changes", async () => {
@@ -317,6 +472,7 @@ describe("CalendarAppointmentDialog", () => {
         specialistId: "specialist-yana",
         specialistName: "Яна",
       }),
+      { notifyClient: true },
     );
   });
 
@@ -338,6 +494,7 @@ describe("CalendarAppointmentDialog", () => {
         specialistId: "specialist-yana",
         specialistName: "Яна",
       }),
+      { notifyClient: false },
     );
   });
 
@@ -408,6 +565,7 @@ describe("CalendarAppointmentDialog", () => {
           postVisitComment: "Клиент отметил улучшение.",
           postVisitCommentedAt: expect.any(String),
         }),
+        { notifyClient: true },
       ),
     );
     expect(within(dialog).getByRole("alert")).toHaveTextContent("Сервер отклонил запись.");
@@ -430,6 +588,14 @@ describe("CalendarAppointmentDialog", () => {
     await user.click(within(dialog).getByRole("button", { name: "Сохранить запись" }));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("button", { name: "Сохранение…" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Отмена" })).toBeDisabled();
+    expect(within(dialog).getByRole("form", { name: "Форма новой записи" })).toHaveAttribute("aria-busy", "true");
+
+    fireEvent.submit(within(dialog).getByRole("form", { name: "Форма новой записи" }));
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
 
     await act(async () => resolveSave?.({ ok: true }));
 
@@ -446,6 +612,7 @@ describe("CalendarAppointmentCancelDialog", () => {
     render(
       <CalendarAppointmentCancelDialog
         appointment={conflictingAppointment}
+        clientEmail="maria@example.com"
         onClose={onClose}
         onConfirm={onConfirm}
       />,
@@ -457,8 +624,8 @@ describe("CalendarAppointmentCancelDialog", () => {
     await user.click(within(dialog).getByRole("button", { name: "Оставить запись" }));
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    await user.click(within(dialog).getByRole("button", { name: "Подтвердить отмену" }));
-    expect(onConfirm).toHaveBeenCalledWith(conflictingAppointment);
+    await user.click(within(dialog).getByRole("button", { name: "Отменить запись" }));
+    expect(onConfirm).toHaveBeenCalledWith(conflictingAppointment, { notifyClient: true });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(2));
   });
 
@@ -475,9 +642,64 @@ describe("CalendarAppointmentCancelDialog", () => {
     );
 
     const dialog = screen.getByRole("dialog", { name: "Отменить запись" });
-    await user.click(within(dialog).getByRole("button", { name: "Подтвердить отмену" }));
+    await user.click(within(dialog).getByRole("button", { name: "Отменить запись" }));
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("Отмена не сохранена.");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("disables client notification when the appointment has no email", () => {
+    render(
+      <CalendarAppointmentCancelDialog
+        appointment={conflictingAppointment}
+        onClose={vi.fn()}
+        onConfirm={vi.fn(async () => ({ ok: true as const }))}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "Уведомить клиента об отмене" })).toBeDisabled();
+    expect(screen.getByText("У клиента нет email. Отмена сохранится без письма.")).toBeVisible();
+  });
+
+  it("traps focus above the appointment drawer and restores the trigger", async () => {
+    const user = userEvent.setup();
+
+    function NestedCancellationHarness() {
+      const [isOpen, setIsOpen] = useState(false);
+
+      return (
+        <>
+          <section aria-label="Детали записи" aria-modal="true" role="dialog">
+            <button onClick={() => setIsOpen(true)} type="button">Открыть отмену</button>
+          </section>
+          {isOpen ? (
+            <CalendarAppointmentCancelDialog
+              appointment={conflictingAppointment}
+              clientEmail="maria@example.com"
+              onClose={() => setIsOpen(false)}
+              onConfirm={vi.fn(async () => ({ ok: true as const }))}
+            />
+          ) : null}
+        </>
+      );
+    }
+
+    render(<NestedCancellationHarness />);
+    const trigger = screen.getByRole("button", { name: "Открыть отмену" });
+    await user.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "Отменить запись" });
+    const underlyingDialog = document.querySelector<HTMLElement>('[aria-label="Детали записи"]')!;
+    expect(within(dialog).getByRole("heading", { name: "Отменить запись" })).toHaveFocus();
+    expect(underlyingDialog).toHaveAttribute("aria-hidden", "true");
+    expect(underlyingDialog).toHaveAttribute("inert");
+
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(within(dialog).getByRole("button", { name: "Оставить запись" })).toHaveFocus();
+    await user.click(within(dialog).getByRole("button", { name: "Оставить запись" }));
+
+    expect(trigger).toHaveFocus();
+    expect(underlyingDialog).not.toHaveAttribute("aria-hidden");
+    expect(underlyingDialog).not.toHaveAttribute("inert");
   });
 });

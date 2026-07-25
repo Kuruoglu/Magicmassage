@@ -134,7 +134,10 @@ describe("PublicBookingFlow", () => {
     expect(await screen.findByRole("heading", { name: "Your contact details" })).toBeInTheDocument();
     await user.type(screen.getByLabelText("Name"), "Anna Petrova");
     await user.type(screen.getAllByLabelText("Phone")[0], "+359 88 123 4567");
-    await user.click(screen.getByRole("checkbox"));
+    const careEmailConsent = screen.getByRole("checkbox", { name: /follow-up email/i });
+    expect(careEmailConsent).not.toBeChecked();
+    expect(careEmailConsent).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: /privacy policy/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByRole("heading", { name: "Review your booking" })).toBeInTheDocument();
@@ -170,6 +173,7 @@ describe("PublicBookingFlow", () => {
     const confirmRequests = requests.filter((request) => request.url === "/api/public/booking/confirm");
     expect(confirmRequests).toHaveLength(2);
     expect(JSON.parse(confirmRequests[0].body ?? "{}")).toEqual({
+      careEmailOptIn: false,
       email: "",
       fullName: "Anna Petrova",
       holdToken: "hold-token",
@@ -483,7 +487,7 @@ describe("PublicBookingFlow", () => {
     await user.click(screen.getByRole("button", { name: "10:00" }));
     await user.type(await screen.findByLabelText("Name"), "A");
     await user.type(screen.getAllByLabelText("Phone")[0], "123");
-    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("checkbox", { name: /privacy policy/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(screen.getByText("Enter a name with at least 2 characters.")).toBeInTheDocument();

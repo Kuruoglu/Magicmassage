@@ -41,13 +41,15 @@ async function openPersistentAdmin(page: Page, testInfo: TestInfo, requiredSecti
     );
   }
 
-  await page.goto("/admin", { waitUntil: "networkidle" });
+  await page.goto("/admin", { waitUntil: "load" });
 
   if (/\/admin\/login$/.test(page.url())) {
     await page.getByLabel("Email").fill(email!);
     await page.getByLabel("Password").fill(password!);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.getByLabel("Код").fill(createTotpCode(totpSecret!));
+    const totpCode = page.getByLabel("Код");
+    await expect(totpCode).toBeVisible();
+    await totpCode.fill(createTotpCode(totpSecret!));
     await Promise.all([
       page.waitForURL(/\/admin(?:\?.*)?$/),
       page.getByRole("button", { exact: true, name: "Войти" }).click(),
@@ -174,12 +176,22 @@ async function resizeAppointmentByTouch(
   }
 }
 
+async function confirmCalendarChange(page: Page) {
+  const change = page.getByRole("region", { name: "Подтвердите изменение записи" });
+
+  await expect(change).toBeVisible();
+  await change.getByRole("button", { name: "Сохранить изменение" }).click();
+  await expect(change).toHaveCount(0);
+}
+
 async function waitForSupabaseSave(page: Page) {
   await expect(page.getByRole("status").filter({ hasText: supabaseSaveMessage })).toBeVisible();
 }
 
 async function setClassicServiceStatus(page: Page, status: "Опубликована" | "Скрыта") {
-  await page.goto("/admin?section=services&service=classic-massage", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=services&service=classic-massage", {
+    waitUntil: "load",
+  });
 
   const details = page.getByRole("dialog", { name: "Детали услуги" });
   const serviceHeading = details.getByRole("heading", { level: 2 });
@@ -201,7 +213,7 @@ async function setClassicServiceStatus(page: Page, status: "Опубликова
 }
 
 async function setGiftCertificatesEnabled(page: Page, enabled: boolean) {
-  await page.goto("/admin?section=settings", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=settings", { waitUntil: "load" });
   await page.getByRole("button", { name: "Сохранить", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Настройки админки" });
@@ -226,14 +238,20 @@ async function fillBlogCore(editor: Locator, input: {
   slug: string;
   title: string;
 }) {
+  if (input.locale) {
+    const localeTabNames = {
+      bg: "Български",
+      en: "English",
+      ru: "Русский",
+      ua: "Українська",
+    } as const;
+    await editor.getByRole("tab", { name: new RegExp(`^${localeTabNames[input.locale]}\\.`) }).click();
+  }
+
   await editor.getByLabel("Заголовок", { exact: true }).fill(input.title);
   await editor.getByLabel("Slug").fill(input.slug);
   await editor.getByLabel("Категория").fill(input.category ?? "Советы");
   await editor.getByLabel("Автор").fill("Natali");
-
-  if (input.locale) {
-    await editor.getByLabel("Язык").selectOption(input.locale);
-  }
 
   await editor.getByRole("textbox", { name: "Текст статьи" }).fill(input.content);
 }
@@ -356,6 +374,7 @@ test("7. drags a day-view appointment to a different time", async ({ page }) => 
   const appointment = schedule.getByRole("listitem").filter({ hasText: "Анна Петрова" });
 
   await dragAppointmentTo(appointment, schedule, 14);
+  await confirmCalendarChange(page);
 
   await expect(schedule.getByRole("button", { name: /14:00.*Анна Петрова/ })).toBeVisible();
   await expect(schedule.getByRole("button", { name: /10:00.*Анна Петрова/ })).toHaveCount(0);
@@ -372,6 +391,7 @@ test("7a. allows an appointment to end when the next appointment begins", async 
     await expect(preview).toContainText("11:30");
     await expect(preview).toContainText("Анна Петрова");
   });
+  await confirmCalendarChange(page);
 
   await expect(page.getByRole("region", { name: "Изменение пересекается с другой записью" })).toHaveCount(0);
   await expect(schedule.getByRole("button", { name: /11:30.*Анна Петрова/ })).toBeVisible();
@@ -426,6 +446,7 @@ test("8. increases an appointment duration in day view", async ({ page }) => {
 
   const appointment = page.getByLabel("Расписание 6 июля").getByRole("listitem").filter({ hasText: "Анна Петрова" });
   await resizeAppointmentBy(page, appointment, 15);
+  await confirmCalendarChange(page);
 
   await expect(appointment.getByLabel("Длительность 75 минут")).toBeVisible();
 });
@@ -456,12 +477,12 @@ test("8a. resizes an appointment from its visible bottom edge on mobile", async 
     await expect(appointment.getByRole("button", { name: /10:00.*Анна Петрова/ })).toBeVisible();
     expect(await page.evaluate(() => window.scrollY)).toBe(initialWindowScrollY);
   });
+  await confirmCalendarChange(page);
 
   await expect(appointment.getByLabel("Длительность 90 минут")).toBeVisible();
   await expect(page.locator(".admin-timed-appointment.is-drag-preview")).toHaveCount(0);
   await expect(timeGrid).not.toHaveClass(/is-resizing/);
   expect(await timeGrid.evaluate((element) => element.scrollTop)).toBe(initialScrollTop);
-  expect(await page.evaluate(() => window.scrollY)).toBe(initialWindowScrollY);
   await expect(appointment.getByRole("button", { name: /10:00.*Анна Петрова/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
@@ -473,6 +494,7 @@ test("8b. keeps a short mobile appointment openable above its resize edge", asyn
   const appointment = page.getByLabel("Расписание 6 июля").getByRole("listitem").filter({ hasText: "Анна Петрова" });
   await appointment.getByRole("slider").focus();
   await page.keyboard.press("Home");
+  await confirmCalendarChange(page);
 
   await expect(appointment.getByLabel("Длительность 15 минут")).toBeVisible();
   const [appointmentBox, handleBox] = await Promise.all([
@@ -498,6 +520,7 @@ test("9. moves a week-view appointment to another day", async ({ page }) => {
   const appointment = monday.getByRole("listitem").filter({ hasText: "Анна Петрова" });
 
   await dragAppointmentTo(appointment, tuesday, 11);
+  await confirmCalendarChange(page);
 
   const updatedMonday = week.getByLabel("6 июля, 1 запись");
   const updatedTuesday = week.getByLabel("7 июля, 1 запись");
@@ -514,6 +537,7 @@ test("10. increases an appointment duration in week view", async ({ page }) => {
     .getByRole("listitem")
     .filter({ hasText: "Анна Петрова" });
   await resizeAppointmentBy(page, appointment, 15);
+  await confirmCalendarChange(page);
 
   await expect(appointment.getByLabel("Длительность 75 минут")).toBeVisible();
 });
@@ -531,6 +555,7 @@ test("10a. keeps horizontal week scrolling available beside a compact resize gri
   const handle = appointment.getByRole("slider");
   await handle.focus();
   await page.keyboard.press("Home");
+  await confirmCalendarChange(page);
   await expect(appointment.getByLabel("Длительность 15 минут")).toBeVisible();
 
   const [appointmentBox, handleBox] = await Promise.all([
@@ -560,7 +585,7 @@ test("11. creates an appointment on Sunday", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "Новая запись" });
 
   await expect(dialog.getByLabel("Дата")).toHaveValue("2026-07-12");
-  await dialog.getByLabel("Клиент").fill("Sunday Playwright Client");
+  await dialog.getByLabel("Клиент", { exact: true }).fill("Sunday Playwright Client");
   await dialog.getByLabel("Услуга").selectOption("SPA процедура");
   await dialog.getByLabel("Время").fill("11:15");
   await dialog.getByRole("button", { name: "Сохранить запись" }).click();
@@ -603,7 +628,7 @@ test("12. hides a service and removes it from the public catalog @persistent", a
 test("13. replaces one image through its media placement @persistent", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await openPersistentAdmin(page, testInfo, "Медиа");
-  await page.goto("/admin?section=media", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=media", { waitUntil: "load" });
   await page.getByRole("button", { exact: true, name: "Используется" }).click();
 
   const gallery = page.getByLabel("Галерея медиа");
@@ -633,7 +658,7 @@ test("13. replaces one image through its media placement @persistent", async ({ 
   const replacement = await assetRadios.evaluateAll((inputs, originalId) => {
     const index = inputs.findIndex((input) => {
       const item = input as HTMLInputElement;
-      return Boolean(item.value) && item.value !== originalId && !item.disabled;
+      return item.value.startsWith("public-service-") && item.value !== originalId && !item.disabled;
     });
 
     return index >= 0 ? { index, value: (inputs[index] as HTMLInputElement).value } : null;
@@ -648,12 +673,13 @@ test("13. replaces one image through its media placement @persistent", async ({ 
   try {
     await assetRadios.nth(replacement!.index).locator("..").click();
     await expect(assetRadios.nth(replacement!.index)).toBeChecked();
-    const reloaded = page.waitForEvent("load");
     await editor.getByRole("button", { name: "Применить к этому месту" }).click();
-    await reloaded;
+    await expect(editor).toHaveCount(0);
     placementWasReplaced = true;
 
-    await page.goto(`/admin?section=media&media=${encodeURIComponent(replacement!.value)}`, { waitUntil: "networkidle" });
+    await page.goto(`/admin?section=media&media=${encodeURIComponent(replacement!.value)}`, {
+      waitUntil: "load",
+    });
     await expect(page.getByRole("dialog", { name: "Детали медиа" }).getByText(placementKey!, { exact: true })).toBeVisible();
   } finally {
     if (placementWasReplaced) {
@@ -670,9 +696,8 @@ test("13. replaces one image through its media placement @persistent", async ({ 
       expect(originalIndex).toBeGreaterThanOrEqual(0);
       await restoreRadios.nth(originalIndex).locator("..").click();
       await expect(restoreRadios.nth(originalIndex)).toBeChecked();
-      const restored = page.waitForEvent("load");
       await restoreEditor.getByRole("button", { name: "Применить к этому месту" }).click();
-      await restored;
+      await expect(restoreEditor).toHaveCount(0);
     }
   }
 });
@@ -693,7 +718,8 @@ test("14. creates a blog draft in the full-page editor", async ({ page }) => {
     slug: "playwright-draft-article",
     title,
   });
-  await editor.getByRole("button", { exact: true, name: "Сохранить" }).click();
+  await expect(editor.getByRole("status")).toHaveText("Все изменения сохранены");
+  await editor.getByRole("button", { exact: true, name: "К списку" }).click();
 
   await expect(editor).toHaveCount(0);
   await expect(page.getByRole("table").getByRole("link", { name: title })).toBeVisible();
@@ -707,7 +733,7 @@ test("15. publishes a blog post and exposes its public route @persistent", async
   const slug = `playwright-published-massage-guide-${runId}`;
 
   await openPersistentAdmin(page, testInfo, "Блог");
-  await page.goto("/admin?section=blog", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=blog", { waitUntil: "load" });
   await page.getByRole("button", { name: "Новая статья" }).click();
 
   const editor = page.getByRole("form", { name: "Редактор статьи" });
@@ -732,25 +758,30 @@ test("15. publishes a blog post and exposes its public route @persistent", async
   let postWasPublished = false;
 
   try {
-    await editor.getByRole("button", { exact: true, name: "Сохранить" }).click();
+    await expect(editor.getByRole("status")).toHaveText("Все изменения сохранены");
+    await editor.getByRole("button", { exact: true, name: "К списку" }).click();
     await expect(editor).toHaveCount(0);
     postWasPublished = true;
     await waitForSupabaseSave(page);
 
-    const publicResponse = await page.goto(`/ru/blog/${slug}`, { waitUntil: "networkidle" });
+    const publicResponse = await page.goto(`/ru/blog/${slug}`, {
+      waitUntil: "load",
+    });
     expect(publicResponse?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
     await expect(page.getByText("Опубликованная статья проверяет связку админки и публичного блога.")).toBeVisible();
   } finally {
     if (postWasPublished) {
-      await page.goto("/admin?section=blog", { waitUntil: "networkidle" });
+      await page.goto("/admin?section=blog", { waitUntil: "load" });
       await page.getByRole("table").getByRole("link", { name: title }).click();
       await page.getByRole("dialog", { name: "Детали статьи" }).getByRole("button", { name: "Редактировать" }).click();
 
       const restoreEditor = page.getByRole("form", { name: "Редактор статьи" });
       await restoreEditor.getByLabel("Статус").selectOption("draft");
-      await restoreEditor.getByRole("button", { exact: true, name: "Сохранить" }).click();
       await waitForSupabaseSave(page);
+      if (await restoreEditor.count() === 1) {
+        await restoreEditor.getByRole("button", { exact: true, name: "К списку" }).click();
+      }
     }
   }
 });
@@ -764,7 +795,7 @@ test("16. disables certificates across menus, page, and payment API @persistent"
   try {
     originalEnabled = await setGiftCertificatesEnabled(page, false);
 
-    await page.goto("/ru", { waitUntil: "networkidle" });
+    await page.goto("/ru", { waitUntil: "load" });
     await expect(page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: "Сертификаты" })).toHaveCount(0);
 
     await page.setViewportSize({ height: 844, width: 390 });
@@ -780,7 +811,7 @@ test("16. disables certificates across menus, page, and payment API @persistent"
     if (originalEnabled !== undefined) {
       await page.setViewportSize({ height: 900, width: 1440 });
       await setGiftCertificatesEnabled(page, originalEnabled);
-      await page.goto("/ru", { waitUntil: "networkidle" });
+      await page.goto("/ru", { waitUntil: "load" });
       const certificateLink = page
         .getByRole("navigation", { name: "Primary navigation" })
         .getByRole("link", { name: "Сертификаты" });

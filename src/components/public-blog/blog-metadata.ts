@@ -52,7 +52,8 @@ export function createBlogPostMetadata(locale: Locale, post: PublicBlogPost): Me
   const copy = getBlogCopy(locale);
   const fallbackCanonical = getBlogPostPath(locale, post.slug);
   const canonical = post.seo.canonicalUrl || fallbackCanonical;
-  const title = post.seo.ogTitle || post.title;
+  const title = post.title;
+  const openGraphTitle = post.seo.ogTitle || post.title;
   const description = post.seo.description || post.seo.ogDescription || copy.articleFallbackDescription;
   const configuredLanguages = Object.fromEntries(
     Object.entries(post.seo.hreflang).flatMap(([item, url]) => {
@@ -73,7 +74,7 @@ export function createBlogPostMetadata(locale: Locale, post: PublicBlogPost): Me
     description,
     alternates: { canonical, languages },
     openGraph: {
-      title,
+      title: openGraphTitle,
       description: post.seo.ogDescription || description,
       locale: openGraphLocales[locale],
       type: "article",

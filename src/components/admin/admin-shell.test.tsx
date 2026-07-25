@@ -1,11 +1,37 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { cloneBusinessHoursSchedule } from "@/lib/business-hours";
 
 import { AdminShell } from "./admin-shell";
 
+const blogVisibilitySettings = {
+  auditLogRetentionDays: 365,
+  blogEnabled: true,
+  bookingBufferMinutes: 30,
+  businessName: "Magic Massage Natali",
+  cookiePrivacyMode: "External embeds load only when needed.",
+  currency: "EUR" as const,
+  dailySlotCapacity: 6,
+  defaultLocale: "bg",
+  defaultSeoTitle: "Magic Massage Natali Burgas",
+  emailSender: "info@magicmassage.bg",
+  googleCalendarId: "",
+  googleCalendarMode: "Внутренний календарь главный" as const,
+  publicBookingDailyLimit: 8,
+  publicBookingEnabled: false,
+  reminderTemplate: "Reminder",
+  rolesPolicy: "Role policy",
+  stripeMode: "Тестовый" as const,
+  timezone: "Europe/Sofia",
+  updatedAt: "2026-07-18",
+  workingDays: "Пн-Сб",
+  workingHours: "10:00-19:00",
+};
+
 describe("AdminShell", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -30,9 +56,90 @@ describe("AdminShell", () => {
       "/admin?section=calendar&role=specialist",
     );
     expect(screen.queryByRole("link", { name: "Финансы" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Комментарии после визита" })).not.toBeInTheDocument();
+  });
+
+  it("shows the owner an oldest-first queue of past visits without comments", async () => {
+    const user = userEvent.setup();
+    render(
+      <AdminShell
+        activeSection="dashboard"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [
+              {
+                client: "Анна Петрова",
+                clientId: "client-anna",
+                date: "2026-07-04",
+                id: "visit-anna",
+                note: "",
+                service: "Классический массаж",
+                status: "Завершена",
+                time: "10:00",
+              },
+            ],
+            certificates: [],
+            clients: [
+              {
+                email: "anna@example.com",
+                history: [],
+                id: "client-anna",
+                language: "ru",
+                name: "Анна Петрова",
+                next: "—",
+                note: "",
+                phone: "+359 88 111 2233",
+                preferredContact: "Телефон",
+                status: "Активный клиент",
+                tags: [],
+                telegram: "",
+                totalSpend: "0 €",
+                visits: 1,
+              },
+            ],
+          },
+          source: "demo",
+        }}
+        role="owner"
+      />,
+    );
+
+    const queue = screen.getByRole("region", { name: "Комментарии после визита" });
+    expect(within(queue).getByText("1 визит без комментария")).toBeInTheDocument();
+    expect(within(queue).getByRole("link", { name: "Анна Петрова" })).toHaveAttribute(
+      "href",
+      "/admin?section=clients&role=owner&client=client-anna",
+    );
+
+    await user.click(within(queue).getByRole("button", { name: /Заполнить комментарий: Анна Петрова/ }));
+    await user.type(
+      within(queue).getByLabelText("Комментарий после визита"),
+      "Клиент хорошо перенёс массаж.",
+    );
+    await user.click(within(queue).getByRole("button", { name: "Сохранить комментарий" }));
+
+    expect(
+      await within(queue).findByText("Все комментарии после прошедших визитов заполнены."),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["administrator", true],
+    ["viewer", false],
+  ] as const)("applies post-visit queue access for the %s role", (role, isVisible) => {
+    render(<AdminShell activeSection="dashboard" role={role} />);
+
+    const queueHeading = screen.queryByRole("heading", {
+      name: "Комментарии после визита",
+    });
+    expect(Boolean(queueHeading)).toBe(isVisible);
   });
 
   it("links dashboard operational rows to the connected workspaces", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-05T09:00:00.000Z"));
+
     render(<AdminShell activeSection="dashboard" role="owner" />);
 
     expect(screen.queryByRole("heading", { name: "Операционная очередь" })).not.toBeInTheDocument();
@@ -44,9 +151,14 @@ describe("AdminShell", () => {
       "href",
       "/admin?section=calendar&role=owner",
     );
-    expect(screen.getByRole("link", { name: "Анна Петрова" })).toHaveAttribute(
-      "href",
-      "/admin?section=clients&role=owner&client=client-359881112233",
+    expect(screen.getAllByRole("link", { name: "Анна Петрова" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          href: expect.stringContaining(
+            "/admin?section=clients&role=owner&client=client-359881112233",
+          ),
+        }),
+      ]),
     );
     expect(within(screen.getByRole("row", { name: /10:00 Анна Петрова/ })).getByRole("link", { name: "Календарь" })).toHaveAttribute(
       "href",
@@ -56,6 +168,110 @@ describe("AdminShell", () => {
       "href",
       "/admin?section=certificates&role=owner&certificate=MMN-2407-1023",
     );
+  });
+
+  it("shows only future appointments in chronological order on the dashboard", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-25T08:00:30.000Z"));
+
+    render(
+      <AdminShell
+        activeSection="dashboard"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [
+              {
+                client: "Прошедшая запись",
+                date: "2026-07-25",
+                id: "past-today",
+                note: "",
+                service: "Классический массаж",
+                status: "Новая заявка",
+                time: "10:30",
+              },
+              {
+                client: "Завтрашняя запись",
+                date: "2026-07-26",
+                id: "future-tomorrow",
+                note: "",
+                service: "Классический массаж",
+                status: "Подтверждена",
+                time: "09:00",
+              },
+              {
+                client: "Ближайшая запись",
+                date: "2026-07-25",
+                id: "future-today",
+                note: "",
+                service: "Классический массаж",
+                status: "Новая заявка",
+                time: "11:30",
+              },
+              {
+                client: "Отменённая запись",
+                date: "2026-07-25",
+                id: "cancelled-future",
+                note: "",
+                service: "Классический массаж",
+                status: "Отменена",
+                time: "12:00",
+              },
+            ],
+            certificates: [],
+            clients: [],
+          },
+          settings: blogVisibilitySettings,
+          source: "demo",
+        }}
+        role="owner"
+      />,
+    );
+
+    const upcomingSection = screen.getByRole("heading", { name: "Ближайшие записи" }).closest("section");
+    expect(upcomingSection).not.toBeNull();
+
+    const rows = within(upcomingSection as HTMLElement).getAllByRole("row");
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toHaveTextContent("Ближайшая запись");
+    expect(rows[2]).toHaveTextContent("Завтрашняя запись");
+    expect(within(upcomingSection as HTMLElement).queryByText("Прошедшая запись")).not.toBeInTheDocument();
+    expect(within(upcomingSection as HTMLElement).queryByText("Отменённая запись")).not.toBeInTheDocument();
+  });
+
+  it("shows an explicit empty state when there are no future appointments", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-25T08:00:30.000Z"));
+
+    render(
+      <AdminShell
+        activeSection="dashboard"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [
+              {
+                client: "Прошедшая запись",
+                date: "2026-07-24",
+                id: "past-only",
+                note: "",
+                service: "Классический массаж",
+                status: "Новая заявка",
+                time: "15:00",
+              },
+            ],
+            certificates: [],
+            clients: [],
+          },
+          settings: blogVisibilitySettings,
+          source: "demo",
+        }}
+        role="owner"
+      />,
+    );
+
+    expect(screen.getByText("Будущих записей пока нет.")).toBeInTheDocument();
+    expect(screen.queryByText("Прошедшая запись")).not.toBeInTheDocument();
   });
 
   it("hides restricted dashboard operation links for a specialist", () => {
@@ -234,6 +450,7 @@ describe("AdminShell", () => {
               status: "Запланирована",
               tags: ["supabase", "blog"],
               title: "Supabase Blog",
+              translationKey: "blog-supabase",
               updatedAt: "2026-07-09",
             },
           ],
@@ -254,6 +471,88 @@ describe("AdminShell", () => {
       "/admin?section=blog&role=owner&blog=blog-supabase",
     );
     expect(screen.queryByText("Подготовка к первому массажу")).not.toBeInTheDocument();
+  });
+
+  it("toggles public blog visibility through the narrow admin record", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (...args: [RequestInfo | URL, RequestInit?]) => {
+      void args;
+      return new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts: [],
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          settings: blogVisibilitySettings,
+          source: "supabase",
+        }}
+        role="editor"
+      />,
+    );
+
+    const toggle = screen.getByRole("switch", { name: "Показывать блог на сайте" });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(toggle).not.toBeChecked();
+    const [, requestInit] = fetchMock.mock.calls[0];
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toEqual({
+      audit: { action: "site.blog_visibility" },
+      record: { enabled: false },
+      type: "blogVisibility",
+    });
+    expect(screen.getByText("Блог скрыт на сайте; статьи сохранены в админке.")).toBeInTheDocument();
+  });
+
+  it("keeps blog visibility read-only for a viewer", () => {
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts: [],
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          settings: blogVisibilitySettings,
+          source: "supabase",
+        }}
+        role="viewer"
+      />,
+    );
+
+    expect(screen.getByRole("switch", { name: "Показывать блог на сайте" })).toBeDisabled();
+  });
+
+  it("restores blog visibility when persistence fails", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ message: "write failed", ok: false }), { status: 500 }),
+    ));
+
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts: [],
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          settings: blogVisibilitySettings,
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    const toggle = screen.getByRole("switch", { name: "Показывать блог на сайте" });
+    await user.click(toggle);
+
+    expect(await screen.findByText("Не удалось изменить видимость блога. Исходное состояние восстановлено.")).toBeInTheDocument();
+    expect(toggle).toBeChecked();
   });
 
   it("renders supplied initial settings instead of demo settings", () => {
@@ -494,6 +793,7 @@ describe("AdminShell", () => {
             phone: "+359 88 000 1122",
             seoArea: "Burgas",
             workingHours: "Пн-Сб 10:00-19:00",
+            workingSchedule: cloneBusinessHoursSchedule(),
           },
           financeRows: [],
           records: {
@@ -762,8 +1062,11 @@ describe("AdminShell", () => {
     const details = screen.getByRole("dialog", { name: "Детали контакта" });
     expect(details).toHaveClass("admin-drawer-panel");
     expect(within(details).getByRole("heading", { name: "Телефон салона" })).toBeInTheDocument();
-    expect(within(details).getByText("+359 89 677 8309")).toBeInTheDocument();
+    expect(within(details).getByText("+359 89 677 8308")).toBeInTheDocument();
     expect(within(details).getByText("LocalBusiness SEO")).toBeInTheDocument();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+    expect(within(screen.getByRole("dialog", { name: "Редактировать контакт" })).getByLabelText("Тип")).toBeDisabled();
   });
 
   it("posts saved contact settings when the admin shell is backed by Supabase", async () => {
@@ -798,7 +1101,7 @@ describe("AdminShell", () => {
     fireEvent.change(within(dialog).getByLabelText("Телефон"), { target: { value: "+359 87 333 4411" } });
     fireEvent.change(within(dialog).getByLabelText("Адрес"), { target: { value: "ул. Места 49, Бургас, Болгария" } });
     fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "info@magicmassage.bg" } });
-    fireEvent.change(within(dialog).getByLabelText("Часы работы"), { target: { value: "Пн-Сб 10:00-19:00" } });
+    fireEvent.change(within(dialog).getByLabelText("Суббота: закрытие"), { target: { value: "17:00" } });
     fireEvent.change(within(dialog).getByLabelText("Studio24 URL"), {
       target: { value: "https://studio24.bg/magic-massage-natali" },
     });
@@ -810,56 +1113,27 @@ describe("AdminShell", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить контакты" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    const requestBodies = fetchMock.mock.calls.map(([url, requestInit]) => {
-      expect(url).toBe("/api/admin/records");
-      return JSON.parse(String((requestInit as RequestInit).body));
-    });
-    expect(requestBodies).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          record: expect.objectContaining({
-            address: "ул. Места 49, Бургас, Болгария",
-            bookingUrl: "https://studio24.bg/magic-massage-natali",
-            businessName: "Magic Massage Natali",
-            email: "info@magicmassage.bg",
-            mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
-            phone: "+359 87 333 4411",
-            seoArea: "Burgas, Bulgaria",
-            workingHours: "Пн-Сб 10:00-19:00",
-          }),
-          type: "contactSettings",
+    const [[url, requestInit]] = fetchMock.mock.calls;
+    expect(url).toBe("/api/admin/records");
+    expect(JSON.parse(String((requestInit as RequestInit).body))).toEqual(
+      expect.objectContaining({
+        record: expect.objectContaining({
+          address: "ул. Места 49, Бургас, Болгария",
+          bookingUrl: "https://studio24.bg/magic-massage-natali",
+          businessName: "Magic Massage Natali",
+          email: "info@magicmassage.bg",
+          mapUrl: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
+          phone: "+359 87 333 4411",
+          seoArea: "Burgas, Bulgaria",
+          workingSchedule: expect.arrayContaining([
+            expect.objectContaining({ closesAt: "17:00", isOpen: true, weekday: 6 }),
+            expect.objectContaining({ isOpen: false, weekday: 7 }),
+          ]),
         }),
-        expect.objectContaining({
-          record: expect.objectContaining({
-            id: "contact-phone",
-            value: "+359 87 333 4411",
-          }),
-          type: "contactChannel",
-        }),
-        expect.objectContaining({
-          record: expect.objectContaining({
-            id: "contact-email",
-            value: "info@magicmassage.bg",
-          }),
-          type: "contactChannel",
-        }),
-        expect.objectContaining({
-          record: expect.objectContaining({
-            id: "contact-map",
-            value: "https://maps.google.com/?q=Magic+Massage+Natali+Burgas",
-          }),
-          type: "contactChannel",
-        }),
-        expect.objectContaining({
-          record: expect.objectContaining({
-            id: "contact-studio24",
-            value: "https://studio24.bg/magic-massage-natali",
-          }),
-          type: "contactChannel",
-        }),
-      ]),
+        type: "contactSettings",
+      }),
     );
   });
 
@@ -903,9 +1177,12 @@ describe("AdminShell", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить изменения" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/records",
+      expect.objectContaining({ method: "POST" }),
+    ));
 
-    const [url, requestInit] = fetchMock.mock.calls[0];
+    const [url, requestInit] = fetchMock.mock.calls.find(([requestUrl]) => requestUrl === "/api/admin/records")!;
     expect(url).toBe("/api/admin/records");
     expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
       record: {
@@ -1147,9 +1424,12 @@ describe("AdminShell", () => {
     fireEvent.change(within(dialog).getByLabelText("Заметка"), { target: { value: "Manual certificate persisted." } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Сохранить сертификат" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/records",
+      expect.objectContaining({ method: "POST" }),
+    ));
 
-    const [url, requestInit] = fetchMock.mock.calls[0];
+    const [url, requestInit] = fetchMock.mock.calls.find(([requestUrl]) => requestUrl === "/api/admin/records")!;
     expect(url).toBe("/api/admin/records");
     expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
       record: {
@@ -1499,14 +1779,16 @@ describe("AdminShell", () => {
     fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
 
     const editDialog = screen.getByRole("dialog", { name: "Редактировать медиа" });
-    fireEvent.change(within(editDialog).getByLabelText("Статус"), { target: { value: "Требует alt" } });
+    fireEvent.change(within(editDialog).getByLabelText("Alt-текст"), { target: { value: "" } });
+    expect(within(editDialog).getByLabelText("Статус")).toHaveValue("Требует alt");
     fireEvent.change(within(editDialog).getByLabelText("Alt-текст"), { target: { value: "Нужно уточнить alt перед публикацией" } });
+    expect(within(editDialog).getByLabelText("Статус")).toHaveValue("Готово");
     fireEvent.click(within(editDialog).getByRole("button", { name: "Сохранить изменения" }));
 
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Редактировать медиа" })).not.toBeInTheDocument(),
     );
-    expect(within(details).getByText("Требует alt")).toBeInTheDocument();
+    expect(within(details).getByText("Готово")).toBeInTheDocument();
     expect(within(details).getAllByText("Нужно уточнить alt перед публикацией").length).toBeGreaterThan(0);
   });
 
@@ -1744,7 +2026,14 @@ describe("AdminShell", () => {
   });
 
   it("opens the calendar scoped to the selected client", () => {
-    render(<AdminShell activeSection="calendar" role="owner" selectedClientName="Olena K." />);
+    render(
+      <AdminShell
+        activeSection="calendar"
+        role="owner"
+        selectedCalendarDate="2026-07-08"
+        selectedClientName="Olena K."
+      />,
+    );
 
     const context = screen.getByLabelText("Фильтр календаря по клиенту");
     expect(within(context).getByText("Показаны записи клиента Olena K.")).toBeInTheDocument();
@@ -2158,7 +2447,7 @@ describe("AdminShell", () => {
   it("shows a real weekly calendar view", async () => {
     const user = userEvent.setup();
 
-    render(<AdminShell activeSection="calendar" role="owner" />);
+    render(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-06" />);
 
     await user.click(screen.getByRole("button", { name: "Неделя" }));
 
@@ -2189,12 +2478,12 @@ describe("AdminShell", () => {
   it("keeps day mode focused on one day and list mode on all appointments", async () => {
     const user = userEvent.setup();
 
-    render(<AdminShell activeSection="calendar" role="owner" />);
+    render(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-06" />);
 
     expect(screen.getByRole("heading", { name: "6 июля" })).toBeInTheDocument();
     const daySchedule = screen.getByLabelText("Расписание 6 июля");
     expect(daySchedule.parentElement).toHaveClass("admin-day-time-grid");
-    expect(within(screen.getByLabelText("Сводка дня 6 июля")).getByText("30 минут")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Сводка дня 6 июля")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Olena K./ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Список" }));
@@ -2418,7 +2707,7 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: /Olena K./ }));
 
     const details = screen.getByLabelText("Детали выбранной записи");
-    await user.click(within(details).getByRole("button", { name: "Отменить" }));
+    await user.click(within(details).getByRole("button", { name: "Отменить запись" }));
 
     const firstDialog = screen.getByRole("dialog", { name: "Отменить запись" });
     expect(within(firstDialog).getByText("Olena K.")).toBeInTheDocument();
@@ -2427,15 +2716,62 @@ describe("AdminShell", () => {
     expect(screen.queryByRole("dialog", { name: "Отменить запись" })).not.toBeInTheDocument();
     expect(within(details).getByText("Подтверждена")).toBeInTheDocument();
 
-    await user.click(within(details).getByRole("button", { name: "Отменить" }));
+    await user.click(within(details).getByRole("button", { name: "Отменить запись" }));
     const confirmationDialog = screen.getByRole("dialog", { name: "Отменить запись" });
-    await user.click(within(confirmationDialog).getByRole("button", { name: "Подтвердить отмену" }));
+    await user.click(within(confirmationDialog).getByRole("button", { name: "Отменить запись" }));
 
     const updatedDetails = screen.getByLabelText("Детали выбранной записи");
     const cancelledAppointment = screen.getByRole("button", { name: /Olena K./ });
     expect(screen.queryByRole("dialog", { name: "Отменить запись" })).not.toBeInTheDocument();
     expect(within(updatedDetails).getByText("Отменена")).toBeInTheDocument();
     expect(within(cancelledAppointment).getByText("Отменена")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "День" }));
+    expect(screen.queryByRole("button", { name: /Olena K./ })).not.toBeInTheDocument();
+  });
+
+  it("permanently deletes a calendar appointment only after a separate confirmation", async () => {
+    const user = userEvent.setup();
+    render(<AdminShell activeSection="calendar" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Список" }));
+    await user.click(screen.getByRole("button", { name: /Olena K./ }));
+    const details = screen.getByLabelText("Детали выбранной записи");
+    await user.click(within(details).getByRole("button", { name: "Удалить запись" }));
+
+    const dialog = screen.getByRole("alertdialog", { name: "Удалить запись?" });
+    expect(within(dialog).getByText(/Это не отмена/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Удалить запись" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog", { name: "Удалить запись?" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /Olena K./ })).not.toBeInTheDocument();
+  });
+
+  it("blocks client deletion while calendar records are still linked", async () => {
+    const user = userEvent.setup();
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
+    const details = screen.getByRole("dialog", { name: "Карточка клиента" });
+
+    await user.click(within(details).getByRole("button", { name: "Удалить клиента" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Удалить клиента?" });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/Сначала удалите их из календаря/);
+    expect(within(dialog).queryByRole("button", { name: "Удалить клиента" })).not.toBeInTheDocument();
+  });
+
+  it("requires the exact name before deleting a client without calendar records", async () => {
+    const user = userEvent.setup();
+    render(<AdminShell activeSection="clients" role="owner" selectedClientName="Maria Georgieva" />);
+    const details = screen.getByRole("dialog", { name: "Карточка клиента" });
+    await user.click(within(details).getByRole("button", { name: "Удалить клиента" }));
+
+    const dialog = screen.getByRole("alertdialog", { name: "Удалить клиента?" });
+    const confirm = within(dialog).getByRole("button", { name: "Удалить клиента" });
+    expect(confirm).toBeDisabled();
+    await user.type(within(dialog).getByRole("textbox"), "Maria Georgieva");
+    await user.click(confirm);
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog", { name: "Удалить клиента?" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "Maria Georgieva" })).not.toBeInTheDocument();
   });
 
   it("acknowledges CSV exports in the accountant finance workspace", async () => {
@@ -2586,7 +2922,7 @@ describe("AdminShell", () => {
     const createEditor = screen.getByRole("form", { name: "Редактор статьи" });
     expect(createEditor).toHaveClass("admin-blog-editor-page");
     expect(within(createEditor).getByRole("heading", { name: "Новая статья" })).toBeInTheDocument();
-    await user.click(within(createEditor).getByRole("button", { name: "Отмена" }));
+    await user.click(within(createEditor).getByRole("button", { name: "К списку" }));
 
     expect(screen.queryByRole("form", { name: "Редактор статьи" })).not.toBeInTheDocument();
     const details = screen.getByLabelText("Детали статьи");
@@ -2605,12 +2941,76 @@ describe("AdminShell", () => {
     fireEvent.change(within(editEditor).getByLabelText("SEO-описание"), {
       target: { value: "Отдельное SEO-описание после редактирования." },
     });
-    await user.click(within(editEditor).getByRole("button", { name: "Сохранить" }));
+    await user.click(within(editEditor).getByRole("button", { name: "Сохранить RU" }));
 
+    expect(screen.getByRole("form", { name: "Редактор статьи" })).toBeInTheDocument();
+    await user.click(within(editEditor).getByRole("button", { name: "К списку" }));
     expect(screen.queryByRole("form", { name: "Редактор статьи" })).not.toBeInTheDocument();
     const updatedDetails = screen.getByRole("dialog", { name: "Детали статьи" });
     expect(within(updatedDetails).getByText("На проверке")).toBeInTheDocument();
     expect(within(updatedDetails).getByText("Обновленная памятка перед визитом.")).toBeInTheDocument();
+  });
+
+  it("renders twelve locale rows as three articles and preserves drafts between language tabs", async () => {
+    const user = userEvent.setup();
+    const locales = ["bg", "ru", "ua", "en"] as const;
+    const articleKeys = ["massage-guide", "first-visit", "desk-recovery"];
+    const blogPosts = articleKeys.flatMap((translationKey) =>
+      locales.map((locale) => ({
+        author: "Natali",
+        body: `<p>${locale} body for ${translationKey}</p>`,
+        category: `${locale} category`,
+        coverAlt: `${locale} cover`,
+        coverImage: "/media/blog/first-massage-preparation.jpg",
+        excerpt: `${locale} excerpt`,
+        id: `blog-${translationKey}-${locale}`,
+        locales: [locale],
+        publishedAt: "2026-07-18",
+        seoDescription: `${locale} SEO description`,
+        seoTitle: `${locale} SEO title`,
+        slug: `${translationKey}-${locale}`,
+        status: "Опубликована" as const,
+        tags: [locale],
+        title: `${locale.toUpperCase()} ${translationKey}`,
+        translationKey,
+        updatedAt: "2026-07-18",
+      })),
+    );
+
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts,
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("link")).toHaveLength(3);
+    expect(screen.getByText(/3 опубликованных статей доступны посетителям/)).toBeInTheDocument();
+
+    const articleLink = within(table).getByRole("link", { name: "RU massage-guide" });
+    articleLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(articleLink);
+    await user.click(within(screen.getByRole("dialog", { name: "Детали статьи" })).getByRole("button", { name: "Редактировать" }));
+
+    let editor = screen.getByRole("form", { name: "Редактор статьи" });
+    expect(within(editor).getByLabelText("Заголовок")).toHaveValue("RU massage-guide");
+    await user.click(within(editor).getByRole("tab", { name: /English\. Опубликована/ }));
+    editor = screen.getByRole("form", { name: "Редактор статьи" });
+    expect(within(editor).getByLabelText("Заголовок")).toHaveValue("EN massage-guide");
+    fireEvent.change(within(editor).getByLabelText("Заголовок"), { target: { value: "Edited English title" } });
+
+    await user.click(within(editor).getByRole("tab", { name: /Русский\. Опубликована/ }));
+    editor = screen.getByRole("form", { name: "Редактор статьи" });
+    expect(within(editor).getByLabelText("Заголовок")).toHaveValue("RU massage-guide");
+    await user.click(within(editor).getByRole("tab", { name: /English\. Опубликована/ }));
+    expect(within(screen.getByRole("form", { name: "Редактор статьи" })).getByLabelText("Заголовок")).toHaveValue("Edited English title");
   });
 
   it("posts saved blog posts when the admin shell is backed by Supabase", async () => {
@@ -2643,6 +3043,7 @@ describe("AdminShell", () => {
               status: "Черновик",
               tags: ["подготовка"],
               title: "Подготовка к первому массажу",
+              translationKey: "first-massage-preparation",
               updatedAt: "2026-07-07",
             },
           ],
@@ -2668,7 +3069,7 @@ describe("AdminShell", () => {
       target: { value: "Обновленное SEO-описание." },
     });
     fireEvent.change(within(editor).getByLabelText("Краткое описание"), { target: { value: "Обновленный анонс." } });
-    expect(within(editor).getByRole("button", { name: "Сохранить" })).toBeEnabled();
+    expect(within(editor).getByRole("button", { name: "Сохранить BG" })).toBeEnabled();
     fireEvent.submit(editor);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -2690,6 +3091,7 @@ describe("AdminShell", () => {
         status: "Черновик",
         tags: ["подготовка"],
         title: "Подготовка к первому массажу",
+        translationKey: "first-massage-preparation",
       },
       type: "blogPost",
     });
@@ -2716,7 +3118,7 @@ describe("AdminShell", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Новая статья" }));
-    const editor = screen.getByRole("form", { name: "Редактор статьи" });
+    let editor = screen.getByRole("form", { name: "Редактор статьи" });
     fireEvent.change(within(editor).getByLabelText("Заголовок"), { target: { value: "Рабочий черновик" } });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 3000 });
 
@@ -2724,6 +3126,7 @@ describe("AdminShell", () => {
     expect(firstPayload.record.id).toMatch(/^blog-[0-9a-f-]{36}$/);
     expect(firstPayload.record.slug).toBe(`draft-${firstPayload.record.id.replace(/^blog-/, "")}`);
 
+    editor = screen.getByRole("form", { name: "Редактор статьи" });
     fireEvent.change(within(editor).getByLabelText("Slug"), { target: { value: "working-draft" } });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 3000 });
 
@@ -2731,6 +3134,167 @@ describe("AdminShell", () => {
     expect(secondPayload.record.id).toBe(firstPayload.record.id);
     expect(secondPayload.record.slug).toBe("working-draft");
   }, 10_000);
+
+  it("keeps newer local text when an older autosave response completes", async () => {
+    let resolveRequest: (() => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveRequest = () => resolve(new Response(JSON.stringify({ mode: "supabase", ok: true }), { status: 200 }));
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts: [],
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Новая статья" }));
+    let editor = screen.getByRole("form", { name: "Редактор статьи" });
+    fireEvent.change(within(editor).getByLabelText("Заголовок"), { target: { value: "Первый снимок" } });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    editor = screen.getByRole("form", { name: "Редактор статьи" });
+    fireEvent.change(within(editor).getByLabelText("Заголовок"), { target: { value: "Более свежий текст" } });
+    resolveRequest?.();
+
+    await waitFor(() =>
+      expect(within(screen.getByRole("form", { name: "Редактор статьи" })).getByLabelText("Заголовок")).toHaveValue(
+        "Более свежий текст",
+      ),
+    );
+  }, 10_000);
+
+  it("does not roll back a successfully saved locale when another locale save fails", async () => {
+    const user = userEvent.setup();
+    const responses: Array<(response: Response) => void> = [];
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          responses.push(resolve);
+        }),
+    );
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.stubGlobal("fetch", fetchMock);
+    const blogPosts = (["ru", "en"] as const).map((locale) => ({
+      author: "Natali",
+      body: `<p>${locale} body</p>`,
+      category: "Советы",
+      coverImage: "/media/blog/first-massage-preparation.jpg",
+      excerpt: `${locale} excerpt`,
+      id: `blog-massage-guide-${locale}`,
+      locales: [locale],
+      publishedAt: "2026-07-18",
+      seoDescription: `${locale} SEO description`,
+      seoTitle: `${locale} SEO title`,
+      slug: `massage-guide-${locale}`,
+      status: "Черновик" as const,
+      tags: [locale],
+      title: `${locale.toUpperCase()} massage-guide`,
+      translationKey: "massage-guide",
+      updatedAt: "2026-07-18",
+    }));
+
+    render(
+      <AdminShell
+        activeSection="blog"
+        initialData={{
+          blogPosts,
+          financeRows: [],
+          records: { appointments: [], certificates: [], clients: [] },
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    const ruLink = within(screen.getByRole("table")).getByRole("link", {
+      name: "RU massage-guide",
+    });
+    ruLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(ruLink);
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Детали статьи" })).getByRole(
+        "button",
+        { name: "Редактировать" },
+      ),
+    );
+
+    let editor = screen.getByRole("form", { name: "Редактор статьи" });
+    fireEvent.change(within(editor).getByLabelText("Заголовок"), {
+      target: { value: "RU pending update" },
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    await user.click(within(editor).getByRole("tab", { name: /English/ }));
+    editor = screen.getByRole("form", { name: "Редактор статьи" });
+    fireEvent.change(within(editor).getByLabelText("Заголовок"), {
+      target: { value: "EN saved update" },
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 3000 });
+
+    await act(async () => {
+      responses[1](
+        new Response(JSON.stringify({ mode: "supabase", ok: true }), {
+          status: 200,
+        }),
+      );
+    });
+    await waitFor(() =>
+      expect(within(editor).getByRole("status")).toHaveTextContent(
+        "Все изменения сохранены",
+      ),
+    );
+    await act(async () => {
+      responses[0](
+        new Response(JSON.stringify({ error: "save failed" }), { status: 500 }),
+      );
+    });
+
+    await user.click(within(editor).getByRole("button", { name: "К списку" }));
+    const reopenedLink = within(screen.getByRole("table")).getByRole("link", {
+      name: "RU massage-guide",
+    });
+    reopenedLink.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    });
+    await user.click(reopenedLink);
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Детали статьи" })).getByRole(
+        "button",
+        { name: "Редактировать" },
+      ),
+    );
+    editor = screen.getByRole("form", { name: "Редактор статьи" });
+    await user.click(within(editor).getByRole("tab", { name: /English/ }));
+    expect(
+      within(screen.getByRole("form", { name: "Редактор статьи" })).getByLabelText(
+        "Заголовок",
+      ),
+    ).toHaveValue("EN saved update");
+    confirmSpy.mockRestore();
+  }, 15_000);
+
+  it("keeps blog write controls hidden from viewer roles", async () => {
+    const user = userEvent.setup();
+    render(<AdminShell activeSection="blog" role="viewer" />);
+
+    expect(screen.queryByRole("button", { name: "Новая статья" })).not.toBeInTheDocument();
+    const articleLink = within(screen.getByRole("table")).getByRole("link", { name: "Подготовка к первому массажу" });
+    articleLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(articleLink);
+
+    expect(within(screen.getByRole("dialog", { name: "Детали статьи" })).queryByRole("button", { name: "Редактировать" })).not.toBeInTheDocument();
+  });
 
   it("filters blog posts by status and global search", async () => {
     const user = userEvent.setup();
@@ -2775,6 +3339,15 @@ describe("AdminShell", () => {
     await user.click(screen.getByRole("button", { name: "Сохранить" }));
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    expect(dialog).toHaveClass("admin-drawer-panel", "admin-settings-drawer");
+    expect(dialog.querySelector("form")).toHaveClass("admin-drawer-form");
+    expect(within(dialog).getByLabelText("Название бизнеса")).toHaveAttribute("autocomplete", "off");
+    expect(within(dialog).getByLabelText("Google Calendar ID")).toHaveAttribute("autocomplete", "off");
+    expect(within(dialog).getByLabelText("Проверенный отправитель")).toHaveTextContent("RESEND_FROM_EMAIL не настроен");
+    expect(within(dialog).getByLabelText("Тип письма")).toHaveValue("booking_confirmed");
+    expect(within(dialog).getByLabelText("Язык письма")).toHaveValue("ru");
+    expect(await within(dialog).findByText(/admin-сессию/)).toBeVisible();
+    expect(within(dialog).queryByText(/HTML и текстовые версии хранятся/)).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "15 минут" }));
     fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "5" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar"), { target: { value: "Односторонняя" } });
@@ -2827,14 +3400,19 @@ describe("AdminShell", () => {
     fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "5" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar"), { target: { value: "Односторонняя" } });
     fireEvent.change(within(dialog).getByLabelText("Google Calendar ID"), { target: { value: "natali@example.com" } });
-    fireEvent.change(within(dialog).getByLabelText("Email отправителя"), { target: { value: "info@magicmassage.bg" } });
+    await user.click(within(dialog).getByRole("checkbox", { name: "Письма клиентам о записях" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: /Письма Натали/ }));
+    fireEvent.change(within(dialog).getByLabelText("Email Натали для уведомлений"), {
+      target: { value: "natali@magicmassage.bg" },
+    });
+    await user.click(within(dialog).getByRole("checkbox", { name: /Письмо после визита/ }));
+    fireEvent.change(within(dialog).getByLabelText("HTTPS-ссылка для отзыва"), {
+      target: { value: "https://example.com/review" },
+    });
     fireEvent.change(within(dialog).getByLabelText("Хранение audit log"), { target: { value: "365" } });
     fireEvent.change(within(dialog).getByLabelText("SEO title"), { target: { value: "Magic Massage Natali Burgas" } });
     fireEvent.change(within(dialog).getByLabelText("Cookie/privacy"), {
       target: { value: "Stripe и Google Maps загружаются только по назначению." },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Шаблон напоминания"), {
-      target: { value: "Напоминание о записи за день до сеанса." },
     });
     fireEvent.change(within(dialog).getByLabelText("Политика ролей"), {
       target: { value: "Бухгалтер: только Stripe-отчеты." },
@@ -2848,6 +3426,7 @@ describe("AdminShell", () => {
     expect(JSON.parse(String((requestInit as RequestInit).body))).toMatchObject({
       record: {
         auditLogRetentionDays: 365,
+        bookingCustomerEmailsEnabled: true,
         bookingBufferMinutes: 15,
         businessName: "Magic Massage Natali",
         cookiePrivacyMode: "Stripe и Google Maps загружаются только по назначению.",
@@ -2855,9 +3434,12 @@ describe("AdminShell", () => {
         dailySlotCapacity: 5,
         defaultSeoTitle: "Magic Massage Natali Burgas",
         emailSender: "info@magicmassage.bg",
+        emailReviewUrl: "https://example.com/review",
         googleCalendarId: "natali@example.com",
         googleCalendarMode: "Односторонняя",
-        reminderTemplate: "Напоминание о записи за день до сеанса.",
+        careEmailsEnabled: true,
+        ownerNotificationEmail: "natali@magicmassage.bg",
+        ownerNotificationsEnabled: true,
         rolesPolicy: "Бухгалтер: только Stripe-отчеты.",
         timezone: "Europe/Sofia",
         workingDays: "Пн-Сб",
@@ -2865,6 +3447,22 @@ describe("AdminShell", () => {
       },
       type: "settings",
     });
+  });
+
+  it("keeps care emails disabled until a public HTTPS review URL is valid", async () => {
+    const user = userEvent.setup();
+    render(<AdminShell activeSection="settings" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    await user.click(within(dialog).getByRole("checkbox", { name: /Письмо после визита/ }));
+    fireEvent.change(within(dialog).getByLabelText("HTTPS-ссылка для отзыва"), {
+      target: { value: "http://example.com/review" },
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("публичную HTTPS-ссылку");
+    expect(within(dialog).getByLabelText("HTTPS-ссылка для отзыва")).toHaveFocus();
   });
 
   it("restores settings when Supabase rejects the mutation", async () => {
@@ -2912,7 +3510,7 @@ describe("AdminShell", () => {
     fireEvent.change(within(dialog).getByLabelText("Лимит онлайн-записей в день"), { target: { value: "5" } });
     await user.click(within(dialog).getByRole("button", { name: "Сохранить настройки" }));
 
-    rerender(<AdminShell activeSection="calendar" role="owner" />);
+    rerender(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-06" />);
     await user.click(screen.getByRole("button", { name: "Месяц" }));
 
     const monthGrid = screen.getByRole("grid", { name: /Месяц Июль 2026/ });
@@ -2953,10 +3551,45 @@ describe("AdminShell", () => {
     const bookingLink = within(screen.getByRole("table")).getByRole("link", { name: "Запись и календарь" });
     bookingLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
     await user.click(bookingLink);
-    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+    const trigger = screen.getByRole("button", { name: "Сохранить" });
+    await user.click(trigger);
 
     const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
     await waitFor(() => expect(within(dialog).getByRole("heading", { name: "Настройки админки" })).toHaveFocus());
+
+    await user.tab({ shift: true });
+    expect(within(dialog).getByRole("button", { name: "Отмена" })).toHaveFocus();
+    await user.tab();
+    expect(within(dialog).getByRole("button", { name: "Закрыть" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Настройки админки" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("guards backdrop and Escape closing when settings have unsaved changes", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<AdminShell activeSection="settings" role="owner" />);
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Настройки админки" });
+    fireEvent.change(within(dialog).getByLabelText("Название бизнеса"), { target: { value: "Magic Massage Updated" } });
+    fireEvent.click(dialog.parentElement!);
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("dialog", { name: "Настройки админки" })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Отмена" }));
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("dialog", { name: "Настройки админки" })).toBeInTheDocument();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Настройки админки" })).not.toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 
   it("rejects invalid numeric settings", async () => {
@@ -2975,7 +3608,10 @@ describe("AdminShell", () => {
 
     expect(screen.getByRole("dialog", { name: "Настройки админки" })).toBeInTheDocument();
     expect(within(dialog).getByRole("alert")).toHaveTextContent("Укажите название, буфер 15 или 30 минут, публичный лимит до 8 записей и срок хранения audit log.");
-    expect(within(dialog).getByLabelText("Лимит онлайн-записей в день")).toHaveAttribute("aria-invalid", "true");
+    const invalidLimit = within(dialog).getByLabelText("Лимит онлайн-записей в день");
+    expect(invalidLimit).toHaveAttribute("aria-invalid", "true");
+    expect(invalidLimit).toHaveAttribute("aria-describedby", "settings-form-error");
+    expect(invalidLimit).toHaveFocus();
     expect(screen.getByRole("dialog", { name: "Детали настроек" })).toHaveTextContent("30 минут");
   });
 

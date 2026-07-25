@@ -7,6 +7,7 @@ import { imageSize } from "image-size";
 import { getPublicPagesContent } from "../../src/content/public-pages";
 import { giftCertificateSalesConfig } from "../../src/content/gift-certificates";
 import { locales, type Locale } from "../../src/i18n/config";
+import { mediaStorageStatus } from "./media-alt-status";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SECRET_KEY;
@@ -186,7 +187,7 @@ async function importService(slug: string, order: number) {
         original_filename: metadata.fileName,
         publication_consent_status: "not_required",
         source_path: metadata.sourcePath,
-        status: "ready",
+        status: mediaStorageStatus(base.imageAlt),
         uploaded_on: new Date().toISOString().slice(0, 10),
         url: base.image,
         usage_contexts: [`service:${slug}:cover`],
@@ -285,7 +286,7 @@ async function importMediaInventory() {
   for (const record of inventory.records) {
     const { data: existing, error: existingError } = await client
       .from("admin_media_assets")
-      .select("alt_text, id, publication_consent_status")
+      .select("alt_text, id, publication_consent_status, status")
       .eq("url", record.url)
       .maybeSingle();
     if (existingError) throw new Error(`existing inventory media ${record.url}: ${existingError.message}`);
@@ -310,7 +311,7 @@ async function importMediaInventory() {
           original_filename: record.fileName,
           publication_consent_status: record.consent === "granted" ? "granted" : "not_required",
           source_path: record.repoPath,
-          status: record.alt ? "ready" : "needs_alt",
+          status: mediaStorageStatus(record.alt),
           uploaded_on: new Date().toISOString().slice(0, 10),
           url: record.url,
           usage_contexts: record.placements.map((placement) => `${placement.sourcePath}:${placement.line}`),
@@ -323,6 +324,9 @@ async function importMediaInventory() {
         ...(!existing.alt_text?.trim() ? { alt_text: record.alt } : {}),
         ...(existing.publication_consent_status === "unknown"
           ? { publication_consent_status: "not_required" }
+          : {}),
+        ...(existing.status === "needs_alt" && (existing.alt_text?.trim() || record.alt.trim())
+          ? { status: "ready" }
           : {}),
       };
 

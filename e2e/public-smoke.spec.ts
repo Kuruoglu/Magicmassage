@@ -6,18 +6,18 @@ test("public routes render and expose the Studio24 booking handoff", async ({ pa
   test.setTimeout(60_000);
 
   for (const locale of ["bg", "ru", "ua", "en"]) {
-    await page.goto(`/${locale}`);
+    await page.goto(`/${locale}`, { waitUntil: "domcontentloaded" });
 
     await expect(page.locator("h1")).toBeVisible();
+    if (locale === "bg") {
+      await expect(page.locator(`a[href="${studio24BookingUrl}"]`).first()).toBeVisible();
+    }
 
-    await page.goto(`/${locale}/gift-certificates`);
+    await page.goto(`/${locale}/gift-certificates`, { waitUntil: "domcontentloaded" });
 
     await expect(page.locator("h1")).toBeVisible();
     await expect(page.getByRole("group", { name: /payment|плащане|оплата|оплата/i })).toBeVisible();
   }
-
-  await page.goto("/bg");
-  await expect(page.locator(`a[href="${studio24BookingUrl}"]`).first()).toBeVisible();
 });
 
 test("Google Maps follows persisted cookie consent choices", async ({ page }) => {

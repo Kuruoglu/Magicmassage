@@ -12,6 +12,7 @@ import type {
 } from "./types";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const maxEmailLength = 254;
 const maxNameLength = 80;
 const maxRecipientMessageLength = 180;
 const maxServiceItems = 6;
@@ -162,7 +163,9 @@ export function validateGiftCertificateOrderPayload(
     errors.push(`Purchaser name must be ${maxNameLength} characters or fewer.`);
   }
 
-  if (!emailPattern.test(purchaserEmail)) {
+  if (purchaserEmail.length > maxEmailLength) {
+    errors.push(`Purchaser email must be ${maxEmailLength} characters or fewer.`);
+  } else if (!emailPattern.test(purchaserEmail)) {
     errors.push("Valid purchaser email is required.");
   }
 
@@ -187,6 +190,8 @@ export function validateGiftCertificateOrderPayload(
   if (deliveryMode === "recipient_email") {
     if (!recipientEmail) {
       errors.push("Recipient email is required for automatic delivery.");
+    } else if (recipientEmail.length > maxEmailLength) {
+      errors.push(`Recipient email must be ${maxEmailLength} characters or fewer.`);
     } else if (!emailPattern.test(recipientEmail)) {
       errors.push("Valid recipient email is required.");
     }

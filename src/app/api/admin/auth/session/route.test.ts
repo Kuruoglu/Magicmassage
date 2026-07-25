@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { authorizeSupabaseAdminAccess } from "@/lib/supabase/admin";
+import { adminSessionLifetimeSeconds } from "@/lib/supabase/admin-session-cookie";
 
 import { POST } from "./route";
 
@@ -42,6 +43,9 @@ describe("admin session cookie", () => {
       expect.stringContaining("Path=/admin"),
       expect.stringContaining("Path=/api/media/admin"),
     ]));
+    expect(cookies.every((cookie) =>
+      cookie.includes(`Max-Age=${adminSessionLifetimeSeconds}`)
+    )).toBe(true);
     expect(cookies.every((cookie) => cookie.includes("HttpOnly") && /SameSite=Lax/i.test(cookie))).toBe(true);
     expect(cookies.some((cookie) => /Path=\/(?:;|$)/.test(cookie))).toBe(false);
     expect(rpc).toHaveBeenCalledWith("admin_mark_login", {

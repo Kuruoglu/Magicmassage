@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { giftCertificateSalesConfig } from "@/content/gift-certificates";
 import { createGiftCertificatePaymentSession } from "./payment-session";
+import type { GiftCertificateOrderStore } from "./order-store";
 
 const orderPayload = {
   locale: "en",
@@ -18,6 +19,24 @@ const orderPayload = {
   clientTotalEurCents: 1,
 };
 
+function createOrderStore() {
+  const attachPaymentIntent = vi.fn().mockResolvedValue(undefined);
+  const createPendingOrder = vi.fn(async ({ certificateCode, order, orderId }) => ({
+    ...order,
+    certificateCode,
+    id: orderId,
+    status: "pending" as const,
+  }));
+
+  return {
+    attachPaymentIntent,
+    createPendingOrder,
+    loadOrder: vi.fn(),
+    markPaidAndEnqueue: vi.fn(),
+    reconcilePaidAndEnqueue: vi.fn(),
+  } satisfies GiftCertificateOrderStore;
+}
+
 describe("gift certificate payment session", () => {
   it("creates a Stripe PaymentIntent using server-side configured prices", async () => {
     const create = vi.fn().mockResolvedValue({
@@ -25,18 +44,19 @@ describe("gift certificate payment session", () => {
       client_secret: "pi_test_123_secret_456",
     });
 
+    const orderStore = createOrderStore();
     const result = await createGiftCertificatePaymentSession({
+      createOrderId: () => "01234567-89ab-4def-8123-456789abcdef",
       payload: orderPayload,
       now: new Date("2026-07-05T00:00:00.000Z"),
       env: {
         STRIPE_SECRET_KEY: "sk_test_123",
         NEXT_PUBLIC_SITE_URL: "https://example.com",
-        RESEND_API_KEY: "re_test",
-        RESEND_FROM_EMAIL: "Magic Massage Natali <gifts@example.com>",
       },
       stripe: {
         paymentIntents: { create },
       },
+      orderStore,
       idempotencyKey: "gift-intent-key",
     });
 
@@ -59,7 +79,18 @@ describe("gift certificate payment session", () => {
       }),
       { idempotencyKey: "gift-intent-key" },
     );
-    expect(create.mock.calls[0][0].metadata.gift_order_001).toEqual(expect.any(String));
+    expect(orderStore.createPendingOrder).toHaveBeenCalledBefore(create);
+    expect(orderStore.attachPaymentIntent).toHaveBeenCalledWith(
+      "01234567-89ab-4def-8123-456789abcdef",
+      "pi_test_123",
+    );
+    expect(create.mock.calls[0][0].metadata).toEqual({
+      gift_order_id: "01234567-89ab-4def-8123-456789abcdef",
+      gift_certificate_code: expect.stringMatching(/^MMN-GC-20260705-[A-Z0-9]{8}$/),
+      gift_total_eur_cents: String(expectedAmount),
+      gift_locale: "en",
+      gift_order_schema_version: "v2",
+    });
     expect(create.mock.calls[0][0].metadata.gift_certificate_code).toMatch(
       /^MMN-GC-20260705-[A-Z0-9]{8}$/,
     );
@@ -78,7 +109,7 @@ describe("gift certificate payment session", () => {
     expect(result.clientSecret).toBeNull();
   });
 
-  it("blocks Stripe payment creation when email delivery is not configured", async () => {
+  it("blocks Stripe payment creation when durable order persistence is not configured", async () => {
     await expect(
       createGiftCertificatePaymentSession({
         payload: orderPayload,
@@ -91,7 +122,7 @@ describe("gift certificate payment session", () => {
           paymentIntents: { create: vi.fn() },
         },
       }),
-    ).rejects.toThrow("Gift certificate email delivery is not configured");
+    ).rejects.toThrow("Gift certificate order persistence is not configured");
   });
 
   it("blocks live checkout when final prices or the live-payment flag are missing", async () => {

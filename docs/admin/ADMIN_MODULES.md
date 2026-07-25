@@ -3,7 +3,8 @@
 ## Operations
 
 - Dashboard: daily overview, pending requests, upcoming appointments, certificate
-  alerts, quick actions.
+  alerts, quick actions, and an oldest-first owner/administrator queue of
+  completed or already-past visits whose post-visit comment is still blank.
 - Clients: profile, contacts, language, visit history, certificates, notes,
   consent/GDPR actions.
 - Calendar: day, week, month, list, statuses, create/reschedule/cancel/complete.
@@ -38,3 +39,9 @@ and lets an authorized user mark each alert as reviewed.
 - Users and roles: invite, update profile, suspend/offboard, Auth ban, MFA, audit.
 - Settings: business facts, booking rules, email templates, Stripe mode,
   privacy/cookie text, SEO defaults, audit retention.
+- Email settings stay inside Settings: disabled-by-default customer, owner, and
+  care toggles; owner address; HTTPS review URL; fixed delivery intervals; and
+  read-only sender/template previews. Care cannot be enabled without a valid
+  HTTPS review URL.
+- Appointment and certificate drawers show text delivery states, timestamps,
+  and owner/administrator resend actions. No standalone email module is added.

@@ -1,7 +1,7 @@
 import { isIsoDate } from "./date";
 import { clampDuration, timeToMinutes } from "./time";
 
-import type { AppointmentStatus } from "@/admin/domain";
+import type { AppointmentStatus, CalendarBlock } from "@/admin/domain";
 
 export type CalendarAppointmentTime = {
   date: string;
@@ -29,6 +29,13 @@ function appointmentInterval(appointment: CalendarAppointmentTime) {
   return {
     end: start + clampDuration(appointment.duration),
     start,
+  };
+}
+
+function calendarBlockInterval(block: CalendarBlock) {
+  return {
+    end: timeToMinutes(block.endsAt),
+    start: timeToMinutes(block.startsAt),
   };
 }
 
@@ -67,6 +74,36 @@ export function hasAppointmentOverlap(
   appointments: readonly CalendarAppointmentTime[],
 ): boolean {
   return appointments.some((appointment) => appointmentsOverlap(candidate, appointment));
+}
+
+export function appointmentOverlapsCalendarBlock(
+  appointment: CalendarAppointmentTime & { buffer?: number },
+  block: CalendarBlock,
+): boolean {
+  const appointmentTime = appointmentInterval({
+    ...appointment,
+    duration: appointment.duration + Math.max(0, appointment.buffer ?? 0),
+  });
+  const blockTime = calendarBlockInterval(block);
+
+  return (
+    appointment.date === block.blockDate &&
+    appointment.specialistId === block.specialistId &&
+    appointmentTime.start < blockTime.end &&
+    blockTime.start < appointmentTime.end
+  );
+}
+
+export function calendarBlocksOverlap(first: CalendarBlock, second: CalendarBlock): boolean {
+  const firstInterval = calendarBlockInterval(first);
+  const secondInterval = calendarBlockInterval(second);
+
+  return (
+    first.blockDate === second.blockDate &&
+    first.specialistId === second.specialistId &&
+    firstInterval.start < secondInterval.end &&
+    secondInterval.start < firstInterval.end
+  );
 }
 
 export function isOutsideWorkingHours(

@@ -39,6 +39,7 @@ export default async function LocalePage({ params }: LocalePageProps) {
   return (
     <PublicPageShell locale={locale} currentPage="home" content={content} {...shellRuntime}>
       <HomePageView
+        businessDetails={shellRuntime.businessDetails}
         locale={locale}
         content={content}
         mediaPlacements={shellRuntime.mediaPlacements}
