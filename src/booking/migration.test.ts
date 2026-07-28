@@ -232,7 +232,7 @@ describe("public booking migration", () => {
       sql.indexOf("create or replace function public.public_booking_consume_rate_limit"),
     );
 
-    expect(sql).toContain("where token_hash = p_token_hash\n  for update");
+    expect(sql).toMatch(/where token_hash = p_token_hash\r?\n  for update/);
     expect(sql).toContain("from public.admin_calendar_blocks block");
     expect(sql).toContain("status in ('confirmed', 'pending', 'request')");
     expect(sql).toContain("status <> 'cancelled'");
@@ -350,7 +350,7 @@ describe("public booking migration", () => {
     expect(classificationSql).toContain("errcode = 'P0001', message = 'appointment_concurrent_update'");
     expect(classificationSql).toContain("errcode = 'P0001', message = 'appointment_public_hold_conflict'");
     expect(compatibilitySql).toContain("pg_get_functiondef");
-    expect(compatibilitySql).toContain("'errcode = ''P0001'''\n");
+    expect(compatibilitySql).toMatch(/'errcode = ''P0001'''\r?\n/);
   });
 
   it("permits only one active hold per opaque browser session", () => {

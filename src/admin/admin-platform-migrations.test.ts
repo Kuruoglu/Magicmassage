@@ -48,7 +48,7 @@ describe("admin platform completion migrations", () => {
     const boundarySql = readMigration("20260714150000_admin_server_write_boundary.sql");
 
     expect(storageSql).toContain("'admin-media'");
-    expect(storageSql).toContain("'admin-media',\n  'admin-media',\n  false,");
+    expect(storageSql).toMatch(/'admin-media',\r?\n  'admin-media',\r?\n  false,/);
     expect(storageSql).not.toContain('create policy "public can read admin media"');
     expect(storageSql).not.toMatch(/to\s+anon/i);
     expect(boundarySql).toContain("set public = false");

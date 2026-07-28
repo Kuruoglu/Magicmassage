@@ -192,6 +192,13 @@ async function cleanup() {
     if (auditResult.error) cleanupErrors.push(auditResult.error);
   }
   if (appointmentIds.size > 0) {
+    const emailResult = await supabase
+      .from("email_notifications")
+      .delete()
+      .eq("aggregate_type", "appointment")
+      .in("aggregate_id", [...appointmentIds]);
+    if (emailResult.error) cleanupErrors.push(emailResult.error);
+
     const result = await supabase.from("admin_appointments").delete().in("id", [...appointmentIds]);
     if (result.error) cleanupErrors.push(result.error);
   }
@@ -705,6 +712,7 @@ try {
     date: capacityDay.date,
     priceVariantId,
     sessionKeyHash,
+    specialistSlug: recreatedHold.data.specialistId,
     time: capacityDay.slots[0],
     tokenHash: contenderTokens[index],
   })));
