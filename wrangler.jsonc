@@ -11,6 +11,20 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://magicmassagenatali.bg",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://eolpkhovcgezzvmanhlh.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_V9taNZIRidgHIMFAdfVY0Q_hOH7Rci7",
+    "GIFT_CERTIFICATES_ENABLE_LIVE_PAYMENTS": "false",
+    "GIFT_CERTIFICATES_FINAL_PRICES_CONFIRMED": "false",
+    "RESEND_FROM_EMAIL": "Magic Massage Natali <info@mail.magicmassagenatali.bg>"
+  },
+  "routes": [
+    {
+      "pattern": "magicmassagenatali.bg",
+      "custom_domain": true
+    }
+  ],
   "observability": {
     "enabled": true
   }
