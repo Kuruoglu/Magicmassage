@@ -1909,6 +1909,9 @@ describe("AdminShell", () => {
   });
 
   it("shows the next calendar appointment in the selected client card", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-01T09:00:00.000Z"));
+
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
     const card = screen.getByRole("dialog", { name: "Карточка клиента" });
@@ -1925,6 +1928,9 @@ describe("AdminShell", () => {
   });
 
   it("summarizes the selected client working profile with related records", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-01T09:00:00.000Z"));
+
     render(<AdminShell activeSection="clients" role="owner" selectedClientName="Olena K." />);
 
     const card = screen.getByRole("dialog", { name: "Карточка клиента" });
@@ -1983,6 +1989,92 @@ describe("AdminShell", () => {
       "href",
       "/admin?section=calendar&role=owner&client=client-359895550099&action=create",
     );
+  });
+
+  it("shows the real next appointment in the client table instead of a stale stored label", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-29T04:00:00.000Z"));
+
+    render(
+      <AdminShell
+        activeSection="clients"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [
+              {
+                client: "Andrey Kuruohlu",
+                clientId: "client-andrey",
+                date: "2026-07-20",
+                id: "appointment-andrey-completed",
+                note: "",
+                service: "Классический массаж",
+                status: "Завершена",
+                time: "11:00",
+              },
+              {
+                client: "Andrey Kuruohlu",
+                clientId: "client-andrey",
+                date: "2026-07-25",
+                id: "appointment-andrey-completed-latest",
+                note: "",
+                service: "Классический массаж",
+                status: "Завершена",
+                time: "12:00",
+              },
+              {
+                client: "Andrey Kuruohlu",
+                clientId: "client-andrey",
+                date: "2026-07-29",
+                id: "appointment-andrey",
+                note: "",
+                service: "Классический массаж",
+                status: "Подтверждена",
+                time: "10:00",
+              },
+            ],
+            certificates: [],
+            clients: [
+              {
+                email: "andrey@example.com",
+                history: [],
+                id: "client-andrey",
+                language: "ru",
+                name: "Andrey Kuruohlu",
+                next: "Not scheduled",
+                note: "",
+                phone: "0877888457",
+                preferredContact: "Telegram",
+                status: "new",
+                tags: [],
+                telegram: "",
+                totalSpend: "0 EUR",
+                visits: 0,
+              },
+            ],
+          },
+          settings: blogVisibilitySettings,
+          source: "supabase",
+        }}
+        role="administrator"
+        selectedClientName="client-andrey"
+      />,
+    );
+
+    const row = screen.getByRole("row", { name: /Andrey Kuruohlu/ });
+    expect(within(row).getByText("29 июля, 10:00")).toBeInTheDocument();
+    expect(within(row).queryByText("Not scheduled")).not.toBeInTheDocument();
+    expect(within(row).getByText("2")).toBeInTheDocument();
+
+    const card = screen.getByRole("dialog", { name: "Карточка клиента" });
+    const nextAppointment = within(card).getByRole("region", { name: "Ближайшая запись клиента" });
+    expect(within(nextAppointment).getByText("29 июля, 10:00")).toBeInTheDocument();
+    const profile = within(card).getByRole("region", { name: "Рабочий профиль клиента" });
+    expect(within(profile).getByText("2026-07-25 12:00")).toBeInTheDocument();
+    expect(within(card).getAllByText("2026-07-20 11:00").length).toBeGreaterThan(0);
+    expect(within(card).getAllByText("2026-07-25 12:00").length).toBeGreaterThan(0);
+    expect(within(card).getAllByText("2026-07-29 10:00").length).toBeGreaterThan(0);
+    expect(within(card).getAllByRole("link", { name: "Открыть запись" }).length).toBeGreaterThan(0);
   });
 
   it("filters the selected client working activity feed", async () => {

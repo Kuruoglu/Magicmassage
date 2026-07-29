@@ -705,6 +705,91 @@ export function findClientAppointments(appointments: Appointment[], client: Clie
   return appointments.filter((appointment) => appointmentBelongsToClient(appointment, client, clients));
 }
 
+export function getLocalDateTimeKey(now: Date, timeZone: string) {
+  const formatInTimeZone = (resolvedTimeZone: string) => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        day: "2-digit",
+        hour: "2-digit",
+        hourCycle: "h23",
+        minute: "2-digit",
+        month: "2-digit",
+        second: "2-digit",
+        timeZone: resolvedTimeZone,
+        year: "numeric",
+      }).formatToParts(now).map((part) => [part.type, part.value]),
+    );
+
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+  };
+
+  try {
+    return formatInTimeZone(timeZone);
+  } catch {
+    return formatInTimeZone("Europe/Sofia");
+  }
+}
+
+function formatClientNextVisit(appointment: Appointment) {
+  const date = new Date(`${appointment.date}T00:00:00.000Z`);
+  const day = Number.isNaN(date.getTime())
+    ? appointment.date
+    : new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "long",
+        timeZone: "UTC",
+      }).format(date);
+
+  return `${day}, ${appointment.time.slice(0, 5)}`;
+}
+
+export function findNextClientAppointment(
+  appointments: Appointment[],
+  currentDateTimeKey: string,
+) {
+  return appointments
+    .slice()
+    .sort((left, right) =>
+      `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`),
+    )
+    .find((appointment) => {
+      if (["Отменена", "Завершена", "Не пришёл"].includes(appointment.status)) {
+        return false;
+      }
+
+      return `${appointment.date}T${appointment.time.slice(0, 5)}:00` > currentDateTimeKey;
+    });
+}
+
+export function reconcileClientAppointmentSummaries(
+  clients: ClientRecord[],
+  appointments: Appointment[],
+  currentDateTimeKey: string,
+) {
+  return clients.map((client) => {
+    const relatedAppointments = findClientAppointments(appointments, client, clients)
+      .slice()
+      .sort((left, right) =>
+        `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`),
+      );
+    const completedVisitCount = relatedAppointments.filter(
+      (appointment) => appointment.status === "Завершена",
+    ).length;
+    const nextAppointment = findNextClientAppointment(relatedAppointments, currentDateTimeKey);
+
+    return {
+      ...client,
+      history: relatedAppointments.map((appointment) => ({
+        date: `${appointment.date} ${appointment.time}`,
+        service: appointment.service,
+        status: appointment.status,
+      })),
+      next: nextAppointment ? formatClientNextVisit(nextAppointment) : "Не назначен",
+      visits: Math.max(client.visits, completedVisitCount),
+    };
+  });
+}
+
 export function findClientCertificates(certificates: CertificateRecord[], client: ClientRecord, clients: ClientRecord[]) {
   return certificates.filter((certificate) => certificateBelongsToClient(certificate, client, clients));
 }

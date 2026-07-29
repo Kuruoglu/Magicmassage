@@ -132,14 +132,17 @@ import {
   certificateBelongsToClient,
   createAdminDemoRecords,
   findAppointmentClient,
+  findNextClientAppointment,
   getAppointmentNotificationEmail,
   findCertificateClient,
   findClientAppointments,
   findClientByIdentity,
   findClientCertificates,
+  getLocalDateTimeKey,
   matchesClientIdentity,
   normalizeClientPhone,
   normalizeSearch,
+  reconcileClientAppointmentSummaries,
   type AdminDomainRecords,
   type AdminUserRecord,
   type AdminUserStatus,
@@ -189,33 +192,8 @@ function getSofiaWalkInWindow(now = new Date()) {
   return { endsAt: format(endMinutes), startsAt: format(startMinutes) };
 }
 
-function getLocalDateTimeKey(now: Date, timeZone: string) {
-  const formatInTimeZone = (resolvedTimeZone: string) => {
-    const parts = Object.fromEntries(
-      new Intl.DateTimeFormat("en-CA", {
-        day: "2-digit",
-        hour: "2-digit",
-        hourCycle: "h23",
-        minute: "2-digit",
-        month: "2-digit",
-        second: "2-digit",
-        timeZone: resolvedTimeZone,
-        year: "numeric",
-      }).formatToParts(now).map((part) => [part.type, part.value]),
-    );
-
-    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
-  };
-
-  try {
-    return formatInTimeZone(timeZone);
-  } catch {
-    return formatInTimeZone("Europe/Sofia");
-  }
-}
-
 function isUpcomingAppointment(appointment: Appointment, currentDateTimeKey: string) {
-  if (appointment.status === "Отменена") {
+  if (["Отменена", "Завершена", "Не пришёл"].includes(appointment.status)) {
     return false;
   }
 
@@ -1222,16 +1200,31 @@ function findClientVisitAppointment(visit: ClientVisit, appointments: Appointmen
   return appointments.find(
     (appointment) =>
       normalizeSearch(appointment.service) === normalizedVisitService &&
-      normalizeSearch(appointmentVisitLabel(appointment)) === normalizedVisitDate,
+      [
+        appointmentVisitLabel(appointment),
+        `${appointment.date} ${appointment.time.slice(0, 5)}`,
+        `${appointment.date}T${appointment.time.slice(0, 5)}`,
+      ].some((dateLabel) => normalizeSearch(dateLabel) === normalizedVisitDate),
   );
 }
 
-function findClientNextAppointment(appointments: Appointment[]) {
-  return sortAppointments(appointments).find((appointment) => appointment.status !== "Отменена");
-}
+function findClientLastCompletedVisit(client: ClientRecord, appointments: Appointment[]) {
+  const latestCompletedAppointment = sortAppointments(appointments)
+    .filter((appointment) => appointment.status === "Завершена")
+    .at(-1);
 
-function findClientLastCompletedVisit(client: ClientRecord) {
-  return client.history.find((visit) => normalizeSearch(visit.status).includes("заверш")) ?? client.history[client.history.length - 1];
+  if (latestCompletedAppointment) {
+    return client.history.find(
+      (visit) =>
+        findClientVisitAppointment(visit, [latestCompletedAppointment]) === latestCompletedAppointment,
+    ) ?? {
+      date: `${latestCompletedAppointment.date} ${latestCompletedAppointment.time.slice(0, 5)}`,
+      service: latestCompletedAppointment.service,
+      status: latestCompletedAppointment.status,
+    };
+  }
+
+  return client.history.find((visit) => normalizeSearch(visit.status).includes("заверш"));
 }
 
 function findClientActiveCertificate(certificates: CertificateRecord[]) {
@@ -3055,6 +3048,7 @@ function ClientDetailCard({
   onSaveAppointment,
   onSaveNote,
   role,
+  timeZone,
 }: {
   appointments: Appointment[];
   certificates: CertificateRecord[];
@@ -3067,6 +3061,7 @@ function ClientDetailCard({
   onSaveAppointment: (appointment: Appointment) => Promise<CalendarAppointmentSaveResult>;
   onSaveNote: (clientId: string, note: string) => void;
   role: AdminRoleId;
+  timeZone: string;
 }) {
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [activeFeedFilter, setActiveFeedFilter] = useState<ClientFeedFilterId>("all");
@@ -3080,8 +3075,11 @@ function ClientDetailCard({
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const nextAppointment = findClientNextAppointment(appointments);
-  const lastCompletedVisit = findClientLastCompletedVisit(client);
+  const nextAppointment = findNextClientAppointment(
+    appointments,
+    getLocalDateTimeKey(new Date(), timeZone),
+  );
+  const lastCompletedVisit = findClientLastCompletedVisit(client, appointments);
   const activeCertificate = findClientActiveCertificate(certificates);
   const nextClientAction = buildClientNextAction(client, nextAppointment, activeCertificate, role);
   const shouldShowVisits = activeFeedFilter === "all" || activeFeedFilter === "visits";
@@ -3464,6 +3462,7 @@ function ClientsWorkspace({
   query,
   role,
   selectedClientName,
+  timeZone,
 }: {
   appointments: Appointment[];
   certificates: CertificateRecord[];
@@ -3483,6 +3482,7 @@ function ClientsWorkspace({
   query: string;
   role: AdminRoleId;
   selectedClientName?: string;
+  timeZone: string;
 }) {
   const initialSelectedClientKey = findClientByIdentity(clients, selectedClientName)?.id ?? clients[0]?.id ?? "";
   const [selectedClientKey, setSelectedClientKey] = useState(initialSelectedClientKey);
@@ -3680,6 +3680,7 @@ function ClientsWorkspace({
           onSaveAppointment={(appointment) => onSaveAppointment(appointment, "appointment.post_visit_comment")}
           onSaveNote={onSaveClientNote}
           role={role}
+          timeZone={timeZone}
         />
       ) : null}
       {isClientFormOpen ? (
@@ -6331,6 +6332,7 @@ function Workspace({
         query={query}
         role={role}
         selectedClientName={selectedClientName}
+        timeZone={settings.timezone}
       />
     );
   }
@@ -6564,7 +6566,7 @@ export function AdminShell({
   const [calendarBlocks, setCalendarBlocks] = useState<CalendarBlock[]>(() =>
     buildInitialCalendarBlocks(initialRecords),
   );
-  const [clients, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows(initialRecords));
+  const [clientRecords, setClients] = useState<ClientRecord[]>(() => buildInitialClientRows(initialRecords));
   const [certificates, setCertificates] = useState<CertificateRecord[]>(() => buildInitialCertificateRows(initialRecords));
   const [stripeSales] = useState<FinanceRow[]>(() => initialFinanceRows);
   const [services, setServices] = useState<ServiceRecord[]>(() => buildInitialServiceRows(initialData));
@@ -6575,13 +6577,28 @@ export function AdminShell({
   const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>(() => buildInitialBlogPostRows(initialData));
   const [settings, setSettings] = useState<SettingsRecord>(() => buildInitialSettingsRecord(initialData));
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>(() => buildInitialAdminUsers(initialData));
+  const [clientSummaryClock, setClientSummaryClock] = useState(() => new Date());
+  const isSupabaseBacked = initialData?.source === "supabase";
+  const clients = useMemo(
+    () => isSupabaseBacked
+      ? reconcileClientAppointmentSummaries(
+          clientRecords,
+          calendarAppointments,
+          getLocalDateTimeKey(clientSummaryClock, settings.timezone),
+        )
+      : clientRecords,
+    [calendarAppointments, clientRecords, clientSummaryClock, isSupabaseBacked, settings.timezone],
+  );
   const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
+  useEffect(() => {
+    const interval = window.setInterval(() => setClientSummaryClock(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
   const {
     message: persistenceStatus,
     showStatus: showPersistenceStatus,
     variant: persistenceStatusVariant,
   } = useTransientStatus(activeSection);
-  const isSupabaseBacked = initialData?.source === "supabase";
   const selectedRouteAppointment = selectedAppointmentKey
     ? calendarAppointments.find((appointment) => appointmentKey(appointment) === selectedAppointmentKey)
     : undefined;

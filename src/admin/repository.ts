@@ -1,7 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import { resolveAdminRole, type FinanceRow, type FinanceSummary } from "./config";
-import { normalizeClientPhone, parseEuroAmountToCents } from "./domain";
+import {
+  getLocalDateTimeKey,
+  normalizeClientPhone,
+  parseEuroAmountToCents,
+  reconcileClientAppointmentSummaries,
+} from "./domain";
 import { normalizeMediaStatus } from "./media-status";
 import type {
   AdminAppointmentDatabaseRow,
@@ -1406,16 +1411,11 @@ function mapStripeSaleRow(row: AdminStripeSaleDatabaseRow): FinanceRow {
 }
 
 function addAppointmentHistories(clients: ClientRecord[], appointments: Appointment[]): ClientRecord[] {
-  return clients.map((client) => ({
-    ...client,
-    history: appointments
-      .filter((appointment) => appointment.clientId === client.id)
-      .map((appointment) => ({
-        date: `${appointment.date} ${appointment.time}`,
-        service: appointment.service,
-        status: appointment.status,
-      })),
-  }));
+  return reconcileClientAppointmentSummaries(
+    clients,
+    appointments,
+    getLocalDateTimeKey(new Date(), "Europe/Sofia"),
+  );
 }
 
 async function selectRows<T>(

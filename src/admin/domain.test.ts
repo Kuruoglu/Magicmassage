@@ -7,6 +7,7 @@ import {
   createAdminDemoRecords,
   findClientByIdentity,
   getAppointmentNotificationEmail,
+  reconcileClientAppointmentSummaries,
 } from "./domain";
 
 const demoRecords = () =>
@@ -109,5 +110,58 @@ describe("admin domain records", () => {
         publicEmail: "stale-snapshot@example.com",
       }),
     ).toBe(findClientByIdentity(records.clients, appointment.clientId)?.email);
+  });
+
+  it("derives the next visit and completed count from linked appointments", () => {
+    const client = {
+      ...demoRecords().clients[0],
+      history: [],
+      next: "Not scheduled",
+      visits: 0,
+    };
+    const appointments = [
+      {
+        client: client.name,
+        clientId: client.id,
+        date: "2026-07-20",
+        id: "completed-visit",
+        note: "",
+        service: "Классический массаж",
+        status: "Завершена" as const,
+        time: "11:00",
+      },
+      {
+        client: client.name,
+        clientId: client.id,
+        date: "2026-07-29",
+        id: "next-visit",
+        note: "",
+        service: "Классический массаж",
+        status: "Подтверждена" as const,
+        time: "10:00",
+      },
+      {
+        client: client.name,
+        clientId: client.id,
+        date: "2026-07-29",
+        id: "cancelled-visit",
+        note: "",
+        service: "Классический массаж",
+        status: "Отменена" as const,
+        time: "09:00",
+      },
+    ];
+
+    const [summary] = reconcileClientAppointmentSummaries(
+      [client],
+      appointments,
+      "2026-07-29T07:00:00",
+    );
+
+    expect(summary).toMatchObject({
+      next: "29 июля, 10:00",
+      visits: 1,
+    });
+    expect(summary.history).toHaveLength(3);
   });
 });
