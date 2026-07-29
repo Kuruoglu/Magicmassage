@@ -1,12 +1,13 @@
 // @vitest-environment node
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const adminPageMocks = vi.hoisted(() => ({
   authorization: {
     mode: "supabase",
     ok: true,
     role: "accountant",
+    specialistId: undefined as string | undefined,
     userId: "11111111-1111-4111-8111-111111111111",
   },
   client: { from: vi.fn() },
@@ -73,6 +74,13 @@ vi.mock("@/components/admin/admin-shell", () => ({
 }));
 
 describe("/admin page authorization", () => {
+  beforeEach(() => {
+    adminPageMocks.authorization.role = "accountant";
+    adminPageMocks.authorization.specialistId = undefined;
+    adminPageMocks.cookieToken = undefined;
+    adminPageMocks.loadAdminShellData.mockClear();
+  });
+
   it("redirects unauthenticated users to admin login", async () => {
     adminPageMocks.cookieToken = undefined;
     const { default: AdminPage } = await import("./page");
@@ -99,6 +107,28 @@ describe("/admin page authorization", () => {
     expect(element.props).toMatchObject({
       activeSection: "finances",
       role: "accountant",
+    });
+  });
+
+  it("forwards the authorized profile's linked specialist to the admin data source", async () => {
+    adminPageMocks.cookieToken = "administrator-token";
+    adminPageMocks.authorization.role = "administrator";
+    adminPageMocks.authorization.specialistId = "specialist-natali";
+    adminPageMocks.loadAdminShellData.mockClear();
+    const { default: AdminPage } = await import("./page");
+
+    const element = await AdminPage({
+      searchParams: Promise.resolve({ section: "calendar" }),
+    });
+
+    expect(adminPageMocks.loadAdminShellData).toHaveBeenCalledWith({
+      activeSection: "calendar",
+      role: "administrator",
+      specialistId: "specialist-natali",
+    });
+    expect(element.props).toMatchObject({
+      activeSection: "calendar",
+      role: "administrator",
     });
   });
 });

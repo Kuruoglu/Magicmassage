@@ -251,6 +251,33 @@ describe("CalendarWorkspace", () => {
     expect(screen.getAllByText("Яна")).toHaveLength(2);
   });
 
+  it("opens an administrator on their linked specialist calendar and still allows all calendars", async () => {
+    const user = userEvent.setup();
+    const yanaAppointment: Appointment = {
+      ...appointments[1],
+      id: "appointment-yana",
+      specialistId: "specialist-yana",
+      specialistName: "Яна",
+    };
+    renderCalendar({
+      calendarAppointments: [appointments[0], yanaAppointment],
+      currentSpecialistId: "specialist-natali",
+      role: "administrator",
+      specialistRecords: specialists,
+    });
+
+    const specialistFilter = screen.getByLabelText("Показать календарь специалиста");
+    expect(specialistFilter).toHaveValue("specialist-natali");
+    expect(screen.getByText(clients[0].name)).toBeVisible();
+    expect(screen.queryByText(clients[1].name)).not.toBeInTheDocument();
+
+    await user.selectOptions(specialistFilter, "all");
+
+    expect(specialistFilter).toHaveValue("all");
+    expect(screen.getByText(clients[0].name)).toBeVisible();
+    expect(screen.getByText(clients[1].name)).toBeVisible();
+  });
+
   it("fixes a specialist to their own calendar", () => {
     const yanaAppointment: Appointment = {
       ...appointments[1],
@@ -269,6 +296,20 @@ describe("CalendarWorkspace", () => {
     expect(screen.queryByLabelText("Показать календарь специалиста")).not.toBeInTheDocument();
     expect(screen.queryByText("Анна Петрова")).not.toBeInTheDocument();
     expect(screen.getByText("Мария Иванова")).toBeVisible();
+  });
+
+  it("does not fall back to another active calendar when a specialist link is inactive", () => {
+    renderCalendar({
+      calendarAppointments: [appointments[0]],
+      currentSpecialistId: "specialist-inactive",
+      role: "specialist",
+      specialistRecords: specialists,
+    });
+
+    expect(screen.getByLabelText("Текущий календарь специалиста")).toHaveTextContent(
+      "Мой календарьНазначенный специалист",
+    );
+    expect(screen.queryByText(clients[0].name)).not.toBeInTheDocument();
   });
 
   it("keeps appointments read-only while exposing the contact-free current-client action", async () => {

@@ -327,8 +327,15 @@ export function CalendarWorkspace({
     () => activeSpecialists.filter((specialist) => specialist.publicBookingEnabled),
     [activeSpecialists],
   );
+  const linkedActiveSpecialistId = activeSpecialists.some(
+    (specialist) => specialist.id === currentSpecialistId,
+  )
+    ? currentSpecialistId
+    : undefined;
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(
-    role === "specialist" ? (currentSpecialistId ?? activeSpecialists[0]?.id ?? "all") : "all",
+    role === "specialist"
+      ? (currentSpecialistId ?? activeSpecialists[0]?.id ?? "all")
+      : (linkedActiveSpecialistId ?? "all"),
   );
   const effectiveSpecialistId = role === "specialist"
     ? (currentSpecialistId ?? selectedSpecialistId)

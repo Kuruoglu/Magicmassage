@@ -226,6 +226,7 @@ export async function loadAdminShellData({
       blogPosts,
       contactChannels,
       contactSettings,
+      ...(specialistId ? { currentSpecialistId: specialistId } : {}),
       financeRows,
       media,
       prices,

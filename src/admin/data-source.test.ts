@@ -256,9 +256,12 @@ describe("admin data source", () => {
         RESEND_FROM_EMAIL: "Magic Massage Natali <hello@mail.magicmassage.bg>",
       },
       now: new Date("2026-07-09T12:00:00.000Z"),
+      role: "administrator",
+      specialistId: "specialist-natali",
     });
 
     expect(data.source).toBe("supabase");
+    expect(data.currentSpecialistId).toBe("specialist-natali");
     expect(data.adminUsers?.[0]?.name).toBe("Supabase Accountant");
     expect(data.records.clients[0]?.name).toBe("Supabase Client");
     expect(data.blogPosts?.[0]?.title).toBe("Supabase Blog");
