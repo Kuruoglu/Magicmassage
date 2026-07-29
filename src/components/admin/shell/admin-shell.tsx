@@ -23,7 +23,6 @@ import {
 import {
   certificateRows,
   clientRows,
-  dashboardMetrics,
   financeRows as demoFinanceRows,
   sectionSamples,
   upcomingAppointments,
@@ -201,6 +200,23 @@ function isUpcomingAppointment(appointment: Appointment, currentDateTimeKey: str
   return appointmentDateTimeKey > currentDateTimeKey;
 }
 
+function formatRussianCount(
+  count: number,
+  forms: { one: string; few: string; many: string },
+) {
+  const modulo100 = count % 100;
+  const modulo10 = count % 10;
+  const noun = modulo100 >= 11 && modulo100 <= 14
+    ? forms.many
+    : modulo10 === 1
+      ? forms.one
+      : modulo10 >= 2 && modulo10 <= 4
+        ? forms.few
+        : forms.many;
+
+  return `${count} ${noun}`;
+}
+
 type AdminCalendarAction = "create";
 export type AdminShellProps = {
   activeSection: AdminSectionId;
@@ -369,7 +385,13 @@ const adminRolePermissionSummary: Record<AdminRoleId, { items: string[]; scope: 
     scope: "Read-only доступ для проверки контента и операций.",
   },
 };
-const certificateStatusOptions: CertificateStatus[] = ["Оплачено", "Отправлен", "Ожидает PDF", "Погашен"];
+const certificateStatusOptions: CertificateStatus[] = [
+  "Оплачено",
+  "Отправлен",
+  "Ожидает PDF",
+  "Погашен",
+  "Возвращён",
+];
 const priceStatusOptions: PriceStatus[] = ["Активна", "Скрыта"];
 const mediaTypeOptions: MediaType[] = ["Фото", "Документ"];
 const contactChannelTypeOptions: ContactChannelType[] = ["Телефон", "Email", "Мессенджер", "Соцсеть", "Карта", "Бронирование"];
@@ -1227,8 +1249,12 @@ function findClientLastCompletedVisit(client: ClientRecord, appointments: Appoin
   return client.history.find((visit) => normalizeSearch(visit.status).includes("заверш"));
 }
 
+function isCertificateInactive(status: CertificateStatus) {
+  return status === "Погашен" || status === "Возвращён";
+}
+
 function findClientActiveCertificate(certificates: CertificateRecord[]) {
-  return certificates.find((certificate) => certificate.status !== "Погашен") ?? certificates[0];
+  return certificates.find((certificate) => !isCertificateInactive(certificate.status));
 }
 
 function buildClientNextAction(
@@ -1630,9 +1656,13 @@ function CertificateFormDialog({
             </label>
             <label>
               Статус
-              <select onChange={(event) => updateForm("status", event.target.value as CertificateStatus)} value={form.status}>
+              <select
+                disabled={initialCertificate?.status === "Возвращён"}
+                onChange={(event) => updateForm("status", event.target.value as CertificateStatus)}
+                value={form.status}
+              >
                 {certificateStatusOptions.map((status) => (
-                  <option key={status} value={status}>
+                  <option disabled={status === "Возвращён"} key={status} value={status}>
                     {status}
                   </option>
                 ))}
@@ -2877,6 +2907,7 @@ function DashboardWorkspace({
   appointments,
   certificates,
   clients,
+  financeRows,
   hasLoadError,
   onSaveAppointment,
   query,
@@ -2886,6 +2917,7 @@ function DashboardWorkspace({
   appointments: Appointment[];
   certificates: CertificateRecord[];
   clients: ClientRecord[];
+  financeRows: FinanceRow[];
   hasLoadError: boolean;
   onSaveAppointment: (
     appointment: Appointment,
@@ -2897,6 +2929,7 @@ function DashboardWorkspace({
   timeZone: string;
 }) {
   const currentDateTimeKey = getLocalDateTimeKey(new Date(), timeZone);
+  const currentDate = currentDateTimeKey.slice(0, 10);
   const filteredAppointments = sortAppointments(
     appointments.filter(
       (appointment) =>
@@ -2909,6 +2942,39 @@ function DashboardWorkspace({
   );
   const isSpecialist = role === "specialist";
   const canManagePostVisitComments = role === "owner" || role === "administrator";
+  const canViewOperationalMetrics = role === "owner" || role === "administrator" || role === "viewer";
+  const canViewFinancialMetrics = role === "owner" || role === "administrator";
+  const todayAppointmentCount = appointments.filter(
+    (appointment) => appointment.date === currentDate && appointment.status !== "Отменена",
+  ).length;
+  const pendingAppointmentCount = appointments.filter(
+    (appointment) => appointment.status === "Ожидает" || appointment.status === "Новая заявка",
+  ).length;
+  const paidCertificateCount = certificates.filter(
+    (certificate) => certificate.status !== "Возвращён" && Boolean(certificate.paymentDate.trim()),
+  ).length;
+  const financeSummary = calculateFinanceSummary(financeRows);
+  const operationalMetrics = [
+    {
+      label: "Сегодня",
+      tone: "info",
+      value: formatRussianCount(todayAppointmentCount, {
+        few: "записи",
+        many: "записей",
+        one: "запись",
+      }),
+    },
+    {
+      label: "Ждут подтверждения",
+      tone: "warning",
+      value: formatRussianCount(pendingAppointmentCount, {
+        few: "заявки",
+        many: "заявок",
+        one: "заявка",
+      }),
+    },
+    { label: "Сертификаты", tone: "success", value: `${paidCertificateCount} оплачено` },
+  ];
   const visibleMetrics = isSpecialist
     ? [
         { label: "Мои записи", tone: "primary", value: String(appointments.length) },
@@ -2918,18 +2984,25 @@ function DashboardWorkspace({
           value: String(appointments.filter((appointment) => appointment.status === "Подтверждена").length),
         },
       ]
-    : dashboardMetrics;
+    : canViewOperationalMetrics
+      ? [
+          ...operationalMetrics,
+          ...(canViewFinancialMetrics
+            ? [{ label: "Stripe за месяц", tone: "neutral", value: formatCurrency(financeSummary.gross) }]
+            : []),
+        ]
+      : [];
 
   return (
     <div className="admin-dashboard-grid">
-      <section className="admin-metric-row" aria-label="Ключевые показатели">
+      {visibleMetrics.length > 0 ? <section className="admin-metric-row" aria-label="Ключевые показатели">
         {visibleMetrics.map((metric) => (
           <article className={`admin-metric admin-metric-${metric.tone}`} key={metric.label}>
             <span>{metric.label}</span>
             <strong>{metric.value}</strong>
           </article>
         ))}
-      </section>
+      </section> : null}
 
       {canManagePostVisitComments ? (
         <PostVisitCommentQueue
@@ -3988,7 +4061,7 @@ function CertificatesWorkspace({
             </button>
             <button
               className="admin-text-action"
-              disabled={selectedCertificate.status === "Отправлен" || selectedCertificate.status === "Погашен"}
+              disabled={selectedCertificate.status === "Отправлен" || isCertificateInactive(selectedCertificate.status)}
               onClick={() => setCertificateStatus("Отправлен", "PDF отмечен как отправленный.")}
               type="button"
             >
@@ -3996,7 +4069,7 @@ function CertificatesWorkspace({
             </button>
             <button
               className="admin-danger-button"
-              disabled={selectedCertificate.status === "Погашен"}
+              disabled={isCertificateInactive(selectedCertificate.status)}
               onClick={() => setCertificateStatus("Погашен", "Сертификат погашен.")}
               type="button"
             >
@@ -6305,6 +6378,7 @@ function Workspace({
         appointments={appointments}
         certificates={certificates}
         clients={clients}
+        financeRows={financeRows}
         hasLoadError={hasLoadError}
         onSaveAppointment={onSaveAppointment}
         query={query}

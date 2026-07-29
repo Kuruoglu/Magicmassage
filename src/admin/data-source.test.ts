@@ -14,13 +14,26 @@ import type {
   SettingsRecord,
 } from "./domain";
 import type { AdminRepository, AdminSupabaseClient } from "./repository";
-import { loadAdminShellData } from "./data-source";
+import { getMonthFinancePeriod, loadAdminShellData } from "./data-source";
 
 const emptyRecords: AdminDomainRecords = {
   appointments: [],
   certificates: [],
   clients: [],
 };
+
+describe("getMonthFinancePeriod", () => {
+  it("uses the Europe/Sofia month near the UTC month boundary", () => {
+    expect(getMonthFinancePeriod(new Date("2026-07-31T20:59:59.999Z"))).toEqual({
+      from: "2026-07-01",
+      to: "2026-07-31",
+    });
+    expect(getMonthFinancePeriod(new Date("2026-07-31T21:00:00.000Z"))).toEqual({
+      from: "2026-08-01",
+      to: "2026-08-31",
+    });
+  });
+});
 
 function createRepositoryStub(overrides: Partial<AdminRepository>): AdminRepository {
   return {

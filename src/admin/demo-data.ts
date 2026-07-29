@@ -1,12 +1,5 @@
 import { calculateFinanceSummary, type AdminSectionId, type FinanceRow } from "./config";
 
-export const dashboardMetrics = [
-  { label: "Сегодня", value: "8 записей", tone: "info" },
-  { label: "Ждут подтверждения", value: "3 заявки", tone: "warning" },
-  { label: "Сертификаты", value: "5 оплачено", tone: "success" },
-  { label: "Stripe за месяц", value: "1 240 €", tone: "neutral" },
-] as const;
-
 export const upcomingAppointments = [
   {
     date: "2026-07-06",

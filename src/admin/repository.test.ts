@@ -20,7 +20,7 @@ import {
 
 type QueryFilter = {
   column: string;
-  operator: "eq" | "gt" | "gte" | "lte";
+  operator: "eq" | "gt" | "gte" | "lt" | "lte";
   value: unknown;
 };
 
@@ -64,6 +64,11 @@ class FakeSelectQuery implements PromiseLike<{ data: unknown[] | null; error: { 
 
   gt(column: string, value: unknown) {
     this.filters.push({ column, operator: "gt", value });
+    return this;
+  }
+
+  lt(column: string, value: unknown) {
+    this.filters.push({ column, operator: "lt", value });
     return this;
   }
 
@@ -871,6 +876,26 @@ describe("admin Supabase repository", () => {
     ]);
   });
 
+  it("normalizes nullable payment dates and preserves refunded certificate status", async () => {
+    const client = new FakeSupabaseClient({
+      admin_certificates: [
+        {
+          ...certificateRows[0],
+          paid_on: null,
+          status: "refunded",
+        },
+      ],
+    });
+    const repository = createAdminSupabaseRepository(client);
+
+    const records = await repository.loadDomainRecords();
+
+    expect(records.certificates[0]).toMatchObject({
+      paymentDate: "",
+      status: "Возвращён",
+    });
+  });
+
   it("sends no client contacts, ids, or notes to a specialist calendar", async () => {
     const client = new FakeSupabaseClient({
       admin_appointments: [{
@@ -1045,10 +1070,25 @@ describe("admin Supabase repository", () => {
     ]);
     expect(client.operations[0]).toMatchObject({
       filters: [
-        { column: "paid_at", operator: "gte", value: "2026-07-01T00:00:00.000Z" },
-        { column: "paid_at", operator: "lte", value: "2026-07-31T23:59:59.999Z" },
+        { column: "paid_at", operator: "gte", value: "2026-06-30T21:00:00.000Z" },
+        { column: "paid_at", operator: "lt", value: "2026-07-31T21:00:00.000Z" },
       ],
       order: { ascending: true, column: "paid_at" },
+      table: "admin_stripe_sales",
+    });
+  });
+
+  it("uses the Europe/Sofia winter offset for Stripe period boundaries", async () => {
+    const client = new FakeSupabaseClient({ admin_stripe_sales: [] });
+    const repository = createAdminSupabaseRepository(client);
+
+    await repository.listStripeSales({ from: "2026-01-01", to: "2026-01-31" });
+
+    expect(client.operations[0]).toMatchObject({
+      filters: [
+        { column: "paid_at", operator: "gte", value: "2025-12-31T22:00:00.000Z" },
+        { column: "paid_at", operator: "lt", value: "2026-01-31T22:00:00.000Z" },
+      ],
       table: "admin_stripe_sales",
     });
   });

@@ -3,6 +3,7 @@ import type { AdminRoleId, AdminSectionId } from "./config";
 import { certificateRows, clientRows, financeRows as demoFinanceRows, upcomingAppointments } from "./demo-data";
 import {
   createAdminDemoRecords,
+  getLocalDateTimeKey,
   type AdminDomainRecords,
   type AdminUserRecord,
   type BlogPostRecord,
@@ -98,10 +99,11 @@ export function buildDemoAdminShellData(loadError?: string): AdminShellInitialDa
 }
 
 export function getMonthFinancePeriod(now = new Date()) {
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth();
+  const localDate = getLocalDateTimeKey(now, "Europe/Sofia").slice(0, 10);
+  const [year, monthNumber] = localDate.split("-").map(Number);
+  const month = monthNumber - 1;
   const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const monthLabel = String(month + 1).padStart(2, "0");
+  const monthLabel = String(monthNumber).padStart(2, "0");
 
   return {
     from: `${year}-${monthLabel}-01`,

@@ -89,6 +89,7 @@ type AdminSupabaseSelectQuery<T> = PromiseLike<SupabaseQueryResult<T>> & {
   eq(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   gte(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   gt(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
+  lt(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   lte(column: string, value: unknown): AdminSupabaseSelectQuery<T>;
   order(column: string, options?: { ascending?: boolean }): AdminSupabaseSelectQuery<T>;
   range(from: number, to: number): AdminSupabaseSelectQuery<T>;
@@ -624,7 +625,9 @@ const certificateStatusByDatabase: Record<string, CertificateStatus> = {
   paid: "Оплачено",
   pending_pdf: "Ожидает PDF",
   redeemed: "Погашен",
+  refunded: "Возвращён",
   sent: "Отправлен",
+  Возвращён: "Возвращён",
   Оплачено: "Оплачено",
   "Ожидает PDF": "Ожидает PDF",
   Отправлен: "Отправлен",
@@ -635,6 +638,7 @@ const databaseCertificateStatusByStatus = new Map<CertificateStatus, string>([
   [certificateStatusByDatabase.paid, "paid"],
   [certificateStatusByDatabase.pending_pdf, "pending_pdf"],
   [certificateStatusByDatabase.redeemed, "redeemed"],
+  [certificateStatusByDatabase.refunded, "refunded"],
   [certificateStatusByDatabase.sent, "sent"],
 ]);
 
@@ -658,12 +662,24 @@ function normalizeTime(value: string) {
   return value.match(/^\d{2}:\d{2}/)?.[0] ?? value;
 }
 
-function startOfUtcDay(value: string) {
-  return `${value.slice(0, 10)}T00:00:00.000Z`;
+function addCalendarDays(value: string, days: number) {
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+
+  return date.toISOString().slice(0, 10);
 }
 
-function endOfUtcDay(value: string) {
-  return `${value.slice(0, 10)}T23:59:59.999Z`;
+function startOfBusinessDay(value: string) {
+  const result = sofiaLocalDateTimeToIso(`${value.slice(0, 10)}T00:00`);
+  if (!result) {
+    throw new Error(`Invalid Europe/Sofia business date: ${value}`);
+  }
+
+  return result;
+}
+
+function startOfNextBusinessDay(value: string) {
+  return startOfBusinessDay(addCalendarDays(value, 1));
 }
 
 function mapAppointmentStatus(status: string): AppointmentStatus {
@@ -937,7 +953,7 @@ function mapCertificateRow(row: AdminCertificateDatabaseRow): CertificateRecord 
     expiresAt: row.expires_on,
     history: [...row.history],
     note: row.internal_note,
-    paymentDate: row.paid_on,
+    paymentDate: row.paid_on ?? "",
     recipient: row.recipient_name,
     status: mapCertificateStatus(row.status),
     stripeId: row.stripe_payment_intent_id,
@@ -1680,8 +1696,8 @@ export function createAdminSupabaseRepository(client: AdminSupabaseClient): Admi
   async function listStripeSales(period: AdminFinancePeriod) {
     const rows = await selectRows<AdminStripeSaleDatabaseRow>(client, "admin_stripe_sales", stripeSaleColumns, (query) =>
       query
-        .gte("paid_at", startOfUtcDay(period.from))
-        .lte("paid_at", endOfUtcDay(period.to))
+        .gte("paid_at", startOfBusinessDay(period.from))
+        .lt("paid_at", startOfNextBusinessDay(period.to))
         .order("paid_at", { ascending: true }),
     );
 

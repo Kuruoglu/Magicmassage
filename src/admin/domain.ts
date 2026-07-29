@@ -101,7 +101,7 @@ export type SpecialistRecord = {
   weeklySchedule: SpecialistScheduleDay[];
 };
 
-export type CertificateStatus = "Оплачено" | "Отправлен" | "Ожидает PDF" | "Погашен";
+export type CertificateStatus = "Оплачено" | "Отправлен" | "Ожидает PDF" | "Погашен" | "Возвращён";
 
 export type CertificateRecord = {
   amount: string;
@@ -417,7 +417,7 @@ export type AdminCertificateDatabaseRow = {
   expires_on: string;
   history: string[];
   internal_note: string;
-  paid_on: string;
+  paid_on: string | null;
   recipient_name: string;
   status: string;
   stripe_payment_intent_id: string;

@@ -48,6 +48,127 @@ describe("AdminShell", () => {
     expect(screen.queryByText(/hero/i)).not.toBeInTheDocument();
   });
 
+  it("derives owner dashboard metrics from the supplied operational data", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-29T08:00:00.000Z"));
+
+    render(
+      <AdminShell
+        activeSection="dashboard"
+        initialData={{
+          financeRows: [
+            { gross: 100, refund: 0, stripeFee: 3 },
+            { gross: 50.5, refund: 10, stripeFee: 2 },
+          ],
+          records: {
+            appointments: [
+              {
+                client: "Confirmed Client",
+                date: "2026-07-29",
+                id: "appointment-confirmed",
+                note: "",
+                service: "Massage",
+                status: "Подтверждена",
+                time: "10:00",
+              },
+              {
+                client: "Pending Client",
+                date: "2026-07-29",
+                id: "appointment-pending",
+                note: "",
+                service: "Massage",
+                status: "Ожидает",
+                time: "11:00",
+              },
+              {
+                client: "Cancelled Client",
+                date: "2026-07-29",
+                id: "appointment-cancelled",
+                note: "",
+                service: "Massage",
+                status: "Отменена",
+                time: "12:00",
+              },
+              {
+                client: "Request Client",
+                date: "2026-07-30",
+                id: "appointment-request",
+                note: "",
+                service: "Massage",
+                status: "Новая заявка",
+                time: "13:00",
+              },
+            ],
+            certificates: [
+              {
+                amount: "100 €",
+                buyer: "Paid Buyer",
+                clientName: "Paid Client",
+                code: "CERT-PAID",
+                expiresAt: "2027-01-01",
+                history: [],
+                note: "",
+                paymentDate: "2026-07-10",
+                recipient: "Paid Client",
+                status: "Оплачено",
+                stripeId: "pi_paid",
+              },
+              {
+                amount: "80 €",
+                buyer: "Sent Buyer",
+                clientName: "Sent Client",
+                code: "CERT-SENT",
+                expiresAt: "2027-01-02",
+                history: [],
+                note: "",
+                paymentDate: "2026-07-11",
+                recipient: "Sent Client",
+                status: "Отправлен",
+                stripeId: "pi_sent",
+              },
+              {
+                amount: "90 €",
+                buyer: "Refunded Buyer",
+                clientName: "Refunded Client",
+                code: "CERT-REFUNDED",
+                expiresAt: "2027-01-03",
+                history: [],
+                note: "",
+                paymentDate: "2026-07-12",
+                recipient: "Refunded Client",
+                status: "Возвращён",
+                stripeId: "pi_refunded",
+              },
+            ],
+            clients: [],
+          },
+          settings: blogVisibilitySettings,
+          source: "supabase",
+        }}
+        role="owner"
+      />,
+    );
+
+    const metrics = screen.getByLabelText("Ключевые показатели");
+    expect(metrics).toHaveTextContent("2 записи");
+    expect(metrics).toHaveTextContent("2 заявки");
+    expect(metrics).toHaveTextContent("2 оплачено");
+    expect(metrics).toHaveTextContent("150,50 €");
+    expect(metrics).not.toHaveTextContent("8 записей");
+    expect(metrics).not.toHaveTextContent("5 оплачено");
+    expect(metrics).not.toHaveTextContent("1 240 €");
+  });
+
+  it("does not show unavailable financial metrics as zero to read-only roles", () => {
+    const { rerender } = render(<AdminShell activeSection="dashboard" role="viewer" />);
+
+    expect(screen.getByLabelText("Ключевые показатели")).not.toHaveTextContent("Stripe за месяц");
+
+    rerender(<AdminShell activeSection="dashboard" role="editor" />);
+
+    expect(screen.queryByLabelText("Ключевые показатели")).not.toBeInTheDocument();
+  });
+
   it("keeps dashboard shortcut links inside the current role view", () => {
     render(<AdminShell activeSection="dashboard" role="specialist" />);
 
@@ -1496,6 +1617,49 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Oksana → Olena K.")).toBeInTheDocument();
     expect(within(details).getByText("260 €")).toBeInTheDocument();
     expect(within(details).getByText("Погашен после записи клиента.")).toBeInTheDocument();
+  });
+
+  it("keeps refunded certificates inactive and disables fulfillment actions", () => {
+    render(
+      <AdminShell
+        activeSection="certificates"
+        initialData={{
+          financeRows: [],
+          records: {
+            appointments: [],
+            certificates: [
+              {
+                amount: "90 €",
+                buyer: "Refunded Buyer",
+                clientName: "Refunded Client",
+                code: "CERT-REFUNDED",
+                expiresAt: "2027-01-03",
+                history: ["2026-07-12: Payment refunded."],
+                note: "",
+                paymentDate: "2026-07-12",
+                recipient: "Refunded Client",
+                status: "Возвращён",
+                stripeId: "pi_refunded",
+              },
+            ],
+            clients: [],
+          },
+          source: "supabase",
+        }}
+        role="owner"
+        selectedCertificateCode="CERT-REFUNDED"
+      />,
+    );
+
+    const details = screen.getByLabelText("Детали сертификата");
+    expect(within(details).getByText("Возвращён")).toBeInTheDocument();
+    expect(within(details).getByRole("button", { name: "Отправить PDF" })).toBeDisabled();
+    expect(within(details).getByRole("button", { name: "Погасить" })).toBeDisabled();
+
+    fireEvent.click(within(details).getByRole("button", { name: "Редактировать" }));
+    const editDialog = screen.getByRole("dialog", { name: "Редактировать сертификат" });
+    expect(within(editDialog).getByLabelText("Статус")).toBeDisabled();
+    expect(within(editDialog).getByRole("option", { name: "Возвращён" })).toBeDisabled();
   });
 
   it("creates and edits a massage service from the services workspace", () => {
