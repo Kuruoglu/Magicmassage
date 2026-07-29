@@ -347,6 +347,18 @@ export function CalendarWorkspace({
   const clientScopedAppointments = selectedClientFilterName
     ? specialistScopedAppointments.filter((appointment) => appointmentBelongsToClient(appointment, selectedClientFilter, clients))
     : specialistScopedAppointments;
+  const appointmentClientSearchValues = useMemo(
+    () => new Map(
+      appointments.map((appointment) => {
+        const linkedClient = findAppointmentClient(clients, appointment);
+        return [
+          appointmentKey(appointment),
+          [linkedClient?.phone, linkedClient?.email] as const,
+        ];
+      }),
+    ),
+    [appointments, clients],
+  );
   const fallbackAppointment = specialistScopedAppointments[0] ?? {
     client: "Нет записи",
     date: getCalendarIsoDate(workingSchedule),
@@ -356,12 +368,23 @@ export function CalendarWorkspace({
     status: "Новая заявка" as const,
     time: "00:00",
   };
-  const filteredAppointments = clientScopedAppointments.filter((appointment) =>
-    matchesSearch(
-      [appointment.date, appointment.time, appointment.client, appointment.service, appointment.specialistName, appointment.status, appointment.note],
+  const filteredAppointments = clientScopedAppointments.filter((appointment) => {
+    const linkedClientSearchValues = appointmentClientSearchValues.get(appointmentKey(appointment));
+
+    return matchesSearch(
+      [
+        appointment.date,
+        appointment.time,
+        appointment.client,
+        appointment.service,
+        appointment.specialistName,
+        appointment.status,
+        appointment.note,
+        ...(linkedClientSearchValues ?? []),
+      ],
       query,
-    ),
-  );
+    );
+  });
   const calendarGridAppointments = filteredAppointments.filter(
     (appointment) => appointment.status !== "Отменена",
   );

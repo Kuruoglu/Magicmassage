@@ -830,6 +830,26 @@ describe("AdminShell", () => {
     expect(screen.queryByText("Maria Georgieva")).not.toBeInTheDocument();
   });
 
+  it("keeps a client phone search useful after switching to the calendar", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<AdminShell activeSection="clients" role="owner" />);
+    const search = screen.getByRole("searchbox", { name: "Поиск" });
+
+    await user.type(search, "+359 87 333 4411");
+    expect(within(screen.getByRole("table")).getByRole("link", { name: "Olena K." })).toBeInTheDocument();
+
+    rerender(
+      <AdminShell
+        activeSection="calendar"
+        role="owner"
+        selectedCalendarDate="2026-07-08"
+      />,
+    );
+
+    expect(screen.getByRole("searchbox", { name: "Поиск" })).toHaveValue("+359 87 333 4411");
+    expect(screen.getByRole("button", { name: /Olena K\..*Deep tissue massage/ })).toBeInTheDocument();
+  });
+
   it("filters clients with segmented controls", async () => {
     const user = userEvent.setup();
 

@@ -685,6 +685,13 @@ describe("CalendarWorkspace", () => {
     expect(screen.getByRole("button", { name: /^6 июля, 1 запись, 2 свободных слота$/ })).toBeInTheDocument();
   });
 
+  it("finds an appointment by the linked client's phone", () => {
+    renderCalendar({ query: "+359881112233" });
+
+    expect(screen.getByText(clients[0].name)).toBeInTheDocument();
+    expect(screen.queryByText(clients[1].name)).not.toBeInTheDocument();
+  });
+
   it("counts only specialists who work on the selected day in month capacity", async () => {
     const user = userEvent.setup();
     renderCalendar({
