@@ -104,8 +104,24 @@ describe("PublicBookingFlow", () => {
 
     render(<PublicBookingFlow locale="en" />);
 
-    await user.click(await screen.findByRole("button", { name: /Classic massage/i }));
+    const serviceButton = await screen.findByRole("button", { name: /Classic massage/i });
+    const stepHeading = screen.getByRole("heading", { name: "Choose a service" });
+    const stepHint = screen.getByText("We will show options and times only for the selected massage.");
+    // Google Translate replaces React-owned text nodes with nested font elements.
+    for (const translatedElement of [stepHeading, stepHint]) {
+      const translatedText = document.createTreeWalker(translatedElement, 4).nextNode();
+      expect(translatedText).toBeInstanceOf(Text);
+      const innerTranslationWrapper = document.createElement("font");
+      const outerTranslationWrapper = document.createElement("font");
+      innerTranslationWrapper.textContent = translatedText?.textContent ?? "";
+      outerTranslationWrapper.append(innerTranslationWrapper);
+      translatedText?.parentNode?.replaceChild(outerTranslationWrapper, translatedText);
+    }
+
+    await user.click(serviceButton);
     await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("heading", { name: "Choose a duration" })).toBeInTheDocument();
+    expect(screen.getByText("The price and duration are fixed for this option.")).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: /60 min/i }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByRole("heading", { name: "Choose a specialist" })).toBeInTheDocument();

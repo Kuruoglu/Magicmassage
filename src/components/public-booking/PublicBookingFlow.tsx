@@ -326,6 +326,22 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
     ?? selectedSpecialist?.displayName
     ?? (selectedSpecialistId === null ? copy.anySpecialist : copy.notSelected);
   const notice = policyNotice(options?.policy);
+  const currentStepTitle: Record<BookingStep, string> = {
+    service: copy.serviceTitle,
+    variant: copy.variantTitle,
+    specialist: copy.specialistTitle,
+    schedule: copy.scheduleTitle,
+    details: copy.detailsTitle,
+    review: copy.reviewTitle,
+  };
+  const currentStepHint: Record<BookingStep, string> = {
+    service: copy.serviceHint,
+    variant: copy.variantHint,
+    specialist: copy.specialistHint,
+    schedule: copy.scheduleHint,
+    details: copy.detailsHint,
+    review: copy.reviewHint,
+  };
 
   const writeHistory = useCallback((nextStep: BookingStep, mode: "push" | "replace", overrides?: {
     date?: string | null;
@@ -907,22 +923,11 @@ export function PublicBookingFlow({ initialServiceSlug, locale }: PublicBookingF
               </button>
             ) : null}
             <div>
+              {/* Keyed wrappers keep browser translation DOM mutations inside the node React replaces. */}
               <h2 ref={headingRef} tabIndex={-1}>
-                {step === "service" ? copy.serviceTitle : null}
-                {step === "variant" ? copy.variantTitle : null}
-                {step === "specialist" ? copy.specialistTitle : null}
-                {step === "schedule" ? copy.scheduleTitle : null}
-                {step === "details" ? copy.detailsTitle : null}
-                {step === "review" ? copy.reviewTitle : null}
+                <span key={step}>{currentStepTitle[step]}</span>
               </h2>
-              <p>
-                {step === "service" ? copy.serviceHint : null}
-                {step === "variant" ? copy.variantHint : null}
-                {step === "specialist" ? copy.specialistHint : null}
-                {step === "schedule" ? copy.scheduleHint : null}
-                {step === "details" ? copy.detailsHint : null}
-                {step === "review" ? copy.reviewHint : null}
-              </p>
+              <p><span key={step}>{currentStepHint[step]}</span></p>
             </div>
           </div>
 
