@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AdminLink as Link } from "@/components/admin/AdminLink";
 import { useState } from "react";
 
 import type { AdminRoleId } from "@/admin/config";

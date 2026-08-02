@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const adminPageMocks = vi.hoisted(() => ({
   authorization: {
+    message: undefined as string | undefined,
     mode: "supabase",
     ok: true,
     role: "accountant",
     specialistId: undefined as string | undefined,
+    statusCode: undefined as 401 | 403 | 503 | undefined,
     userId: "11111111-1111-4111-8111-111111111111",
   },
   client: { from: vi.fn() },
@@ -66,17 +68,20 @@ vi.mock("@/lib/supabase/admin", async (importOriginal) => {
   };
 });
 
-vi.mock("@/components/admin/admin-shell", () => ({
-  AdminShell: vi.fn((props: unknown) => ({
+vi.mock("@/components/admin/admin-shell-client", () => ({
+  AdminShellClient: vi.fn((props: unknown) => ({
     props,
-    type: "AdminShell",
+    type: "AdminShellClient",
   })),
 }));
 
 describe("/admin page authorization", () => {
   beforeEach(() => {
+    adminPageMocks.authorization.message = undefined;
+    adminPageMocks.authorization.ok = true;
     adminPageMocks.authorization.role = "accountant";
     adminPageMocks.authorization.specialistId = undefined;
+    adminPageMocks.authorization.statusCode = undefined;
     adminPageMocks.cookieToken = undefined;
     adminPageMocks.loadAdminShellData.mockClear();
   });
@@ -108,6 +113,19 @@ describe("/admin page authorization", () => {
       activeSection: "finances",
       role: "accountant",
     });
+  });
+
+  it("surfaces temporary authorization infrastructure failures", async () => {
+    adminPageMocks.cookieToken = "admin-token";
+    adminPageMocks.authorization.message = "Service unavailable";
+    adminPageMocks.authorization.ok = false;
+    adminPageMocks.authorization.statusCode = 503;
+    const { default: AdminPage } = await import("./page");
+
+    await expect(AdminPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+      "Admin authorization service is temporarily unavailable.",
+    );
+    expect(adminPageMocks.loadAdminShellData).not.toHaveBeenCalled();
   });
 
   it("forwards the authorized profile's linked specialist to the admin data source", async () => {

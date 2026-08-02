@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const cloudflareFreeBuild = process.env.CLOUDFLARE_FREE_BUILD === "true";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    authInterrupts: true,
+  },
   turbopack: cloudflareFreeBuild
     ? {
         resolveAlias: {

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AdminLink as Link } from "@/components/admin/AdminLink";
 import {
   type MouseEvent as ReactMouseEvent,
   useEffect,
@@ -210,6 +210,7 @@ export function AdminMobileNavigation({
                         data-section={module.id}
                         href={getHref(module.id)}
                         onClick={() => onCloseRef.current()}
+                        prefetch={false}
                       >
                         {module.title}
                       </Link>

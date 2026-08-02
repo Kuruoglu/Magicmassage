@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AdminLink as Link } from "@/components/admin/AdminLink";
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -3024,7 +3024,7 @@ function DashboardWorkspace({
       <section className="admin-panel admin-panel-large" aria-labelledby="appointments-heading">
         <div className="admin-panel-head">
           <h2 id="appointments-heading">Ближайшие записи</h2>
-          <Link className="admin-text-action" href={`/admin?section=calendar&role=${role}`}>
+          <Link className="admin-text-action" href={`/admin?section=calendar&role=${role}`} prefetch={false}>
             Открыть календарь
           </Link>
         </div>
@@ -3051,7 +3051,7 @@ function DashboardWorkspace({
                       {isSpecialist ? (
                         appointment.client
                       ) : (
-                        <Link className="admin-row-action admin-row-link" href={clientProfileHref(appointmentClientIdentity, role)}>
+                        <Link className="admin-row-action admin-row-link" href={clientProfileHref(appointmentClientIdentity, role)} prefetch={false}>
                           {appointment.client}
                         </Link>
                       )}
@@ -3061,7 +3061,7 @@ function DashboardWorkspace({
                       <span className={statusClass(appointment.status)}>{appointment.status}</span>
                     </td>
                     <td>
-                      <Link className="admin-row-action admin-row-link" href={calendarAppointmentHref(appointment, role, appointmentClientIdentity)}>
+                      <Link className="admin-row-action admin-row-link" href={calendarAppointmentHref(appointment, role, appointmentClientIdentity)} prefetch={false}>
                         Календарь
                       </Link>
                     </td>
@@ -3081,7 +3081,7 @@ function DashboardWorkspace({
       {!isSpecialist ? <section className="admin-panel" aria-labelledby="certificate-heading">
         <div className="admin-panel-head">
           <h2 id="certificate-heading">Сертификаты</h2>
-          <Link className="admin-text-action" href={`/admin?section=certificates&role=${role}`}>
+          <Link className="admin-text-action" href={`/admin?section=certificates&role=${role}`} prefetch={false}>
             Все
           </Link>
         </div>
@@ -3090,7 +3090,7 @@ function DashboardWorkspace({
             <article className="admin-list-item" key={certificate.code}>
               <div>
                 <strong>
-                  <Link className="admin-row-action admin-row-link" href={certificateDetailHref(certificate.code, role)}>
+                  <Link className="admin-row-action admin-row-link" href={certificateDetailHref(certificate.code, role)} prefetch={false}>
                     {certificate.code}
                   </Link>
                 </strong>
@@ -7959,7 +7959,7 @@ export function AdminShell({
         onClose={() => setIsMobileNavigationOpen(false)}
       />
       <aside className="admin-sidebar">
-        <Link className="admin-brand" href={`/admin?role=${role}`} aria-label="Magic Massage Natali admin home">
+        <Link className="admin-brand" href={`/admin?role=${role}`} aria-label="Magic Massage Natali admin home" prefetch={false}>
           <span>MMN</span>
           <strong>Magic Massage Natali</strong>
         </Link>
@@ -7980,6 +7980,7 @@ export function AdminShell({
                     aria-current={item.id === activeSection ? "page" : undefined}
                     href={`/admin?section=${item.id}&role=${role}`}
                     key={item.id}
+                    prefetch={false}
                   >
                     {item.title}
                   </Link>

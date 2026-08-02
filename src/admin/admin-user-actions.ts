@@ -10,7 +10,7 @@ export type AdminUserActionResult = {
   message: string;
   mode: "demo" | "supabase";
   ok: boolean;
-  statusCode?: 401 | 403 | 500;
+  statusCode?: 401 | 403 | 500 | 503;
   userId?: string;
 };
 

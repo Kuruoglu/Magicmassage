@@ -2898,6 +2898,28 @@ h2 { font-size: clamp(2.25rem, 4.2vw, 4rem); line-height: 1.08; }
   box-shadow: inset 3px 0 0 #B477DD;
 }
 
+.admin-load-state {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.admin-load-state h1,
+.admin-load-state p {
+  margin: 0;
+}
+
+.admin-load-state p {
+  margin-top: 0.75rem;
+}
+
+.admin-load-state button {
+  justify-self: center;
+  margin-top: 1.25rem;
+}
+
 .admin-main {
   max-width: 100%;
   min-width: 0;

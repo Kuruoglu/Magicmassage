@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AdminLink as Link } from "@/components/admin/AdminLink";
 
 import type { AdminRoleId } from "@/admin/config";
 import type { Appointment, ClientVisit } from "@/admin/domain";

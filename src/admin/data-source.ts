@@ -42,12 +42,17 @@ type LoadAdminShellDataOptions = {
     client: AdminSupabaseClient,
   ) => Pick<
     AdminRepository,
+    | "listAppointments"
     | "listAdminUsers"
     | "listBlogPosts"
+    | "listCalendarBlocks"
+    | "listCertificates"
+    | "listClients"
     | "listContactChannels"
     | "listMedia"
     | "listPrices"
     | "listServices"
+    | "listSpecialists"
     | "listStripeSales"
     | "loadContactSettings"
     | "loadDomainRecords"
@@ -59,12 +64,16 @@ type LoadAdminShellDataOptions = {
   specialistId?: string;
 };
 
+type AdminShellRepository = ReturnType<NonNullable<LoadAdminShellDataOptions["createRepository"]>>;
+
 const emptyRecords: AdminDomainRecords = {
   appointments: [],
   calendarBlocks: [],
   certificates: [],
   clients: [],
 };
+
+const contentSections: readonly AdminSectionId[] = ["services", "price", "media", "contacts", "blog"];
 
 function cloneFinanceRows(rows: readonly FinanceRow[]): FinanceRow[] {
   return rows.map((row) => ({ ...row }));
@@ -124,6 +133,168 @@ function withRuntimeEmailSender(
   return verifiedEmailSender ? { ...settings, verifiedEmailSender } : settings;
 }
 
+async function loadFullAccessSectionData(
+  repository: AdminShellRepository,
+  activeSection: AdminSectionId,
+  env: AdminSupabaseEnvSource,
+  now: Date,
+): Promise<Omit<AdminShellInitialData, "source">> {
+  const baseData = {
+    financeRows: [],
+    records: emptyRecords,
+  } satisfies Omit<AdminShellInitialData, "source">;
+
+  if (activeSection === "dashboard") {
+    const [appointments, certificates, clients, financeRows, settings] = await Promise.all([
+      repository.listAppointments(),
+      repository.listCertificates(),
+      repository.listClients(),
+      repository.listStripeSales(getMonthFinancePeriod(now)),
+      repository.loadSettings(),
+    ]);
+
+    return {
+      ...baseData,
+      financeRows,
+      records: {
+        appointments,
+        calendarBlocks: [],
+        certificates,
+        clients,
+        specialists: [],
+      },
+      settings: withRuntimeEmailSender(settings, env),
+    };
+  }
+
+  if (activeSection === "clients") {
+    const [appointments, certificates, clients, settings] = await Promise.all([
+      repository.listAppointments(),
+      repository.listCertificates(),
+      repository.listClients(),
+      repository.loadSettings(),
+    ]);
+
+    return {
+      ...baseData,
+      records: {
+        appointments,
+        calendarBlocks: [],
+        certificates,
+        clients,
+        specialists: [],
+      },
+      settings: withRuntimeEmailSender(settings, env),
+    };
+  }
+
+  if (activeSection === "certificates") {
+    const [certificates, clients] = await Promise.all([
+      repository.listCertificates(),
+      repository.listClients(),
+    ]);
+
+    return {
+      ...baseData,
+      records: {
+        appointments: [],
+        calendarBlocks: [],
+        certificates,
+        clients,
+        specialists: [],
+      },
+    };
+  }
+
+  if (activeSection === "calendar") {
+    const [appointments, calendarBlocks, clients, specialists, settings] = await Promise.all([
+      repository.listAppointments(),
+      repository.listCalendarBlocks(),
+      repository.listClients(),
+      repository.listSpecialists(),
+      repository.loadSettings(),
+    ]);
+    const specialistNames = new Map(
+      specialists.map((specialist) => [specialist.id, specialist.displayName]),
+    );
+
+    return {
+      ...baseData,
+      records: {
+        appointments: appointments.map((appointment) => ({
+          ...appointment,
+          specialistName: appointment.specialistId
+            ? specialistNames.get(appointment.specialistId)
+            : undefined,
+        })),
+        calendarBlocks: calendarBlocks.map((block) => ({
+          ...block,
+          specialistName: block.specialistId
+            ? specialistNames.get(block.specialistId)
+            : undefined,
+        })),
+        certificates: [],
+        clients,
+        specialists,
+      },
+      settings: withRuntimeEmailSender(settings, env),
+    };
+  }
+
+  if (activeSection === "users") {
+    return { ...baseData, adminUsers: await repository.listAdminUsers() };
+  }
+
+  if (activeSection === "services" || activeSection === "price") {
+    const [services, prices] = await Promise.all([
+      repository.listServices(),
+      repository.listPrices(),
+    ]);
+
+    return { ...baseData, prices, services };
+  }
+
+  if (activeSection === "media") {
+    return { ...baseData, media: await repository.listMedia() };
+  }
+
+  if (activeSection === "contacts") {
+    const [contactChannels, contactSettings] = await Promise.all([
+      repository.listContactChannels(),
+      repository.loadContactSettings(),
+    ]);
+
+    return { ...baseData, contactChannels, contactSettings };
+  }
+
+  if (activeSection === "blog") {
+    const [blogPosts, media, settings] = await Promise.all([
+      repository.listBlogPosts(),
+      repository.listMedia(),
+      repository.loadSettings(),
+    ]);
+
+    return {
+      ...baseData,
+      blogPosts,
+      media,
+      settings: withRuntimeEmailSender(settings, env),
+    };
+  }
+
+  if (activeSection === "finances") {
+    return {
+      ...baseData,
+      financeRows: await repository.listStripeSales(getMonthFinancePeriod(now)),
+    };
+  }
+
+  return {
+    ...baseData,
+    settings: withRuntimeEmailSender(await repository.loadSettings(), env),
+  };
+}
+
 export async function loadAdminShellData({
   activeSection,
   createClient = createAdminSupabaseClient,
@@ -163,6 +334,17 @@ export async function loadAdminShellData({
       };
     }
 
+    if (
+      (role === "viewer" || role === "editor")
+      && activeSection
+      && contentSections.includes(activeSection)
+    ) {
+      return {
+        ...(await loadFullAccessSectionData(repository, activeSection, env, now)),
+        source: "supabase",
+      };
+    }
+
     if (role === "viewer") {
       return {
         blogPosts: activeSection === "blog" ? await repository.listBlogPosts() : undefined,
@@ -195,6 +377,16 @@ export async function loadAdminShellData({
         settings: activeSection === "blog"
           ? withRuntimeEmailSender(await repository.loadSettings(), env)
           : undefined,
+        source: "supabase",
+      };
+    }
+
+    if (activeSection) {
+      const sectionData = await loadFullAccessSectionData(repository, activeSection, env, now);
+
+      return {
+        ...sectionData,
+        ...(specialistId ? { currentSpecialistId: specialistId } : {}),
         source: "supabase",
       };
     }

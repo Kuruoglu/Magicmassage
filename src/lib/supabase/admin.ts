@@ -35,7 +35,9 @@ type AdminAuthGetUserResult = {
     } | null;
   };
   error: {
+    code?: string;
     message: string;
+    status?: number;
   } | null;
 };
 
@@ -75,7 +77,7 @@ export type SupabaseAdminAuthorizationResult =
       message: string;
       mode: "supabase";
       ok: false;
-      statusCode: 401 | 403 | 500;
+      statusCode: 401 | 403 | 503;
     };
 
 type AuthorizeSupabaseAdminAccessOptions = {
@@ -169,6 +171,17 @@ export function getBearerToken(authorizationHeader: string | null) {
   return token.trim();
 }
 
+function isInvalidAdminTokenError(error: NonNullable<AdminAuthGetUserResult["error"]>) {
+  if (error.status === 401 || error.status === 403) {
+    return true;
+  }
+
+  const details = `${error.code ?? ""} ${error.message}`.toLowerCase();
+  return ["invalid jwt", "jwt expired", "invalid token", "session expired"].some((value) =>
+    details.includes(value),
+  );
+}
+
 export async function authorizeSupabaseAdminAccess(
   client: SupabaseAdminClient,
   actorToken: string | undefined,
@@ -186,8 +199,20 @@ export async function authorizeSupabaseAdminAccess(
   const { data: authData, error: authError } = await client.auth.getUser(actorToken);
   const actorUserId = authData.user?.id;
 
-  if (authError || !actorUserId) {
-    console.error("Supabase admin auth failed", authError?.message ?? "authenticated user was not found");
+  if (authError) {
+    const invalidToken = isInvalidAdminTokenError(authError);
+    console.error("Supabase admin auth failed", authError.message);
+
+    return {
+      message: invalidToken ? "Unauthorized" : "Service unavailable",
+      mode: "supabase",
+      ok: false,
+      statusCode: invalidToken ? 401 : 503,
+    };
+  }
+
+  if (!actorUserId) {
+    console.error("Supabase admin auth failed", "authenticated user was not found");
 
     return {
       message: "Unauthorized",
@@ -206,10 +231,10 @@ export async function authorizeSupabaseAdminAccess(
     console.error("Supabase admin profile lookup failed", profileError.message);
 
     return {
-      message: "Forbidden",
+      message: "Service unavailable",
       mode: "supabase",
       ok: false,
-      statusCode: 403,
+      statusCode: 503,
     };
   }
 

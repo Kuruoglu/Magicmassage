@@ -22,9 +22,12 @@ type Operation =
 
 class FakeSupabaseAdminClient {
   readonly operations: Operation[] = [];
-  authResult = {
+  authResult: {
+    data: { user: { id: string } | null };
+    error: { code?: string; message: string; status?: number } | null;
+  } = {
     data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
-    error: null as { message: string } | null,
+    error: null,
   };
   profileRows: Array<{ role: string; status: string; user_id: string }> = [
     {
@@ -201,6 +204,50 @@ describe("server-only Supabase admin client", () => {
       ok: false,
       statusCode: 403,
     });
+  });
+
+  it("reports profile lookup failures as temporary service unavailability", async () => {
+    const client = new FakeSupabaseAdminClient();
+    client.profileError = { message: "upstream timeout" };
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(
+      authorizeSupabaseAdminAccess(client as unknown as SupabaseAdminClient, "admin-token"),
+    ).resolves.toEqual({
+      message: "Service unavailable",
+      mode: "supabase",
+      ok: false,
+      statusCode: 503,
+    });
+
+    expect(consoleError).toHaveBeenCalledWith(
+      "Supabase admin profile lookup failed",
+      "upstream timeout",
+    );
+    consoleError.mockRestore();
+  });
+
+  it("keeps invalid tokens unauthorized but treats Auth infrastructure errors as unavailable", async () => {
+    const invalidTokenClient = new FakeSupabaseAdminClient();
+    invalidTokenClient.authResult = {
+      data: { user: null },
+      error: { message: "Invalid JWT", status: 401 },
+    };
+    const unavailableClient = new FakeSupabaseAdminClient();
+    unavailableClient.authResult = {
+      data: { user: null },
+      error: { message: "Auth upstream timed out", status: 504 },
+    };
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(
+      authorizeSupabaseAdminAccess(invalidTokenClient as unknown as SupabaseAdminClient, "expired-token"),
+    ).resolves.toMatchObject({ ok: false, statusCode: 401 });
+    await expect(
+      authorizeSupabaseAdminAccess(unavailableClient as unknown as SupabaseAdminClient, "valid-token"),
+    ).resolves.toMatchObject({ ok: false, statusCode: 503 });
+
+    consoleError.mockRestore();
   });
 
   it("requires an aal2 token for every admin role", async () => {

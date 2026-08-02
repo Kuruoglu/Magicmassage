@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AdminLink as Link } from "@/components/admin/AdminLink";
 import type { ReactNode } from "react";
 
 import type { AdminModule } from "@/admin/config";
@@ -42,6 +42,7 @@ export function AdminMobileHeader({
         aria-label={brandLabel ?? `${brandName} admin home`}
         className="admin-mobile-header-brand"
         href={brandHref}
+        prefetch={false}
       >
         <span aria-hidden="true" className="admin-mobile-header-brand-mark">
           {brandMark}

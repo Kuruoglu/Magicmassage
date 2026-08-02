@@ -1,4 +1,4 @@
-import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminShellClient } from "@/components/admin/admin-shell-client";
 import { loadAdminShellData } from "@/admin/data-source";
 import type { AdminRoleId } from "@/admin/config";
 import { resolveAdminShellSelection } from "@/admin/page-access";
@@ -35,6 +35,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         redirect("/admin/login");
       }
 
+      if (authorization.statusCode === 503) {
+        throw new Error("Admin authorization service is temporarily unavailable.");
+      }
+
       forbidden();
     }
 
@@ -53,7 +57,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   });
 
   return (
-    <AdminShell
+    <AdminShellClient
       activeSection={selection.activeSection}
       actorUserId={actorUserId}
       calendarAction={selection.calendarAction}

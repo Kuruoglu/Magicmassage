@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { cloneBusinessHoursSchedule } from "@/lib/business-hours";
 
-import type { FinanceRow } from "./config";
+import type { AdminSectionId, FinanceRow } from "./config";
 import type {
   AdminDomainRecords,
   AdminUserRecord,
@@ -288,6 +288,69 @@ describe("admin data source", () => {
       "Magic Massage Natali <hello@mail.magicmassage.bg>",
     );
     expect(data.financeRows).toBe(financeRows);
+  });
+
+  it("loads only the repositories required by each full-access section", async () => {
+    const fakeClient = { from: () => ({}) } as unknown as AdminSupabaseClient;
+    const loadSpies = {
+      listAdminUsers: vi.fn(async () => []),
+      listAppointments: vi.fn(async () => []),
+      listBlogPosts: vi.fn(async () => []),
+      listCalendarBlocks: vi.fn(async () => []),
+      listCertificates: vi.fn(async () => []),
+      listClients: vi.fn(async () => []),
+      listContactChannels: vi.fn(async () => []),
+      listMedia: vi.fn(async () => []),
+      listPrices: vi.fn(async () => []),
+      listServices: vi.fn(async () => []),
+      listSpecialists: vi.fn(async () => []),
+      listStripeSales: vi.fn(async () => []),
+      loadContactSettings: vi.fn(async () => undefined),
+      loadDomainRecords: vi.fn(async () => emptyRecords),
+      loadSettings: vi.fn(async () => undefined),
+    };
+    const repository = createRepositoryStub(loadSpies);
+    const cases: Array<[AdminSectionId, Array<keyof typeof loadSpies>]> = [
+      ["dashboard", ["listAppointments", "listCertificates", "listClients", "listStripeSales", "loadSettings"]],
+      ["clients", ["listAppointments", "listCertificates", "listClients", "loadSettings"]],
+      ["certificates", ["listCertificates", "listClients"]],
+      ["calendar", ["listAppointments", "listCalendarBlocks", "listClients", "listSpecialists", "loadSettings"]],
+      ["services", ["listPrices", "listServices"]],
+      ["price", ["listPrices", "listServices"]],
+      ["media", ["listMedia"]],
+      ["contacts", ["listContactChannels", "loadContactSettings"]],
+      ["blog", ["listBlogPosts", "listMedia", "loadSettings"]],
+      ["users", ["listAdminUsers"]],
+      ["settings", ["loadSettings"]],
+      ["finances", ["listStripeSales"]],
+    ];
+
+    for (const [activeSection, expectedLoaders] of cases) {
+      Object.values(loadSpies).forEach((spy) => spy.mockClear());
+
+      const data = await loadAdminShellData({
+        activeSection,
+        createClient: () => fakeClient,
+        createRepository: () => repository,
+        env: { NODE_ENV: "production" },
+        now: new Date("2026-07-09T12:00:00.000Z"),
+        role: "administrator",
+        specialistId: "specialist-natali",
+      });
+      const calledLoaders = Object.entries(loadSpies)
+        .filter(([, spy]) => spy.mock.calls.length > 0)
+        .map(([name]) => name)
+        .sort();
+
+      expect(calledLoaders).toEqual([...expectedLoaders].sort());
+      expect(data).toMatchObject({
+        currentSpecialistId: "specialist-natali",
+        financeRows: expect.any(Array),
+        records: expect.any(Object),
+        source: "supabase",
+      });
+      expect(loadSpies.loadDomainRecords).not.toHaveBeenCalled();
+    }
   });
 
   it("falls back to demo data when Supabase loading fails", async () => {
