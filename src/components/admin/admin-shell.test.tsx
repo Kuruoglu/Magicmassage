@@ -2699,7 +2699,7 @@ describe("AdminShell", () => {
   it("switches the calendar to a month view with selectable days", async () => {
     const user = userEvent.setup();
 
-    render(<AdminShell activeSection="calendar" role="owner" />);
+    render(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-06" />);
 
     await user.click(screen.getByRole("button", { name: "Месяц" }));
 
@@ -2740,7 +2740,7 @@ describe("AdminShell", () => {
   it("shows an empty state when a month day has no appointments", async () => {
     const user = userEvent.setup();
 
-    render(<AdminShell activeSection="calendar" role="owner" />);
+    render(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-06" />);
 
     await user.click(screen.getByRole("button", { name: "Месяц" }));
     await user.click(screen.getByRole("button", { name: /^7 июля.*0 записей/ }));
@@ -2794,7 +2794,7 @@ describe("AdminShell", () => {
   it("prefills appointment creation with the day selected in month view", async () => {
     const user = userEvent.setup();
 
-    render(<AdminShell activeSection="calendar" role="owner" />);
+    render(<AdminShell activeSection="calendar" role="owner" selectedCalendarDate="2026-07-06" />);
 
     await user.click(screen.getByRole("button", { name: "Месяц" }));
     await user.click(screen.getByRole("button", { name: /^7 июля.*0 записей/ }));

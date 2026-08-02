@@ -352,7 +352,7 @@ test("5. adds a post-visit comment without replacing the client note", async ({ 
 });
 
 test("6. keeps the full time grid visible for an empty calendar day", async ({ page }) => {
-  await page.goto("/admin?section=calendar", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=calendar&date=2026-07-06", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Месяц" }).click();
   await page.getByRole("button", { name: /^7 июля, 0 записей/ }).click();
 

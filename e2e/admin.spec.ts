@@ -106,7 +106,7 @@ test("finance workspace filters Stripe sales by tax period", async ({ page }) =>
 });
 
 test("calendar month view is selectable", async ({ page }) => {
-  await page.goto("/admin?section=calendar");
+  await page.goto("/admin?section=calendar&date=2026-07-06");
 
   await page.getByRole("button", { name: "Месяц" }).click();
 
@@ -599,7 +599,9 @@ test("client profile saves a note and exposes contact actions", async ({ page })
 });
 
 test("client profile shows the next calendar appointment", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
+  await page.clock.setFixedTime(new Date("2026-07-01T09:00:00.000Z"));
+  await page.getByRole("table").getByRole("link", { exact: true, name: "Olena K." }).click();
 
   const nextAppointment = page.getByLabel("Ближайшая запись клиента");
   await expect(nextAppointment.getByRole("heading", { name: "Ближайшая запись" })).toBeVisible();
@@ -613,7 +615,9 @@ test("client profile shows the next calendar appointment", async ({ page }) => {
 });
 
 test("client profile summarizes related work records", async ({ page }) => {
-  await page.goto("/admin?section=clients&client=client-359873334411", { waitUntil: "networkidle" });
+  await page.goto("/admin?section=clients", { waitUntil: "networkidle" });
+  await page.clock.setFixedTime(new Date("2026-07-01T09:00:00.000Z"));
+  await page.getByRole("table").getByRole("link", { exact: true, name: "Olena K." }).click();
 
   const profile = page.getByLabel("Рабочий профиль клиента");
   await expect(profile.getByRole("heading", { name: "Рабочий профиль" })).toBeVisible();
@@ -1312,6 +1316,7 @@ test("calendar availability uses saved booking settings", async ({ page }) => {
 
   await settingsDetails.getByRole("button", { name: "Закрыть" }).click();
   await expect(settingsDetails).toHaveCount(0);
+  await page.clock.setFixedTime(new Date("2026-07-01T09:00:00.000Z"));
   await page.getByRole("navigation", { name: "Admin sections" }).getByRole("link", { name: "Календарь", exact: true }).click();
   await page.getByRole("button", { name: "Месяц" }).click();
 
