@@ -70,7 +70,7 @@ export function ServicesPageView({ locale, content, mediaPlacements }: ServicesP
                         <p>{content.categoryLabels[service.category]}</p>
                         <h3>{service.title}</h3>
                         <span>{service.description}</span>
-                        <Link href={getServicePagePath(locale, service.slug)}>
+                        <Link href={getServicePagePath(locale, service.slug)} prefetch={false}>
                           {detailLinkLabels[locale]} <span aria-hidden="true">↗</span>
                         </Link>
                       </div>

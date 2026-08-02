@@ -173,6 +173,7 @@ export function HomePageView({
                   {publicBookingEnabled ? (
                     <Link
                       href={getPublicBookingPath(locale, service.slug)}
+                      prefetch={false}
                       aria-label={`${content.navigation.booking}: ${service.title}`}
                     >
                       {content.navigation.booking} <span aria-hidden="true">→</span>

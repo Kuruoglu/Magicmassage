@@ -186,6 +186,7 @@ export function SiteHeader({
                     <Link
                       key={service.slug}
                       href={getServicePagePath(locale, service.slug)}
+                      prefetch={false}
                       onClick={() => setOpenDropdown(null)}
                     >
                       {service.title}
@@ -222,6 +223,7 @@ export function SiteHeader({
                   key={item}
                   className={item === locale ? "is-active" : undefined}
                   href={localePathFor(item)}
+                  prefetch={false}
                   aria-current={item === locale ? "page" : undefined}
                   onClick={() => setOpenDropdown(null)}
                 >
@@ -298,6 +300,7 @@ export function SiteHeader({
               key={item}
               className={item === locale ? "is-active" : undefined}
               href={localePathFor(item)}
+              prefetch={false}
               aria-current={item === locale ? "page" : undefined}
               onClick={closeMenu}
             >
@@ -329,6 +332,7 @@ export function SiteHeader({
                     <Link
                       key={service.slug}
                       href={getServicePagePath(locale, service.slug)}
+                      prefetch={false}
                       onClick={closeMenu}
                     >
                       {service.title}
