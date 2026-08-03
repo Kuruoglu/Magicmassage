@@ -444,6 +444,7 @@ describe("public content data layer", () => {
         data: [{
           address: "ул. Места 50, Бургас",
           business_name: "Magic Massage Natali",
+          email: "hello@magicmassage.bg",
           id: "site",
           phone: "+359 89 677 8308",
           seo_area: "Burgas, Bulgaria",
@@ -458,6 +459,7 @@ describe("public content data layer", () => {
       data: {
         address: "ул. Места 50, Бургас",
         businessName: "Magic Massage Natali",
+        email: "hello@magicmassage.bg",
         phone: "+359 89 677 8308",
         seoArea: "Burgas, Bulgaria",
         updatedAt: "2026-07-18T10:00:00.000Z",
@@ -476,6 +478,7 @@ describe("public content data layer", () => {
         data: [{
           address: "Burgas",
           business_name: "Magic Massage Natali",
+          email: "hello@magicmassage.bg",
           id: "site",
           phone: "+359 89 677 8308",
           seo_area: "Burgas, Bulgaria",

@@ -173,6 +173,7 @@ describe("PublicPageShell", () => {
         businessDetails={{
           address: "ул. Места 50, Бургас",
           businessName: "Magic Massage Natali",
+          email: "hello@magicmassage.bg",
           phone: "+359 89 677 8308",
           seoArea: "Burgas, Bulgaria",
           updatedAt: "2026-07-18T10:00:00.000Z",
@@ -187,6 +188,10 @@ describe("PublicPageShell", () => {
     );
 
     expect(screen.getByText("ул. Места 50, Бургас")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "hello@magicmassage.bg" })).toHaveAttribute(
+      "href",
+      "mailto:hello@magicmassage.bg",
+    );
     expect(screen.getByRole("link", { name: "+359 89 677 8308" })).toHaveAttribute(
       "href",
       "tel:+359896778308",

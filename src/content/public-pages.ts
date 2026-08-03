@@ -52,6 +52,7 @@ export type PublicPagesContent = {
     address: string;
     phoneLabel: string;
     phone: string;
+    emailLabel: string;
     hoursLabel: string;
     hours: string;
     callAction: string;
@@ -392,6 +393,7 @@ const content: Record<Locale, PublicPagesContent> = {
       address: "ул. „Места“ 49, Бургас",
       phoneLabel: "Телефон",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Работно време",
       hours: "С предварително записване",
       callAction: "Обадете се",
@@ -430,6 +432,7 @@ const content: Record<Locale, PublicPagesContent> = {
       address: "ул. «Места» 49, Бургас",
       phoneLabel: "Телефон",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Время работы",
       hours: "По предварительной записи",
       callAction: "Позвонить",
@@ -468,6 +471,7 @@ const content: Record<Locale, PublicPagesContent> = {
       address: "вул. «Места» 49, Бургас",
       phoneLabel: "Телефон",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Години роботи",
       hours: "За попереднім записом",
       callAction: "Зателефонувати",
@@ -506,6 +510,7 @@ const content: Record<Locale, PublicPagesContent> = {
       address: "Mesta Street 49, Burgas",
       phoneLabel: "Phone",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Working hours",
       hours: "By appointment",
       callAction: "Call now",

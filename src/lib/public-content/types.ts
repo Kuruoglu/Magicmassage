@@ -142,6 +142,7 @@ export type PublicSiteFeatures = {
 export type PublicBusinessDetails = {
   address: string;
   businessName: string;
+  email: string;
   phone: string;
   seoArea: string;
   updatedAt: string;

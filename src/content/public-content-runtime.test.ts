@@ -14,6 +14,7 @@ const runtimeMock = vi.hoisted(() => ({
     data: {
       address: "ul. Mesta 49, Burgas",
       businessName: "Magic Massage Natali",
+      email: "info@magicmassage.bg",
       phone: "+359 89 677 8308",
       seoArea: "Burgas, Bulgaria",
       updatedAt: "2026-07-18T10:00:00.000Z",
@@ -63,6 +64,7 @@ describe("public content runtime failure policy", () => {
       data: {
         address: "ul. Mesta 49, Burgas",
         businessName: "Magic Massage Natali",
+        email: "info@magicmassage.bg",
         phone: "+359 89 677 8308",
         seoArea: "Burgas, Bulgaria",
         updatedAt: "2026-07-18T10:00:00.000Z",
@@ -134,6 +136,7 @@ describe("public content runtime failure policy", () => {
     await expect(getPublicShellRuntime("bg")).resolves.toMatchObject({
       businessDetails: {
         address: "ul. Mesta 49, Burgas",
+        email: "info@magicmassage.bg",
         phone: "+359 89 677 8308",
       },
     });

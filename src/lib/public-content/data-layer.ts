@@ -149,6 +149,16 @@ function asPhone(row: UnknownRow, key: string) {
   return value;
 }
 
+function asEmail(row: UnknownRow, key: string) {
+  const value = asString(row, key);
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    throw new PublicContentReadError("invalid_data");
+  }
+
+  return value;
+}
+
 function asIsoDate(row: UnknownRow, key: string) {
   const value = asString(row, key);
 
@@ -769,7 +779,7 @@ export function createPublicContentDataLayer(
       const rows = await readRows(
         client!
           .from("admin_public_business_details")
-          .select("id, business_name, phone, address, seo_area, working_schedule, updated_at")
+          .select("id, business_name, phone, address, seo_area, working_schedule, updated_at, email")
           .eq("id", "site")
           .limit(1),
       );
@@ -786,6 +796,7 @@ export function createPublicContentDataLayer(
       return ok({
         address: asString(row, "address"),
         businessName: asString(row, "business_name"),
+        email: asEmail(row, "email"),
         phone: asPhone(row, "phone"),
         seoArea: asString(row, "seo_area"),
         updatedAt: asIsoDate(row, "updated_at"),

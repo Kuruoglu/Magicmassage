@@ -52,6 +52,7 @@ export type HomeContent = {
     address: string;
     phoneLabel: string;
     phone: string;
+    emailLabel: string;
     hoursLabel: string;
     hours: string;
     hoursSchedule: Array<{
@@ -133,6 +134,7 @@ const content: Record<Locale, HomeContent> = {
       address: "ул. „Места“ 49, Бургас",
       phoneLabel: "Телефон",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Работно време",
       hours: "С предварително записване",
       hoursSchedule: [
@@ -217,6 +219,7 @@ const content: Record<Locale, HomeContent> = {
       address: "ул. «Места» 49, Бургас",
       phoneLabel: "Телефон",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Время работы",
       hours: "По предварительной записи",
       hoursSchedule: [
@@ -301,6 +304,7 @@ const content: Record<Locale, HomeContent> = {
       address: "вул. «Места» 49, Бургас",
       phoneLabel: "Телефон",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Години роботи",
       hours: "За попереднім записом",
       hoursSchedule: [
@@ -385,6 +389,7 @@ const content: Record<Locale, HomeContent> = {
       address: "Mesta Street 49, Burgas",
       phoneLabel: "Phone",
       phone: "+359 89 677 8308",
+      emailLabel: "Email",
       hoursLabel: "Working hours",
       hours: "By appointment",
       hoursSchedule: [

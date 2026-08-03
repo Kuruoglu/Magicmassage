@@ -401,6 +401,13 @@ const reservedContactChannelTypes: Partial<Record<string, ContactChannelType>> =
   "contact-phone": "Телефон",
   "contact-studio24": "Бронирование",
 };
+type ContactSettingsChannelField = "bookingUrl" | "email" | "mapUrl" | "phone";
+const contactChannelSettingsFields: Partial<Record<string, ContactSettingsChannelField>> = {
+  "contact-email": "email",
+  "contact-map": "mapUrl",
+  "contact-phone": "phone",
+  "contact-studio24": "bookingUrl",
+};
 const businessHoursDayLabels = [
   "Понедельник",
   "Вторник",
@@ -2164,6 +2171,7 @@ function ContactSettingsDialog({
     phoneDigitCount < 7 ||
     phoneDigitCount > 15
   );
+  const hasInvalidEmail = !isValidEmail(form.email.trim());
   const hasInvalidSchedule = !isBusinessHoursSchedule(form.workingSchedule);
 
   function updateForm<Field extends keyof ContactSettingsRecord>(field: Field, value: ContactSettingsRecord[Field]) {
@@ -2184,10 +2192,11 @@ function ContactSettingsDialog({
     if (
       !form.businessName.trim() ||
       hasInvalidPhone ||
+      hasInvalidEmail ||
       !form.address.trim() ||
       hasInvalidSchedule
     ) {
-      setError("Укажите название, корректный телефон, адрес и график хотя бы с одним рабочим днём.");
+      setError("Укажите название, корректные телефон и email, адрес и график хотя бы с одним рабочим днём.");
       return;
     }
 
@@ -2259,7 +2268,15 @@ function ContactSettingsDialog({
             </label>
             <label>
               Email
-              <input autoComplete="email" onChange={(event) => updateForm("email", event.target.value)} type="email" value={form.email} />
+              <input
+                aria-describedby={error && hasInvalidEmail ? "contact-settings-error" : undefined}
+                aria-invalid={error && hasInvalidEmail ? "true" : undefined}
+                autoComplete="email"
+                onChange={(event) => updateForm("email", event.target.value)}
+                required
+                type="email"
+                value={form.email}
+              />
             </label>
             <fieldset
               aria-describedby={error && hasInvalidSchedule ? "contact-settings-error" : undefined}
@@ -7764,7 +7781,7 @@ export function AdminShell({
   function saveContactChannelRecord(channel: ContactChannelRecord, originalId?: string) {
     const previousContactChannels = contactChannels;
     const previousContactSettings = contactSettings;
-    const updatesPrimaryPhone = channel.id === "contact-phone" && channel.type === "Телефон";
+    const linkedSettingsField = contactChannelSettingsFields[channel.id];
     setContactChannels((current) => {
       const originalKey = originalId ? normalizeSearch(originalId) : "";
       const nextKey = normalizeSearch(channel.id);
@@ -7782,15 +7799,15 @@ export function AdminShell({
 
       return current.map((currentChannel, index) => (index === existingIndex ? channel : currentChannel));
     });
-    if (updatesPrimaryPhone) {
-      setContactSettings((current) => ({ ...current, phone: channel.value }));
+    if (linkedSettingsField) {
+      setContactSettings((current) => ({ ...current, [linkedSettingsField]: channel.value }));
     }
     void persistAdminRecord({ record: channel, type: "contactChannel" }).then((result) => {
       if (!result.ok) {
         setContactChannels(previousContactChannels);
         setContactSettings(previousContactSettings);
-      } else if (updatesPrimaryPhone) {
-        showPersistenceStatus("Телефон сохранён. Публичный сайт обновлён.");
+      } else if (linkedSettingsField) {
+        showPersistenceStatus(`${channel.name}: значение сохранено. Публичный сайт обновлён.`);
       }
     });
   }

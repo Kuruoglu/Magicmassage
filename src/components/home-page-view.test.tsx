@@ -56,6 +56,7 @@ describe("HomePageView", () => {
     expect(jsonLd["@type"]).toBe("HealthAndBeautyBusiness");
     expect(jsonLd.name).toBe("Magic Massage Natali");
     expect(jsonLd.address.addressLocality).toBe("Burgas");
+    expect(jsonLd.email).toBe("info@magicmassage.bg");
     expect(jsonLd.telephone).toBe("+359 89 677 8308");
     expect(jsonLd.makesOffer).toHaveLength(19);
   });
@@ -67,6 +68,7 @@ describe("HomePageView", () => {
         businessDetails={{
           address: "ул. Места 50, Бургас",
           businessName: "Magic Massage Natali Burgas",
+          email: "hello@magicmassage.bg",
           phone: "+359 89 677 8308",
           seoArea: "Nessebar, Bulgaria",
           updatedAt: "2026-07-18T10:00:00.000Z",
@@ -79,6 +81,7 @@ describe("HomePageView", () => {
     const jsonLd = JSON.parse(container.querySelector('script[type="application/ld+json"]')?.textContent ?? "{}");
 
     expect(jsonLd.name).toBe("Magic Massage Natali Burgas");
+    expect(jsonLd.email).toBe("hello@magicmassage.bg");
     expect(jsonLd.telephone).toBe("+359 89 677 8308");
     expect(jsonLd.address.streetAddress).toBe("ул. Места 50, Бургас");
     expect(jsonLd.address.addressLocality).toBe("Nessebar");

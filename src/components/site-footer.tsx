@@ -3,6 +3,7 @@ import {
   messengerLinks,
   telegramUsername,
 } from "@/config/messengers";
+import { businessFacts } from "@/config/business";
 import type { HomeContent } from "@/content/home";
 import type { Locale } from "@/i18n/config";
 import { localizeBusinessHoursSchedule, toPhoneHref } from "@/lib/business-hours";
@@ -19,6 +20,7 @@ type SiteFooterProps = {
 export function SiteFooter({ businessDetails, content, locale }: SiteFooterProps) {
   const address = businessDetails?.address ?? content.contact.address;
   const phone = businessDetails?.phone ?? content.contact.phone;
+  const email = businessDetails?.email ?? businessFacts.email;
   const phoneHref = toPhoneHref(phone);
   const hoursSchedule = businessDetails
     ? localizeBusinessHoursSchedule(locale, businessDetails.workingSchedule)
@@ -40,6 +42,10 @@ export function SiteFooter({ businessDetails, content, locale }: SiteFooterProps
           <div>
             <dt>{content.contact.phoneLabel}</dt>
             <dd><a href={`tel:${phoneHref}`}>{phone}</a></dd>
+          </div>
+          <div>
+            <dt>{content.contact.emailLabel}</dt>
+            <dd><a href={`mailto:${email}`}>{email}</a></dd>
           </div>
           <div className="footer-hours">
             <dt>

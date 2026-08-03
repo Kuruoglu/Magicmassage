@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { businessMapUrls } from "@/config/business";
+import { businessFacts, businessMapUrls } from "@/config/business";
 import {
   externalMessengerLinkProps,
   messengerLinks,
@@ -32,6 +32,7 @@ export function ContactsPageView({ businessDetails, locale, content, mediaPlacem
   const logoMedia = resolvePublicMediaPlacement(mediaPlacements, "global.logo", locale);
   const address = businessDetails?.address ?? content.address;
   const phone = businessDetails?.phone ?? content.phone;
+  const email = businessDetails?.email ?? businessFacts.email;
   const phoneHref = toPhoneHref(phone);
   const mapUrls = businessDetails ? buildRuntimeMapUrls(address) : businessMapUrls;
   const mapDescription = businessDetails ? runtimeMapDescriptions[locale](address) : content.mapDescription;
@@ -77,6 +78,12 @@ export function ContactsPageView({ businessDetails, locale, content, mediaPlacem
                 <dt>{content.phoneLabel}</dt>
                 <dd>
                   <a href={`tel:${phoneHref}`}>{phone}</a>
+                </dd>
+              </div>
+              <div>
+                <dt>{content.emailLabel}</dt>
+                <dd>
+                  <a href={`mailto:${email}`}>{email}</a>
                 </dd>
               </div>
               <div>

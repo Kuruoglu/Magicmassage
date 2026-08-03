@@ -39,6 +39,7 @@ export function createLocalBusinessJsonLd(
     description: descriptions[locale],
     url: `${siteUrl}/${locale}`,
     image: `${siteUrl}/media/hero/hero-massage-session.jpg`,
+    email: businessDetails?.email ?? businessFacts.email,
     telephone: phone,
     priceRange: "$$",
     address: {

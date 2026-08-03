@@ -148,6 +148,10 @@ describe("localized public page views", () => {
     expect(screen.getByTestId("contacts-hero-logo-coin")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText(content.contacts.address)).toBeInTheDocument();
     expect(screen.getByText(content.contacts.hours)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "info@magicmassage.bg" })).toHaveAttribute(
+      "href",
+      "mailto:info@magicmassage.bg",
+    );
     expect(screen.getByRole("link", { name: content.contacts.callAction })).toHaveAttribute("href", "tel:+359896778308");
     expect(screen.getByRole("link", { name: /Telegram/ })).toHaveAttribute(
       "href",
@@ -174,6 +178,7 @@ describe("localized public page views", () => {
         businessDetails={{
           address: "ул. Места 50, Бургас",
           businessName: "Magic Massage Natali",
+          email: "hello@magicmassage.bg",
           phone: "+359 89 677 8308",
           seoArea: "Burgas, Bulgaria",
           updatedAt: "2026-07-18T10:00:00.000Z",
@@ -185,6 +190,10 @@ describe("localized public page views", () => {
     );
 
     expect(screen.getByText("ул. Места 50, Бургас")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "hello@magicmassage.bg" })).toHaveAttribute(
+      "href",
+      "mailto:hello@magicmassage.bg",
+    );
     expect(within(screen.getByRole("list", { name: content.contacts.hoursLabel })).getByText("09:30 - 17:30")).toBeVisible();
     expect(screen.queryByText(content.contacts.hours)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: content.contacts.callAction })).toHaveAttribute(

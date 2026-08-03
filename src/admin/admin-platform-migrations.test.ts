@@ -104,6 +104,16 @@ describe("admin platform completion migrations", () => {
     expect(sql).toContain("to service_role");
   });
 
+  it("publishes the admin-managed email through the narrow business-details view", () => {
+    const sql = readMigration("20260803120000_publish_business_email.sql");
+
+    expect(sql).toContain("create or replace view public.admin_public_business_details");
+    expect(sql).toContain("settings.email");
+    expect(sql).toContain("with (security_invoker = false, security_barrier = true)");
+    expect(sql).toContain("revoke all on public.admin_public_business_details from public");
+    expect(sql).toContain("grant select on public.admin_public_business_details to anon, authenticated, service_role");
+  });
+
   it("gates localized blog content at the database boundary and seeds every locale", () => {
     const sql = readMigration("20260718120000_blog_visibility_and_localized_articles.sql");
 

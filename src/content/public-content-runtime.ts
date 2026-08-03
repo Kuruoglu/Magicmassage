@@ -98,6 +98,7 @@ export async function getPublicShellRuntime(locale: Locale) {
     : {
         address: fallbackContact.address,
         businessName: businessFacts.name,
+        email: businessFacts.email,
         phone: fallbackContact.phone,
         seoArea: `${businessFacts.address.locality}, ${businessFacts.address.countryCode}`,
         updatedAt: "2026-07-18T00:00:00.000Z",

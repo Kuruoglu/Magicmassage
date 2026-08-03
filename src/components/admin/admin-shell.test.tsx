@@ -3181,6 +3181,51 @@ describe("AdminShell", () => {
     expect(within(details).getByText("Активен")).toBeInTheDocument();
   });
 
+  it("keeps contact settings synchronized after editing the public email channel", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="contacts" role="owner" />);
+
+    const emailLink = within(screen.getByRole("table")).getByRole("link", { name: "Email" });
+    emailLink.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    await user.click(emailLink);
+
+    const details = screen.getByRole("dialog", { name: "Детали контакта" });
+    await user.click(within(details).getByRole("button", { name: "Редактировать" }));
+
+    const channelDialog = screen.getByRole("dialog", { name: "Редактировать контакт" });
+    await user.clear(within(channelDialog).getByLabelText("Значение"));
+    await user.type(within(channelDialog).getByLabelText("Значение"), "hello@magicmassage.bg");
+    await user.click(within(channelDialog).getByRole("button", { name: "Сохранить изменения" }));
+
+    expect(within(details).getByText("hello@magicmassage.bg")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+    const settingsDialog = screen.getByRole("dialog", { name: "Контактные настройки" });
+    expect(within(settingsDialog).getByLabelText("Email")).toHaveValue("hello@magicmassage.bg");
+    await user.click(within(settingsDialog).getByRole("button", { name: "Сохранить контакты" }));
+
+    expect(within(screen.getByRole("table")).getByText("hello@magicmassage.bg")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).queryByText("info@magicmassage.bg")).not.toBeInTheDocument();
+  });
+
+  it("keeps contact settings open and identifies an invalid public email", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminShell activeSection="contacts" role="owner" />);
+
+    await user.click(screen.getByRole("button", { name: "Сохранить" }));
+    const dialog = screen.getByRole("dialog", { name: "Контактные настройки" });
+    const email = within(dialog).getByLabelText("Email");
+    await user.clear(email);
+    await user.type(email, "invalid-email");
+    await user.click(within(dialog).getByRole("button", { name: "Сохранить контакты" }));
+
+    expect(dialog).toBeInTheDocument();
+    expect(email).toHaveAttribute("aria-invalid", "true");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("корректные телефон и email");
+  });
+
   it("opens the full-page blog editor and edits an existing article", async () => {
     const user = userEvent.setup();
 
