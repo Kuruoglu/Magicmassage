@@ -11,6 +11,9 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "limits": {
+    "cpu_ms": 2000
+  },
   "vars": {
     "NEXT_PUBLIC_SITE_URL": "https://magicmassagenatali.bg",
     "NEXT_PUBLIC_SUPABASE_URL": "https://eolpkhovcgezzvmanhlh.supabase.co",
